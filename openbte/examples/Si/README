@@ -1,0 +1,13 @@
+#Create geometry
+openbte -g porous/aligned
+
+#Create material
+openbte -m Si-300K
+
+#Solve
+openbte -s bte
+
+#Plot thermal flux
+openbte -p map/flux_magnitude
+
+
