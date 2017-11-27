@@ -11,17 +11,7 @@
 
 OpenBTE's documentation
 ===================================
-OpenBTE solves the phonon Boltzmann transport equation in its mean-free-path formulation. Below, we provide info for downloading and getting started. 
-
----------------------------------------
-Download
----------------------------------------
-
-OpenBTE can be download by simply typing in your shell
-
-.. code-block:: shell
-
-   pip install openbte 
+OpenBTE solves the phonon Boltzmann transport equation in its mean-free-path formulation.  
 
 ---------------------------------------
 Getting started
@@ -35,7 +25,7 @@ The first step for setting up a OpenBTE simulation is creating a geometry. This 
 
 where ``porous/aligned`` is the geometry model for a two-dimensional porous material. In this case, the shape of the pore is circular, the porosity is 0.25 and the periodicity is 10 nm in both Cartesian directions. Essentially, we simulate only one pore with periodic boundary conditions. The keywords and relative options for other geometry models are listed in the Reference. Once this command is run, the file ``geometry.hdf5`` is created in the current directory. 
 
-To plot the geometry, type che command
+To plot the geometry, type the command
 
 .. code-block:: shell
 
@@ -97,7 +87,7 @@ To pseudotemperature is plotted with
    :width: 60 %
    :align: center
 
-The MFP distribution in the porous materials can be plotted with
+The MFP distribution in the porous material can be plotted with
 
 .. code-block:: shell
 
@@ -119,30 +109,27 @@ The suppression function is plotted with
    :align: center
 
 
-The directional suppression function in the diffusive regime is plotte with
+The directional suppression function is plotted with
 
 .. code-block:: shell
 
-   openbte -p directional_suppression_function -m 0
-
-.. image:: images/GettingStarted_8.png
-   :width: 60 %
-   :align: center
-
-.. _ShengBTE: http://www.shengbte.com
-
-while for the ballistic regime, we have
-
-.. code-block:: shell
-
-   openbte -p directional_suppression_function -m -1
+   openbte -p directional_suppression_function 
 
 .. image:: images/GettingStarted_6.png
    :width: 60 %
    :align: center
 
+.. _ShengBTE: http://www.shengbte.com
+
+
+---------------------------------------
+References
+---------------------------------------
+
+If you use the code, it would be nice if you cite G. Romano and J. C. Grossman, J. Heat Transfer 137(7), 071302 (link_) 
 
 .. _ShengBTE: http://www.shengbte.com
+.. _link: https://heattransfer.asmedigitalcollection.asme.org/article.aspx?articleid=2119334
 
 
 
