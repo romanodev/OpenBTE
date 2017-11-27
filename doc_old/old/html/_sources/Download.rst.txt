@@ -1,0 +1,8 @@
+Download
+============
+
+The quickest way to download OpenBTE is simply
+
+.. code-block:: shell
+
+   pip install openbte 

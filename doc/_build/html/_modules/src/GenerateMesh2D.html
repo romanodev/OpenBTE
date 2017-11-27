@@ -1,0 +1,532 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>src.GenerateMesh2D &#8212; OpenBTE 0.9 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.9',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for src.GenerateMesh2D</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">xml.etree.ElementTree</span> <span class="k">as</span> <span class="nn">ET</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span><span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">from</span> <span class="nn">matplotlib.pylab</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">import</span> <span class="nn">pyclipper</span>
+<span class="kn">from</span> <span class="nn">pyclipper</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+
+<div class="viewcode-block" id="line_exists"><a class="viewcode-back" href="../../src.html#src.GenerateMesh2D.line_exists">[docs]</a><span class="k">def</span> <span class="nf">line_exists</span><span class="p">(</span><span class="n">l</span><span class="p">,</span><span class="n">lines</span><span class="p">):</span>
+
+ <span class="k">for</span> <span class="n">n</span><span class="p">,</span><span class="n">line</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span> <span class="p">:</span>
+   <span class="k">if</span> <span class="p">(</span><span class="n">line</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">l</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="n">line</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">l</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="ow">or</span> <span class="p">(</span><span class="n">line</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">l</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">line</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">l</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="p">:</span>
+     <span class="k">return</span> <span class="n">line</span>
+ <span class="k">return</span> <span class="mi">0</span></div>
+
+<div class="viewcode-block" id="point_exists"><a class="viewcode-back" href="../../src.html#src.GenerateMesh2D.point_exists">[docs]</a><span class="k">def</span> <span class="nf">point_exists</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="n">points</span><span class="p">):</span>
+
+ <span class="k">for</span> <span class="n">n</span><span class="p">,</span><span class="n">point</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">points</span><span class="p">)</span> <span class="p">:</span>
+   <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">point</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">4</span> <span class="ow">and</span> <span class="nb">abs</span><span class="p">(</span><span class="n">point</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="o">&lt;</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">4</span> <span class="p">:</span>
+     <span class="k">return</span> <span class="n">n</span>
+
+ <span class="k">return</span> <span class="o">-</span><span class="mi">1</span></div>
+
+
+<div class="viewcode-block" id="get_line_from_points"><a class="viewcode-back" href="../../src.html#src.GenerateMesh2D.get_line_from_points">[docs]</a><span class="k">def</span> <span class="nf">get_line_from_points</span><span class="p">(</span><span class="n">p1</span><span class="p">,</span><span class="n">p2</span><span class="p">,</span><span class="n">all_lines</span><span class="p">,</span><span class="n">points</span><span class="p">):</span>
+
+ <span class="c1">#Get indexes</span>
+ <span class="k">for</span> <span class="n">t</span><span class="p">,</span><span class="n">p</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">points</span><span class="p">):</span>
+  <span class="k">if</span> <span class="n">p</span> <span class="o">==</span> <span class="n">p1</span> <span class="p">:</span>
+   <span class="n">t1</span> <span class="o">=</span> <span class="n">t</span> 
+  <span class="k">if</span> <span class="n">p</span> <span class="o">==</span> <span class="n">p2</span> <span class="p">:</span>
+   <span class="n">t2</span> <span class="o">=</span> <span class="n">t</span> 
+
+
+ <span class="k">for</span> <span class="n">t</span><span class="p">,</span><span class="n">l</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">all_lines</span><span class="p">):</span>
+  <span class="k">if</span> <span class="p">(</span><span class="n">t1</span> <span class="o">==</span> <span class="n">l</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">t2</span> <span class="o">==</span> <span class="n">l</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="p">:</span>  
+   <span class="n">line</span> <span class="o">=</span> <span class="p">[</span><span class="n">l</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">t1</span><span class="p">,</span><span class="n">t2</span><span class="p">]</span>
+   <span class="k">break</span>
+  <span class="k">if</span> <span class="p">(</span><span class="n">t2</span> <span class="o">==</span> <span class="n">l</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">t1</span> <span class="o">==</span> <span class="n">l</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>  <span class="p">:</span>
+   <span class="n">line</span> <span class="o">=</span> <span class="p">[</span><span class="n">l</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">t2</span><span class="p">,</span><span class="n">t1</span><span class="p">]</span>
+   <span class="k">break</span>
+
+
+ <span class="k">return</span> <span class="n">line</span></div>
+
+
+<div class="viewcode-block" id="rev_rotate"><a class="viewcode-back" href="../../src.html#src.GenerateMesh2D.rev_rotate">[docs]</a><span class="k">def</span> <span class="nf">rev_rotate</span><span class="p">(</span><span class="n">l</span><span class="p">,</span><span class="n">n</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">l</span><span class="p">[</span><span class="o">-</span><span class="n">n</span><span class="p">:]</span> <span class="o">+</span> <span class="n">l</span><span class="p">[:</span><span class="o">-</span><span class="n">n</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="rotate"><a class="viewcode-back" href="../../src.html#src.GenerateMesh2D.rotate">[docs]</a><span class="k">def</span> <span class="nf">rotate</span><span class="p">(</span><span class="n">l</span><span class="p">,</span><span class="n">n</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">l</span><span class="p">[</span><span class="n">n</span><span class="p">:]</span> <span class="o">+</span> <span class="n">l</span><span class="p">[:</span><span class="n">n</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="GetSampleList"><a class="viewcode-back" href="../../src.html#src.GenerateMesh2D.GetSampleList">[docs]</a><span class="k">def</span> <span class="nf">GetSampleList</span><span class="p">(</span><span class="n">output_dir</span><span class="p">)</span> <span class="p">:</span>
+   <span class="n">tmp</span> <span class="o">=</span>  <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">output_dir</span> <span class="o">+</span> <span class="s1">&#39;/*.json&#39;</span><span class="p">)</span>
+   <span class="n">index</span> <span class="o">=</span> <span class="mi">0</span>
+   <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tmp</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">tmp</span><span class="p">))</span> <span class="p">:</span>
+     <span class="n">tmp2</span> <span class="o">=</span> <span class="n">tmp</span><span class="p">[</span><span class="n">n</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span>
+     <span class="n">tmp3</span> <span class="o">=</span> <span class="n">tmp2</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)</span>
+     <span class="n">tmp4</span> <span class="o">=</span> <span class="n">tmp3</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)</span> 
+     <span class="n">index</span> <span class="o">=</span> <span class="nb">max</span><span class="p">([</span><span class="nb">int</span><span class="p">(</span><span class="n">tmp4</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span><span class="n">index</span><span class="p">])</span>
+    <span class="n">index</span> <span class="o">+=</span><span class="mi">1</span>
+
+
+   <span class="k">return</span> <span class="n">index</span></div>
+
+ 
+
+<div class="viewcode-block" id="plot_region"><a class="viewcode-back" href="../../src.html#src.GenerateMesh2D.plot_region">[docs]</a><span class="k">def</span> <span class="nf">plot_region</span><span class="p">(</span><span class="n">region</span><span class="p">):</span>
+
+   <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">region</span><span class="p">))</span> <span class="p">:</span>
+    <span class="n">n1</span> <span class="o">=</span> <span class="n">n</span>
+    <span class="n">n2</span> <span class="o">=</span> <span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">%</span><span class="nb">len</span><span class="p">(</span><span class="n">region</span><span class="p">)</span>
+    <span class="n">plot</span><span class="p">([</span><span class="n">region</span><span class="p">[</span><span class="n">n1</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span><span class="n">region</span><span class="p">[</span><span class="n">n2</span><span class="p">][</span><span class="mi">0</span><span class="p">]],[</span><span class="n">region</span><span class="p">[</span><span class="n">n1</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span><span class="n">region</span><span class="p">[</span><span class="n">n2</span><span class="p">][</span><span class="mi">1</span><span class="p">]],</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">)</span>
+   <span class="n">xlim</span><span class="p">([</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">])</span>
+   <span class="n">ylim</span><span class="p">([</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">])</span></div>
+
+<div class="viewcode-block" id="FindPeriodic"><a class="viewcode-back" href="../../src.html#src.GenerateMesh2D.FindPeriodic">[docs]</a><span class="k">def</span> <span class="nf">FindPeriodic</span><span class="p">(</span><span class="n">control</span><span class="p">,</span><span class="n">lines</span><span class="p">,</span><span class="n">points</span><span class="p">):</span>
+ 
+ 
+ <span class="n">p1c</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">control</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+ <span class="n">p2c</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">control</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span>
+ <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">)):</span>
+   <span class="n">p1</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">lines</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">1</span><span class="p">]]</span>
+   <span class="n">p2</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">lines</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">2</span><span class="p">]]</span>
+   <span class="c1">#Positive  </span>
+   <span class="n">pd1</span> <span class="o">=</span> <span class="p">[</span><span class="n">p1c</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-</span><span class="n">p1</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">p1c</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">p1</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>  
+   <span class="n">pd2</span> <span class="o">=</span> <span class="p">[</span><span class="n">p2c</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-</span><span class="n">p2</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">p2c</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">p2</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>  
+   <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">pd1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">pd2</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">6</span> <span class="ow">and</span> <span class="nb">abs</span><span class="p">(</span><span class="n">pd1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">pd2</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">&lt;</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">6</span> <span class="p">:</span>
+     <span class="k">return</span> <span class="n">lines</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+   
+   <span class="c1">#Negative  </span>
+   <span class="n">pd1</span> <span class="o">=</span> <span class="p">[</span><span class="n">p1c</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-</span><span class="n">p2</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">p1c</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">p2</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>   
+   <span class="n">pd2</span> <span class="o">=</span> <span class="p">[</span><span class="n">p2c</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-</span><span class="n">p1</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">p2c</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">p1</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>   
+   <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">pd1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">pd2</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">&lt;</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">6</span> <span class="ow">and</span> <span class="nb">abs</span><span class="p">(</span><span class="n">pd1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">pd2</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="o">&lt;</span><span class="mi">1</span><span class="n">e</span><span class="o">-</span><span class="mi">6</span> <span class="p">:</span>
+     <span class="k">return</span> <span class="o">-</span><span class="n">lines</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+
+
+ <span class="c1">#If no periodic line has been found</span>
+ <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;NO PERIODIC LINES HAS BEEN FOUND&quot;</span><span class="p">)</span>
+ <span class="n">quit</span><span class="p">()</span></div>
+ 
+<div class="viewcode-block" id="LineOrdering"><a class="viewcode-back" href="../../src.html#src.GenerateMesh2D.LineOrdering">[docs]</a><span class="k">def</span> <span class="nf">LineOrdering</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span> <span class="p">:</span>
+
+  <span class="n">new_lines</span> <span class="o">=</span> <span class="p">[]</span>
+  <span class="n">new_lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+  <span class="n">check</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">))</span>
+  <span class="n">check</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+  <span class="n">n_check</span> <span class="o">=</span> <span class="mi">0</span> 
+  <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_lines</span><span class="p">)</span> <span class="p">:</span>
+   <span class="n">n_check</span> <span class="o">+=</span><span class="mi">1</span> 
+   <span class="n">line</span> <span class="o">=</span> <span class="n">new_lines</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span> <span class="n">new_lines</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+   <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">)):</span>
+    <span class="k">if</span> <span class="n">check</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+     <span class="k">if</span> <span class="n">lines</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">line</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>  <span class="p">:</span>
+      <span class="n">check</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+      <span class="n">new_lines</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">lines</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span><span class="n">lines</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span><span class="n">lines</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="mi">2</span><span class="p">]])</span>
+      <span class="k">break</span><span class="p">;</span>
+     <span class="k">if</span> <span class="n">lines</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">line</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>  <span class="p">:</span>
+      <span class="n">check</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+      <span class="n">new_lines</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="o">-</span><span class="n">lines</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span><span class="n">lines</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="mi">2</span><span class="p">],</span><span class="n">lines</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="mi">1</span><span class="p">]])</span>
+      <span class="k">break</span><span class="p">;</span>
+   <span class="k">if</span> <span class="n">n_check</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span> <span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;CANNOT FIND A ORDERED LOOP&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span>
+    <span class="n">quit</span><span class="p">()</span>
+  <span class="k">return</span> <span class="n">new_lines</span></div>
+
+
+
+<div class="viewcode-block" id="PolygonArea"><a class="viewcode-back" href="../../src.html#src.GenerateMesh2D.PolygonArea">[docs]</a><span class="k">def</span> <span class="nf">PolygonArea</span><span class="p">(</span><span class="n">corners</span><span class="p">):</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">corners</span><span class="p">)</span> <span class="c1"># of corners</span>
+    <span class="n">area</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+        <span class="n">j</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="n">n</span>
+        <span class="n">area</span> <span class="o">+=</span> <span class="n">corners</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">corners</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">area</span> <span class="o">-=</span> <span class="n">corners</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">corners</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">area</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">area</span><span class="p">)</span> <span class="o">/</span> <span class="mf">2.0</span>
+    <span class="k">return</span> <span class="n">area</span></div>
+
+<div class="viewcode-block" id="mesh"><a class="viewcode-back" href="../../src.html#src.GenerateMesh2D.mesh">[docs]</a><span class="k">def</span> <span class="nf">mesh</span><span class="p">(</span><span class="n">polygons</span><span class="p">,</span><span class="n">frame</span><span class="p">,</span><span class="n">argv</span><span class="p">):</span>
+
+  <span class="n">mesh_ext</span> <span class="o">=</span> <span class="n">argv</span><span class="p">[</span><span class="s1">&#39;step&#39;</span><span class="p">]</span>
+  <span class="n">include_pores</span> <span class="o">=</span> <span class="n">argv</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;include_pores&#39;</span><span class="p">,</span><span class="kc">False</span><span class="p">)</span>
+  <span class="n">store</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;mesh.geo&#39;</span><span class="p">,</span> <span class="s1">&#39;w+&#39;</span><span class="p">)</span>
+  <span class="c1">#CREATE BULK SURFACE------------------------------------</span>
+  <span class="n">c</span> <span class="o">=</span> <span class="n">pyclipper</span><span class="o">.</span><span class="n">Pyclipper</span><span class="p">()</span>
+  <span class="n">c</span><span class="o">.</span><span class="n">AddPath</span><span class="p">(</span><span class="n">scale_to_clipper</span><span class="p">(</span><span class="n">frame</span><span class="p">),</span> <span class="n">pyclipper</span><span class="o">.</span><span class="n">PT_SUBJECT</span><span class="p">,</span><span class="kc">True</span><span class="p">)</span> 
+  <span class="n">c</span><span class="o">.</span><span class="n">AddPaths</span><span class="p">(</span><span class="n">scale_to_clipper</span><span class="p">(</span><span class="n">polygons</span><span class="p">),</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">PT_CLIP</span><span class="p">,</span><span class="kc">True</span><span class="p">)</span> 
+  <span class="n">solution</span> <span class="o">=</span> <span class="n">scale_from_clipper</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">Execute</span><span class="p">(</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">CT_DIFFERENCE</span><span class="p">,</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">PFT_EVENODD</span><span class="p">,</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">PFT_EVENODD</span><span class="p">))</span>
+
+  <span class="n">points</span> <span class="o">=</span> <span class="p">[]</span>
+  <span class="n">lines</span> <span class="o">=</span> <span class="p">[]</span>
+  <span class="n">loop</span> <span class="o">=</span> <span class="mi">0</span>
+  <span class="n">ss</span> <span class="o">=</span> <span class="mi">0</span>
+  <span class="n">ll</span> <span class="o">=</span> <span class="mi">1</span>
+  <span class="n">line_contour</span> <span class="o">=</span> <span class="p">[]</span>
+  <span class="n">pore_regions</span> <span class="o">=</span> <span class="p">[]</span>
+  <span class="c1">#check_points = []</span>
+  <span class="n">p_start</span> <span class="o">=</span> <span class="mi">0</span>
+  <span class="k">for</span> <span class="n">g</span><span class="p">,</span><span class="n">region</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">solution</span><span class="p">)</span> <span class="p">:</span>
+   <span class="c1">#p_start = len(points)</span>
+
+   <span class="c1">#Write Points</span>
+   
+   <span class="n">region_points</span> <span class="o">=</span> <span class="p">[]</span>
+   <span class="k">for</span> <span class="n">p</span><span class="p">,</span><span class="n">point</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">region</span><span class="p">)</span> <span class="p">:</span>
+
+    <span class="n">new_point</span> <span class="o">=</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">point</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="mi">4</span><span class="p">),</span><span class="nb">round</span><span class="p">(</span><span class="n">point</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span><span class="mi">4</span><span class="p">)]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">new_point</span> <span class="ow">in</span> <span class="n">points</span><span class="p">:</span>
+     <span class="n">points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_point</span><span class="p">)</span>
+     <span class="c1">#region_points.append(new_point)</span>
+     <span class="n">region_points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+     <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span> <span class="s1">&#39;Point(&#39;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span><span class="s1">&#39;) = {&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">new_point</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span><span class="s1">&#39;,&#39;</span><span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">new_point</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="o">+</span><span class="s1">&#39;,0,&#39;</span><span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">mesh_ext</span><span class="p">)</span> <span class="o">+</span><span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+     <span class="n">region_points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">points</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">new_point</span><span class="p">))</span>
+
+   <span class="c1">#Write lines   </span>
+   <span class="n">local_line_list</span> <span class="o">=</span> <span class="p">[]</span>
+   <span class="k">for</span> <span class="n">p</span><span class="p">,</span><span class="n">point</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">region_points</span><span class="p">)</span> <span class="p">:</span>
+    <span class="c1">#---</span>
+    <span class="c1">#-------</span>
+    <span class="n">p1</span> <span class="o">=</span> <span class="n">region_points</span><span class="p">[</span><span class="n">p</span><span class="p">]</span>
+    <span class="n">p2</span> <span class="o">=</span> <span class="n">region_points</span><span class="p">[(</span><span class="n">p</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">%</span><span class="nb">len</span><span class="p">(</span><span class="n">region_points</span><span class="p">)]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">p1</span> <span class="o">==</span> <span class="n">p2</span><span class="p">:</span>
+     <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">ll</span><span class="p">,</span><span class="n">p1</span><span class="p">,</span><span class="n">p2</span><span class="p">])</span>
+     <span class="n">local_line_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ll</span><span class="p">)</span>
+     <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span> <span class="s1">&#39;Line(&#39;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="n">ll</span><span class="p">)</span> <span class="o">+</span><span class="s1">&#39;) = {&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">p1</span><span class="p">)</span> <span class="o">+</span><span class="s1">&#39;,&#39;</span><span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">p2</span><span class="p">)</span><span class="o">+</span><span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+     <span class="n">line_contour</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">ll</span><span class="p">,</span><span class="n">p1</span><span class="p">,</span><span class="n">p2</span><span class="p">])</span>
+     <span class="n">ll</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">else</span><span class="p">:</span>
+     <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;here&#39;</span><span class="p">)</span>
+
+   <span class="c1">#create the loop</span>
+   <span class="n">strc</span> <span class="o">=</span> <span class="s1">&#39;Line Loop(&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">loop</span><span class="p">)</span><span class="o">+</span> <span class="s1">&#39;) = {&#39;</span>
+   <span class="c1">#for p,point in enumerate(region_points) :</span>
+   <span class="k">for</span> <span class="n">local_line</span> <span class="ow">in</span> <span class="n">local_line_list</span><span class="p">:</span> 
+    <span class="c1">#strc +=str(p_start+p+1)</span>
+    <span class="n">strc</span> <span class="o">+=</span><span class="nb">str</span><span class="p">(</span><span class="n">local_line</span><span class="p">)</span>
+    <span class="c1">#if p == len(region_points)-1:</span>
+    <span class="k">if</span> <span class="n">local_line</span> <span class="o">==</span> <span class="n">local_line_list</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+     <span class="n">strc</span> <span class="o">+=</span> <span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span>
+    <span class="k">else</span> <span class="p">:</span>
+     <span class="n">strc</span> <span class="o">+=</span> <span class="s1">&#39;,&#39;</span>
+
+   <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">strc</span><span class="p">)</span>
+   <span class="n">loop</span> <span class="o">+=</span><span class="mi">1</span>
+   <span class="c1">#p_start += len(region)</span>
+   
+
+  <span class="c1">#Create Bulk Surface</span>
+  <span class="c1">#Get corners----------------------------------------------------------</span>
+  <span class="n">corner_list</span> <span class="o">=</span> <span class="p">[]</span> 
+  <span class="k">for</span> <span class="n">r1</span><span class="p">,</span><span class="n">region1</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">solution</span><span class="p">)</span> <span class="p">:</span>
+   <span class="n">intersect</span> <span class="o">=</span> <span class="kc">False</span>
+   <span class="k">for</span> <span class="n">r2</span><span class="p">,</span><span class="n">region2</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">solution</span><span class="p">)</span> <span class="p">:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">r2</span> <span class="o">==</span> <span class="n">r1</span><span class="p">:</span>
+     <span class="n">c</span> <span class="o">=</span> <span class="n">pyclipper</span><span class="o">.</span><span class="n">Pyclipper</span><span class="p">()</span>
+     <span class="n">c</span><span class="o">.</span><span class="n">AddPath</span><span class="p">(</span><span class="n">scale_to_clipper</span><span class="p">(</span><span class="n">region1</span><span class="p">),</span> <span class="n">pyclipper</span><span class="o">.</span><span class="n">PT_SUBJECT</span><span class="p">,</span><span class="kc">True</span><span class="p">)</span> 
+     <span class="n">c</span><span class="o">.</span><span class="n">AddPaths</span><span class="p">(</span><span class="n">scale_to_clipper</span><span class="p">([</span><span class="n">region2</span><span class="p">]),</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">PT_CLIP</span><span class="p">,</span><span class="kc">True</span><span class="p">)</span> 
+     <span class="n">test</span> <span class="o">=</span> <span class="n">scale_from_clipper</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">Execute</span><span class="p">(</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">CT_INTERSECTION</span><span class="p">,</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">PFT_EVENODD</span><span class="p">,</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">PFT_EVENODD</span><span class="p">))</span>
+     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">test</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="p">:</span>
+      <span class="n">intersect</span> <span class="o">=</span> <span class="kc">True</span>
+      <span class="k">break</span>
+   <span class="k">if</span> <span class="n">intersect</span> <span class="o">==</span> <span class="kc">False</span><span class="p">:</span>
+    <span class="n">corner_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r1</span><span class="p">)</span>
+  
+  <span class="c1">#Get frame --------------------------------------------------------- </span>
+  <span class="k">for</span> <span class="n">r1</span><span class="p">,</span><span class="n">region1</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">solution</span><span class="p">)</span> <span class="p">:</span>
+   <span class="n">is_frame</span> <span class="o">=</span> <span class="kc">True</span>
+   <span class="k">for</span> <span class="n">r2</span><span class="p">,</span><span class="n">region2</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">solution</span><span class="p">)</span> <span class="p">:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">r2</span> <span class="o">==</span> <span class="n">r1</span> <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="n">r2</span> <span class="ow">in</span> <span class="n">corner_list</span><span class="p">):</span>
+     <span class="n">c</span> <span class="o">=</span> <span class="n">pyclipper</span><span class="o">.</span><span class="n">Pyclipper</span><span class="p">()</span>
+     <span class="n">c</span><span class="o">.</span><span class="n">AddPath</span><span class="p">(</span><span class="n">scale_to_clipper</span><span class="p">(</span><span class="n">region1</span><span class="p">),</span> <span class="n">pyclipper</span><span class="o">.</span><span class="n">PT_SUBJECT</span><span class="p">,</span><span class="kc">True</span><span class="p">)</span> 
+     <span class="n">c</span><span class="o">.</span><span class="n">AddPaths</span><span class="p">(</span><span class="n">scale_to_clipper</span><span class="p">([</span><span class="n">region2</span><span class="p">]),</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">PT_CLIP</span><span class="p">,</span><span class="kc">True</span><span class="p">)</span> 
+     <span class="n">test</span> <span class="o">=</span> <span class="n">scale_from_clipper</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">Execute</span><span class="p">(</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">CT_INTERSECTION</span><span class="p">,</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">PFT_EVENODD</span><span class="p">,</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">PFT_EVENODD</span><span class="p">))</span>
+     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">test</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">:</span>
+      <span class="n">is_frame</span> <span class="o">=</span> <span class="kc">False</span>
+      <span class="k">break</span>
+   <span class="k">if</span> <span class="n">is_frame</span><span class="p">:</span>
+    <span class="n">frame_index</span> <span class="o">=</span> <span class="n">r1</span>
+    <span class="k">break</span>
+  <span class="c1">#-------------------------------------</span>
+
+  <span class="c1">#----------------------</span>
+  <span class="n">no_corner</span><span class="o">=</span><span class="kc">False</span>
+  <span class="k">for</span> <span class="n">r</span><span class="p">,</span><span class="n">region</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">solution</span><span class="p">)</span> <span class="p">:</span>
+   <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">corner_list</span><span class="p">):</span>
+    <span class="n">no_corner</span><span class="o">=</span><span class="kc">True</span>
+    <span class="k">break</span> 
+
+  <span class="k">if</span> <span class="n">no_corner</span><span class="p">:</span>
+   <span class="n">nostart</span> <span class="o">=</span> <span class="kc">False</span>
+   <span class="n">separate_list</span> <span class="o">=</span> <span class="p">[]</span>
+   <span class="n">strc</span> <span class="o">=</span> <span class="s1">&#39;Plane Surface(&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">ss</span><span class="p">)</span><span class="o">+</span> <span class="s1">&#39;) = {&#39;</span> 
+   <span class="k">for</span> <span class="n">r</span><span class="p">,</span><span class="n">region</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">solution</span><span class="p">)</span> <span class="p">:</span>
+  
+    <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">corner_list</span><span class="p">):</span>
+     <span class="k">if</span> <span class="n">nostart</span> <span class="p">:</span> <span class="n">strc</span> <span class="o">+=</span><span class="s1">&#39;,&#39;</span>
+     <span class="n">strc</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+     <span class="n">nostart</span> <span class="o">=</span> <span class="kc">True</span>
+  
+   <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">strc</span> <span class="o">+</span> <span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+   <span class="n">ss</span> <span class="o">+=</span> <span class="mi">1</span>
+
+  <span class="c1">#Add piece of corners (if any)---------------------------------------</span>
+  <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">corner_list</span><span class="p">:</span>
+   <span class="n">strc</span> <span class="o">=</span> <span class="s1">&#39;Plane Surface(&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">ss</span><span class="p">)</span><span class="o">+</span> <span class="s1">&#39;) = {&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span>
+   <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">strc</span><span class="p">)</span>
+   <span class="n">ss</span> <span class="o">+=</span> <span class="mi">1</span>
+
+  <span class="c1">#Collect Bulk Surfaces-------------</span>
+  <span class="n">tmp</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+  <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ss</span><span class="p">):</span>
+   <span class="n">tmp</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+   <span class="k">if</span> <span class="n">s</span> <span class="o">&lt;</span> <span class="n">ss</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span> <span class="n">tmp</span> <span class="o">+=</span><span class="s1">&#39;,&#39;</span>
+
+  <span class="n">strc</span> <span class="o">=</span> <span class="s1">r&#39;&#39;&#39;Physical Surface(&#39;Bulk&#39;) = {&#39;&#39;&#39;</span> <span class="o">+</span> <span class="n">tmp</span> <span class="o">+</span> <span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span> 
+  <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">strc</span><span class="p">)</span>
+  <span class="c1">#ss += 1</span>
+
+  <span class="c1">#------------------------------------------------------------------- </span>
+  <span class="c1">#CREATE PORE SURFACE------------------------------------</span>
+  <span class="n">c</span> <span class="o">=</span> <span class="n">pyclipper</span><span class="o">.</span><span class="n">Pyclipper</span><span class="p">()</span>
+  <span class="n">c</span><span class="o">.</span><span class="n">AddPath</span><span class="p">(</span><span class="n">scale_to_clipper</span><span class="p">(</span><span class="n">frame</span><span class="p">),</span> <span class="n">pyclipper</span><span class="o">.</span><span class="n">PT_CLIP</span><span class="p">,</span><span class="kc">True</span><span class="p">)</span> 
+  <span class="n">c</span><span class="o">.</span><span class="n">AddPaths</span><span class="p">(</span><span class="n">scale_to_clipper</span><span class="p">(</span><span class="n">polygons</span><span class="p">),</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">PT_SUBJECT</span><span class="p">,</span><span class="kc">True</span><span class="p">)</span> 
+  <span class="n">solution</span> <span class="o">=</span> <span class="n">scale_from_clipper</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">Execute</span><span class="p">(</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">CT_INTERSECTION</span><span class="p">,</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">PFT_EVENODD</span><span class="p">,</span><span class="n">pyclipper</span><span class="o">.</span><span class="n">PFT_EVENODD</span><span class="p">))</span>
+
+  <span class="n">pore_wall</span> <span class="o">=</span> <span class="p">[]</span>
+  <span class="n">pore_surface</span> <span class="o">=</span> <span class="p">[]</span>
+  <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">solution</span><span class="p">:</span>
+    <span class="n">tmp</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">point</span> <span class="ow">in</span> <span class="n">region</span><span class="p">:</span>
+     <span class="c1">#Create Points</span>
+     <span class="n">index</span> <span class="o">=</span> <span class="n">point_exists</span><span class="p">(</span><span class="n">point</span><span class="p">,</span><span class="n">points</span><span class="p">)</span>
+     <span class="c1">#index = point_exists(point,new_points)</span>
+     <span class="n">tmp</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
+    <span class="n">line_loop</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="c1">#do_add = 0 </span>
+    <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">tmp</span><span class="p">)):</span>
+     <span class="n">n1</span> <span class="o">=</span> <span class="n">n</span>
+     <span class="n">n2</span> <span class="o">=</span> <span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">%</span><span class="nb">len</span><span class="p">(</span><span class="n">tmp</span><span class="p">)</span>
+     <span class="n">line</span> <span class="o">=</span> <span class="p">[</span><span class="n">tmp</span><span class="p">[</span><span class="n">n1</span><span class="p">],</span><span class="n">tmp</span><span class="p">[</span><span class="n">n2</span><span class="p">]]</span>
+ 
+     <span class="n">index</span> <span class="o">=</span>  <span class="n">line_exists</span><span class="p">(</span><span class="n">line</span><span class="p">,</span><span class="n">lines</span><span class="p">)</span>
+     <span class="k">if</span> <span class="ow">not</span> <span class="n">index</span><span class="o">==</span><span class="mi">0</span><span class="p">:</span>
+      <span class="n">pore_wall</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">index</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+      <span class="n">line_loop</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
+     
+ 
+    <span class="c1">#Add Physical Pore </span>
+    <span class="k">if</span> <span class="n">include_pores</span><span class="p">:</span>
+     <span class="n">new_lines</span> <span class="o">=</span> <span class="n">LineOrdering</span><span class="p">(</span><span class="n">line_loop</span><span class="p">)</span> 
+     <span class="n">strc</span> <span class="o">=</span> <span class="s1">&#39;Line Loop(&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">loop</span><span class="p">)</span><span class="o">+</span> <span class="s1">&#39;) = {&#39;</span>
+     <span class="k">for</span> <span class="n">p</span><span class="p">,</span><span class="n">line</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">new_lines</span><span class="p">)</span> <span class="p">:</span>
+      <span class="n">strc</span> <span class="o">+=</span><span class="nb">str</span><span class="p">(</span><span class="n">line</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+      <span class="k">if</span> <span class="n">p</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_lines</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+       <span class="n">strc</span> <span class="o">+=</span> <span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span>
+      <span class="k">else</span> <span class="p">:</span>
+       <span class="n">strc</span> <span class="o">+=</span> <span class="s1">&#39;,&#39;</span>
+     <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">strc</span><span class="p">)</span>
+     
+     <span class="n">strc</span> <span class="o">=</span> <span class="s1">&#39;Plane Surface(&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">ss</span><span class="p">)</span><span class="o">+</span> <span class="s1">&#39;) = {&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">loop</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span>
+     <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">strc</span><span class="p">)</span>
+     <span class="n">pore_regions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ss</span><span class="p">)</span>
+     <span class="n">ss</span> <span class="o">+=</span><span class="mi">1</span>
+     <span class="n">loop</span> <span class="o">+=</span><span class="mi">1</span>
+
+  <span class="k">if</span> <span class="n">include_pores</span> <span class="p">:</span>
+   <span class="c1">#Create Pores Physical Surfaces---------------</span>
+   <span class="n">strc</span> <span class="o">=</span> <span class="s1">r&#39;&#39;&#39;Physical Surface(&#39;Pores2&#39;) = {&#39;&#39;&#39;</span> 
+   <span class="k">for</span> <span class="n">t</span><span class="p">,</span><span class="n">r</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pore_regions</span><span class="p">)</span> <span class="p">:</span>
+    <span class="n">strc</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">pore_regions</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+     <span class="n">strc</span> <span class="o">+=</span> <span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span>
+    <span class="k">else</span> <span class="p">:</span>
+     <span class="n">strc</span> <span class="o">+=</span> <span class="s1">&#39;,&#39;</span>
+   <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">strc</span><span class="p">)</span>
+  <span class="c1">#---------------------------------------------</span>
+
+  <span class="n">frame</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+  <span class="n">Maxy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">frame</span><span class="p">[:,</span><span class="mi">1</span><span class="p">])</span>
+  <span class="n">Miny</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">frame</span><span class="p">[:,</span><span class="mi">1</span><span class="p">])</span>
+  <span class="n">Maxx</span><span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">frame</span><span class="p">[:,</span><span class="mi">0</span><span class="p">])</span>
+  <span class="n">Minx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">frame</span><span class="p">[:,</span><span class="mi">0</span><span class="p">])</span>
+
+
+  <span class="n">lower</span> <span class="o">=</span> <span class="p">[]</span>
+  <span class="n">upper</span> <span class="o">=</span> <span class="p">[]</span>
+  <span class="n">hot</span> <span class="o">=</span> <span class="p">[]</span>
+  <span class="n">cold</span> <span class="o">=</span> <span class="p">[]</span>
+  
+  <span class="k">if</span> <span class="n">include_pores</span> <span class="p">:</span>
+   <span class="n">line_check</span> <span class="o">=</span> <span class="n">lines</span> 
+  <span class="k">else</span> <span class="p">:</span>
+   <span class="n">line_check</span> <span class="o">=</span> <span class="n">line_contour</span>
+
+  <span class="n">deltax</span> <span class="o">=</span> <span class="p">(</span><span class="n">Maxx</span><span class="o">-</span><span class="n">Minx</span><span class="p">)</span><span class="o">/</span><span class="mi">1</span><span class="n">e4</span>
+  <span class="n">deltay</span> <span class="o">=</span> <span class="p">(</span><span class="n">Maxy</span><span class="o">-</span><span class="n">Miny</span><span class="p">)</span><span class="o">/</span><span class="mi">1</span><span class="n">e4</span>
+
+
+  <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">line_check</span><span class="p">:</span>
+   <span class="n">p1</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">l</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+   <span class="n">p2</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">l</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span>
+ 
+   <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">p1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">Minx</span><span class="p">)</span><span class="o">&lt;</span><span class="n">deltax</span> <span class="ow">and</span>  <span class="nb">abs</span><span class="p">(</span><span class="n">p2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">Minx</span><span class="p">)</span><span class="o">&lt;</span><span class="n">deltax</span> <span class="p">:</span>
+    <span class="n">hot</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">l</span><span class="p">)</span>
+   <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">p1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">Maxx</span><span class="p">)</span><span class="o">&lt;</span><span class="n">deltax</span> <span class="ow">and</span>  <span class="nb">abs</span><span class="p">(</span><span class="n">p2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">Maxx</span><span class="p">)</span><span class="o">&lt;</span><span class="n">deltax</span> <span class="p">:</span>
+    <span class="n">cold</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">l</span><span class="p">)</span>
+   <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">p1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">Miny</span><span class="p">)</span><span class="o">&lt;</span><span class="n">deltay</span> <span class="ow">and</span>  <span class="nb">abs</span><span class="p">(</span><span class="n">p2</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">Miny</span><span class="p">)</span><span class="o">&lt;</span><span class="n">deltay</span> <span class="p">:</span>
+    <span class="n">lower</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">l</span><span class="p">)</span>
+   <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">p1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">Maxy</span><span class="p">)</span><span class="o">&lt;</span><span class="n">deltay</span> <span class="ow">and</span>  <span class="nb">abs</span><span class="p">(</span><span class="n">p2</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">Maxy</span><span class="p">)</span><span class="o">&lt;</span><span class="n">deltay</span> <span class="p">:</span>
+    <span class="n">upper</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">l</span><span class="p">)</span>
+
+
+  <span class="n">additional_boundary</span> <span class="o">=</span> <span class="p">[]</span>
+  <span class="k">if</span> <span class="n">argv</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;Periodic&#39;</span><span class="p">,[</span><span class="kc">True</span><span class="p">,</span><span class="kc">True</span><span class="p">,</span><span class="kc">True</span><span class="p">])[</span><span class="mi">0</span><span class="p">]:</span>
+   <span class="n">strc</span> <span class="o">=</span> <span class="s1">r&#39;&#39;&#39;Physical Line(&#39;Periodic_1&#39;) = {&#39;&#39;&#39;</span>
+   <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">hot</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+    <span class="n">strc</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">hot</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="s1">&#39;,&#39;</span>
+   <span class="n">strc</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">hot</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span>
+   <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">strc</span><span class="p">)</span>
+  
+   <span class="n">strc</span> <span class="o">=</span> <span class="s1">r&#39;&#39;&#39;Physical Line(&#39;Periodic_2&#39;) = {&#39;&#39;&#39;</span>
+   <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">cold</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+    <span class="n">strc</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">cold</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="s1">&#39;,&#39;</span>
+   <span class="n">strc</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">cold</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span>
+   <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">strc</span><span class="p">)</span>
+  <span class="k">else</span><span class="p">:</span>
+   <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">hot</span><span class="p">:</span>
+    <span class="n">additional_boundary</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">k</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+   <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">cold</span><span class="p">:</span>
+    <span class="n">additional_boundary</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">k</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+  <span class="k">if</span> <span class="n">argv</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;Periodic&#39;</span><span class="p">,[</span><span class="kc">True</span><span class="p">,</span><span class="kc">True</span><span class="p">,</span><span class="kc">True</span><span class="p">])[</span><span class="mi">1</span><span class="p">]:</span>
+   <span class="n">strc</span> <span class="o">=</span> <span class="s1">r&#39;&#39;&#39;Physical Line(&#39;Periodic_3&#39;) = {&#39;&#39;&#39;</span>
+   <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">upper</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+    <span class="n">strc</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">upper</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="s1">&#39;,&#39;</span>
+   <span class="n">strc</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">upper</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span>
+   <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">strc</span><span class="p">)</span>
+
+   <span class="n">strc</span> <span class="o">=</span> <span class="s1">r&#39;&#39;&#39;Physical Line(&#39;Periodic_4&#39;) = {&#39;&#39;&#39;</span>
+   <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">lower</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+    <span class="n">strc</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">lower</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="s1">&#39;,&#39;</span>
+   <span class="n">strc</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">lower</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span>
+   <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">strc</span><span class="p">)</span>
+  <span class="k">else</span><span class="p">:</span>
+   <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">lower</span><span class="p">:</span>
+    <span class="n">additional_boundary</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">k</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+   <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">upper</span><span class="p">:</span>
+    <span class="n">additional_boundary</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">k</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+  
+  <span class="c1">#Collect Wall</span>
+  <span class="n">boundary_surfaces</span> <span class="o">=</span> <span class="n">pore_wall</span> <span class="o">+</span> <span class="n">additional_boundary</span>
+  <span class="n">strc</span> <span class="o">=</span> <span class="s1">r&#39;&#39;&#39;Physical Line(&#39;Boundary&#39;) = {&#39;&#39;&#39;</span> 
+  <span class="k">for</span> <span class="n">r</span><span class="p">,</span><span class="n">region</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">boundary_surfaces</span><span class="p">)</span> <span class="p">:</span>
+   <span class="n">strc</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">region</span><span class="p">)</span> 
+   <span class="k">if</span> <span class="n">r</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">boundary_surfaces</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+    <span class="n">strc</span> <span class="o">+=</span> <span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span>
+    <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">strc</span><span class="p">)</span>
+   <span class="k">else</span> <span class="p">:</span>
+    <span class="n">strc</span> <span class="o">+=</span> <span class="s1">&#39;,&#39;</span>
+
+
+
+  <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">hot</span><span class="p">)):</span>
+   <span class="n">periodic</span> <span class="o">=</span> <span class="n">FindPeriodic</span><span class="p">(</span><span class="n">hot</span><span class="p">[</span><span class="n">n</span><span class="p">],</span><span class="n">cold</span><span class="p">,</span><span class="n">points</span><span class="p">)</span>
+   <span class="n">strc</span> <span class="o">=</span> <span class="s1">&#39;Periodic Line{&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">hot</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="s1">&#39;}={&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">periodic</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span>
+   <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">strc</span><span class="p">)</span>
+  
+  <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">lower</span><span class="p">)):</span>
+   <span class="n">periodic</span> <span class="o">=</span> <span class="n">FindPeriodic</span><span class="p">(</span><span class="n">lower</span><span class="p">[</span><span class="n">n</span><span class="p">],</span><span class="n">upper</span><span class="p">,</span><span class="n">points</span><span class="p">)</span>
+   <span class="n">strc</span> <span class="o">=</span> <span class="s1">&#39;Periodic Line{&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">lower</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="s1">&#39;}={&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">periodic</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;};</span><span class="se">\n</span><span class="s1">&#39;</span>
+   <span class="n">store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">strc</span><span class="p">)</span>
+  
+<span class="c1">#-------------------------------------------------------</span>
+  <span class="n">store</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+ 
+
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, Giuseppe Romano.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,77 @@
+.. OpenBTE documentation master file, created by
+   sphinx-quickstart on Fri Nov 24 14:59:19 2017.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
+
+.. toctree::
+   :maxdepth: 2
+
+
+
+OpenBTE's documentation
+===================================
+OpenBTE solves the phonon Boltzmann transport equation in its mean-free-path formulation. Below, we provide info for downloading and getting started. 
+
+---------------------------------------
+Download
+---------------------------------------
+
+OpenBTE can be download by simply typing in your shell
+
+.. code-block:: shell
+
+   pip install openbte 
+
+---------------------------------------
+Getting started
+---------------------------------------
+
+The first step for setting up a OpenBTE simulation is creating a geometry. This can be done by the command
+
+.. code-block:: shell
+
+   openbte -g porous/aligned -sh circle -phi=0.25 -lx=10 -ly=10
+
+where ``porous/aligned`` is the geometry model for a two-dimensional porous material. In this case, the shape of the pore is circular, the porosity is 0.25 and the periodicity is 10 nm in both Cartesian directions. Essentially, we simulate only one pore with periodic boundary conditions. The keywords and relative options for other geometry models are listed in the Reference. Once this command is run, the file ``geometry.hdf5`` is created in the current directory. 
+
+To plot the geometry, type che command
+
+.. code-block:: shell
+
+   openbte -p map/geometry
+
+
+.. image:: _figures/GettingStarted_1.png
+   :width: 60 %
+   :align: center
+
+The orange line surrounds the unit cell and represents the areas where periodic boundary conditions are applied, whereas the green line indicates the regions with diffuse scattering.
+
+
+To setup the bulk material, use the folloing command
+
+.. code-block:: shell
+
+   openbte -m Si-300K --n_mfp = 10
+
+where ``Si-300K`` is the mean-free-path (MFP) distribution of Si at 300 K calculated with ShengBTE_. The flag ``--n_mfp`` indicates the number of MFPs to consider in the solution of the BTE.
+
+The bulk MFP distribution can be plotted with
+
+.. code-block:: shell
+
+   openbte -p material/distr
+
+.. image:: _figures/GettingStarted_2.png
+   :width: 60 %
+   :align: center
+
+
+
+.. _ShengBTE: http://www.shengbte.com
+
+
+
+
+

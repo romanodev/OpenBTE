@@ -1,24 +1,22 @@
-from setuptools import setup
+from setuptools import setup,find_packages
 import os
 
 datafiles= []
-rootDir = 'openbte/examples'
+rootDir = 'examples'
 for dirName, subdirList, fileList in os.walk(rootDir):
-    #print('Found directory: %s' % dirName)
     for fname in fileList:
      datafiles.append(dirName + '/' + fname)
 
 
-rootDir = 'openbte/materials'
+rootDir = 'materials'
 for dirName, subdirList, fileList in os.walk(rootDir):
-    #print('Found directory: %s' % dirName)
     for fname in fileList:
      datafiles.append(dirName + '/' + fname)
 
 
 
 setup(name='openbte',
-      version='0.1',
+      version='0.9.0',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',
@@ -31,11 +29,11 @@ setup(name='openbte',
                         'matplotlib',         
                          ],
       license='MIT',\
-      scripts=['openbte/convertShengBTE.py'],\
-      packages=['openbte'],
-      data_files = datafiles,
+      #scripts=['src/convertShengBTE.py'],\
+      packages = find_packages(),
+      #data_files = datafiles,
       entry_points = {
      'console_scripts': [
-      'openbte=openbte.openbte:main'],
+      'openbte=src.__main__:main'],
       },
       zip_safe=False)

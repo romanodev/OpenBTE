@@ -1,0 +1,151 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>src.fig_maker &#8212; OpenBTE 0.9 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.9',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for src.fig_maker</h1><div class="highlight"><pre>
+<span></span>
+<span class="kn">from</span> <span class="nn">matplotlib.pylab</span> <span class="k">import</span> <span class="o">*</span>
+
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span><span class="nn">sys</span>
+
+
+<span class="n">LARGE</span> <span class="o">=</span> <span class="mi">30</span>
+<span class="n">c1</span> <span class="o">=</span> <span class="s1">&#39;#1f77b4&#39;</span>
+<span class="n">c2</span> <span class="o">=</span> <span class="s1">&#39;#f77f0e&#39;</span>
+<span class="n">c3</span> <span class="o">=</span> <span class="s1">&#39;#2ca02c&#39;</span>
+
+
+<div class="viewcode-block" id="savefigure"><a class="viewcode-back" href="../../src.html#src.fig_maker.savefigure">[docs]</a><span class="k">def</span> <span class="nf">savefigure</span><span class="p">(</span><span class="n">prefix</span> <span class="o">=</span> <span class="s1">&#39;./&#39;</span><span class="p">):</span>
+  
+
+ <span class="n">namefile</span> <span class="o">=</span>  <span class="n">prefix</span> <span class="o">+</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="s1">&#39;.png&#39;</span>
+ 
+ <span class="n">savefig</span><span class="p">(</span><span class="n">namefile</span><span class="p">,</span><span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span></div>
+
+
+
+
+<div class="viewcode-block" id="init_plotting"><a class="viewcode-back" href="../../src.html#src.fig_maker.init_plotting">[docs]</a><span class="k">def</span> <span class="nf">init_plotting</span><span class="p">(</span><span class="n">extra_x_padding</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span><span class="n">extra_y_padding</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span><span class="n">extra_bottom_padding</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span><span class="n">extra_top_padding</span><span class="o">=</span>  <span class="mf">0.0</span><span class="p">,</span><span class="n">paraview</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">square</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">delta_square</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span><span class="n">presentation</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+
+ <span class="n">rc</span><span class="p">(</span><span class="s1">&#39;font&#39;</span><span class="p">,</span><span class="o">**</span><span class="p">{</span><span class="s1">&#39;family&#39;</span><span class="p">:</span><span class="s1">&#39;serif&#39;</span><span class="p">,</span><span class="s1">&#39;serif&#39;</span><span class="p">:[</span><span class="s1">&#39;Computer Modern Roman&#39;</span><span class="p">]})</span>
+ <span class="n">rc</span><span class="p">(</span><span class="s1">&#39;font&#39;</span><span class="p">,</span><span class="o">**</span><span class="p">{</span><span class="s1">&#39;family&#39;</span><span class="p">:</span><span class="s1">&#39;serif&#39;</span><span class="p">,</span><span class="s1">&#39;sans-serif&#39;</span><span class="p">:[</span><span class="s1">&#39;Computer Modern Sans serif&#39;</span><span class="p">]})</span>
+
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;xtick.major.pad&#39;</span><span class="p">]</span><span class="o">=</span><span class="s1">&#39;10&#39;</span>
+ <span class="n">rc</span><span class="p">(</span><span class="s1">&#39;text&#39;</span><span class="p">,</span> <span class="n">usetex</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;lines.linewidth&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">4</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;font.size&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">LARGE</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;xtick.labelsize&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">LARGE</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;ytick.labelsize&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">LARGE</span>
+ <span class="k">if</span> <span class="n">square</span><span class="p">:</span>
+  <span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;figure.figsize&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">5.0</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">]</span>
+ <span class="k">else</span><span class="p">:</span>
+  <span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;figure.figsize&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">8.0</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">]</span>
+ <span class="k">if</span> <span class="n">presentation</span><span class="p">:</span>
+  <span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;figure.figsize&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">16.0</span><span class="p">,</span> <span class="mf">12.0</span><span class="p">]</span>
+
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;text.latex.preamble&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s1">r&#39;\usepackage</span><span class="si">{hyperref}</span><span class="s1">&#39;</span><span class="p">,]</span>
+
+
+ <span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;figure.dpi&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">80</span>
+ <span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;savefig.dpi&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">300</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;xtick.major.size&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">3</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;xtick.minor.size&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">3</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;figure.edgecolor&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;k&#39;</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;figure.facecolor&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;w&#39;</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;xtick.major.width&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;xtick.minor.width&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;ytick.major.size&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">3</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;ytick.minor.size&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">3</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;ytick.major.width&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;ytick.minor.width&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;legend.frameon&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;legend.fontsize&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">25</span>
+ <span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;axes.linewidth&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+ <span class="n">axes</span><span class="p">([</span><span class="mf">0.15</span><span class="o">+</span><span class="n">extra_x_padding</span><span class="p">,</span><span class="mf">0.20</span><span class="o">+</span><span class="n">extra_bottom_padding</span><span class="p">,</span><span class="mf">0.78</span><span class="o">-</span><span class="n">extra_x_padding</span><span class="o">-</span><span class="n">extra_y_padding</span><span class="p">,</span><span class="mf">0.75</span><span class="o">-</span><span class="n">extra_bottom_padding</span><span class="o">-</span><span class="n">extra_top_padding</span><span class="p">])</span></div>
+
+
+
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, Giuseppe Romano.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
