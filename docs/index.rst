@@ -8,6 +8,21 @@ Welcome to OpenBTE's documentation!
 
 .. toctree::
    :hidden:
-
+   
    gettingstarted
    citingopenbte
+
+
+OpenBTE is writted in Python and runs both in serial and parallel. The main elements are Material, Geoemtry and Solver.
+
+.. image:: myfile.svg
+   :width: 80 %
+   :align: center
+
+
+
+
+
+
+
+
