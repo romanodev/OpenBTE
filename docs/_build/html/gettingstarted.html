@@ -1,0 +1,166 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Getting Started &#8212; OpenBTE 0.9.0 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.9.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Citing OpenBTE" href="citingopenbte.html" />
+    <link rel="prev" title="Welcome to OpenBTE’s documentation!" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="getting-started">
+<h1>Getting Started<a class="headerlink" href="#getting-started" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+</div>
+<p>The first step for setting up a OpenBTE simulation is creating a geometry. This can be done by the command</p>
+<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -g porous/aligned -sh circle -phi<span class="o">=</span>0.25 -lx<span class="o">=</span><span class="m">10</span> -ly<span class="o">=</span>10
+</pre></div>
+</div>
+<p>where <code class="docutils literal"><span class="pre">porous/aligned</span></code> is the geometry model for a two-dimensional porous material. In this case, the shape of the pore is circular, the porosity is 0.25 and the periodicity is 10 nm in both Cartesian directions. Essentially, we simulate only one pore with periodic boundary conditions. The keywords and relative options for other geometry models are listed in the Reference. Once this command is run, the file <code class="docutils literal"><span class="pre">geometry.hdf5</span></code> is created in the current directory.</p>
+<p>To plot the geometry, type the command</p>
+<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -p map/geometry
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="_images/GettingStarted_1.png"><img alt="_images/GettingStarted_1.png" class="align-center" src="_images/GettingStarted_1.png" style="width: 60%;" /></a>
+<p>The orange line surrounds the unit cell and represents the areas where periodic boundary conditions are applied, whereas the green line indicates the regions with diffuse scattering.</p>
+<p>To setup the bulk material, use the following command</p>
+<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -m Si-300K --n_mfp <span class="o">=</span> 10
+</pre></div>
+</div>
+<p>where <code class="docutils literal"><span class="pre">Si-300K</span></code> is the mean-free-path (MFP) distribution of Si at 300 K calculated with <a class="reference external" href="http://www.shengbte.com">ShengBTE</a>. The flag <code class="docutils literal"><span class="pre">--n_mfp</span></code> indicates the number of MFPs to consider in the solution of the BTE.</p>
+<p>The bulk MFP distribution can be plotted with</p>
+<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -p material/distr
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="_images/GettingStarted_2.png"><img alt="_images/GettingStarted_2.png" class="align-center" src="_images/GettingStarted_2.png" style="width: 60%;" /></a>
+<p>At this point, we should be able to run the BTE with the command</p>
+<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -s bte
+</pre></div>
+</div>
+<p>The solver will first solve the diffusion equation to provide the first guess for the pseudotemperature, then it will solve the BTE. If you run it in serial on your laptop, it should take a few minutes.</p>
+<p>To plot the mangnitude of heat flux, we type</p>
+<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -p map/flux_magnitude
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="_images/GettingStarted_3.png"><img alt="_images/GettingStarted_3.png" class="align-center" src="_images/GettingStarted_3.png" style="width: 60%;" /></a>
+<p>To pseudotemperature is plotted with</p>
+<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -p map/temperature
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="_images/GettingStarted_7.png"><img alt="_images/GettingStarted_7.png" class="align-center" src="_images/GettingStarted_7.png" style="width: 60%;" /></a>
+<p>The MFP distribution in the porous material can be plotted with</p>
+<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -p distr
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="_images/GettingStarted_4.png"><img alt="_images/GettingStarted_4.png" class="align-center" src="_images/GettingStarted_4.png" style="width: 60%;" /></a>
+<p>The suppression function is plotted with</p>
+<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -p suppression_function
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="_images/GettingStarted_5.png"><img alt="_images/GettingStarted_5.png" class="align-center" src="_images/GettingStarted_5.png" style="width: 60%;" /></a>
+<p>The directional suppression function is plotted with</p>
+<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -p directional_suppression_function
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="_images/GettingStarted_6.png"><img alt="_images/GettingStarted_6.png" class="align-center" src="_images/GettingStarted_6.png" style="width: 60%;" /></a>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">OpenBTE</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Getting Started</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="citingopenbte.html">Citing OpenBTE</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Welcome to OpenBTE&#8217;s documentation!</a></li>
+      <li>Next: <a href="citingopenbte.html" title="next chapter">Citing OpenBTE</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, Giuseppe Romano.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+      |
+      <a href="_sources/gettingstarted.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
