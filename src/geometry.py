@@ -85,7 +85,7 @@ class Geometry(object):
 
     return data
 
- def get_decomposed_directions(self,elem_1,elem_2):
+ def get_decomposed_directions(self,elem_1,elem_2,rot = np.eye(3)):
 
    side = self.get_side_between_two_elements(elem_1,elem_2)  
    normal = self.compute_side_normal(elem_1,side)
@@ -94,8 +94,8 @@ class Geometry(object):
    c1 = self.get_elem_centroid(elem_1)
    c2 = self.get_next_elem_centroid(elem_1,side)
    dist = c2-c1
-   v_orth = np.dot(Af,Af)/np.dot(Af,dist)
-   v_non_orth = Af - dist*v_orth
+   v_orth = np.dot(Af,np.dot(rot,Af))/np.dot(Af,dist)
+   v_non_orth = np.dot(rot,Af) - dist*v_orth
 
    return v_orth,v_non_orth
 

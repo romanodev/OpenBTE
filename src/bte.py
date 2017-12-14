@@ -195,7 +195,6 @@ class BTE(object):
      C[i] -= DS[i,j]*(1.0-a)*tmp #Diffuse reflection (interfaces)
     Am = csc_matrix( (np.array(d),(np.array(r),np.array(c))), shape=(self.n_elems,self.n_elems) )
 
-    #--INCOMING FLUX------------------------------- 
     #Assemble Ap----------------
     r = [];c = [];d = [] 
     for i,j in zip(*Bplus.nonzero()):

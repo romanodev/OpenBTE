@@ -1,0 +1,157 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Theory &#8212; OpenBTE 0.9.0 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.9.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Citing OpenBTE" href="citingopenbte.html" />
+    <link rel="prev" title="Getting Started" href="gettingstarted.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="theory">
+<h1>Theory<a class="headerlink" href="#theory" title="Permalink to this headline">¶</a></h1>
+<p>Let us assume we want to calculatee the thermal conductivity of a bar with length L and cross-sectional area A, subjected to a difference of temperatue <span class="math">\(\Delta T\)</span>. At the hot contact (HC), there will be outgoing thermal flux <span class="math">\(\mathbf{J}(\mathbf{r})\)</span>, which is related to the effective thermal conductivity <span class="math">\(\kappa_{eff}\)</span> via Fourier&#8217;s law, i.e.</p>
+<div class="math" id="equation-kappa">
+<span class="eqno">(1)<a class="headerlink" href="#equation-kappa" title="Permalink to this equation">¶</a></span>\[\kappa_{eff} = -\frac{L}{\Delta T A}\int_{HC} dS \, \mathbf{J}(\mathbf{r}) \cdot \mathbf{\hat{n}}\]</div>
+<p>Due to the presence of classical phonon size effects, heat transport is not diffusive and <span class="math">\(\mathbf{J}(\mathbf{r})\)</span> needs to be calculated by the Boltzmann tranposrt equation (BTE). OpenBTE is based on the mean-free-path formulation of the BTE. The starting point of its derivation is the standard steady-state BTE in the relaxation time approximation</p>
+<div class="math" id="equation-bte">
+<span class="eqno">(2)<a class="headerlink" href="#equation-bte" title="Permalink to this equation">¶</a></span>\[\mathbf{v}_\lambda \cdot \nabla f_\lambda (\mathbf{r}) = \frac{1}{\tau_\lambda}\left[f^0_\lambda(T) - f_\lambda(\mathbf{r}) \right],\]</div>
+<p>where <span class="math">\(\lambda\)</span> collectively describes phonon wave vector <span class="math">\(\mathbf{q}\)</span> and polarization <span class="math">\(p\)</span>, <span class="math">\(\mathbf{v}_\lambda\)</span> is the group velocity, <span class="math">\(f_\lambda(\mathbf{r})\)</span> is the non-equilibrium distribution function. The equilibrium function <span class="math">\(f_\lambda^0(\mathbf{r})\)</span> is the Bose-Einstain distribution at the effective temperature <span class="math">\(T(\mathbf{r})\)</span>, i.e.</p>
+<div class="math" id="equation-equilibrium">
+<span class="eqno">(3)<a class="headerlink" href="#equation-equilibrium" title="Permalink to this equation">¶</a></span>\[f^0_\lambda(\mathbf{r})=\left(e^{\frac{\hbar \omega_\lambda}{k_B T(\mathbf{r})}} + 1 \right)^{-1},\]</div>
+<p>where <span class="math">\(k_B\)</span> is the Boltzmann constant <span class="math">\(\hbar\omega_\lambda\)</span> is the phonon energy. Energy conservation requires <span class="math">\(\nabla \cdot \mathbf{J}(\mathbf{r}) = 0\)</span>, where the total phonon flux <span class="math">\(\mathbf{J}(\mathbf{r})\)</span> is defined by</p>
+<div class="math" id="equation-thermal">
+<span class="eqno">(4)<a class="headerlink" href="#equation-thermal" title="Permalink to this equation">¶</a></span>\[\mathbf{J}(\mathbf{r}) = \int \hbar\omega_\lambda \mathbf{v}_\lambda f_\lambda(\mathbf{r})  \frac{d\mathbf{q}}{2\pi^3}.\]</div>
+<p>After multiplying both sides of Eq. <a class="reference internal" href="#equation-bte">(2)</a> by <span class="math">\(\hbar \omega_\lambda\)</span> and integrating over the B. Z., we have</p>
+<div class="math" id="equation-energy">
+<span class="eqno">(5)<a class="headerlink" href="#equation-energy" title="Permalink to this equation">¶</a></span>\[\int  \frac{d\mathbf{q}}{2\pi^3} \frac{\hbar\omega_\lambda}{\tau_\lambda} \left[f_\lambda^0(T) -f_\lambda(\mathbf{r})\right] = 0.\]</div>
+<p>In practice, one has to compute <span class="math">\(T(\mathbf{r})\)</span> such as Eq.:eq:<cite>energy</cite> is satisfied. To simplify this task, we assume that the temperature variation are small such that the equilibrium distribution can be approximated by its first-order Taylor expansion, i.e.</p>
+<div class="math" id="equation-expansion">
+<span class="eqno">(6)<a class="headerlink" href="#equation-expansion" title="Permalink to this equation">¶</a></span>\[f_\lambda^0(T) \approx f_\lambda^0(T_0) + \frac{C_\lambda}{\hbar\omega_\lambda}\left([T(\mathbf{r})-T_0 \right],\]</div>
+<p>where <span class="math">\(C_\lambda(T_0)\)</span> is the heat capacity at a reference temperature <span class="math">\(T_0\)</span>. After including Eq. <a class="reference internal" href="#equation-expansion">(6)</a> into <a class="reference internal" href="#equation-energy">(5)</a>, we have</p>
+<div class="math" id="equation-temperature">
+<span class="eqno">(7)<a class="headerlink" href="#equation-temperature" title="Permalink to this equation">¶</a></span>\[T(\mathbf{r}) -T_0 = \int  \frac{d\mathbf{q}}{2\pi^3} a_\lambda \frac{\hbar \omega_\lambda}{C_\lambda}\left[f_\lambda(\mathbf{r}) - f_\lambda^0(T_0)\right],\]</div>
+<p>where</p>
+<div class="math" id="equation-coefficients">
+<span class="eqno">(8)<a class="headerlink" href="#equation-coefficients" title="Permalink to this equation">¶</a></span>\[a_\lambda = \frac{C_\lambda}{\tau_\lambda} \left[\int  \frac{d\mathbf{q}}{2\pi^3} \frac{C_\lambda}{\tau_\lambda} \right]^{-1}.\]</div>
+<p>The BTE under a small applied temperature gradients can be then derived after including Eqs. <a class="reference internal" href="#equation-temperature">(7)</a>-<a class="reference internal" href="#equation-expansion">(6)</a> into Eq. <a class="reference internal" href="#equation-bte">(2)</a></p>
+<div class="math" id="equation-bte2">
+<span class="eqno">(9)<a class="headerlink" href="#equation-bte2" title="Permalink to this equation">¶</a></span>\[\tau_\lambda \mathbf{v}_\lambda \cdot \nabla f_\lambda (\mathbf{r}) +f_\lambda(\mathbf{r}) - f_\lambda^0= \frac{C_\lambda}{\hbar \omega_\lambda}\int \frac{d\mathbf{q}}{2\pi^3} a_\lambda \frac{\hbar \omega_\lambda}{C_\lambda}\left[f_\lambda(\mathbf{r}) -f_\lambda^0) \right].\]</div>
+<p>Upon the change of variable</p>
+<div class="math" id="equation-variable">
+<span class="eqno">(10)<a class="headerlink" href="#equation-variable" title="Permalink to this equation">¶</a></span>\[T_\lambda(\mathbf{r}) = \frac{\hbar\omega_\lambda}{C_\lambda}\left[f_\lambda(\mathbf{r})- f_\lambda^0) \right]\]</div>
+<p>we obtain the temperature formulation of the BTE</p>
+<div class="math" id="equation-bte3">
+<span class="eqno">(11)<a class="headerlink" href="#equation-bte3" title="Permalink to this equation">¶</a></span>\[\mathbf{F}_\lambda \cdot \nabla T_\lambda(\mathbf{r}) + T_\lambda(\mathbf{r}) - \int \frac{d\mathbf{q}'}{2\pi^3} a_{\lambda'}T_{\lambda'}(\mathbf{r}) = 0,\]</div>
+<p>where <span class="math">\(\mathbf{F}_\lambda=\mathbf{v}_\lambda \tau_\lambda\)</span>. Within this formulation, the thermal flux becomes</p>
+<div class="math" id="equation-thermal2">
+<span class="eqno">(12)<a class="headerlink" href="#equation-thermal2" title="Permalink to this equation">¶</a></span>\[\mathbf{J}(\mathbf{r}) = \int \frac{d\mathbf{q}}{2\pi^3} \frac{C_\lambda}{\tau_\lambda} T_\lambda(\mathbf{r})  \mathbf{F}_\lambda.\]</div>
+<p>Finally, it is possible to show that in the case of isotropic B.Z., Eq. <a class="reference internal" href="#equation-bte3">(11)</a> can be approximated by</p>
+<div class="math" id="equation-bte4">
+<span class="eqno">(13)<a class="headerlink" href="#equation-bte4" title="Permalink to this equation">¶</a></span>\[\Lambda \mathbf{\hat{s}} \cdot \nabla T(\mathbf{r},\Lambda) + T(\mathbf{r},\Lambda) - \int_0^{\infty} d\Lambda' B_2(\Lambda) \overline{T}(\mathbf{r},\Lambda') = 0,\]</div>
+<p>where <span class="math">\(\overline{T}=\left(4\pi \right)^{-1}\int_{4\pi}f(\Omega)d\Omega\)</span> is an angular average and</p>
+<div class="math">
+\[B_n(\Lambda) = \frac{K_{\mathrm{bulk}}(\Lambda)}{\Lambda^n}\left[ \int_0^\infty \frac{K_{\mathrm{bulk}}(\Lambda')}{\Lambda'^n} d\Lambda'  \right]^{-1}.\]</div>
+<p>Similarly, the thermal flux becomes</p>
+<div class="math">
+\[\mathbf{J}(\mathbf{r}) = \int_0^{\infty} B_1(\Lambda)  &lt;T(\mathbf{r},\Lambda) \mathbf{\hat{s}}&gt; d\Lambda\]</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">OpenBTE</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="gettingstarted.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Theory</a></li>
+<li class="toctree-l1"><a class="reference internal" href="citingopenbte.html">Citing OpenBTE</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="gettingstarted.html" title="previous chapter">Getting Started</a></li>
+      <li>Next: <a href="citingopenbte.html" title="next chapter">Citing OpenBTE</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, Giuseppe Romano.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+      |
+      <a href="_sources/theory.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
