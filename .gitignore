@@ -9,6 +9,8 @@ __pycache__/
 # app specific
 *.hdf5
 
+examples/Si/tmp/
+
 # Distribution / packaging
 .Python
 env/
