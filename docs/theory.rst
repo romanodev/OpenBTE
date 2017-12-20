@@ -7,7 +7,7 @@ Let us assume we want to calculatee the thermal conductivity of a bar with lengt
 .. math:: \kappa_{eff} = -\frac{L}{\Delta T A}\int_{HC} dS \, \mathbf{J}(\mathbf{r}) \cdot \mathbf{\hat{n}}
   :label: kappa
 
-Due to the presence of classical phonon size effects, heat transport is not diffusive and :math:`\mathbf{J}(\mathbf{r})` needs to be calculated by the Boltzmann tranposrt equation (BTE). OpenBTE is based on the mean-free-path formulation of the BTE. The starting point of its derivation is the standard steady-state BTE in the relaxation time approximation
+Due to the presence of classical phonon size effects, heat transport is not diffusive and :math:`\mathbf{J}(\mathbf{r})` needs to be calculated by the Boltzmann transport equation (BTE). OpenBTE is based on the mean-free-path formulation of the BTE. The starting point of its derivation is the standard steady-state BTE in the relaxation time approximation
 
  
 .. math:: 

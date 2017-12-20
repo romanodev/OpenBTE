@@ -9,6 +9,7 @@ import matplotlib
 import matplotlib.patches as patches
 from matplotlib.path import Path
 from fig_maker import *
+from shapely import geometry,wkt
 
 
 def get_suppression(mfps,sup,mfp):
@@ -61,6 +62,9 @@ class Plot(object):
   if argv['plot'] == 'suppression_function' :
    self.plot_suppression_function()
 
+  if argv['plot'] == 'line_temperature' :
+   self.plot_line_temperature(argv)
+
   if argv['plot'] == 'directional_suppression_function' :
    self.plot_directional_suppression_function(argv)
 
@@ -74,7 +78,8 @@ class Plot(object):
    
    var = argv['plot'].split('/')[1]
    geo = dd.io.load('geometry.hdf5')
-   Nx = argv['n_x']
+   Nx = argv.setdefault('n_x',1)
+   Ny = argv.setdefault('n_y',1)
    Ny = argv['n_y']
    increment = [0,0]
    #data = np.ones(len(geo['elems']))
@@ -113,8 +118,8 @@ class Plot(object):
    #init_plotting(presentation=True)
    for nx in range(Nx):
     for ny in range(Ny):
-     Px = (nx-1)* Lx
-     Py = (ny-1) * Ly
+     Px = nx* Lx
+     Py = ny * Ly
      displ = [float(nx)/float(Nx),float(ny)/float(Ny)]
      cmap = matplotlib.cm.get_cmap('Wistia')
      for e,elem in enumerate(geo['elems']):
@@ -173,6 +178,46 @@ class Plot(object):
    ylim([0,max(dis_bulk)*1.3])
    show()
 
+ def plot_line_temperature(self,argv):
+
+  if MPI.COMM_WORLD.Get_rank() == 0:
+   geo = dd.io.load('geometry.hdf5')
+   solver = dd.io.load('solver.hdf5')
+   temp = solver['bte_temperature']
+
+   #Compute the closest element on the left-----
+   y0 = argv.setdefault('y0',0)
+   m = argv.setdefault('m',0)
+   size = geo['size'][0]   
+   P = [-size/2.0,-m*size/2.0+y0,0]
+   ce = -1
+   dmin = 1e4
+   for n,elem in enumerate(geo['elems']):   
+    c = geo['elem_centroids'][n]
+    if np.linalg.norm(c-P)<dmin:
+     dmin = np.linalg.norm(c-P)
+     ce = n
+   #---------------------------------------
+
+   line = geometry.LineString([(P[0],P[1]),(P[0]+size,P[1]+m*size)])     
+   kc1 = ce
+   nn = 1
+   while nn > 0:
+    for s in geo['elem_side_map'][ce]:
+     kc2 = mesh.get_neighbor_elem(kc1,s)
+     
+     #Create polygons-------------------
+     poly = []
+     for n in geo['elems'][kc2]:
+      poly.append(geo['nodes'][n][0:2])
+     poly.append(poly[0])      
+     polygon = geometry.Polygon(poly)
+     #----------------------------------
+     ips = line.intersection(poly.boundary)
+     print(ips)
+     quit()
+
+ 
 
  def plot_distribution(self):
   if MPI.COMM_WORLD.Get_rank() == 0:

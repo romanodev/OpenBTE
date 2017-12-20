@@ -31,6 +31,7 @@ setup(name='openbte',
       license='MIT',\
       #scripts=['src/convertShengBTE.py'],\
       packages = find_packages(),
+      #packages = ['openbte'],
       #data_files = datafiles,
       entry_points = {
      'console_scripts': [

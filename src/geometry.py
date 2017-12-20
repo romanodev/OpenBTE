@@ -8,6 +8,7 @@ import GenerateMesh2D
 import GenerateMesh3D 
 import GenerateBulk2D 
 import GenerateBulk3D 
+import GenerateInterface2D 
 import deepdish as dd
 
 
@@ -28,6 +29,11 @@ class Geometry(object):
       self.dim = 3
      else:
       GenerateMesh2D.mesh(polygons,frame,argv)
+      self.dim = 2
+
+    #Interface----EXPERIMENTAL
+    if argv['model'] == '2DInterface':
+      GenerateInterface2D.mesh(argv)
       self.dim = 2
 
     #bulk----------
@@ -544,8 +550,8 @@ class Geometry(object):
    self.boundary_elements.append(self.side_elem_map[ll][0])
 
   #delete MESH-----
-  a=subprocess.check_output(['rm','-f','mesh.geo'])
-  a=subprocess.check_output(['rm','-f','mesh.msh'])
+  #a=subprocess.check_output(['rm','-f','mesh.geo'])
+  #a=subprocess.check_output(['rm','-f','mesh.msh'])
   
   #----------------
 

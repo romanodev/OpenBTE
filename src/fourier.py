@@ -18,7 +18,9 @@ class Fourier(object):
   
     self.mesh = argv['geometry']
     self.mat = argv['material'].state
+    self.mat2 = argv.setdefault('secondary_material',argv['material']).state
 
+    self.kappa_bulk_2 = self.mat2['kappa_bulk_tot']
     self.kappa_bulk = self.mat['kappa_bulk_tot']
     #INITIALIZATION-------------------------
     self.n_el = len(self.mesh.elems)
@@ -26,7 +28,7 @@ class Fourier(object):
     self.side_periodic_value = data['side_periodic_value']
     self.area_flux = data['area_flux']
     self.compute_connection_matrix()
-    self.x = np.ones(len(self.mesh.elems))
+    self.x = argv.setdefault('density',np.ones(len(self.mesh.elems)))
     self.n = np.random.randint(0,len(self.mesh.elems))
     print(' ')
     print('Solving Fourier... started.')

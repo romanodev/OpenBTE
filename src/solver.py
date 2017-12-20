@@ -167,7 +167,19 @@ class Solver(object):
                        Scalars(bte_temp,name = 'Temperature (BTE)'),\
                        Vectors(fourier_flux,name='Flux (Fourier)'),\
                        Vectors(bte_flux,name='Flux (BTE)'))
-   vtk = VtkData(UnstructuredGrid(nodes,triangle=cells),data)
+
+
+   #write VTK-----------------------------------------------------------
+   if self.mesh.dim == 3:
+     vtk = VtkData(UnstructuredGrid(nodes,tetra=cells),data)
+   else :
+     if len(cells[0]) == 3:
+      vtk = VtkData(UnstructuredGrid(nodes,triangle=cells),data)
+     else:
+      vtk = VtkData(PolyData(points = nodes,polygons = cells),data)
+    #--------------------------------------------------------
+
+   #vtk = VtkData(UnstructuredGrid(nodes,triangle=cells),data)
    vtk.tofile('output.vtk','ascii')
 
 

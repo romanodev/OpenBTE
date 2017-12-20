@@ -20,7 +20,7 @@ class BTE(object):
   def __init__(self,argv):
 
    self.mesh = argv['geometry']
-   self.x = np.ones(len(self.mesh.elems))
+   self.x = argv.setdefault('density',np.ones(len(self.mesh.elems)))
 
    #Get material properties-----
    mat = argv['material']
@@ -28,6 +28,14 @@ class BTE(object):
    self.B1 = mat.state['B1']
    self.B2 = mat.state['B2']
    self.kappa_bulk = mat.state['kappa_bulk_tot']
+
+   mat = argv.setdefault('secondary_material',argv['material'])
+   self.B0_2 = mat.state['B0']
+   self.B1_2 = mat.state['B1']
+   self.B2_2 = mat.state['B2']
+
+
+
 
    self.mfp = np.array(mat.state['mfp_sampled'])/1e-9 #In nm
    self.n_mfp = len(self.B0)
@@ -82,6 +90,12 @@ class BTE(object):
      dd.io.save('solver.hdf5', self.state)
 
 
+  def get_transmission(self,i,j):
+
+   a = 2.0*self.x[i]*self.x[j]/(self.x[i]+self.x[j])
+   #return 1.0
+
+   return a
 
   def compute_directional_connections(self,p,options):
     
@@ -162,7 +176,6 @@ class BTE(object):
    DS = csc_matrix(options['DS'])
    old_temp = options['temp']
    TB = options['boundary_temp']
-   x = self.x 
    Bminus=scipy.io.mmread('tmp/BMINUS_' + str(p) + '.mtx').tocsc() 
    Bplus=scipy.io.mmread('tmp/BPLUS_' + str(p) + '.mtx').tocsc()
    Fminus=scipy.io.mmread('tmp/FMINUS_' + str(p) + '.mtx').tocsc() 
@@ -189,10 +202,10 @@ class BTE(object):
     for i,j in zip(*Bminus.nonzero()):
      r.append(i);c.append(j)
      tmp = np.dot(angle_factor,self.mesh.get_coeff(i,j))
-     a = 2.0*x[i]*x[j]/(x[i]+x[j])
+     a = self.get_transmission(i,j)
      value = tmp*a
      d.append(value)
-     C[i] -= DS[i,j]*(1.0-a)*tmp #Diffuse reflection (interfaces)
+     C[i] -= DS[i,j]*(1.0-a)*tmp #Diffuse scattering (interfaces)
     Am = csc_matrix( (np.array(d),(np.array(r),np.array(c))), shape=(self.n_elems,self.n_elems) )
 
     #Assemble Ap----------------
@@ -208,7 +221,12 @@ class BTE(object):
     #PERIODICITY------
     B = np.zeros(self.n_elems)
     for i,j in zip(*Fminus.nonzero()):
-     B[i] += Fminus[i,j] * np.dot(angle_factor,self.mesh.get_coeff(i,j))
+     a = self.get_transmission(i,j)
+     tmp = np.dot(angle_factor,self.mesh.get_coeff(i,j))
+     value = tmp*a
+     B[i] += Fminus[i,j] * value
+     C[i] -= DS[i,j]*(1.0-a)*tmp #Diffuse scattering (interfaces)
+
  
     #Contribution from Hard Boundary------
     HW = np.zeros(self.n_elems)
@@ -249,6 +267,10 @@ class BTE(object):
       #------------------------------------------------------------------------------
 
       #-----------------------   
+     #for n,i in enumerate(temp):
+     # B2 = self.x[n]*self.B2[m] + (1.0-self.x[n])*self.B2[m]
+     # new_temp += B2 * temp * self.dom['d_omega'][t][p]/4.0/np.pi * symmetry
+
      new_temp += self.B2[m] * temp * self.dom['d_omega'][t][p]/4.0/np.pi * symmetry
   
 
