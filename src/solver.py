@@ -35,8 +35,7 @@ class Solver(object):
    #print(' ')
 
 
-
-  self.write_vtk(argv)
+  self.state.update(self.write_vtk(argv))
   if MPI.COMM_WORLD.Get_rank() == 0:
    dd.io.save('solver.hdf5', self.state)
   
@@ -130,6 +129,7 @@ class Solver(object):
  def write_vtk(self,argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
+   nodal_data = {}
    #Write Fourier Temperature
    Nx = argv.setdefault('repeat_x',3)
    Ny = argv.setdefault('repeat_y',3)
@@ -137,6 +137,7 @@ class Solver(object):
 
    #Fourier Temperature----
    node_data = self.cell_to_node(self.state['fourier_temperature'])
+   nodal_data.update({'fourier_temperature_nodal':node_data[:,0]})
    argv.update({'variable':'fourier_temperature'})
    increment = self.get_increment(argv)
    nodes,cells,fourier_temp = self.repeat_nodes_and_data(Nx,Ny,Nz,node_data,increment)
@@ -144,6 +145,7 @@ class Solver(object):
 
    #Fourier Flux----
    node_data = self.cell_to_node(np.array(self.state['fourier_flux']))
+   nodal_data.update({'fourier_flux_nodal':node_data})
    argv.update({'variable':'fourier_flux'})
    increment = self.get_increment(argv)
    nodes,cells,fourier_flux = self.repeat_nodes_and_data(Nx,Ny,Nz,node_data,increment)
@@ -151,12 +153,17 @@ class Solver(object):
 
    #BTE Temperature----
    node_data = self.cell_to_node(self.state['bte_temperature'])
+ 
+   nodal_data.update({'bte_temperature':{'data':node_data[:,0],'label':'Temperature [K]'}})
+
+
    argv.update({'variable':'bte_temperature'})
    increment = self.get_increment(argv)
    nodes,cells,bte_temp = self.repeat_nodes_and_data(Nx,Ny,Nz,node_data,increment)
 
    #BTE Flux----
    node_data = self.cell_to_node(np.array(self.state['bte_flux']))
+   nodal_data.update({'bte_flux_nodal':node_data})
    argv.update({'variable':'bte_flux'})
    increment = self.get_increment(argv)
    nodes,cells,bte_flux = self.repeat_nodes_and_data(Nx,Ny,Nz,node_data,increment)
@@ -179,9 +186,10 @@ class Solver(object):
       vtk = VtkData(PolyData(points = nodes,polygons = cells),data)
     #--------------------------------------------------------
 
-   #vtk = VtkData(UnstructuredGrid(nodes,triangle=cells),data)
    vtk.tofile('output.vtk','ascii')
-
+  else: nodal_data = None
+  return MPI.COMM_WORLD.bcast(nodal_data,root=0)
+  
 
    #--------------
 

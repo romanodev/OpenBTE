@@ -56,6 +56,7 @@ class Geometry(object):
  def compute_mesh_data(self):
 
     self.import_mesh()
+    self.compute_elem_map()
     self.compute_elem_volumes()
     self.compute_side_areas()
     self.compute_side_normals()
@@ -71,6 +72,7 @@ class Geometry(object):
           'side_elem_map':self.side_elem_map,\
           'side_node_map':self.side_node_map,\
           'node_elem_map':self.node_elem_map,\
+          'elem_map':self.elem_map,\
           'nodes':self.nodes,\
           'sides':self.sides,\
           'elems':self.elems,\
@@ -90,6 +92,15 @@ class Geometry(object):
           'side_normals':self.side_normals}
 
     return data
+
+ def compute_elem_map(self):
+
+  self.elem_map = {}
+  for elem1 in self.elem_side_map:
+    for side in self.elem_side_map[elem1]:
+     elem2 = self.get_neighbor_elem(elem1,side)
+     self.elem_map.setdefault(elem1,[]).append(elem2)
+
 
  def get_decomposed_directions(self,elem_1,elem_2,rot = np.eye(3)):
 

@@ -49,39 +49,39 @@
 <p>Let us assume we want to calculatee the thermal conductivity of a bar with length L and cross-sectional area A, subjected to a difference of temperatue <span class="math">\(\Delta T\)</span>. At the hot contact (HC), there will be outgoing thermal flux <span class="math">\(\mathbf{J}(\mathbf{r})\)</span>, which is related to the effective thermal conductivity <span class="math">\(\kappa_{eff}\)</span> via Fourier&#8217;s law, i.e.</p>
 <div class="math" id="equation-kappa">
 <span class="eqno">(1)<a class="headerlink" href="#equation-kappa" title="Permalink to this equation">¶</a></span>\[\kappa_{eff} = -\frac{L}{\Delta T A}\int_{HC} dS \, \mathbf{J}(\mathbf{r}) \cdot \mathbf{\hat{n}}\]</div>
-<p>Due to the presence of classical phonon size effects, heat transport is not diffusive and <span class="math">\(\mathbf{J}(\mathbf{r})\)</span> needs to be calculated by the Boltzmann tranposrt equation (BTE). OpenBTE is based on the mean-free-path formulation of the BTE. The starting point of its derivation is the standard steady-state BTE in the relaxation time approximation</p>
+<p>Due to the presence of classical phonon size effects, heat transport is not diffusive, and <span class="math">\(\mathbf{J}(\mathbf{r})\)</span> needs to be calculated by the Boltzmann transport equation (BTE). OpenBTE is based on the mean-free-path formulation of the BTE. The starting point of its derivation is the standard steady-state BTE in the relaxation time approximation</p>
 <div class="math" id="equation-bte">
 <span class="eqno">(2)<a class="headerlink" href="#equation-bte" title="Permalink to this equation">¶</a></span>\[\mathbf{v}_\lambda \cdot \nabla f_\lambda (\mathbf{r}) = \frac{1}{\tau_\lambda}\left[f^0_\lambda(T) - f_\lambda(\mathbf{r}) \right],\]</div>
 <p>where <span class="math">\(\lambda\)</span> collectively describes phonon wave vector <span class="math">\(\mathbf{q}\)</span> and polarization <span class="math">\(p\)</span>, <span class="math">\(\mathbf{v}_\lambda\)</span> is the group velocity, <span class="math">\(f_\lambda(\mathbf{r})\)</span> is the non-equilibrium distribution function. The equilibrium function <span class="math">\(f_\lambda^0(\mathbf{r})\)</span> is the Bose-Einstain distribution at the effective temperature <span class="math">\(T(\mathbf{r})\)</span>, i.e.</p>
 <div class="math" id="equation-equilibrium">
 <span class="eqno">(3)<a class="headerlink" href="#equation-equilibrium" title="Permalink to this equation">¶</a></span>\[f^0_\lambda(\mathbf{r})=\left(e^{\frac{\hbar \omega_\lambda}{k_B T(\mathbf{r})}} + 1 \right)^{-1},\]</div>
-<p>where <span class="math">\(k_B\)</span> is the Boltzmann constant <span class="math">\(\hbar\omega_\lambda\)</span> is the phonon energy. Energy conservation requires <span class="math">\(\nabla \cdot \mathbf{J}(\mathbf{r}) = 0\)</span>, where the total phonon flux <span class="math">\(\mathbf{J}(\mathbf{r})\)</span> is defined by</p>
+<p>where <span class="math">\(k_B\)</span> is the Boltzmann constant and <span class="math">\(\hbar\omega_\lambda\)</span> is the phonon energy. Energy conservation requires <span class="math">\(\nabla \cdot \mathbf{J}(\mathbf{r}) = 0\)</span>, where the total phonon flux <span class="math">\(\mathbf{J}(\mathbf{r})\)</span> is defined by</p>
 <div class="math" id="equation-thermal">
-<span class="eqno">(4)<a class="headerlink" href="#equation-thermal" title="Permalink to this equation">¶</a></span>\[\mathbf{J}(\mathbf{r}) = \int \hbar\omega_\lambda \mathbf{v}_\lambda f_\lambda(\mathbf{r})  \frac{d\mathbf{q}}{2\pi^3}.\]</div>
+<span class="eqno">(4)<a class="headerlink" href="#equation-thermal" title="Permalink to this equation">¶</a></span>\[\mathbf{J}(\mathbf{r}) = \int \hbar\omega_\lambda \mathbf{v}_\lambda f_\lambda(\mathbf{r})  \frac{d\mathbf{q}}{8\pi^3}.\]</div>
 <p>After multiplying both sides of Eq. <a class="reference internal" href="#equation-bte">(2)</a> by <span class="math">\(\hbar \omega_\lambda\)</span> and integrating over the B. Z., we have</p>
 <div class="math" id="equation-energy">
-<span class="eqno">(5)<a class="headerlink" href="#equation-energy" title="Permalink to this equation">¶</a></span>\[\int  \frac{d\mathbf{q}}{2\pi^3} \frac{\hbar\omega_\lambda}{\tau_\lambda} \left[f_\lambda^0(T) -f_\lambda(\mathbf{r})\right] = 0.\]</div>
-<p>In practice, one has to compute <span class="math">\(T(\mathbf{r})\)</span> such as Eq.:eq:<cite>energy</cite> is satisfied. To simplify this task, we assume that the temperature variation are small such that the equilibrium distribution can be approximated by its first-order Taylor expansion, i.e.</p>
+<span class="eqno">(5)<a class="headerlink" href="#equation-energy" title="Permalink to this equation">¶</a></span>\[\int  \frac{d\mathbf{q}}{8\pi^3} \frac{\hbar\omega_\lambda}{\tau_\lambda} \left[f_\lambda^0(T) -f_\lambda(\mathbf{r})\right] = 0.\]</div>
+<p>In practice, one has to compute <span class="math">\(T(\mathbf{r})\)</span> such as Eq. <a class="reference internal" href="#equation-energy">(5)</a> is satisfied. To simplify this task, we assume that the temperatures variation are small such that the equilibrium distribution can be approximated by its first-order Taylor expansion, i.e.</p>
 <div class="math" id="equation-expansion">
 <span class="eqno">(6)<a class="headerlink" href="#equation-expansion" title="Permalink to this equation">¶</a></span>\[f_\lambda^0(T) \approx f_\lambda^0(T_0) + \frac{C_\lambda}{\hbar\omega_\lambda}\left([T(\mathbf{r})-T_0 \right],\]</div>
-<p>where <span class="math">\(C_\lambda(T_0)\)</span> is the heat capacity at a reference temperature <span class="math">\(T_0\)</span>. After including Eq. <a class="reference internal" href="#equation-expansion">(6)</a> into <a class="reference internal" href="#equation-energy">(5)</a>, we have</p>
+<p>where <span class="math">\(C_\lambda(T_0)\)</span> is the heat capacity at a reference temperature <span class="math">\(T_0\)</span>. After including Eq. <a class="reference internal" href="#equation-expansion">(6)</a> into Eq. <a class="reference internal" href="#equation-energy">(5)</a>, we have</p>
 <div class="math" id="equation-temperature">
-<span class="eqno">(7)<a class="headerlink" href="#equation-temperature" title="Permalink to this equation">¶</a></span>\[T(\mathbf{r}) -T_0 = \int  \frac{d\mathbf{q}}{2\pi^3} a_\lambda \frac{\hbar \omega_\lambda}{C_\lambda}\left[f_\lambda(\mathbf{r}) - f_\lambda^0(T_0)\right],\]</div>
+<span class="eqno">(7)<a class="headerlink" href="#equation-temperature" title="Permalink to this equation">¶</a></span>\[T(\mathbf{r}) -T_0 = \int  \frac{d\mathbf{q}}{8\pi^3} a_\lambda \frac{\hbar \omega_\lambda}{C_\lambda}\left[f_\lambda(\mathbf{r}) - f_\lambda^0(T_0)\right],\]</div>
 <p>where</p>
 <div class="math" id="equation-coefficients">
-<span class="eqno">(8)<a class="headerlink" href="#equation-coefficients" title="Permalink to this equation">¶</a></span>\[a_\lambda = \frac{C_\lambda}{\tau_\lambda} \left[\int  \frac{d\mathbf{q}}{2\pi^3} \frac{C_\lambda}{\tau_\lambda} \right]^{-1}.\]</div>
+<span class="eqno">(8)<a class="headerlink" href="#equation-coefficients" title="Permalink to this equation">¶</a></span>\[a_\lambda = \frac{C_\lambda}{\tau_\lambda} \left[\int  \frac{d\mathbf{q}}{8\pi^3} \frac{C_\lambda}{\tau_\lambda} \right]^{-1}.\]</div>
 <p>The BTE under a small applied temperature gradients can be then derived after including Eqs. <a class="reference internal" href="#equation-temperature">(7)</a>-<a class="reference internal" href="#equation-expansion">(6)</a> into Eq. <a class="reference internal" href="#equation-bte">(2)</a></p>
 <div class="math" id="equation-bte2">
 <span class="eqno">(9)<a class="headerlink" href="#equation-bte2" title="Permalink to this equation">¶</a></span>\[\tau_\lambda \mathbf{v}_\lambda \cdot \nabla f_\lambda (\mathbf{r}) +f_\lambda(\mathbf{r}) - f_\lambda^0= \frac{C_\lambda}{\hbar \omega_\lambda}\int \frac{d\mathbf{q}}{2\pi^3} a_\lambda \frac{\hbar \omega_\lambda}{C_\lambda}\left[f_\lambda(\mathbf{r}) -f_\lambda^0) \right].\]</div>
 <p>Upon the change of variable</p>
 <div class="math" id="equation-variable">
-<span class="eqno">(10)<a class="headerlink" href="#equation-variable" title="Permalink to this equation">¶</a></span>\[T_\lambda(\mathbf{r}) = \frac{\hbar\omega_\lambda}{C_\lambda}\left[f_\lambda(\mathbf{r})- f_\lambda^0) \right]\]</div>
+<span class="eqno">(10)<a class="headerlink" href="#equation-variable" title="Permalink to this equation">¶</a></span>\[T_\lambda(\mathbf{r}) = \frac{\hbar\omega_\lambda}{C_\lambda}\left[f_\lambda(\mathbf{r})- f_\lambda^0) \right],\]</div>
 <p>we obtain the temperature formulation of the BTE</p>
 <div class="math" id="equation-bte3">
 <span class="eqno">(11)<a class="headerlink" href="#equation-bte3" title="Permalink to this equation">¶</a></span>\[\mathbf{F}_\lambda \cdot \nabla T_\lambda(\mathbf{r}) + T_\lambda(\mathbf{r}) - \int \frac{d\mathbf{q}'}{2\pi^3} a_{\lambda'}T_{\lambda'}(\mathbf{r}) = 0,\]</div>
 <p>where <span class="math">\(\mathbf{F}_\lambda=\mathbf{v}_\lambda \tau_\lambda\)</span>. Within this formulation, the thermal flux becomes</p>
 <div class="math" id="equation-thermal2">
-<span class="eqno">(12)<a class="headerlink" href="#equation-thermal2" title="Permalink to this equation">¶</a></span>\[\mathbf{J}(\mathbf{r}) = \int \frac{d\mathbf{q}}{2\pi^3} \frac{C_\lambda}{\tau_\lambda} T_\lambda(\mathbf{r})  \mathbf{F}_\lambda.\]</div>
+<span class="eqno">(12)<a class="headerlink" href="#equation-thermal2" title="Permalink to this equation">¶</a></span>\[\mathbf{J}(\mathbf{r}) = \int \frac{d\mathbf{q}}{8\pi^3} \frac{C_\lambda}{\tau_\lambda} T_\lambda(\mathbf{r})  \mathbf{F}_\lambda.\]</div>
 </div>
 
 

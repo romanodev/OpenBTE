@@ -7,7 +7,7 @@ Let us assume we want to calculatee the thermal conductivity of a bar with lengt
 .. math:: \kappa_{eff} = -\frac{L}{\Delta T A}\int_{HC} dS \, \mathbf{J}(\mathbf{r}) \cdot \mathbf{\hat{n}}
   :label: kappa
 
-Due to the presence of classical phonon size effects, heat transport is not diffusive and :math:`\mathbf{J}(\mathbf{r})` needs to be calculated by the Boltzmann transport equation (BTE). OpenBTE is based on the mean-free-path formulation of the BTE. The starting point of its derivation is the standard steady-state BTE in the relaxation time approximation
+Due to the presence of classical phonon size effects, heat transport is not diffusive, and :math:`\mathbf{J}(\mathbf{r})` needs to be calculated by the Boltzmann transport equation (BTE). OpenBTE is based on the mean-free-path formulation of the BTE. The starting point of its derivation is the standard steady-state BTE in the relaxation time approximation
 
  
 .. math:: 
@@ -19,29 +19,29 @@ where :math:`\lambda` collectively describes phonon wave vector :math:`\mathbf{q
 .. math:: f^0_\lambda(\mathbf{r})=\left(e^{\frac{\hbar \omega_\lambda}{k_B T(\mathbf{r})}} + 1 \right)^{-1},
   :label: equilibrium
 
-where :math:`k_B` is the Boltzmann constant :math:`\hbar\omega_\lambda` is the phonon energy. Energy conservation requires :math:`\nabla \cdot \mathbf{J}(\mathbf{r}) = 0`, where the total phonon flux :math:`\mathbf{J}(\mathbf{r})` is defined by 
+where :math:`k_B` is the Boltzmann constant and :math:`\hbar\omega_\lambda` is the phonon energy. Energy conservation requires :math:`\nabla \cdot \mathbf{J}(\mathbf{r}) = 0`, where the total phonon flux :math:`\mathbf{J}(\mathbf{r})` is defined by 
 
-.. math:: \mathbf{J}(\mathbf{r}) = \int \hbar\omega_\lambda \mathbf{v}_\lambda f_\lambda(\mathbf{r})  \frac{d\mathbf{q}}{2\pi^3}.
+.. math:: \mathbf{J}(\mathbf{r}) = \int \hbar\omega_\lambda \mathbf{v}_\lambda f_\lambda(\mathbf{r})  \frac{d\mathbf{q}}{8\pi^3}.
   :label: thermal
 
 After multiplying both sides of Eq. :eq:`bte` by :math:`\hbar \omega_\lambda` and integrating over the B. Z., we have
 
-.. math:: \int  \frac{d\mathbf{q}}{2\pi^3} \frac{\hbar\omega_\lambda}{\tau_\lambda} \left[f_\lambda^0(T) -f_\lambda(\mathbf{r})\right] = 0.
+.. math:: \int  \frac{d\mathbf{q}}{8\pi^3} \frac{\hbar\omega_\lambda}{\tau_\lambda} \left[f_\lambda^0(T) -f_\lambda(\mathbf{r})\right] = 0.
   :label: energy
 
-In practice, one has to compute :math:`T(\mathbf{r})` such as Eq.:eq:`energy` is satisfied. To simplify this task, we assume that the temperature variation are small such that the equilibrium distribution can be approximated by its first-order Taylor expansion, i.e.
+In practice, one has to compute :math:`T(\mathbf{r})` such as Eq. :eq:`energy` is satisfied. To simplify this task, we assume that the temperatures variation are small such that the equilibrium distribution can be approximated by its first-order Taylor expansion, i.e.
 
 .. math:: f_\lambda^0(T) \approx f_\lambda^0(T_0) + \frac{C_\lambda}{\hbar\omega_\lambda}\left([T(\mathbf{r})-T_0 \right],
   :label: expansion
 
-where :math:`C_\lambda(T_0)` is the heat capacity at a reference temperature :math:`T_0`. After including Eq. :eq:`expansion` into :eq:`energy`, we have
+where :math:`C_\lambda(T_0)` is the heat capacity at a reference temperature :math:`T_0`. After including Eq. :eq:`expansion` into Eq. :eq:`energy`, we have
 
-.. math:: T(\mathbf{r}) -T_0 = \int  \frac{d\mathbf{q}}{2\pi^3} a_\lambda \frac{\hbar \omega_\lambda}{C_\lambda}\left[f_\lambda(\mathbf{r}) - f_\lambda^0(T_0)\right],
+.. math:: T(\mathbf{r}) -T_0 = \int  \frac{d\mathbf{q}}{8\pi^3} a_\lambda \frac{\hbar \omega_\lambda}{C_\lambda}\left[f_\lambda(\mathbf{r}) - f_\lambda^0(T_0)\right],
   :label: temperature
 
 where
 
-.. math:: a_\lambda = \frac{C_\lambda}{\tau_\lambda} \left[\int  \frac{d\mathbf{q}}{2\pi^3} \frac{C_\lambda}{\tau_\lambda} \right]^{-1}.
+.. math:: a_\lambda = \frac{C_\lambda}{\tau_\lambda} \left[\int  \frac{d\mathbf{q}}{8\pi^3} \frac{C_\lambda}{\tau_\lambda} \right]^{-1}.
   :label: coefficients
 
 The BTE under a small applied temperature gradients can be then derived after including Eqs. :eq:`temperature`-:eq:`expansion` into Eq. :eq:`bte`
@@ -53,7 +53,7 @@ The BTE under a small applied temperature gradients can be then derived after in
 Upon the change of variable
 
 .. math::
-  T_\lambda(\mathbf{r}) = \frac{\hbar\omega_\lambda}{C_\lambda}\left[f_\lambda(\mathbf{r})- f_\lambda^0) \right]
+  T_\lambda(\mathbf{r}) = \frac{\hbar\omega_\lambda}{C_\lambda}\left[f_\lambda(\mathbf{r})- f_\lambda^0) \right],
   :label: variable
 
 we obtain the temperature formulation of the BTE
@@ -63,7 +63,7 @@ we obtain the temperature formulation of the BTE
 
 where :math:`\mathbf{F}_\lambda=\mathbf{v}_\lambda \tau_\lambda`. Within this formulation, the thermal flux becomes
 
-.. math:: \mathbf{J}(\mathbf{r}) = \int \frac{d\mathbf{q}}{2\pi^3} \frac{C_\lambda}{\tau_\lambda} T_\lambda(\mathbf{r})  \mathbf{F}_\lambda.
+.. math:: \mathbf{J}(\mathbf{r}) = \int \frac{d\mathbf{q}}{8\pi^3} \frac{C_\lambda}{\tau_\lambda} T_\lambda(\mathbf{r})  \mathbf{F}_\lambda.
   :label: thermal2
 
 

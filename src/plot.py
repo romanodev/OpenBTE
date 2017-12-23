@@ -10,7 +10,8 @@ import matplotlib.patches as patches
 from matplotlib.path import Path
 from fig_maker import *
 from shapely import geometry,wkt
-
+from shapely.geometry import MultiPoint,Point,Polygon,LineString
+from scipy.interpolate import BarycentricInterpolator
 
 def get_suppression(mfps,sup,mfp):
 
@@ -58,12 +59,15 @@ class Plot(object):
      self.plot_map(argv)
    if argv['plot'].split('/')[0] == 'material':
      self.plot_material(argv)
+   if argv['plot'].split('/')[0] == 'line_plot':
+     self.plot_line_temperature(argv)
+     #self.plot_material(argv)
 
   if argv['plot'] == 'suppression_function' :
    self.plot_suppression_function()
 
-  if argv['plot'] == 'line_temperature' :
-   self.plot_line_temperature(argv)
+  #if argv['plot'] == 'line_temperature' :
+  # self.plot_line_temperature(argv)
 
   if argv['plot'] == 'directional_suppression_function' :
    self.plot_directional_suppression_function(argv)
@@ -178,45 +182,82 @@ class Plot(object):
    ylim([0,max(dis_bulk)*1.3])
    show()
 
+
+
  def plot_line_temperature(self,argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
    geo = dd.io.load('geometry.hdf5')
    solver = dd.io.load('solver.hdf5')
-   temp = solver['bte_temperature']
+   data = solver[argv['plot'].split('/')[1]]['data']
+   N = argv.setdefault('N',100)
 
    #Compute the closest element on the left-----
    y0 = argv.setdefault('y0',0)
    m = argv.setdefault('m',0)
-   size = geo['size'][0]   
-   P = [-size/2.0,-m*size/2.0+y0,0]
-   ce = -1
-   dmin = 1e4
-   for n,elem in enumerate(geo['elems']):   
-    c = geo['elem_centroids'][n]
-    if np.linalg.norm(c-P)<dmin:
-     dmin = np.linalg.norm(c-P)
-     ce = n
-   #---------------------------------------
+   Lx = geo['size'][0]   
+   Ly = geo['size'][1]   
+   p1 = Point(-Lx,-m*Lx+y0)
+   p2 = Point(Lx,m*Lx+y0)
+   poly = Polygon([(-Lx/2.0,-Ly/2.0),(Lx/2.0,-Ly/2.0),(Lx/2.0,Ly/2.0),(-Lx/2.0,Ly/2.0)])
+   l =  LineString([p1, p2])
+   isp = l.intersection(poly.boundary)
+   P1 = np.array([list(isp)[0].x,list(isp)[0].y])
+   P2 = np.array([list(isp)[1].x,list(isp)[1].y])
 
-   line = geometry.LineString([(P[0],P[1]),(P[0]+size,P[1]+m*size)])     
-   kc1 = ce
-   nn = 1
-   while nn > 0:
-    for s in geo['elem_side_map'][ce]:
-     kc2 = mesh.get_neighbor_elem(kc1,s)
-     
-     #Create polygons-------------------
-     poly = []
-     for n in geo['elems'][kc2]:
-      poly.append(geo['nodes'][n][0:2])
-     poly.append(poly[0])      
-     polygon = geometry.Polygon(poly)
-     #----------------------------------
-     ips = line.intersection(poly.boundary)
-     print(ips)
-     quit()
 
+   elems = range(len(geo['elems']))
+   line_data = np.zeros(N)
+   x = []
+   x_old = 0.0
+  
+   P_old = P1 
+   for k in range(N):
+    tmp = P1 + (1e-4 + float(k)/float(N-1))*(P2-P1) 
+    dx = np.linalg.norm(tmp-P_old)
+    x.append(x_old + dx)
+    P_old = tmp
+    x_old = x[-1]
+
+    p = Point(tmp[0],tmp[1])
+    for e in elems:   
+     elem = geo['elems'][e]
+     nodes = geo['nodes'][elem][:,0:2]
+     polygon = geometry.Polygon(nodes)
+     if p.within(polygon):
+      #Barycentric interpolation------
+      area = geo['elem_volumes'][e]
+      v = 0
+      for n in range(3):
+       n1 = (n+1)%3    
+       n2 = (n+2)%3   
+       new_nodes = [[p.x,p.y],list(nodes[n1,:]),list(nodes[n2,:])]
+       partial_area = self.compute_area(new_nodes)
+       coeff = partial_area/area
+       v += coeff * data[elem[n]]
+      break
+
+    line_data[k] = v
+
+   init_plotting(extra_x_padding = 0.05)
+   plot(x,line_data,color=c1)  
+   grid(which='both')
+   xlabel('Distance [nm]')
+   
+   yl = solver[argv['plot'].split('/')[1]]['label']
+   ylabel(yl)
+   show()   
+  
+
+
+
+ def compute_area(self,points):
+
+   x = []; y= []
+   for p in points:
+    x.append(p[0])
+    y.append(p[1])
+   return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
  
 
  def plot_distribution(self):
