@@ -22,8 +22,8 @@ def compute_dom_3d(argv) :
    d_phi_plain = Dphi*np.ones(n_phi)
    d_phi_int = Dphi*np.ones(n_phi)
    output.update({'d_phi':Dphi})  
-   #phi_vec = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True) 
-   phi_vec = np.linspace(0.0,2.0*np.pi,n_phi,endpoint=False) 
+   phi_vec = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True) #this is the correct one
+   #phi_vec = np.linspace(0.0,2.0*np.pi,n_phi,endpoint=False) 
 
 
    output.update({'phi_vec':phi_vec})   

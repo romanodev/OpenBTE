@@ -26,6 +26,8 @@ class Material(object):
     data = dd.io.load('material.hdf5')
    else: data=None
    self.state.update(MPI.COMM_WORLD.bcast(data,root=0))
+  if argv.setdefault('model','isotropic') == 'gray':
+   self.create_gray_model(argv)
   #-----------------------------------------------
 
   #Angular discretization-------------------------
@@ -40,6 +42,26 @@ class Material(object):
   if argv.setdefault('save',True):
    if MPI.COMM_WORLD.Get_rank() == 0:
     dd.io.save('material.hdf5', self.state)
+
+
+ def create_gray_model(self,argv):
+
+
+  if MPI.COMM_WORLD.Get_rank() == 0:
+    data = {}
+    mfp = argv.setdefault('mfp',100)
+    kappa = argv.setdefault('kappa',1.0)
+
+    data.update({'kappa_bulk_tot':kappa})
+    data.update({'mfp_bulk':[mfp]})
+    data.update({'kappa_bulk':[kappa]})
+    data.update({'B0':[1]})
+    data.update({'B1':[1]})
+    data.update({'B2':[1]})
+    data.update({'mfp_sampled':[mfp]})
+  else: data=None
+  self.state = MPI.COMM_WORLD.bcast(data,root=0)
+
 
 
 
@@ -105,7 +127,6 @@ class Material(object):
     data.update({'mfp_sampled':mfp_sampled})
   else: data=None
   self.state = MPI.COMM_WORLD.bcast(data,root=0)
-
 
 
  def get_mfp_interpolation(self,mfp_sampled,mfp_bulk) :

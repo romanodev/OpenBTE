@@ -87,32 +87,41 @@ class Plot(object):
    Ny = argv['n_y']
    increment = [0,0]
    #data = np.ones(len(geo['elems']))
-   variable = argv['plot'].split('/')[1]
-   model = 'geometry'
+   variable = argv['plot'].split('/')[1] + '_cell'
+   solver = dd.io.load('solver.hdf5')
+   data = solver[variable]['data']
+   model = 'data'
+   #model = 'geometry'
 
-   if variable == 'temperature':
-    model = 'data'
-    solver = dd.io.load('solver.hdf5')
-    data = solver['bte_temperature']
-    increment = [1,0]
-    maxt = max(data)
-    mint = min(data)
-    a = 1.0; b = (float(Nx)-1.0)/float(Nx)
-    data -= mint
-    data /= (maxt-mint)
-    data *= a-b
-    data += b
+   #if variable == 'temperature':
+   # model = 'data'
+   # solver = dd.io.load('solver.hdf5')
+   # data = solver['bte_temperature']['data']
 
-   if variable == 'flux_magnitude':
-    model = 'data'
-    solver = dd.io.load('solver.hdf5')
-    tmp = solver['bte_flux']
-    data = []
-    for t in tmp:
-     data.append(np.linalg.norm(t))
-    maxt = max(data)
-    mint = min(data)
-    data = (data-mint)/(maxt-mint) 
+
+   maxt = max(data)
+   mint = min(data)
+   data -= mint
+   data /= (maxt-mint)
+
+   if len(np.shape(data)) == 1: #It is flux
+     increment = [1,0]
+     a = 1.0; b = (float(Nx)-1.0)/float(Nx)
+     data *= a-b
+     data += b
+   else: #it is temperature
+     increment = [0,0]
+
+   #if variable == 'flux_magnitude':
+   # model = 'data'
+   # solver = dd.io.load('solver.hdf5')
+   # tmp = solver['bte_flux']
+   # data = []
+   # for t in tmp:
+   #  data.append(np.linalg.norm(t))
+   # maxt = max(data)
+   # mint = min(data)
+   # data = (data-mint)/(maxt-mint) 
 
    mm =1e4
    mm2 =-1e4
@@ -135,11 +144,6 @@ class Plot(object):
        i[0] += Px 
        i[1] += Py 
       path = create_path(p)
-      #value = data[e]#-np.dot(displ,increment)
-      #if value < mm :  
-      # mm = value
-      #if value > mm2 :  
-      # mm2 = value
       if model == 'geometry': color = 'gray'
       if model == 'data': color = color=cmap(data[e]-np.dot(displ,increment))
   
@@ -347,12 +351,18 @@ class Plot(object):
  def plot_suppression_function(self):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
-   init_plotting()
+   init_plotting(extra_x_padding = 0.05)
    data = dd.io.load('solver.hdf5')
    sup = data['suppression_function']
    mfp = data['mfp']*1e6
+   kappa_bulk = data['kappa_bulk']
+   kappa_fourier = data['kappa_fourier']
+   ratio = kappa_fourier/kappa_bulk   
+
    plot(mfp,sup,color=c2)
+   plot([mfp[0],mfp[-1]],[ratio,ratio],color='black',ls='--')
    xscale('log')
+   ylim([0,1])
    grid('on')
    xlabel('Mean Free Path [$\mu$ m]')
    ylabel('Suppression Function')

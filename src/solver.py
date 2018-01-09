@@ -1,6 +1,8 @@
 from mpi4py import MPI
 from fourier import Fourier
-from bte import BTE
+from bte2 import BTE
+#from bte import BTE
+#from bte_opt import BTE_OPT
 from pyvtk import *
 import numpy as np
 import deepdish as dd
@@ -12,35 +14,43 @@ class Solver(object):
   self.mesh = argv['geometry']
   self.state = {}
   #Print kappa Bulk
+  kappa_bulk = argv['material'].state['kappa_bulk_tot']
   if MPI.COMM_WORLD.Get_rank() == 0:
 
    #Initialization-------------
    print(' ')
    self.print_logo()
    print(' ')
-   print('Bulk Thermal Conductivity:  ' + str(round(argv['material'].state['kappa_bulk_tot'],4)) + ' W/m/K')
-
+   print('Bulk Thermal Conductivity:  ' + str(round(kappa_bulk,4)) + ' W/m/K')
+  self.state.update({'kappa_bulk':kappa_bulk})
   #We solve Fourier in any case
   fourier = Fourier(argv)
   self.state.update({'fourier_temperature':fourier.temperature})
   self.state.update({'fourier_flux':fourier.flux})
-  self.state.update({'fourier_kappa':fourier.kappa})
+  self.state.update({'kappa_fourier':fourier.kappa})
   argv.update(self.state)
   #Solve BTE
   if argv['model'] == 'bte':
    bte = BTE(argv)
    self.state.update(bte.state)
+   self.state.update(self.write_vtk(argv))
+  #if argv['model'] == 'bte_opt':
+  # bte = BTE_OPT(argv)
   #if MPI.COMM_WORLD.Get_rank() == 0:
    #print('Ratio:  ' + str(round(self.state['fourier_kappa']/self.state['bte_kappa'],4)))
    #print(' ')
 
 
-  self.state.update(self.write_vtk(argv))
   if MPI.COMM_WORLD.Get_rank() == 0:
    dd.io.save('solver.hdf5', self.state)
   
 #kb,temp = bte.compute_function(x0,fourier_temp = temp)
-   
+  
+ 
+  
+
+
+
  def get_increment(self,argv):
 
    gradient = argv.setdefault('gradient','x')
@@ -129,7 +139,7 @@ class Solver(object):
  def write_vtk(self,argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
-   nodal_data = {}
+   stored_data = {}
    #Write Fourier Temperature
    Nx = argv.setdefault('repeat_x',3)
    Ny = argv.setdefault('repeat_y',3)
@@ -137,7 +147,12 @@ class Solver(object):
 
    #Fourier Temperature----
    node_data = self.cell_to_node(self.state['fourier_temperature'])
-   nodal_data.update({'fourier_temperature_nodal':node_data[:,0]})
+ 
+   #UPDATE-----------------------------------------------------------------------
+   stored_data.update({'fourier_temperature_nodal':{'data':node_data[:,0],'label':'Temperature [K]'}})
+   stored_data.update({'fourier_temperature_cell':{'data':self.state['fourier_temperature'],'label':'Temperature [K]'}})
+   #-----------------------------------------------------------------------------
+
    argv.update({'variable':'fourier_temperature'})
    increment = self.get_increment(argv)
    nodes,cells,fourier_temp = self.repeat_nodes_and_data(Nx,Ny,Nz,node_data,increment)
@@ -145,7 +160,11 @@ class Solver(object):
 
    #Fourier Flux----
    node_data = self.cell_to_node(np.array(self.state['fourier_flux']))
-   nodal_data.update({'fourier_flux_nodal':node_data})
+
+   stored_data.update({'fourier_flux_nodal':node_data})
+   stored_data.update({'fourier_flux_cell':{'data':self.state['fourier_flux'],'label':'Flux W/m2/K'}})
+   #----------------------------------------------------------------------
+
    argv.update({'variable':'fourier_flux'})
    increment = self.get_increment(argv)
    nodes,cells,fourier_flux = self.repeat_nodes_and_data(Nx,Ny,Nz,node_data,increment)
@@ -153,8 +172,9 @@ class Solver(object):
 
    #BTE Temperature----
    node_data = self.cell_to_node(self.state['bte_temperature'])
- 
-   nodal_data.update({'bte_temperature':{'data':node_data[:,0],'label':'Temperature [K]'}})
+   
+   stored_data.update({'bte_temperature_nodal':{'data':node_data[:,0],'label':'Temperature [K]'}})
+   stored_data.update({'bte_temperature_cell':{'data':self.state['bte_temperature'],'label':'Temperature [K]'}})
 
 
    argv.update({'variable':'bte_temperature'})
@@ -163,7 +183,11 @@ class Solver(object):
 
    #BTE Flux----
    node_data = self.cell_to_node(np.array(self.state['bte_flux']))
-   nodal_data.update({'bte_flux_nodal':node_data})
+
+   stored_data.update({'bte_flux_nodal':{'data':node_data,'label':'Flux W/m2/K'}})
+   stored_data.update({'bte_flux_cell':{'data':self.state['bte_flux'],'label':'Flux W/m2/K'}})
+
+
    argv.update({'variable':'bte_flux'})
    increment = self.get_increment(argv)
    nodes,cells,bte_flux = self.repeat_nodes_and_data(Nx,Ny,Nz,node_data,increment)
@@ -187,8 +211,8 @@ class Solver(object):
     #--------------------------------------------------------
 
    vtk.tofile('output.vtk','ascii')
-  else: nodal_data = None
-  return MPI.COMM_WORLD.bcast(nodal_data,root=0)
+  else: stored_data = None
+  return MPI.COMM_WORLD.bcast(stored_data,root=0)
   
 
    #--------------

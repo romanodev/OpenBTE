@@ -14,6 +14,7 @@ import h5py
 from utils import *
 import deepdish as dd
 import sparse
+import time
 
 class BTE(object):
   
@@ -35,7 +36,7 @@ class BTE(object):
    self.B2_2 = mat.state['B2']
   
    self.compute_gradient = argv.setdefault('compute_gradient',False)
-
+   self.lu = {}
 
 
    self.mfp = np.array(mat.state['mfp_sampled'])/1e-9 #In nm
@@ -58,6 +59,9 @@ class BTE(object):
    self.n_elems = len(self.mesh.elems)
 
    self.compute_connection_matrix()
+   if self.compute_gradient:
+    self.compute_gamma_derivative()
+
    if self.compute_matrix:
     if MPI.COMM_WORLD.Get_rank() == 0:
      directory = 'tmp'
@@ -106,7 +110,7 @@ class BTE(object):
 
   def compute_directional_connections(self,p,options):
     
-   
+   Diff = []
    Bplus = []
    rplus = []
    cplus = []
@@ -116,26 +120,26 @@ class BTE(object):
    Fminus = []
    Fplus = []
    
-   for i,j in zip(*self.B.nonzero()):
+   for i,j in zip(*self.Gamma.nonzero()):
    
     side = self.mesh.get_side_between_two_elements(i,j)  
-    normal = self.mesh.compute_side_normal(i,side)
-    
-    tmp = np.dot(normal,self.dom['phi_dir'][p])
-    if tmp > 0:
-     Bplus.append(1)
+    phi_factor = self.dom['phi_dir'][p]/self.dom['d_phi_vec'][p]
+    coeff = np.dot(phi_factor,self.mesh.get_coeff(i,j))
+    d_coeff = np.dot(self.dom['phi_dir'][p],self.mesh.get_normal_between_elems(i,j))/np.pi
+    if coeff > 0:
+     Bplus.append(coeff)
+     Diff.append(d_coeff)
      rplus.append(i)
      cplus.append(j)
      v = self.mesh.get_side_periodic_value(side,i,self.side_periodic_value)
-     Fplus.append(v)
-     #Fplus[j] = v
+     Fplus.append(v*coeff)
 
-    if tmp < 0 :
-     Bminus.append(1)
+    if coeff < 0 :
+     Bminus.append(coeff)
      rminus.append(i)
      cminus.append(j)
      v = self.mesh.get_side_periodic_value(side,j,self.side_periodic_value)
-     Fminus.append(-v)
+     Fminus.append(-v*coeff)
 
 
    #--------------------------WRITE FILES---------------------
@@ -147,8 +151,42 @@ class BTE(object):
    scipy.io.mmwrite('tmp/FMINUS_' + str(p) + r'.mtx',Fm) 
    Fp = csc_matrix( (Fplus,(rplus,cplus)), shape=(self.n_elems,self.n_elems) )
    scipy.io.mmwrite('tmp/FPLUS_' + str(p) + r'.mtx',Fp) 
+   Dp = csc_matrix( (Diff,(rplus,cplus)), shape=(self.n_elems,self.n_elems) )
+   scipy.io.mmwrite('tmp/D_' + str(p) + r'.mtx',Dp) 
    #np.save(file('tmp/F_' + str(p),'w+'),F)
    #----------------------------------------------------------
+   #return Bm,Bp,Fm,Fp
+
+  def compute_gamma_derivative(self) :
+   
+   nc = len(self.mesh.elems)
+   row_tmp = []
+   col_tmp = []
+   data_tmp = [] 
+   data_tmp_b = [] 
+
+   for ll in self.mesh.side_list['active'] :
+    if not ll in self.mesh.side_list['Boundary']:
+     area = self.mesh.get_side_area(ll)
+     elems = self.mesh.get_elems_from_side(ll)
+     kc1 = elems[0]
+     c1 = self.mesh.get_elem_centroid(kc1)
+     normal = self.mesh.get_side_normal(0,ll)
+     Af = area*normal  
+     nodes = self.mesh.side_node_map[ll]
+     c2 = self.mesh.get_next_elem_centroid(kc1,ll)
+     kc2 = elems[1]  
+     a = self.get_transmission_derivative(kc1,kc2)
+     row_tmp.append(kc1)
+     col_tmp.append(kc2)
+     data_tmp.append(a)
+     row_tmp.append(kc2)
+     col_tmp.append(kc1)
+     a = self.get_transmission_derivative(kc2,kc1)
+     data_tmp.append(a)
+  
+   self.Gamma_der = csc_matrix( (np.array(data_tmp),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) )
+
 
   def compute_connection_matrix(self) :
    
@@ -169,132 +207,146 @@ class BTE(object):
      nodes = self.mesh.side_node_map[ll]
      c2 = self.mesh.get_next_elem_centroid(kc1,ll)
      kc2 = elems[1]  
+     a = self.get_transmission(kc1,kc2)
      row_tmp.append(kc1)
      col_tmp.append(kc2)
-     data_tmp.append(1.0)
+     data_tmp.append(a+1e-20)
      row_tmp.append(kc2)
      col_tmp.append(kc1)
-     data_tmp.append(1.0)
+     a = self.get_transmission(kc2,kc1)
+     data_tmp.append(a+1e-20)
   
-   self.B = csc_matrix( (np.array(data_tmp),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) )
+   self.Gamma = csc_matrix( (np.array(data_tmp),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) )
 
   def get_transmission_derivative(self,i,j):
 
    x1 = self.x[i]
    x2 = self.x[j]
-   f = 2.0*x1*x2/(x1+ x2)
-   return 0.5*f*f/x2/x2
+   #f = 2.0*x1*x2/(x1+ x2)
+   #return 0.5*f*f/x2/x2
+   return 2.0*x2*x2/(x1+x2)/(x1+x2)
 
 
 
   def solve(self,p,options):
 
    kappa = 0.0
-   DS = csc_matrix(options['DS'])
-   old_temp = options['temp']
+   
+
    TB = options['boundary_temp']
-   gradient_T = csc_matrix(options['gradient_T'])
    Bminus=scipy.io.mmread('tmp/BMINUS_' + str(p) + '.mtx').tocsc() 
    Bplus=scipy.io.mmread('tmp/BPLUS_' + str(p) + '.mtx').tocsc()
    Fminus=scipy.io.mmread('tmp/FMINUS_' + str(p) + '.mtx').tocsc() 
    Fplus=scipy.io.mmread('tmp/FPLUS_' + str(p) + '.mtx').tocsc() 
+   Diff=scipy.io.mmread('tmp/D_' + str(p) + '.mtx').tocsc() 
    phi_factor = self.dom['phi_dir'][p]/self.dom['d_phi_vec'][p]
    #-------------------------------------------------------------------------
-  
-   new_temp = np.zeros(self.n_el) 
-   new_gradient_T = csc_matrix(np.zeros((self.n_el,self.n_el),dtype=np.float64) )
-   new_gradient_TB = csc_matrix(np.zeros((self.n_el,self.n_el),dtype=np.float64) )
+ 
+    
+   DS = csc_matrix(options['DS'])
+   DS_new = csc_matrix((self.n_el,self.n_el))
+   gradient_TL = csc_matrix(options['gradient_TL'])
+   gradient_TL_new = csc_matrix(np.zeros((self.n_el,self.n_el),dtype=np.float64) )
+   TL = options['temp']
+   TL_new = np.zeros(self.n_el) 
+   gradient_DS = options['gradient_DS']
+   gradient_DS_new = np.zeros((self.n_elems,self.n_elems,self.n_elems))
+   
+
+
+
    flux = np.zeros((self.n_el,3)) 
    new_boundary_temp = np.zeros(self.n_el) 
    suppression = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
-   rd = [];cd = [];dd = [] #initialize for diffuse scattering
+   #rd = [];cd = [];dd = [] #initialize for diffuse scattering
    
    coords = []
-
 
    symmetry = 2
    kappa = 0
 
 
+   tmp = Bminus.multiply(DS-DS.multiply(self.Gamma))
+   D =  -np.einsum('ij->i',tmp.todense())
+   P =  np.einsum('ij->i',(Fminus.multiply(self.Gamma)).todense())
+   #Building matrixes----------------------------------
+   #if self.current_iter == 0:
+   Am = Bminus.multiply(self.Gamma)
+   b = [tmp[0,0] for tmp in Bplus.sum(axis=1)]
+   Ap  = diags([b],[0]).tocsc() 
+
+
+   #collect data
+   A = Ap + Am
+   B = P + D
+   #-------------------------
+   
+
+   #----------------------------------------------------
+
    gradient = np.zeros(self.n_elems)
-   gradient_TB = np.zeros(self.n_elems)
+   #gradient_TB = np.zeros(self.n_elems)
    kappa_factor = 3.0/4.0/np.pi*self.mesh.size[0]/self.area_flux
    for t in range(int(self.n_theta/2.0)): #We take into account the symmetry
     theta_factor = self.dom['at'][t] / self.dom['d_theta_vec'][t]
-    angle_factor = phi_factor * theta_factor
+    for m in range(self.n_mfp):
 
-    #Assemble Am----------------
-    r = [];c = [];d = [] 
-    C = np.zeros(self.n_elems)
-    for i,j in zip(*Bminus.nonzero()):
-     r.append(i);c.append(j)
-     tmp = np.dot(angle_factor,self.mesh.get_coeff(i,j))
-     a = self.get_transmission(i,j)
-     value = tmp*a
-     d.append(value)
-     C[i] -= DS[i,j]*(1.0-a)*tmp #Diffuse scattering (interfaces)
-     #C[i] -= TB[i]*(1.0-a)*tmp #Diffuse scattering (interfaces)
-    Am = csc_matrix( (np.array(d),(np.array(r),np.array(c))), shape=(self.n_elems,self.n_elems) )
+     #----------------------------------------------------------------------------------
+     #index = m*self.dom['n_theta']*self.dom['n_phi'] +t*self.dom['n_phi']+p
+     #if self.current_iter == 0:
+     F = scipy.sparse.eye(self.n_elems) + theta_factor * self.mfp[m] * A
+     lu = splu(F.tocsc())
+     #self.lu.update({m*self.dom['n_theta']*self.dom['n_phi'] +t*self.dom['n_phi']+p:lu})
+     #else:
+      #lu = self.lu[index] #read previous lu
+     #-------------------------------------------------------------------------------
+     RHS = self.mfp[m]*theta_factor * B + TL
 
-
-    #Assemble Ap----------------
-    r = [];c = [];d = [] 
-    for i,k in zip(*Bplus.nonzero()):
-     r.append(i);c.append(k)
-     tmp = np.dot(angle_factor,self.mesh.get_coeff(i,k))
-     value = tmp
-     d.append(value)
-    Ap_tmp = csc_matrix( (np.array(d),(np.array(r),np.array(c))), shape=(self.n_elems,self.n_elems) )
-    b = [tmp[0,0] for tmp in Ap_tmp.sum(axis=1)]
-    Ap  = diags([b],[0]).tocsc() 
+     temp = lu.solve(RHS)
     
 
+     TL_new += self.B2[m] * temp * self.dom['d_omega'][t][p]/4.0/np.pi * symmetry
+     for i in range(self.n_el) :
+      flux[i] += self.B1[m]*temp[i]*self.dom['S'][t][p]
+     #temp = spsolve(F.tocsc(),RHS,use_umfpack = True)
+     #suppression[m,t,p] = power
+     #NEW------------------------------------------------------------------------------
+     pre_factor = 0.5*theta_factor/self.mfp[m]*self.dom['d_theta_vec'][t]*self.dom['d_phi_vec'][p]
+     for i,j in zip(*Fminus.nonzero()):
+      vol = self.mesh.get_elem_volume(i)
+      suppression[m,t,p] += Fminus[i,j]*temp[i]*vol*pre_factor
 
-    #-----------------------------------------
-    #PERIODICITY------
-    B = np.zeros(self.n_elems)
-    for i,j in zip(*Fminus.nonzero()):
-     a = self.get_transmission(i,j)
-     tmp = np.dot(angle_factor,self.mesh.get_coeff(i,j))
-     value = tmp*a
-     B[i] += Fminus[i,j] * value
-
-
-    #Contribution from Hard Boundary------
-    HW = np.zeros(self.n_elems)
-    r = [];c = [];d = [] 
-    for side in self.mesh.side_list['Boundary']:
-     (coeff,elem) = self.mesh.get_side_coeff(side)
-     tmp = np.dot(angle_factor,coeff) #This is specific to boundaries
-     if tmp < 0:
-      HW[elem] -= TB[elem]*tmp
-     else: 
-      r.append(elem);c.append(elem);d.append(tmp)
-    BOUNDARY = csc_matrix( (np.array(d),(np.array(r),np.array(c))), shape=(self.n_elems,self.n_elems) )
-    #------------------------------------
-     
-    #MFP space
-    for m in range(self.n_mfp):
-     #solve the system---
-     F = scipy.sparse.eye(self.n_elems) + self.mfp[m] * (Ap + Am) + self.mfp[m]*BOUNDARY
-     RHS = old_temp + self.mfp[m]*B + self.mfp[m]*C + self.mfp[m]*HW
-     temp = spsolve(F,RHS,use_umfpack = True)
+     for i,j in zip(*Fplus.nonzero()):
+      vol = self.mesh.get_elem_volume(i)
+      suppression[m,t,p] += Fplus[i,j]*temp[i]*vol*pre_factor
      #-------------------------------------------------
-      
+
+
+     
+     #for i,j in zip(*Diff.nonzero()):
+     # rd.append(i); cd.append(j)
+     # value =  self.dom['at'][t]*self.B1[m]*symmetry*Diff[i,j]*temp[i]
+     # dd.append(value)
+
+     temp_mat = csc_matrix(np.tile(temp,[self.n_el,1]).T)
+     DS_new += self.dom['at'][t]*self.B1[m]*symmetry*Diff.multiply(temp_mat)
+     
+
+
      #For diffuse scattering--------------
-     for i,j in zip(*Bplus.nonzero()):
-      rd.append(i); cd.append(j) 
-      value = self.B1[m]*symmetry*temp[i]*np.dot(self.dom['S'][t][p],self.mesh.get_normal_between_elems(i,j))/np.pi
-      dd.append(value)  
+     #for i,j in zip(*Bplus.nonzero()):
+     # rd.append(i); cd.append(j) 
+     # value = self.B1[m]*symmetry*temp[i]*np.dot(self.dom['S'][t][p],self.mesh.get_normal_between_elems(i,j))/np.pi
+     # dd.append(value)  
      #----------------------------------
      
      #Compute TB----------------------------------------------------------------------
-     for side in self.mesh.side_list['Boundary']:
-      elem = self.mesh.side_elem_map[side][0]
-      normal = self.mesh.compute_side_normal(elem,side)
-      if np.dot(self.dom['phonon_dir'][t][p],normal) > 0:
-       value = self.B1[m]*symmetry*temp[elem]*np.dot(self.dom['S'][t][p],normal)/np.pi
-       new_boundary_temp[elem] += value
+     #for side in self.mesh.side_list['Boundary']:
+     # elem = self.mesh.side_elem_map[side][0]
+     # normal = self.mesh.compute_side_normal(elem,side)
+     # if np.dot(self.dom['phonon_dir'][t][p],normal) > 0:
+     #  value = self.B1[m]*symmetry*temp[elem]*np.dot(self.dom['S'][t][p],normal)/np.pi
+     #  new_boundary_temp[elem] += value
       #------------------------------------------------------------------------------
 
       #-----------------------   
@@ -303,145 +355,95 @@ class BTE(object):
      # new_temp += B2 * temp * self.dom['d_omega'][t][p]/4.0/np.pi * symmetry
 
      #new_temp += self.B2[m] * np.multiply(temp,self.x) * self.dom['d_omega'][t][p]/4.0/np.pi * symmetry
-     new_temp += self.B2[m] * temp * self.dom['d_omega'][t][p]/4.0/np.pi * symmetry
   
 
-     for i in range(self.n_el) :
-      flux[i] += self.B1[m]*temp[i]*self.dom['S'][t][p]
 
-     #power = 0.0
-     #for s in self.flux_sides:
-     # elems = self.mesh.side_elem_map[s]  
-     # i = elems[0]
-     # j = elems[1]
-     # Af = self.mesh.get_af(i,j)
-     # tmp = np.dot(self.dom['S'][t][p],self.mesh.get_af(i,j))
-      #if tmp >= 0:
-     # power += temp[i]*tmp/self.mfp[m]
-      #else:
-      # power += (temp[o]-1.0)*tmp/self.mfp[m]
-
-     #suppression[m,t,p] = power
-     #NEW------------------------------------------------------------------------------
-     for i,j in zip(*Fminus.nonzero()):
-      suppression[m,t,p] +=  0.5*Fminus[i,j]*temp[i]*np.dot(self.dom['S'][t][p],self.mesh.get_af(i,j))/self.mfp[m]
-      #suppression[m,t,p] +=   0.5*temp[i] *np.dot(self.dom['S'][t][p],self.mesh.get_af(i,j))/self.mfp[m]
-     for i,j in zip(*Fplus.nonzero()):
-      suppression[m,t,p] +=  0.5*Fplus[i,j]*temp[i]*np.dot(self.dom['S'][t][p],self.mesh.get_af(i,j))/self.mfp[m]
-      #suppression[m,t,p] +=  0.5*temp[i]*np.dot(self.dom['S'][t][p],self.mesh.get_af(i,j))/self.mfp[m]
      #----------------------------------------------------------------------------------
 
      #Compute gradient---------------------
      if self.compute_gradient:
+  
 
-      #StimesT
-      row = []; col = []; data = []
-      for i,j in zip(*Bminus.nonzero()):
-       row.append(i); col.append(j)
-       tmp = np.dot(angle_factor,self.mesh.get_coeff(i,j))
-       der = self.get_transmission_derivative(i,j)
-       data.append(der*tmp*temp[j])
-      T1 = csc_matrix( (np.array(data),(np.array(row),np.array(col))), shape=(self.n_elems,self.n_elems) )
-      b = [tmp[0,0] for tmp in T1.T.sum(axis=1)]
+      T1 = Bminus.multiply(temp_mat.T.multiply(self.Gamma_der.T))
+      tmp = Bminus.multiply(temp_mat.T.multiply(self.Gamma_der))
+      b = [tmp[0,0] for tmp in tmp.sum(axis=1)]
       T2 = diags([b],[0]).tocsc()
-      H = self.mfp[m]*(T1 + T2)
-      #--------------------------------------------------------
-      #PERIODICITY------
-      B2 = np.zeros(self.n_elems)
-      row = []; col = []; data = []
-      for i,j in zip(*Fminus.nonzero()):
-       row.append(i); col.append(j)
-       der = self.get_transmission_derivative(i,j)
-       tmp = np.dot(angle_factor,self.mesh.get_coeff(i,j))
-       data.append(tmp*Fminus[i,j]*der)
-      T1 = csc_matrix( (np.array(data),(np.array(row),np.array(col))), shape=(self.n_elems,self.n_elems) )
-      b = [tmp[0,0] for tmp in T1.T.sum(axis=1)]
+      H = T1 + T2 
+
+      T1 = Fminus.multiply(self.Gamma_der.T)
+      tmp = Fminus.multiply(self.Gamma_der)
+      b = [tmp[0,0] for tmp in tmp.sum(axis=1)]
       T2 = diags([b],[0]).tocsc()
-      B2 = self.mfp[m]*(T1 + T2)
+      B2 = T1 + T2
 
-
-      #DIFFUSE SCATTERING------
-      B3 = np.zeros(self.n_elems)
-      row = []; col = []; data = []
-      for i,j in zip(*Bminus.nonzero()):
-       row.append(i); col.append(j); 
-       der = self.get_transmission_derivative(i,j)
-       tmp = np.dot(angle_factor,self.mesh.get_coeff(i,j))
-       data.append(tmp*der*DS[i,j])
-      T1 = csc_matrix( (np.array(data),(np.array(row),np.array(col))), shape=(self.n_elems,self.n_elems) )
-      b = [tmp[0,0] for tmp in T1.T.sum(axis=1)]
+      T1 = DS.multiply(Bminus.multiply(self.Gamma_der.T))
+      tmp = DS.multiply(Bminus.multiply(self.Gamma_der))
+      b = [tmp[0,0] for tmp in tmp.sum(axis=1)]
       T2 = diags([b],[0]).tocsc()
-      B3 = self.mfp[m]*(T1 + T2)
+      B3 = T1 + T2
 
- 
+      T1 = -(Bminus-Bminus.multiply(self.Gamma)).todense()
+      B4 =  np.einsum('kij,ij->ik',gradient_DS,T1)
+      B4 =  csc_matrix(B4)
+
+      S = B2 + B3 + B4
+      
+      #if self.current_iter == 1:
+      # print(np.sum(B4)/np.sum(B3))
       #GX-------------------
       #NEW------------------------------------------------------------------------------
       GX = np.zeros(self.n_elems)
+      pre_factor = theta_factor*self.B0[m]/self.mfp[m]*self.dom['d_theta_vec'][t]*self.dom['d_phi_vec'][p]*kappa_factor
       for i,j in zip(*Fminus.nonzero()):
-       GX[i] +=  self.B0[m]*0.5*Fminus[i,j]*np.dot(self.dom['S'][t][p],self.mesh.get_af(i,j))/self.mfp[m]*2.0*kappa_factor
+       vol = self.mesh.get_elem_volume(i)
+       GX[i] += Fminus[i,j]*vol*pre_factor
 
       for i,j in zip(*Fplus.nonzero()):
-       GX[i] +=  self.B0[m]*0.5*Fplus[i,j]*np.dot(self.dom['S'][t][p],self.mesh.get_af(i,j))/self.mfp[m]*2.0*kappa_factor
-      #---------------------
+       vol = self.mesh.get_elem_volume(i)
+       GX[i] += Fplus[i,j]*vol*pre_factor
+     #----------------------------------------------------------------------------------
 
-      #NEW------------------------------------------------------------------------------
-      #GP = np.zeros(self.n_elems)
-      #for i,j in zip(*Fminus.nonzero()):
-      # der_ij = self.get_transmission_derivative(i,j)
-      # der_ji = self.get_transmission_derivative(j,i)
-      # tmp_m = self.B0[m]/self.mfp[m]
-      # tmp_ij = np.dot(self.dom['S'][t][p],self.mesh.get_af(i,j))
-      # tmp_ji = np.dot(self.dom['S'][t][p],self.mesh.get_af(j,i))
-      # value =  tmp_m*Fminus[i,j]*tmp_ij*temp[i]*der_ij
-      # GP[i] += value
-      # GP[j] += value
-
+     #Compute gradient---------------------
       #Compute gradient
-      #fp = H - B2-B3
-      Finv = inv(F.T)
+      Finv = inv(F.T.tocsc())
       L = Finv*GX
 
       #L = spsolve(F.T,GX,use_umfpack = False)
-      gradient -= L.T*(H-B2-B3)
-      T_der = Finv*(H-B2-B3-gradient_T)
-   
-  
+      #gradient -= L.T*(H-S-gradient_TL)
+      #T_der = Finv*(H-S-gradient_TL)
+
+      fp = (H-S)*self.mfp[m]*theta_factor-gradient_TL
+
+      gradient -= L.T*fp
+      #T_der = Finv*fp #i,k
+
+      T_der = -inv(F.tocsc())*fp
+ 
       #For lattice temp----
-      new_gradient_T -= T_der * self.B2[m] * self.dom['d_omega'][t][p]/4.0/np.pi * symmetry
-     
+      gradient_TL_new += T_der * self.B2[m] * self.dom['d_omega'][t][p]/4.0/np.pi * symmetry
 
-      #C = np.einsum('ij,jk->ijk',T_der.todense(),Bplus.todense())
-      #Compute gradient for TB
-      #for i,j in zip(*Bplus.nonzero()):
-      # for dummy,k in zip(*T_der[i].nonzero()):
-      #  coords.append([i,j,k])
-      #  ind_i.append(i);ind_j.append(j);ind_k.append(k)
-      #  value = self.B1[m]*symmetry * T_der[i,k] * np.dot(self.dom['S'][t][p],self.mesh.get_normal_between_elems(i,j))/np.pi
-      #  data_tb.append(value) 
+      #if new:
+      # for i,k in zip(*T_der.nonzero()):
+      #  for dummy,j in zip(*Diff[i].nonzero()):
+      #   gradient_DS_new[k,i,j] += self.dom['at'][t] * self.B1[m] * symmetry * T_der[i,k] * Diff[i,j]
 
+      #else:
+      gradient_DS_new += self.dom['at'][t]*self.B1[m]*symmetry*np.einsum('ij,ik->kij',Diff.todense(),T_der.todense())
+         
 
-
-      #For boundary temp---
-      #new_gradient_TB -= Finv*(H-B2-B3-gradient_T) * self.B1[m]*symmetry*temp[i]*np.dot(self.dom['S'][t][p],self.mesh.get_normal_between_elems(i,j))/np.pi
-
-   #Create output------
-
-
-   #x = sparse.COO(np.array(coords).T, data_tb, shape=((self.n_elems,self.n_elems,self.n_elems,)))
-   #print(np.shape(x.todense()))
-
-
+   #---------------------------------------------
    suppression *= kappa_factor
-   DS = csc_matrix( (np.array(dd),(np.array(rd),np.array(cd))),shape=(self.n_elems,self.n_elems))
-   DS = np.array(DS.todense())
+
+   #DS_new = csc_matrix( (np.array(dd),(np.array(rd),np.array(cd))), shape=(self.n_el,self.n_el) )
+   DS = np.array(DS_new.todense())
    kappa = np.array([kappa])
-
    tmp = np.zeros((self.n_el,self.n_el))
-   for i,j in zip(*new_gradient_T.nonzero()):
-    tmp[i,j] = new_gradient_T[i,j]
+   for i,j in zip(*gradient_TL_new.nonzero()):
+    tmp[i,j] = gradient_TL_new[i,j]
+   #--------------------------------------------
 
 
-   output = {'gradient_T':tmp,'kappa':kappa,'temp':new_temp,'DS':DS,'boundary_temp':new_boundary_temp,'suppression':suppression,'flux':flux,'gradient':gradient}
+   output = {'gradient_DS':gradient_DS_new,'gradient_TL':tmp,'kappa':kappa,'temp':TL_new,'DS':DS,'boundary_temp':new_boundary_temp,'suppression':suppression,'flux':flux,'gradient':gradient}
 
    return output
 
@@ -467,16 +469,18 @@ class BTE(object):
    previous_temp = fourier_temp
    previous_boundary_temp = fourier_temp
    previous_gradient_T = np.zeros((self.n_el,self.n_el),dtype=np.float64)
+   previous_gradient_DS = np.zeros((self.n_el,self.n_el,self.n_el),dtype=np.float64)
   
    previous_kappa = 0.0
-   n = 0
+   self.current_iter = 0
    symmetry = 2 
 
    #Initialize DF to Fourier modeling---
    rd = [];cd = [];dd = []
-   for i,j in zip(*self.B.nonzero()):
+   for i,j in zip(*self.Gamma.nonzero()):
     rd.append(i);cd.append(j)
     dd.append(fourier_temp[i])
+    #dd.append(0.0)
    DS = csc_matrix( (np.array(dd),(np.array(rd),np.array(cd))),shape=(self.n_elems,self.n_elems))
    DS = DS.todense()
    #---------------------------------
@@ -485,10 +489,10 @@ class BTE(object):
     print('    Iter    Thermal Conductivity [W/m/K]      Error')
     print('   ---------------------------------------------------')
 
-   while error > max_error and n < max_iter:
+   while error > max_error and self.current_iter < max_iter:
 
-    options = {'DS':np.array(DS),'temp':np.array(previous_temp),'boundary_temp':np.array(previous_boundary_temp),'gradient_T':np.array(previous_gradient_T)}
-    output = {'DS':np.zeros((self.n_el,self.n_el)),'temp':np.zeros(self.n_el),'kappa':np.array([0],dtype=np.float64),'boundary_temp':np.zeros(self.n_el),'suppression':np.zeros((self.n_mfp,self.n_theta,self.n_phi)),'flux':np.zeros((self.n_el,3)),'gradient':np.zeros(self.n_el),'gradient_T':np.zeros((self.n_el,self.n_el),dtype=np.float64)}
+    options = {'DS':np.array(DS),'temp':np.array(previous_temp),'boundary_temp':np.array(previous_boundary_temp),'gradient_TL':np.array(previous_gradient_T),'gradient_DS':np.array(previous_gradient_DS)}
+    output = {'DS':np.zeros((self.n_el,self.n_el)),'temp':np.zeros(self.n_el),'kappa':np.array([0],dtype=np.float64),'boundary_temp':np.zeros(self.n_el),'suppression':np.zeros((self.n_mfp,self.n_theta,self.n_phi)),'flux':np.zeros((self.n_el,3)),'gradient':np.zeros(self.n_el),'gradient_TL':np.zeros((self.n_el,self.n_el),dtype=np.float64),'gradient_DS':np.zeros((self.n_el,self.n_el,self.n_el),dtype=np.float64)}
 
     #solve---
     output = compute_sum(self.solve,self.n_phi,output,options)
@@ -497,7 +501,8 @@ class BTE(object):
     flux = output['flux']
     previous_boundary_temp = output['boundary_temp']
     previous_temp = output['temp']
-    previous_gradient_T = output['gradient_T']
+    previous_gradient_T = output['gradient_TL']
+    previous_gradient_DS = output['gradient_DS']
     gradient = output['gradient']
     directional_suppression = output['suppression']
     DS = output['DS']
@@ -513,10 +518,10 @@ class BTE(object):
     error = abs((kappa-previous_kappa))/kappa
     if MPI.COMM_WORLD.Get_rank() == 0:
      #print(np.linalg.norm(gradient))
-     print('{0:7d} {1:20.4E} {2:25.4E}'.format(n,kappa*self.kappa_bulk, error))
+     print('{0:7d} {1:20.4E} {2:25.4E}'.format(self.current_iter,kappa*self.kappa_bulk, error))
     
     previous_kappa = kappa
-    n +=1
+    self.current_iter +=1
 
    #Apply symmetry-----------------
    Nt = int(self.n_theta/2.0)

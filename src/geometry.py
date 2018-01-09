@@ -131,7 +131,8 @@ class Geometry(object):
    vol = self.get_elem_volume(elem_1)  
    normal = self.compute_side_normal(elem_1,side)
    area = self.compute_side_area(side)
- 
+
+    
    return normal*area/vol
 
  def get_af(self,elem_1,elem_2):

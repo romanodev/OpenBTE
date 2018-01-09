@@ -19,7 +19,7 @@ class Fourier(object):
     self.mesh = argv['geometry']
     self.mat = argv['material'].state
     self.mat2 = argv.setdefault('secondary_material',argv['material']).state
-
+    self.compute_gradient = argv.setdefault('compute_gradient',False)
     self.kappa_bulk_2 = self.mat2['kappa_bulk_tot']
     self.kappa_bulk = self.mat['kappa_bulk_tot']
     #INITIALIZATION-------------------------
@@ -27,9 +27,12 @@ class Fourier(object):
     data = self.mesh.compute_boundary_condition_data('x')
     self.side_periodic_value = data['side_periodic_value']
     self.area_flux = data['area_flux']
-    self.compute_connection_matrix()
     self.x = argv.setdefault('density',np.ones(len(self.mesh.elems)))
-    self.n = np.random.randint(0,len(self.mesh.elems))
+    self.compute_connection_matrix()
+    self.kappa_factor = 0.5*self.mesh.size[0]/self.area_flux
+    #self.x = np.ones(len(self.mesh.elems))
+    #self.n = np.random.randint(0,len(self.mesh.elems))
+    self.n = 10
     print(' ')
     print('Solving Fourier... started.')
     data = self.compute_function()
@@ -47,6 +50,31 @@ class Fourier(object):
    
 
 
+  #def compute_connection_matrix(self) :
+   
+  # nc = len(self.mesh.elems)
+  # row_tmp = []
+  # col_tmp = []
+  # data_tmp = [] 
+  # data_tmp_b = [] 
+   #B = np.zeros(nc) 
+
+  # for ll in self.mesh.side_list['active'] :
+  #  if not ll in self.mesh.side_list['Boundary'] :
+
+   #  (kc1,kc2) = self.mesh.get_elems_from_side(ll)
+
+   #  row_tmp.append(kc1)
+   #  col_tmp.append(kc2)
+   #  data_tmp.append(1.0)
+   #  data_tmp_b.append(self.mesh.get_side_periodic_value(ll,kc2,self.side_periodic_value))
+
+   #  row_tmp.append(kc2)
+   #  col_tmp.append(kc1)
+   #  data_tmp.append(1.0)
+   #  data_tmp_b.append(self.mesh.get_side_periodic_value(ll,kc1,self.side_periodic_value))
+  
+   #self.A = csc_matrix( (np.array(data_tmp),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) )
 
 
 
@@ -57,24 +85,40 @@ class Fourier(object):
    col_tmp = []
    data_tmp = [] 
    data_tmp_b = [] 
+   data_kappa = []
+   data_kappa_der = []
    #B = np.zeros(nc) 
 
    for ll in self.mesh.side_list['active'] :
     if not ll in self.mesh.side_list['Boundary'] :
 
      (kc1,kc2) = self.mesh.get_elems_from_side(ll)
-
      row_tmp.append(kc1)
      col_tmp.append(kc2)
-     data_tmp.append(1.0)
-     data_tmp_b.append(self.mesh.get_side_periodic_value(ll,kc2,self.side_periodic_value))
+
+     (v_orth,dummy) = self.mesh.get_decomposed_directions(kc1,kc2)
+     kappa = self.get_kappa(kc1,kc2)
+
+     kappa_der = self.get_kappa_derivative(kc1,kc2)
+
+     data_tmp.append(v_orth)
+
+     data_kappa.append(kappa)
+     data_kappa_der.append(kappa_der)
+
+     data_tmp_b.append(self.mesh.get_side_periodic_value(ll,kc2,self.side_periodic_value)*v_orth)
 
      row_tmp.append(kc2)
      col_tmp.append(kc1)
-     data_tmp.append(1.0)
-     data_tmp_b.append(self.mesh.get_side_periodic_value(ll,kc1,self.side_periodic_value))
+     kappa_der = self.get_kappa_derivative(kc2,kc1)
+     data_kappa_der.append(kappa_der)
+     data_tmp.append(v_orth)
+     data_tmp_b.append(self.mesh.get_side_periodic_value(ll,kc1,self.side_periodic_value)*v_orth)
+     data_kappa.append(kappa)
   
    self.A = csc_matrix( (np.array(data_tmp),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) )
+   self.Gamma = csc_matrix( (np.array(data_kappa),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) )
+   self.Gamma_der = csc_matrix( (np.array(data_kappa),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) )
    self.RHS = csc_matrix( (np.array(data_tmp_b),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) )
 
 
@@ -82,29 +126,35 @@ class Fourier(object):
  
     nc = len(self.x)
     #Add kappa------------------
-    r = []
-    c = []
-    d = [] 
-    for i,j in zip(*self.A.nonzero()):
-     r.append(i)
-     c.append(j)
-     (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j)
-     kappa = self.get_kappa(i,j)*v_orth
-     d.append(self.A[i,j]*kappa)
-    A = csc_matrix( (np.array(d),(np.array(r),np.array(c))), shape=(nc,nc) )
+    #r = []
+    #c = []
+    #d = [] 
+    #for i,j in zip(*self.A.nonzero()):
+    # r.append(i)
+    # c.append(j)
+    # (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j)
+    # kappa = self.get_kappa(i,j)*self.A[i,j]
+    # d.append(kappa)
+    #A = csc_matrix( (np.array(d),(np.array(r),np.array(c))), shape=(nc,nc) )
+
+    
+    #-----------------------------------
+    #BUILD RHS--------------------------------- 
+    #B = np.zeros(nc)
+    #for i,j in zip(*self.RHS.nonzero()):
+    # kappa = self.get_kappa(i,j)
+    # (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j)
+    # B[i] += self.RHS[i,j]*kappa*v_orth
+    #------------------------------------------
+
+    #NEW-----------------------------------------------------------------
+    A = self.A.multiply(self.Gamma)
     b = [tmp[0,0] for tmp in A.sum(axis=1)]
     F = diags([b],[0]).tocsc()-A
     F[self.n,self.n] = 1.0
     SU = splu(F)
-    
-    #-----------------------------------
-    #BUILD RHS--------------------------------- 
-    B = np.zeros(nc)
-    for i,j in zip(*self.RHS.nonzero()):
-     kappa = self.get_kappa(i,j)
-     (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j)
-     B[i] += self.RHS[i,j]*kappa*v_orth
-    #------------------------------------------
+    B = np.array(self.RHS.multiply(self.Gamma).sum(axis=1).T)[0]
+    #-------------------------------------------------------------------
 
 
     #Start the cycle------------------------
@@ -112,7 +162,7 @@ class Fourier(object):
     #--------------------------------------
     min_err = 1e-3
     error = 2*min_err
-    max_iter = 5
+    max_iter = 1
     n_iter = 0
     kappa_old = 0
     
@@ -125,8 +175,13 @@ class Fourier(object):
      RHS[self.n] = 0.0
      temp = SU.solve(RHS)
      temp = temp - (max(temp)+min(temp))/2.0
+     self.calculate_temp_matrix(temp)   
+  
+     if self.compute_gradient:
+       self.calculate_gradient()
+
      (C,flux) = self.compute_non_orth_contribution(temp)
-     kappa = self.compute_thermal_conductivity(temp)
+     kappa = self.compute_thermal_conductivity()
      error = abs((kappa - kappa_old)/kappa)
      kappa_old = kappa
      print('{0:7d} {1:20.4f} {2:25.4E}'.format(n_iter, kappa*self.kappa_bulk, error))
@@ -135,6 +190,16 @@ class Fourier(object):
     print('  ')
 
     return {'kappa':kappa*self.kappa_bulk,'temperature':temp,'flux':flux}
+
+  def get_kappa_derivative(self,c1,c2):
+
+   x1 = self.x[c1]
+   x2 = self.x[c2]
+
+   if x1 == 0 and x2 == 0:
+    return 0.0
+
+   return 2.0*x2*x2/(x1 + x2)/(x1 + x2)
 
  
 
@@ -149,15 +214,16 @@ class Fourier(object):
    return 2.0*x1*x2/(x1 + x2)
 
 
-  def compute_thermal_conductivity(self,temp):
+  def compute_thermal_conductivity(self):
 
-   kappa = 0
-   for i,j in zip(*self.RHS.nonzero()):
-    (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j)
-    density = self.get_kappa(i,j) 
-    kappa += 0.5*self.RHS[i,j]*density*(temp[j]+self.RHS[i,j]-temp[i])*self.mesh.size[0]/self.area_flux*v_orth
+  # kappa = 0
+   #for i,j in zip(*self.RHS.nonzero()):
+    #(v_orth,dummy) = self.mesh.get_decomposed_directions(i,j)
+   # kappa += 0.5*self.RHS[i,j]*self.Gamma[i,j]*(temp[j]+self.RHS[i,j]-temp[i])*self.mesh.size[0]/self.area_flux
 
-   return kappa
+   kappa = self.RHS.multiply(self.Gamma.multiply(self.RHS-self.temp_mat))
+
+   return np.sum(kappa) * self.kappa_factor
 
 
 
@@ -180,9 +246,57 @@ class Fourier(object):
 
     return C,-gradT*self.kappa_bulk
 
+  def get_kappa_derivative(self,i,j):
+
+   x1 = self.x[i]
+   x2 = self.x[j]
+   return 2.0*x2*x2/(x1+x2)/(x1+x2)
 
 
 
+  def calculate_temp_matrix(self,temp) :
+
+    n_el = len(temp)
+    tmp = np.zeros((n_el,n_el))
+    for i in range(n_el): 
+     for j in range(n_el): 
+      tmp[i,j] = temp[i]-temp[j]
+    self.temp_mat = csc_matrix(tmp)
+   
+    #H--------------------------------
+  def calculate_gradient(self):  
+
+    S = self.A.multiply(self.Gamma_der.multiply(self.temp_mat))
+    b = [tmp[0,0] for tmp in S.sum(axis=1)]
+    H = diags([b],[0]).tocsc()-S.T
+    #---------------------------------
+
+    S = self.RHS.multiply(self.Gamma_der)
+    b = [tmp[0,0] for tmp in S.sum(axis=1)]
+    B = diags([b],[0]).tocsc()-S.T
+    #-----------------------------------
+  
+    #GP
+
+
+    #GX
+
+
+
+
+
+    
+
+
+
+   # quit()
+    #A = self.A.multiply(self.Gamma)
+    #b = [tmp[0,0] for tmp in A.sum(axis=1)]
+    #F = diags([b],[0]).tocsc()-A
+    #F[self.n,self.n] = 1.0
+    #SU = splu(F)
+    #B = np.array(self.RHS.multiply(self.Gamma).sum(axis=1).T)[0]
+    #-------------------------------------------------------------------
 
 
 
