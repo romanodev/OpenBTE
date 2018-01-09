@@ -20,6 +20,7 @@ class Fourier(object):
     self.mat = argv['material'].state
     self.mat2 = argv.setdefault('secondary_material',argv['material']).state
     self.compute_gradient = argv.setdefault('compute_gradient',False)
+    #self.compute_gradient = False
     self.kappa_bulk_2 = self.mat2['kappa_bulk_tot']
     self.kappa_bulk = self.mat['kappa_bulk_tot']
     #INITIALIZATION-------------------------
@@ -28,9 +29,10 @@ class Fourier(object):
     self.side_periodic_value = data['side_periodic_value']
     self.area_flux = data['area_flux']
     self.x = argv.setdefault('density',np.ones(len(self.mesh.elems)))
+    #self.x = np.ones(len(self.mesh.elems))
     self.compute_connection_matrix()
     self.kappa_factor = 0.5*self.mesh.size[0]/self.area_flux
-    #self.x = np.ones(len(self.mesh.elems))
+    
     #self.n = np.random.randint(0,len(self.mesh.elems))
     self.n = 10
     print(' ')
@@ -45,6 +47,8 @@ class Fourier(object):
    MPI.COMM_WORLD.Barrier()
    data = MPI.COMM_WORLD.bcast(data,root=0)
    self.kappa = data['kappa']
+   self.gradient = data['gradient']
+   self.T_der = data['T_der']
    self.temperature = data['temperature']
    self.flux = data['flux']
    
@@ -98,7 +102,7 @@ class Fourier(object):
 
      (v_orth,dummy) = self.mesh.get_decomposed_directions(kc1,kc2)
      kappa = self.get_kappa(kc1,kc2)
-
+ 
      kappa_der = self.get_kappa_derivative(kc1,kc2)
 
      data_tmp.append(v_orth)
@@ -107,6 +111,7 @@ class Fourier(object):
      data_kappa_der.append(kappa_der)
 
      data_tmp_b.append(self.mesh.get_side_periodic_value(ll,kc2,self.side_periodic_value)*v_orth)
+
 
      row_tmp.append(kc2)
      col_tmp.append(kc1)
@@ -118,34 +123,13 @@ class Fourier(object):
   
    self.A = csc_matrix( (np.array(data_tmp),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) )
    self.Gamma = csc_matrix( (np.array(data_kappa),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) )
-   self.Gamma_der = csc_matrix( (np.array(data_kappa),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) )
+   self.Gamma_der = csc_matrix( (np.array(data_kappa_der),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) )
    self.RHS = csc_matrix( (np.array(data_tmp_b),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) )
 
 
   def compute_function(self):
  
     nc = len(self.x)
-    #Add kappa------------------
-    #r = []
-    #c = []
-    #d = [] 
-    #for i,j in zip(*self.A.nonzero()):
-    # r.append(i)
-    # c.append(j)
-    # (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j)
-    # kappa = self.get_kappa(i,j)*self.A[i,j]
-    # d.append(kappa)
-    #A = csc_matrix( (np.array(d),(np.array(r),np.array(c))), shape=(nc,nc) )
-
-    
-    #-----------------------------------
-    #BUILD RHS--------------------------------- 
-    #B = np.zeros(nc)
-    #for i,j in zip(*self.RHS.nonzero()):
-    # kappa = self.get_kappa(i,j)
-    # (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j)
-    # B[i] += self.RHS[i,j]*kappa*v_orth
-    #------------------------------------------
 
     #NEW-----------------------------------------------------------------
     A = self.A.multiply(self.Gamma)
@@ -165,6 +149,8 @@ class Fourier(object):
     max_iter = 1
     n_iter = 0
     kappa_old = 0
+    gradient = np.zeros(self.n_el)
+    T_der = np.zeros((self.n_el,self.n_el))
     
     print('  ')
     print('    Iter    Thermal Conductivity [W/m/K]      Error')
@@ -178,7 +164,7 @@ class Fourier(object):
      self.calculate_temp_matrix(temp)   
   
      if self.compute_gradient:
-       self.calculate_gradient()
+       gradient,T_der = self.calculate_gradient()
 
      (C,flux) = self.compute_non_orth_contribution(temp)
      kappa = self.compute_thermal_conductivity()
@@ -189,7 +175,7 @@ class Fourier(object):
     print('   ---------------------------------------------------')
     print('  ')
 
-    return {'kappa':kappa*self.kappa_bulk,'temperature':temp,'flux':flux}
+    return {'kappa':kappa*self.kappa_bulk,'temperature':temp,'flux':flux,'gradient':gradient,'T_der':T_der}
 
   def get_kappa_derivative(self,c1,c2):
 
@@ -266,37 +252,44 @@ class Fourier(object):
     #H--------------------------------
   def calculate_gradient(self):  
 
+    nc = len(self.x)
+    #Recompute F----------------------------------
+    A = self.A.multiply(self.Gamma)
+    b = [tmp[0,0] for tmp in A.sum(axis=1)]
+    F = diags([b],[0]).tocsc()-A
+    F[self.n,self.n] = 1.0
+    #------------------------------------
+
     S = self.A.multiply(self.Gamma_der.multiply(self.temp_mat))
     b = [tmp[0,0] for tmp in S.sum(axis=1)]
     H = diags([b],[0]).tocsc()-S.T
     #---------------------------------
 
+
     S = self.RHS.multiply(self.Gamma_der)
     b = [tmp[0,0] for tmp in S.sum(axis=1)]
-    B = diags([b],[0]).tocsc()-S.T
+    B =  diags([b],[0]).tocsc()-S.T
     #-----------------------------------
+
   
     #GP
-
-
-    #GX
-
-
-
-
-
+    S = self.RHS.multiply(self.Gamma_der.multiply(self.RHS-self.temp_mat))
+    GP = 2.0*np.array((S.sum(axis=1)).T)[0]*self.kappa_factor
     
+    #GX
+    S = self.RHS.multiply(self.Gamma)
+    GX = 2.0*np.array((S.sum(axis=1)).T)[0]*self.kappa_factor
+
+
+    fp = B-H
+    L = spsolve(F.T,GX,use_umfpack = False)
+
+    T_der = inv(F.tocsc())*fp
+
+    return (GP - L.T*fp),T_der.todense()
 
 
 
-   # quit()
-    #A = self.A.multiply(self.Gamma)
-    #b = [tmp[0,0] for tmp in A.sum(axis=1)]
-    #F = diags([b],[0]).tocsc()-A
-    #F[self.n,self.n] = 1.0
-    #SU = splu(F)
-    #B = np.array(self.RHS.multiply(self.Gamma).sum(axis=1).T)[0]
-    #-------------------------------------------------------------------
 
 
 

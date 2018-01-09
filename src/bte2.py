@@ -72,7 +72,6 @@ class BTE(object):
     #compute matrix--------
     output = compute_sum(self.compute_directional_connections,self.n_phi,{},{})
    
-
    #solve the BTE 
    if MPI.COMM_WORLD.Get_rank() == 0:
     print('Solving BTE... started.')
@@ -252,7 +251,6 @@ class BTE(object):
    gradient_DS = options['gradient_DS']
    gradient_DS_new = np.zeros((self.n_elems,self.n_elems,self.n_elems))
    
-
 
 
    flux = np.zeros((self.n_el,3)) 
@@ -468,21 +466,27 @@ class BTE(object):
    error = 2.0 * max_error
    previous_temp = fourier_temp
    previous_boundary_temp = fourier_temp
-   previous_gradient_T = np.zeros((self.n_el,self.n_el),dtype=np.float64)
-   previous_gradient_DS = np.zeros((self.n_el,self.n_el,self.n_el),dtype=np.float64)
+   #previous_gradient_T = np.zeros((self.n_el,self.n_el),dtype=np.float64)
+   previous_gradient_T = argv['T_der']
+   #previous_gradient_DS = np.zeros((self.n_el,self.n_el,self.n_el),dtype=np.float64)
   
    previous_kappa = 0.0
    self.current_iter = 0
    symmetry = 2 
 
    #Initialize DF to Fourier modeling---
-   rd = [];cd = [];dd = []
-   for i,j in zip(*self.Gamma.nonzero()):
-    rd.append(i);cd.append(j)
-    dd.append(fourier_temp[i])
-    #dd.append(0.0)
-   DS = csc_matrix( (np.array(dd),(np.array(rd),np.array(cd))),shape=(self.n_elems,self.n_elems))
-   DS = DS.todense()
+   #rd = [];cd = [];dd = []
+   
+   #for i,j in zip(*self.Gamma.nonzero()):
+   # rd.append(i);cd.append(j)
+   # dd.append(fourier_temp[i])
+   #DS = csc_matrix( (np.array(dd),(np.array(rd),np.array(cd))),shape=(self.n_elems,self.n_elems))
+   #DS = DS.todense()
+
+   DS = np.einsum('i,ij->ij',fourier_temp,self.mesh.A)
+   #Initialize previous gradient on DS
+   previous_gradient_DS = np.einsum('ij,ik->kij',self.mesh.A,previous_gradient_T)
+   #------------------------
    #---------------------------------
    #-----------------------------------
    if MPI.COMM_WORLD.Get_rank() == 0:

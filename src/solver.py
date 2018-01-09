@@ -28,6 +28,8 @@ class Solver(object):
   self.state.update({'fourier_temperature':fourier.temperature})
   self.state.update({'fourier_flux':fourier.flux})
   self.state.update({'kappa_fourier':fourier.kappa})
+  self.state.update({'gradient_fourier':fourier.gradient})
+  self.state.update({'T_der':fourier.T_der})
   argv.update(self.state)
   #Solve BTE
   if argv['model'] == 'bte':

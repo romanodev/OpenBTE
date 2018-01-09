@@ -10,6 +10,7 @@ import GenerateBulk2D
 import GenerateBulk3D 
 import GenerateInterface2D 
 import deepdish as dd
+from scipy.sparse import csc_matrix
 
 
 class Geometry(object):
@@ -63,6 +64,7 @@ class Geometry(object):
     self.compute_elem_centroids()
     self.compute_side_centroids()
     self.compute_least_square_weigths()
+    self.compute_connecting_matrix()
     self.compute_interpolation_weigths()
     self.compute_contact_areas()
 
@@ -76,6 +78,7 @@ class Geometry(object):
           'nodes':self.nodes,\
           'sides':self.sides,\
           'elems':self.elems,\
+          'A':self.A,\
           'side_periodicity':self.side_periodicity,\
           'dim':self.dim,\
           'weigths':self.weigths,\
@@ -92,6 +95,32 @@ class Geometry(object):
           'side_normals':self.side_normals}
 
     return data
+
+ def compute_connecting_matrix(self):
+
+   nc = len(self.elems)
+   row_tmp = []
+   col_tmp = []
+   data_tmp = [] 
+   data_tmp_b = [] 
+
+   for ll in self.side_list['active'] :
+    if not ll in self.side_list['Boundary']:
+     elems = self.get_elems_from_side(ll)
+     kc1 = elems[0]
+     kc2 = elems[1]  
+     row_tmp.append(kc1)
+     col_tmp.append(kc2)
+     data_tmp.append(1)
+     row_tmp.append(kc2)
+     col_tmp.append(kc1)
+     data_tmp.append(1)
+  
+   self.A = csc_matrix( (np.array(data_tmp),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) ).todense()
+
+
+
+
 
  def compute_elem_map(self):
 
@@ -334,6 +363,7 @@ class Geometry(object):
  def _update_data(self):   
     self.nodes = self.state['nodes']
     self.dim = self.state['dim']
+    self.A = self.state['A']
     self.sides = self.state['sides']
     self.elems = self.state['elems']
     self.side_periodicity = self.state['side_periodicity']
