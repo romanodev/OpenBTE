@@ -2,7 +2,7 @@
 Theory
 =============================
 
-Let us assume we want to calculatee the thermal conductivity of a bar with length L and cross-sectional area A, subjected to a difference of temperatue :math:`\Delta T`. At the hot contact (HC), there will be outgoing thermal flux :math:`\mathbf{J}(\mathbf{r})`, which is related to the effective thermal conductivity :math:`\kappa_{eff}` via Fourier's law, i.e.
+Let us assume we want to calculate the thermal conductivity of a bar with length L and cross-sectional area A, subjected to a difference of temperatue :math:`\Delta T`. At the hot contact (HC), there will be outgoing thermal flux :math:`\mathbf{J}(\mathbf{r})`, which is related to the effective thermal conductivity :math:`\kappa_{eff}` via Fourier's law, i.e.
 
 .. math:: \kappa_{eff} = -\frac{L}{\Delta T A}\int_{HC} dS \, \mathbf{J}(\mathbf{r}) \cdot \mathbf{\hat{n}}
   :label: kappa

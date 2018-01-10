@@ -14,7 +14,7 @@ Welcome to OpenBTE's documentation!
    citingopenbte
 
 
-OpenBTE is writted in Python and runs both in serial and parallel. The main elements are Material, Geoemtry and Solver.
+OpenBTE is writted in Python and runs both in serial and parallel. The main elements are Material, Geometry and Solver.
 
 .. image:: myfile.svg
    :width: 80 %

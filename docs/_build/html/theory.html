@@ -46,7 +46,7 @@
             
   <div class="section" id="theory">
 <h1>Theory<a class="headerlink" href="#theory" title="Permalink to this headline">¶</a></h1>
-<p>Let us assume we want to calculatee the thermal conductivity of a bar with length L and cross-sectional area A, subjected to a difference of temperatue <span class="math">\(\Delta T\)</span>. At the hot contact (HC), there will be outgoing thermal flux <span class="math">\(\mathbf{J}(\mathbf{r})\)</span>, which is related to the effective thermal conductivity <span class="math">\(\kappa_{eff}\)</span> via Fourier&#8217;s law, i.e.</p>
+<p>Let us assume we want to calculate the thermal conductivity of a bar with length L and cross-sectional area A, subjected to a difference of temperatue <span class="math">\(\Delta T\)</span>. At the hot contact (HC), there will be outgoing thermal flux <span class="math">\(\mathbf{J}(\mathbf{r})\)</span>, which is related to the effective thermal conductivity <span class="math">\(\kappa_{eff}\)</span> via Fourier&#8217;s law, i.e.</p>
 <div class="math" id="equation-kappa">
 <span class="eqno">(1)<a class="headerlink" href="#equation-kappa" title="Permalink to this equation">¶</a></span>\[\kappa_{eff} = -\frac{L}{\Delta T A}\int_{HC} dS \, \mathbf{J}(\mathbf{r}) \cdot \mathbf{\hat{n}}\]</div>
 <p>Due to the presence of classical phonon size effects, heat transport is not diffusive, and <span class="math">\(\mathbf{J}(\mathbf{r})\)</span> needs to be calculated by the Boltzmann transport equation (BTE). OpenBTE is based on the mean-free-path formulation of the BTE. The starting point of its derivation is the standard steady-state BTE in the relaxation time approximation</p>

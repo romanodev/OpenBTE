@@ -82,7 +82,7 @@ class BTE(object):
     print('')
     print('Solving BTE....done.')
     print('')
-    print('Effective Thermal Conductivity (BTE):   ' + str(round(self.state['bte_kappa'],4)) + r' W/m/K')
+    print('Effective Thermal Conductivity (BTE):   ' + str(round(self.state['kappa_bte'],4)) + r' W/m/K')
     print('')
 
    #if argv['compute_gradient']:
@@ -541,10 +541,10 @@ class BTE(object):
      for p in range(self.n_phi):
       suppression[m] += directional_suppression[m,t,p]
 
-   self.state = {'bte_kappa':kappa*self.kappa_bulk,\
+   self.state = {'kappa_bte':kappa*self.kappa_bulk,\
             'directional_suppression':directional_suppression,\
             'suppression_function':suppression,\
-            'gradient':gradient,\
+            'gradient_bte':gradient,\
             'dom':self.dom,\
             'mfp':self.mfp*1e-9,\
             'bte_temperature':previous_temp,\

@@ -36,10 +36,33 @@ class Solver(object):
    bte = BTE(argv)
    self.state.update(bte.state)
    self.state.update(self.write_vtk(argv))
+   self.state.update({'ratio':self.state['kappa_bte']/self.state['kappa_fourier']})
+
+  
+  if MPI.COMM_WORLD.Get_rank() == 0:
+   print('Ratio:  ' + str(round(self.state['ratio'],4)))
+
+   #Compute combined gradient-------------
+   gradient_fourier = self.state['gradient_fourier']
+   gradient_bte = self.state['gradient_bte']
+   kappa_fourier = self.state['kappa_fourier']
+   kappa_bte = self.state['kappa_bte']
+   N = len(gradient_bte)
+   gradient_ratio =  np.zeros(N)
+   for n in range(N):
+    gradient_ratio[n] = (gradient_bte[n]*kappa_fourier - gradient_fourier[n]*kappa_bte)/gradient_fourier[n]/gradient_fourier[n]
+  
+
+   data = {'gradient_ratio':gradient_ratio}
+  else: data = None 
+  data =  MPI.COMM_WORLD.bcast(data,root=0)
+
+  self.state.update(data)
+
+
   #if argv['model'] == 'bte_opt':
   # bte = BTE_OPT(argv)
   #if MPI.COMM_WORLD.Get_rank() == 0:
-   #print('Ratio:  ' + str(round(self.state['fourier_kappa']/self.state['bte_kappa'],4)))
    #print(' ')
 
 
