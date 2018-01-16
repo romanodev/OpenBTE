@@ -9,8 +9,7 @@ from scipy.sparse import diags
 from mpi4py import MPI
 
 
-
-class Fourier(object):
+class Fourier_graded(object):
  
   def __init__(self,argv):
 
@@ -18,11 +17,13 @@ class Fourier(object):
   
     self.mesh = argv['geometry']
     self.mat = argv['material'].state
+    self.mat_b = argv['material_b'].state
     #self.mat2 = argv.setdefault('secondary_material',argv['material']).state
     self.compute_gradient = argv.setdefault('compute_gradient',False)
     #self.compute_gradient = False
     #self.kappa_bulk_2 = self.mat2['kappa_bulk_tot']
     self.kappa_bulk = self.mat['kappa_bulk_tot']
+    self.kappa_bulk_b = self.mat_b['kappa_bulk_tot']
     #INITIALIZATION-------------------------
     self.n_el = len(self.mesh.elems)
     data = self.mesh.compute_boundary_condition_data('x')
@@ -148,7 +149,7 @@ class Fourier(object):
     #--------------------------------------
     min_err = 1e-3
     error = 2*min_err
-    max_iter = 1
+    max_iter = 5
     n_iter = 0
     kappa_old = 0
     gradient = np.zeros(self.n_el)
@@ -192,13 +193,15 @@ class Fourier(object):
 
   def get_kappa(self,c1,c2):
 
+
    x1 = self.x[c1]
    x2 = self.x[c2]
 
-   if x1 == 0 and x2 == 0:
-    return 0.0
+   k1 = (1.0-x1)*self.kappa_bulk + x1*self.kappa_bulk_b
+   k2 = (1.0-x2)*self.kappa_bulk + x2*self.kappa_bulk_b
+   
 
-   return 2.0*x1*x2/(x1 + x2)
+   return 2.0*k1*k2/(k1 + k2)
 
 
   def compute_thermal_conductivity(self):
@@ -208,13 +211,12 @@ class Fourier(object):
    for i,j in zip(*self.RHS.nonzero()):
     side = self.mesh.get_side_between_two_elements(i,j)  
     area = self.mesh.get_side_area(side) 
-    (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j)
-    kappa += 0.5*self.RHS[i,j]*self.Gamma[i,j]*(self.temp[j]+self.RHS[i,j]/abs(self.RHS[i,j])-self.temp[i])*self.mesh.size[0]/self.area_flux
+
+    if side in self.flux_sides:
+     (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j)
+     kappa += 0.5*self.RHS[i,j]*self.Gamma[i,j]*(self.temp[j]+self.RHS[i,j]/abs(self.RHS[i,j])-self.temp[i])*self.mesh.size[0]/self.area_flux
 
 
-   #for s in self.flux_sides:
-   # print(self.mesh.compute_side_centroid(s)) 
-   #quit()
    return kappa
    #kappa = self.RHS.multiply(self.Gamma.multiply(self.RHS-self.temp_mat))
    #return kappa

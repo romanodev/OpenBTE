@@ -15,7 +15,7 @@ from utils import *
 import deepdish as dd
 import sparse
 
-class BTE(object):
+class BTE_graded(object):
   
   def __init__(self,argv):
 
@@ -535,7 +535,7 @@ class BTE(object):
    self.state = {'kappa_bte':kappa*self.kappa_bulk,\
             'directional_suppression':directional_suppression,\
             'suppression_function':suppression,\
-            'gradient_bte':gradient,\
+            'gradient':gradient,\
             'dom':self.dom,\
             'mfp':self.mfp*1e-9,\
             'bte_temperature':previous_temp,\

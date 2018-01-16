@@ -119,9 +119,6 @@ class Geometry(object):
    self.A = csc_matrix( (np.array(data_tmp),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) ).todense()
 
 
-
-
-
  def compute_elem_map(self):
 
   self.elem_map = {}
@@ -142,7 +139,7 @@ class Geometry(object):
    dist = c2-c1
    v_orth = np.dot(Af,np.dot(rot,Af))/np.dot(Af,dist)
    v_non_orth = np.dot(rot,Af) - dist*v_orth
-
+   
    return v_orth,v_non_orth
 
 
@@ -177,8 +174,6 @@ class Geometry(object):
    side = self.get_side_between_two_elements(elem_1,elem_2)  
    normal = self.compute_side_normal(elem_1,side)
    return normal
-
-
 
 
  def get_side_between_two_elements(self,elem_1,elem_2):   

@@ -1,7 +1,11 @@
 from mpi4py import MPI
 from fourier import Fourier
-from bte2 import BTE
-#from bte import BTE
+#from fourier_graded import Fourier_graded
+from fourier_graded import Fourier_graded
+#from bte2 import BTE
+from bte import BTE
+#from bte_graded import BTE_graded
+#from bte_graded import BTE_graded
 #from bte_opt import BTE_OPT
 from pyvtk import *
 import numpy as np
@@ -14,17 +18,20 @@ class Solver(object):
   self.mesh = argv['geometry']
   self.state = {}
   #Print kappa Bulk
-  kappa_bulk = argv['material'].state['kappa_bulk_tot']
+  #kappa_bulk = argv['material'].state['kappa_bulk_tot']
   if MPI.COMM_WORLD.Get_rank() == 0:
-
    #Initialization-------------
    print(' ')
    self.print_logo()
    print(' ')
-   print('Bulk Thermal Conductivity:  ' + str(round(kappa_bulk,4)) + ' W/m/K')
-  self.state.update({'kappa_bulk':kappa_bulk})
-  #We solve Fourier in any case
-  fourier = Fourier(argv)
+
+  #We solve Fourier in any case------
+  if argv['model'] == 'bte_graded' or argv['model'] == 'fourier_graded':
+   fourier = Fourier_graded(argv)
+  else: 
+   fourier = Fourier(argv)
+  #----------------------------------
+
   self.state.update({'fourier_temperature':fourier.temperature})
   self.state.update({'fourier_flux':fourier.flux})
   self.state.update({'kappa_fourier':fourier.kappa})
@@ -36,28 +43,33 @@ class Solver(object):
    bte = BTE(argv)
    self.state.update(bte.state)
    self.state.update(self.write_vtk(argv))
-   self.state.update({'ratio':self.state['kappa_bte']/self.state['kappa_fourier']})
+   self.state.update({'kappa_ratio':self.state['kappa_bte']/self.state['kappa_fourier']})
+ 
 
+  if argv['model'] == 'bte_graded':
+   bte = BTE_graded(argv)
+   self.state.update(bte.state)
+   #self.state.update(self.write_vtk(argv))
+   self.state.update({'kappa_ratio':self.state['kappa_bte']/self.state['kappa_fourier']})
+
+ 
+  if argv['compute_gradient'] == True:
+   if MPI.COMM_WORLD.Get_rank() == 0:
+    #print('Ratio:  ' + str(round(self.state['kappa_ratio'],4)))
+    #Compute combined gradient-------------
+    gradient_fourier = self.state['gradient_fourier']
+    gradient_bte = self.state['gradient_bte']
+    kappa_fourier = self.state['kappa_fourier']
+    kappa_bte = self.state['kappa_bte']
+    N = len(gradient_bte)
+    gradient_ratio =  np.zeros(N)
+    for n in range(N):
+     gradient_ratio[n] = (gradient_bte[n]*kappa_fourier - gradient_fourier[n]*kappa_bte)/gradient_fourier[n]/gradient_fourier[n]
   
-  if MPI.COMM_WORLD.Get_rank() == 0:
-   print('Ratio:  ' + str(round(self.state['ratio'],4)))
-
-   #Compute combined gradient-------------
-   gradient_fourier = self.state['gradient_fourier']
-   gradient_bte = self.state['gradient_bte']
-   kappa_fourier = self.state['kappa_fourier']
-   kappa_bte = self.state['kappa_bte']
-   N = len(gradient_bte)
-   gradient_ratio =  np.zeros(N)
-   for n in range(N):
-    gradient_ratio[n] = (gradient_bte[n]*kappa_fourier - gradient_fourier[n]*kappa_bte)/gradient_fourier[n]/gradient_fourier[n]
-  
-
-   data = {'gradient_ratio':gradient_ratio}
-  else: data = None 
-  data =  MPI.COMM_WORLD.bcast(data,root=0)
-
-  self.state.update(data)
+    data = {'gradient_ratio':gradient_ratio}
+   else: data = None 
+   data =  MPI.COMM_WORLD.bcast(data,root=0)
+   self.state.update(data)
 
 
   #if argv['model'] == 'bte_opt':
@@ -70,11 +82,6 @@ class Solver(object):
    dd.io.save('solver.hdf5', self.state)
   
 #kb,temp = bte.compute_function(x0,fourier_temp = temp)
-  
- 
-  
-
-
 
  def get_increment(self,argv):
 
@@ -166,8 +173,8 @@ class Solver(object):
   if MPI.COMM_WORLD.Get_rank() == 0:
    stored_data = {}
    #Write Fourier Temperature
-   Nx = argv.setdefault('repeat_x',3)
-   Ny = argv.setdefault('repeat_y',3)
+   Nx = argv.setdefault('repeat_x',1)
+   Ny = argv.setdefault('repeat_y',1)
    Nz = argv.setdefault('repeat_z',1)
 
    #Fourier Temperature----
