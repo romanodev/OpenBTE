@@ -4,7 +4,7 @@ from fourier import Fourier
 from fourier_graded import Fourier_graded
 #from bte2 import BTE
 from bte import BTE
-#from bte_graded import BTE_graded
+from bte_graded import BTE_graded
 #from bte_graded import BTE_graded
 #from bte_opt import BTE_OPT
 from pyvtk import *

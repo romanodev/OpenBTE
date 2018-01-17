@@ -99,6 +99,25 @@
 </pre></div>
 </div>
 <a class="reference internal image-reference" href="_images/GettingStarted_6.png"><img alt="_images/GettingStarted_6.png" class="align-center" src="_images/GettingStarted_6.png" style="width: 60%;" /></a>
+<p>In case you are familiar with Python, you can setup a simulation with a script, i.e.</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">openbte.material</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">openbte.geometry</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">openbte.solver</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">openbte.plot</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="n">mat</span> <span class="o">=</span> <span class="n">Material</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="s1">&#39;Si-300K&#39;</span><span class="p">,</span><span class="n">grid</span><span class="o">=</span><span class="p">[</span><span class="mi">25</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">32</span><span class="p">])</span>
+
+<span class="n">geo</span> <span class="o">=</span> <span class="n">Geometry</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s1">&#39;porous/aligned&#39;</span><span class="p">,</span>
+              <span class="n">frame</span> <span class="o">=</span> <span class="p">[</span><span class="mf">10.0</span><span class="p">,</span><span class="mf">10.0</span><span class="p">],</span>
+              <span class="n">porosity</span> <span class="o">=</span> <span class="mf">0.25</span><span class="p">,</span>
+              <span class="n">step</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+              <span class="n">shape</span> <span class="o">=</span> <span class="s1">&#39;square&#39;</span><span class="p">)</span>
+
+<span class="n">sol</span> <span class="o">=</span> <span class="n">Solver</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s1">&#39;bte&#39;</span><span class="p">,</span><span class="n">material</span><span class="o">=</span><span class="n">mat</span><span class="p">,</span><span class="n">geometry</span><span class="o">=</span><span class="n">geo</span><span class="p">,</span><span class="n">max_bte_iter</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+
+<span class="n">Plot</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s1">&#39;map/flux_magnitude&#39;</span><span class="p">,</span><span class="n">material</span><span class="o">=</span><span class="n">mat</span><span class="p">,</span><span class="n">geometry</span><span class="o">=</span><span class="n">geo</span><span class="p">)</span>
+</pre></div>
+</div>
 </div>
 
 

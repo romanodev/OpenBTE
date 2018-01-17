@@ -21,6 +21,7 @@ class BTE_graded(object):
 
    self.mesh = argv['geometry']
    self.x = argv.setdefault('density',np.ones(len(self.mesh.elems)))
+   self.material_gradient = argv['material_gradient']
 
    #Get material properties-----
    mat = argv['material']
@@ -29,16 +30,16 @@ class BTE_graded(object):
    self.B2 = mat.state['B2']
    self.kappa_bulk = mat.state['kappa_bulk_tot']
 
-   mat = argv.setdefault('secondary_material',argv['material'])
-   self.B0_2 = mat.state['B0']
-   self.B1_2 = mat.state['B1']
-   self.B2_2 = mat.state['B2']
+   mat = argv.setdefault('material_b',argv['material'])
+   self.B0_b = mat.state['B0']
+   self.B1_b = mat.state['B1']
+   self.B2_b = mat.state['B2']
   
    self.compute_gradient = argv.setdefault('compute_gradient',False)
 
 
-
    self.mfp = np.array(mat.state['mfp_sampled'])/1e-9 #In nm
+   self.mfp_b = np.array(mat.state['mfp_sampled'])/1e-9 #In nm
    self.n_mfp = len(self.B0)
 
    #INITIALIZATION-------------------------
@@ -100,9 +101,9 @@ class BTE_graded(object):
   def get_transmission(self,i,j):
 
    a = 2.0*self.x[i]*self.x[j]/(self.x[i]+self.x[j])
-   #return 1.0
+   return 1.0
 
-   return a
+   #return a
 
   def compute_directional_connections(self,p,options):
     
@@ -185,6 +186,10 @@ class BTE_graded(object):
    f = 2.0*x1*x2/(x1+ x2)
    return 0.5*f*f/x2/x2
 
+  def get_mfp(self,i):
+
+   return  self.mfp[0]*(1.0-self.x[i]) + self.mfp_b[0] * self.x[i]
+
 
 
   def solve(self,p,options):
@@ -202,6 +207,7 @@ class BTE_graded(object):
    #-------------------------------------------------------------------------
   
    new_temp = np.zeros(self.n_el) 
+   diff_temp_new = np.zeros(self.n_el) 
    new_gradient_T = csc_matrix(np.zeros((self.n_el,self.n_el),dtype=np.float64) )
    new_gradient_TB = csc_matrix(np.zeros((self.n_el,self.n_el),dtype=np.float64) )
    flux = np.zeros((self.n_el,3)) 
@@ -210,7 +216,6 @@ class BTE_graded(object):
    rd = [];cd = [];dd = [] #initialize for diffuse scattering
    
    coords = []
-
 
    symmetry = 2
    kappa = 0
@@ -230,11 +235,10 @@ class BTE_graded(object):
      r.append(i);c.append(j)
      tmp = np.dot(angle_factor,self.mesh.get_coeff(i,j))
      a = self.get_transmission(i,j)
-     value = tmp*a
+     value = tmp * a * self.get_mfp(j)
      d.append(value)
-     C[i] -= DS[i,j]*(1.0-a)*tmp #Diffuse scattering (interfaces)
-     #C[i] -= TB[i]*(1.0-a)*tmp #Diffuse scattering (interfaces)
     Am = csc_matrix( (np.array(d),(np.array(r),np.array(c))), shape=(self.n_elems,self.n_elems) )
+
 
 
     #Assemble Ap----------------
@@ -242,13 +246,12 @@ class BTE_graded(object):
     for i,k in zip(*Bplus.nonzero()):
      r.append(i);c.append(k)
      tmp = np.dot(angle_factor,self.mesh.get_coeff(i,k))
-     value = tmp
+     value = tmp * self.get_mfp(i)
      d.append(value)
     Ap_tmp = csc_matrix( (np.array(d),(np.array(r),np.array(c))), shape=(self.n_elems,self.n_elems) )
     b = [tmp[0,0] for tmp in Ap_tmp.sum(axis=1)]
     Ap  = diags([b],[0]).tocsc() 
     
-
 
     #-----------------------------------------
     #PERIODICITY------
@@ -256,28 +259,20 @@ class BTE_graded(object):
     for i,j in zip(*Fminus.nonzero()):
      a = self.get_transmission(i,j)
      tmp = np.dot(angle_factor,self.mesh.get_coeff(i,j))
-     value = tmp*a
+     value = tmp*a * self.get_mfp(j)
      B[i] += Fminus[i,j] * value
 
+    source = np.zeros(self.n_el)
+    for n in range(self.n_el):
+     source[n]  = old_temp[n]*(self.B2_b[0] - self.B2[0])*np.dot(angle_factor,self.material_gradient[n])
 
-    #Contribution from Hard Boundary------
-    HW = np.zeros(self.n_elems)
-    r = [];c = [];d = [] 
-    for side in self.mesh.side_list['Boundary']:
-     (coeff,elem) = self.mesh.get_side_coeff(side)
-     tmp = np.dot(angle_factor,coeff) #This is specific to boundaries
-     if tmp < 0:
-      HW[elem] -= TB[elem]*tmp
-     else: 
-      r.append(elem);c.append(elem);d.append(tmp)
-    BOUNDARY = csc_matrix( (np.array(d),(np.array(r),np.array(c))), shape=(self.n_elems,self.n_elems) )
     #------------------------------------
      
     #MFP space
     for m in range(self.n_mfp):
      #solve the system---
-     F = scipy.sparse.eye(self.n_elems) + self.mfp[m] * (Ap + Am) + self.mfp[m]*BOUNDARY
-     RHS = old_temp + self.mfp[m]*B + self.mfp[m]*C + self.mfp[m]*HW
+     F = scipy.sparse.eye(self.n_elems) + Ap + Am
+     RHS = old_temp + B + C 
      temp = spsolve(F,RHS,use_umfpack = True)
      #-------------------------------------------------
       
@@ -303,7 +298,10 @@ class BTE_graded(object):
      # new_temp += B2 * temp * self.dom['d_omega'][t][p]/4.0/np.pi * symmetry
 
      #new_temp += self.B2[m] * np.multiply(temp,self.x) * self.dom['d_omega'][t][p]/4.0/np.pi * symmetry
-     new_temp += self.B2[m] * temp * self.dom['d_omega'][t][p]/4.0/np.pi * symmetry
+
+
+     for n in range(self.n_el):
+      new_temp[n] += (self.B2[m]*(1.0-self.x[n]) + self.B2_b[m]*self.x[n]) * temp[n] * self.dom['d_omega'][t][p]/4.0/np.pi * symmetry
   
 
      for i in range(self.n_el) :
@@ -324,10 +322,10 @@ class BTE_graded(object):
      #suppression[m,t,p] = power
      #NEW------------------------------------------------------------------------------
      for i,j in zip(*Fminus.nonzero()):
-      suppression[m,t,p] +=  0.5*Fminus[i,j]*temp[i]*np.dot(self.dom['S'][t][p],self.mesh.get_af(i,j))/self.mfp[m]
+      suppression[m,t,p] +=  0.5*Fminus[i,j]*temp[i]*np.dot(self.dom['S'][t][p],self.mesh.get_af(i,j))/self.mfp[m]*(self.B0[m]*(1.0-self.x[n]) + self.B0_b[m]*self.x[n])
       #suppression[m,t,p] +=   0.5*temp[i] *np.dot(self.dom['S'][t][p],self.mesh.get_af(i,j))/self.mfp[m]
      for i,j in zip(*Fplus.nonzero()):
-      suppression[m,t,p] +=  0.5*Fplus[i,j]*temp[i]*np.dot(self.dom['S'][t][p],self.mesh.get_af(i,j))/self.mfp[m]
+      suppression[m,t,p] +=  0.5*Fplus[i,j]*temp[i]*np.dot(self.dom['S'][t][p],self.mesh.get_af(i,j))/self.mfp[m]*(self.B0[m]*(1.0-self.x[n]) + self.B0_b[m]*self.x[n])
       #suppression[m,t,p] +=  0.5*temp[i]*np.dot(self.dom['S'][t][p],self.mesh.get_af(i,j))/self.mfp[m]
      #----------------------------------------------------------------------------------
 
@@ -468,6 +466,7 @@ class BTE_graded(object):
    previous_boundary_temp = fourier_temp
    previous_gradient_T = np.zeros((self.n_el,self.n_el),dtype=np.float64)
   
+
    previous_kappa = 0.0
    n = 0
    symmetry = 2 
@@ -507,7 +506,7 @@ class BTE_graded(object):
     for m in range(self.n_mfp):
      for t in range(self.n_theta):
       for p in range(self.n_phi):
-       kappa += self.B0[m]*directional_suppression[m,t,p]*symmetry
+       kappa += directional_suppression[m,t,p]*symmetry
     #----------------------------------------
  
     error = abs((kappa-previous_kappa))/kappa
