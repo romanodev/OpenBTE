@@ -47,13 +47,13 @@ where
 The BTE under a small applied temperature gradients can be then derived after including Eqs. :eq:`temperature`-:eq:`expansion` into Eq. :eq:`bte`
 
 .. math::
-  \tau_\lambda \mathbf{v}_\lambda \cdot \nabla f_\lambda (\mathbf{r}) +f_\lambda(\mathbf{r}) - f_\lambda^0 = \frac{C_\lambda}{\hbar \omega_\lambda}\int \frac{d\mathbf{q}'}{2\pi^3} a_\lambda' \frac{\hbar \omega_{\lambda'}}{C_{\lambda'}}\left[f_\lambda(\mathbf{r}) -f_{\lambda'}^0) \right].
+  \tau_\lambda \mathbf{v}_\lambda \cdot \nabla f_\lambda (\mathbf{r}) +f_\lambda(\mathbf{r}) - f_\lambda^0(T_0) = \frac{C_\lambda}{\hbar \omega_\lambda}\int \frac{d\mathbf{q}'}{2\pi^3} a_\lambda' \frac{\hbar \omega_{\lambda'}}{C_{\lambda'}}\left[f_{\lambda'}(\mathbf{r}) - f_{\lambda'}^0(T_0)) \right].
   :label: bte2
 
 Upon the change of variable
 
 .. math::
-  T_\lambda(\mathbf{r}) = \frac{\hbar\omega_\lambda}{C_\lambda}\left[f_\lambda(\mathbf{r})- f_\lambda^0) \right],
+  T_\lambda(\mathbf{r}) = \frac{\hbar\omega_\lambda}{C_\lambda}\left[f_\lambda(\mathbf{r})- f_\lambda^0(T_0) \right],
   :label: variable
 
 we obtain the temperature formulation of the BTE
