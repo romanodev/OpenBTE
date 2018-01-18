@@ -47,7 +47,7 @@ where
 The BTE under a small applied temperature gradients can be then derived after including Eqs. :eq:`temperature`-:eq:`expansion` into Eq. :eq:`bte`
 
 .. math::
-  \tau_\lambda \mathbf{v}_\lambda \cdot \nabla f_\lambda (\mathbf{r}) +f_\lambda(\mathbf{r}) - f_\lambda^0(T_0) = \frac{C_\lambda}{\hbar \omega_\lambda}\int \frac{d\mathbf{q}'}{2\pi^3} a_\lambda' \frac{\hbar \omega_{\lambda'}}{C_{\lambda'}}\left[f_{\lambda'}(\mathbf{r}) - f_{\lambda'}^0(T_0)) \right].
+  \tau_\lambda \mathbf{v}_\lambda \cdot \nabla f_\lambda (\mathbf{r}) +f_\lambda(\mathbf{r}) - f_\lambda^0(T_0) = \frac{C_\lambda}{\hbar \omega_\lambda}\int \frac{d\mathbf{q}'}{8\pi^3} a_\lambda' \frac{\hbar \omega_{\lambda'}}{C_{\lambda'}}\left[f_{\lambda'}(\mathbf{r}) - f_{\lambda'}^0(T_0)) \right].
   :label: bte2
 
 Upon the change of variable
@@ -58,7 +58,7 @@ Upon the change of variable
 
 we obtain the temperature formulation of the BTE
 
-.. math:: \mathbf{F}_\lambda \cdot \nabla T_\lambda(\mathbf{r}) + T_\lambda(\mathbf{r}) - \int \frac{d\mathbf{q}'}{2\pi^3} a_{\lambda'}T_{\lambda'}(\mathbf{r}) = 0,
+.. math:: \mathbf{F}_\lambda \cdot \nabla T_\lambda(\mathbf{r}) + T_\lambda(\mathbf{r}) - \int \frac{d\mathbf{q}'}{8\pi^3} a_{\lambda'}T_{\lambda'}(\mathbf{r}) = 0,
   :label: bte3
 
 where :math:`\mathbf{F}_\lambda=\mathbf{v}_\lambda \tau_\lambda`. Within this formulation, the thermal flux becomes
