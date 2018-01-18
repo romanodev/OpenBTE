@@ -37,7 +37,6 @@ class BTE(object):
    self.compute_gradient = argv.setdefault('compute_gradient',False)
 
 
-
    self.mfp = np.array(mat.state['mfp_sampled'])/1e-9 #In nm
    self.n_mfp = len(self.B0)
 

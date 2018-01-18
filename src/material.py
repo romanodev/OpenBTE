@@ -46,7 +46,6 @@ class Material(object):
 
  def create_gray_model(self,argv):
 
-
   if MPI.COMM_WORLD.Get_rank() == 0:
     data = {}
     mfp = argv.setdefault('mfp',100)
@@ -115,7 +114,6 @@ class Material(object):
     B1 /=np.sum(B1)
     B2 /=np.sum(B2)
     #---------------------------------------------
-
     #Compute DOM
     #----------------
     data.update({'kappa_bulk_tot':sum(kappa_bulk_new)})

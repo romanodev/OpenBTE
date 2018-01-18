@@ -193,7 +193,9 @@ class Plot(object):
   if MPI.COMM_WORLD.Get_rank() == 0:
    geo = dd.io.load('geometry.hdf5')
    solver = dd.io.load('solver.hdf5')
-   data = solver[argv['plot'].split('/')[1]]['data']
+   data = solver[argv['plot'].split('/')[1]+'_nodal']['data']
+
+  #['data']
    N = argv.setdefault('N',100)
 
    #Compute the closest element on the left-----
@@ -248,7 +250,7 @@ class Plot(object):
    grid(which='both')
    xlabel('Distance [nm]')
    
-   yl = solver[argv['plot'].split('/')[1]]['label']
+   yl = solver[argv['plot'].split('/')[1]+'_nodal']['label']
    ylabel(yl)
    show()   
   

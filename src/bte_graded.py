@@ -30,16 +30,16 @@ class BTE_graded(object):
    self.B2 = mat.state['B2']
    self.kappa_bulk = mat.state['kappa_bulk_tot']
 
-   mat = argv.setdefault('material_b',argv['material'])
-   self.B0_b = mat.state['B0']
-   self.B1_b = mat.state['B1']
-   self.B2_b = mat.state['B2']
+   mat_b = argv.setdefault('material_b',argv['material'])
+   self.B0_b = mat_b.state['B0']
+   self.B1_b = mat_b.state['B1']
+   self.B2_b = mat_b.state['B2']
   
    self.compute_gradient = argv.setdefault('compute_gradient',False)
 
 
    self.mfp = np.array(mat.state['mfp_sampled'])/1e-9 #In nm
-   self.mfp_b = np.array(mat.state['mfp_sampled'])/1e-9 #In nm
+   self.mfp_b = np.array(mat_b.state['mfp_sampled'])/1e-9 #In nm
    self.n_mfp = len(self.B0)
 
    #INITIALIZATION-------------------------
@@ -220,7 +220,6 @@ class BTE_graded(object):
    symmetry = 2
    kappa = 0
 
-
    gradient = np.zeros(self.n_elems)
    gradient_TB = np.zeros(self.n_elems)
    kappa_factor = 3.0/4.0/np.pi*self.mesh.size[0]/self.area_flux
@@ -238,7 +237,6 @@ class BTE_graded(object):
      value = tmp * a * self.get_mfp(j)
      d.append(value)
     Am = csc_matrix( (np.array(d),(np.array(r),np.array(c))), shape=(self.n_elems,self.n_elems) )
-
 
 
     #Assemble Ap----------------
@@ -263,6 +261,9 @@ class BTE_graded(object):
      B[i] += Fminus[i,j] * value
 
     source = np.zeros(self.n_el)
+
+
+    print(self.B2_b[0] - self.B2[0])
     for n in range(self.n_el):
      source[n]  = old_temp[n]*(self.B2_b[0] - self.B2[0])*np.dot(angle_factor,self.material_gradient[n])
 
@@ -272,7 +273,7 @@ class BTE_graded(object):
     for m in range(self.n_mfp):
      #solve the system---
      F = scipy.sparse.eye(self.n_elems) + Ap + Am
-     RHS = old_temp + B + C 
+     RHS = old_temp + B + C + source
      temp = spsolve(F,RHS,use_umfpack = True)
      #-------------------------------------------------
       

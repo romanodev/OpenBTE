@@ -49,7 +49,7 @@ class Solver(object):
   if argv['model'] == 'bte_graded':
    bte = BTE_graded(argv)
    self.state.update(bte.state)
-   #self.state.update(self.write_vtk(argv))
+   self.state.update(self.write_vtk(argv))
    self.state.update({'kappa_ratio':self.state['kappa_bte']/self.state['kappa_fourier']})
 
  
