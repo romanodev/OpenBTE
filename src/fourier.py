@@ -173,7 +173,7 @@ class Fourier(object):
      kappa = self.compute_thermal_conductivity()
      error = abs((kappa - kappa_old)/kappa)
      kappa_old = kappa
-     print('{0:7d} {1:20.4f} {2:25.4E}'.format(n_iter, kappa*self.kappa_bulk, error))
+     print('{0:7d} {1:20.4E} {2:25.4E}'.format(n_iter, kappa*self.kappa_bulk, error))
      n_iter +=1 
     print('   ---------------------------------------------------')
     print('  ')
@@ -247,6 +247,8 @@ class Fourier(object):
 
    x1 = self.x[i]
    x2 = self.x[j]
+
+
    return 2.0*x2*x2/(x1+x2)/(x1+x2)
 
 
