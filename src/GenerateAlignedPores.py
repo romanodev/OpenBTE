@@ -9,9 +9,12 @@ def GenerateAlignedPores(argv):
    
   #Read shape
   shape = argv['shape']
-  if shape == 'circle': Na = 24
-  if shape == 'square': Na = 4
-  if shape == 'triangle': Na = 3
+  if shape == 'circle': 
+     Na = 24; phi0= 360.0/48.0
+  if shape == 'square': 
+     Na = 4; phi0 = 0.0
+  if shape == 'triangle':  
+     Na = 3; phi0 = 0.0
 
 
   #Read Number of pores
@@ -31,7 +34,7 @@ def GenerateAlignedPores(argv):
      dphi = 2.0*math.pi/Na;
      p = []    
      for ka in range(Na):
-      ph =  dphi/2 + (ka-1) * dphi
+      ph =  dphi/2 + (ka-1) * dphi + phi0*np.pi/180.0
       px  = cx + r * math.cos(ph)
       py  = cy + r * math.sin(ph)
       p.append([px,py])

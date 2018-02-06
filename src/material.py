@@ -77,7 +77,7 @@ class Material(object):
     kappa_bulk = tmp[:,1]
     n_mfp_bulk = len(mfp_bulk)
     #-----------------------------------------------------
-    delta = 1e-3
+    delta = argv.setdefault('delta',0.0)
     acc = 0
     mfp_bulk_new = []
     kappa_bulk_new = []
@@ -86,15 +86,24 @@ class Material(object):
       mfp_bulk_new.append(mfp_bulk[m])
       kappa_bulk_new.append(kappa_bulk[m])
      acc += kappa_bulk[m]
-    
-    mfp_sampled_log = np.linspace(np.log10(min(mfp_bulk_new)*0.99),np.log10(max(mfp_bulk_new)*1.01),n_mfp)
+   
+
+
+    min_mfp = min(mfp_bulk_new)
+    min_mfp = min(min_mfp,argv.setdefault('min_mfp',min_mfp))
+    max_mfp = max(mfp_bulk_new)
+    max_mfp = max(max_mfp,argv.setdefault('max_mfp',max_mfp))
+
+    mfp_sampled_log = np.linspace(np.log10(min_mfp*0.99),np.log10(max_mfp*1.01),n_mfp)
 
     #---DISCRETIZE MFPS in LOG SPACE---------------------
     mfp_sampled = []
     for m in mfp_sampled_log:
      mfp_sampled.append(pow(10,m))
     #--------------------------------------------------------
- 
+
+
+
     #MFP interpolation---------------------------
     B0 = np.zeros(n_mfp) 
     B1 = np.zeros(n_mfp) 

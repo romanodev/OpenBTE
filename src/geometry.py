@@ -128,6 +128,20 @@ class Geometry(object):
      self.elem_map.setdefault(elem1,[]).append(elem2)
 
 
+
+ #def get_decomposed_directions_vectorial(self,elem_1,elem_2,rot = np.eye(3)):
+
+ #  side = self.get_side_between_two_elements(elem_1,elem_2)  
+ #  normal = self.compute_side_normal(elem_1,side)
+ #  area = self.compute_side_area(side)
+ #  Af = area*normal
+ #  c1 = self.get_elem_centroid(elem_1)
+ #  c2 = self.get_next_elem_centroid(elem_1,side)
+ #  dist = c2-c1
+ #  v_orth = Af/np.dot(Af,dist)
+ #  return v_orth
+
+
  def get_decomposed_directions(self,elem_1,elem_2,rot = np.eye(3)):
 
    side = self.get_side_between_two_elements(elem_1,elem_2)  
@@ -139,7 +153,6 @@ class Geometry(object):
    dist = c2-c1
    v_orth = np.dot(Af,np.dot(rot,Af))/np.dot(Af,dist)
    v_non_orth = np.dot(rot,Af) - dist*v_orth
-   
    return v_orth,v_non_orth
 
 
@@ -257,7 +270,6 @@ class Geometry(object):
       kappa -= normal[i]*factor[i][j]*grad[j]*area_loc
 
    return kappa
-
 
 
  def compute_thermal_conductivity_outer(self,vector,scalar,flux_sides):

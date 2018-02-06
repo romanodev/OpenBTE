@@ -26,24 +26,25 @@ class Solver(object):
    print(' ')
 
   #We solve Fourier in any case------
-  if argv['model'] == 'bte_graded' or argv['model'] == 'fourier_graded':
-   fourier = Fourier_graded(argv)
-  else: 
-   fourier = Fourier(argv)
+  #if argv['model'] == 'bte_graded' or argv['model'] == 'fourier_graded':
+  # argv.update({'full':False})
+  # fourier = Fourier_graded(argv)
+  #else: 
+  # fourier = Fourier(argv)
   #----------------------------------
 
-  self.state.update({'fourier_temperature':fourier.temperature})
-  self.state.update({'fourier_flux':fourier.flux})
-  self.state.update({'kappa_fourier':fourier.kappa})
-  self.state.update({'gradient_fourier':fourier.gradient})
-  self.state.update({'T_der':fourier.T_der})
-  argv.update(self.state)
+  #self.state.update({'fourier_temperature':fourier.temperature})
+  #self.state.update({'fourier_flux':fourier.flux})
+  #self.state.update({'kappa_fourier':fourier.kappa})
+  #self.state.update({'gradient_fourier':fourier.gradient})
+  #self.state.update({'T_der':fourier.T_der})
+  #argv.update(self.state)
   #Solve BTE
   if argv['model'] == 'bte':
    bte = BTE(argv)
    self.state.update(bte.state)
-   self.state.update(self.write_vtk(argv))
-   self.state.update({'kappa_ratio':self.state['kappa_bte']/self.state['kappa_fourier']})
+  # self.state.update(self.write_vtk(argv))
+   #self.state.update({'kappa_ratio':self.state['kappa_bte']/self.state['kappa_fourier']})
  
 
   if argv['model'] == 'bte_graded':
