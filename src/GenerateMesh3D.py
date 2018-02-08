@@ -143,18 +143,19 @@ def PolygonArea(corners):
 
 def mesh(polygons,frame,argv):
 
-  mesh_ext = argv['m']
+  mesh_ext = argv['step']
   include_pores = argv.setdefault('include_pores',False)
   #Lx = argv['Lx']*argv['Nx']
   #Ly = argv['Ly']*argv['Ny']
   #if argv['submodel'] == 'staggered':
   # Lx *=sqrt(2)
   # Ly *=sqrt(2)
-  Lz = argv['Lz']
+
+  Lz = argv['frame'][2]
   Lx = -frame[0][0]*2
   Ly = frame[0][1]*2
   
-  store = open(argv['output_dir'] + '/mesh.geo', 'w+')
+  store = open('mesh.geo', 'w+')
   #CREATE BULK SURFACE------------------------------------
   c = pyclipper.Pyclipper()
   c.AddPath(scale_to_clipper(frame), pyclipper.PT_SUBJECT,True) 
@@ -315,7 +316,8 @@ def mesh(polygons,frame,argv):
   Nc1 = len(C1)
   Nc2 = len(C2)
   additional_boundary = []
-  if argv['Periodic_x']:
+  
+  if argv.setdefault('Periodic',[True,True,True])[0]:
    Px1 = []
    Px2 = []
    assert Nc1 == Nc2 
@@ -368,7 +370,7 @@ def mesh(polygons,frame,argv):
   #periodic contats---------------------------------- 
   Nc3 = len(C3)
   Nc4 = len(C4)
-  if argv['Periodic_y']:
+  if argv.setdefault('Periodic',[True,True,True])[1]:
    Px3 = []
    Px4 = []
    assert Nc3 == Nc4 

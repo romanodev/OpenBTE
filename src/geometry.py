@@ -398,7 +398,7 @@ class Geometry(object):
  def import_mesh(self):
 
   #Create mesh---
-  a=subprocess.check_output(['gmsh','-2','mesh.geo','-o','mesh.msh'])
+  a=subprocess.check_output(['gmsh','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
 
   #-------------
 

@@ -22,6 +22,8 @@ class BTE(object):
   def __init__(self,argv):
 
    self.mesh = argv['geometry']
+   self.n_elems = len(self.mesh.elems)
+   self.dim = self.mesh.dim
    #self.x = argv.setdefault('density',np.ones(len(self.mesh.elems)))
 
 
@@ -45,12 +47,22 @@ class BTE(object):
    self.side_periodic_value = data['side_periodic_value']
    self.flux_sides = data['flux_sides']
    self.area_flux = data['area_flux']
-
+   self.kappa_factor = self.mesh.size[0]/self.area_flux
 
    self.dom = mat.state['dom']
    self.n_theta = self.dom['n_theta']
    self.n_phi = self.dom['n_phi']
-   self.n_elems = len(self.mesh.elems)
+  
+   #apply symmetry--------
+   if self.dim == 2:
+    self.n_theta_irr = int(self.n_theta/2)
+    self.symmetry = 2.0
+    self.n_index = self.n_phi
+   else:
+    self.n_theta_irr = 1
+    self.symmetry = 1.0
+    self.n_index = self.n_phi * self.n_theta
+   #---------------------
 
    #if self.compute_matrix:
    if MPI.COMM_WORLD.Get_rank() == 0:
@@ -59,7 +71,7 @@ class BTE(object):
      shutil.rmtree(directory)
     os.makedirs(directory)
     #compute matrix--------
-   output = compute_sum(self.compute_directional_connections,self.n_phi,{},{})
+   output = compute_sum(self.compute_directional_connections,self.n_index,{},{})
    #output = compute_sum(self.compute_directional_diffusion,self.n_phi*self.n_theta,{},{})
 
    self.assemble_fourier()  
@@ -107,7 +119,7 @@ class BTE(object):
     scipy.io.mmwrite('tmp/RHS_DIFF_' + str(t) + '_' + str(p) + r'.mtx',RHS) 
 
 
-  def compute_directional_connections(self,p,options):
+  def compute_directional_connections(self,index,options):
 
     
    Diff = []
@@ -117,12 +129,23 @@ class BTE(object):
    rk=[]; ck=[]; dk=[]
 
    P = np.zeros(self.n_elems)
-   phi_factor = self.dom['phi_dir'][p]/self.dom['d_phi_vec'][p]
-   
+
+   if self.dim == 2:
+    p = index
+    angle_factor = self.dom['phi_dir'][index]/self.dom['d_phi_vec'][index]
+   else:
+    t = int(index/self.n_phi)
+    p = index%self.n_phi
+    #theta_factor = self.dom['at'][t] / self.dom['d_theta_vec'][t]
+    #phi_factor = self.dom['phi_dir'][p]/self.dom['d_phi_vec'][p]
+
+    angle_factor = self.dom['S'][t][p]/self.dom['d_omega'][t][p]
+    #angle_factor = phi_factor * theta_factor     
+ 
    for i,j in zip(*self.mesh.A.nonzero()):
    
     side = self.mesh.get_side_between_two_elements(i,j)  
-    coeff = np.dot(phi_factor,self.mesh.get_coeff(i,j))
+    coeff = np.dot(angle_factor,self.mesh.get_coeff(i,j))
 
     if coeff > 0:
      r.append(i); c.append(i); d.append(coeff)
@@ -142,10 +165,13 @@ class BTE(object):
    HW_plus = np.zeros(self.n_elems)
    for side in self.mesh.side_list['Boundary']:
     (coeff,elem) = self.mesh.get_side_coeff(side)
-    tmp = np.dot(coeff,phi_factor)
+    tmp = np.dot(coeff,angle_factor)
     if tmp > 0:
      r.append(elem); c.append(elem); d.append(tmp)
-     HW_plus[elem] = np.dot(self.dom['phi_dir'][p],self.mesh.get_side_normal(0,side))/np.pi
+     if self.dim == 2:
+      HW_plus[elem] = np.dot(self.dom['phi_dir'][p],self.mesh.get_side_normal(0,side))/np.pi
+     else:
+      HW_plus[elem] = np.dot(self.dom['S'][t][p],self.mesh.get_side_normal(0,side))/np.pi
     else :
      HW_minus[elem] = -tmp
    #-------------
@@ -153,20 +179,21 @@ class BTE(object):
    #--------------------------WRITE FILES---------------------
    A = csc_matrix( (d,(r,c)), shape=(self.n_elems,self.n_elems) )
    K = csc_matrix( (dk,(rk,ck)), shape=(self.n_elems,self.n_elems) )
-   scipy.io.mmwrite('tmp/A_' + str(p) + r'.mtx',A) 
-   scipy.io.mmwrite('tmp/K_' + str(p) + r'.mtx',K) 
-   P.dump(file('tmp/P_' + str(p) +r'.np','wb+'))
-   HW_minus.dump(file('tmp/HW_MINUS_' + str(p) +r'.np','w+'))
-   HW_plus.dump(file('tmp/HW_PLUS_' + str(p) +r'.np','w+'))
+   scipy.io.mmwrite('tmp/A_' + str(index) + r'.mtx',A) 
+   scipy.io.mmwrite('tmp/K_' + str(index) + r'.mtx',K) 
+   P.dump(file('tmp/P_' + str(index) +r'.np','wb+'))
+   HW_minus.dump(file('tmp/HW_MINUS_' + str(index) +r'.np','w+'))
+   HW_plus.dump(file('tmp/HW_PLUS_' + str(index) +r'.np','w+'))
 
-  def solve_bte(self,p,options):
+  def solve_bte(self,index,options):
 
    #if self.current_iter == 0:
-   A = scipy.io.mmread('tmp/A_' + str(p) + '.mtx').tocsc()
-   P = np.load(file('tmp/P_' + str(p) +r'.np','rb'))
-   HW_MINUS = np.load(file('tmp/HW_MINUS_' + str(p) +r'.np','r'))
-   HW_PLUS = np.load(file('tmp/HW_PLUS_' + str(p) +r'.np','r'))
-   K = scipy.io.mmread('tmp/K_' + str(p) + '.mtx').tocsc()
+   A = scipy.io.mmread('tmp/A_' + str(index) + '.mtx').tocsc()
+   P = np.load(file('tmp/P_' + str(index) +r'.np','rb'))
+   HW_MINUS = np.load(file('tmp/HW_MINUS_' + str(index) +r'.np','r'))
+   HW_PLUS = np.load(file('tmp/HW_PLUS_' + str(index) +r'.np','r'))
+   K = scipy.io.mmread('tmp/K_' + str(index) + '.mtx').tocsc()
+
 
    TB = options['boundary_temp']
    suppression_first = options['suppression_fourier']
@@ -175,7 +202,7 @@ class BTE(object):
    temp_fourier_gradient = options['temperature_fourier_gradient']
    TL_new = np.zeros(self.n_el) 
    TB_new = np.zeros(self.n_el) 
-   phi_factor = self.dom['phi_dir'][p]/self.dom['d_phi_vec'][p]
+   #phi_factor = self.dom['phi_dir'][p]/self.dom['d_phi_vec'][p]
    D = np.multiply(TB,HW_MINUS)
 
    flux = np.zeros((self.n_el,3)) 
@@ -184,58 +211,62 @@ class BTE(object):
    ff = 0
    ff_0 = 0
    
-   symmetry = 2
-   kappa_factor = 3.0/4.0/np.pi*self.mesh.size[0]/self.area_flux
-   for t in range(int(self.n_theta/2.0)): #We take into account the symmetry
-    theta_factor = self.dom['at'][t] / self.dom['d_theta_vec'][t]
+   #for t in range(int(self.n_theta/2.0)): #We take into account the symmetry
+   for tt in range(self.n_theta_irr): #We take into account the symmetry
+    
+    if self.dim == 2:
+     t = tt
+     p = index
+     theta_factor = self.dom['at'][t] / self.dom['d_theta_vec'][t]
+    else:
+     t = int(index/self.n_phi)
+     p = index%self.n_phi
+     theta_factor = 1.0
+
+    
+    pre_factor = 0.5*theta_factor* self.dom['d_omega'][t][p]#  self.dom['d_theta_vec'][t]*self.dom['d_phi_vec'][p]
     ss = self.dom['ss'][t][p]
     fourier = False
     zeroth_order = False
     #RHS_DIFF = scipy.io.mmread('tmp/RHS_DIFF_' + str(t) + '_' + str(p) + '.mtx').tocsc()
     for m in range(self.n_mfp)[::-1]:
-     pre_factor = 0.5*theta_factor*self.dom['d_theta_vec'][t]*self.dom['d_phi_vec'][p]
      #----------------------------------------------------------------------------------
      if not fourier:
-      index = m*self.dom['n_theta']*self.dom['n_phi'] +t*self.dom['n_phi']+p
-      if not index in self.lu.keys():
+      global_index = m*self.dom['n_theta']*self.dom['n_phi'] +t*self.dom['n_phi']+p
+      if not global_index in self.lu.keys():
        F = scipy.sparse.eye(self.n_elems) + theta_factor * self.mfp[m] * A
        lu = splu(F.tocsc())
-       self.lu.update({index:lu})
+       self.lu.update({global_index:lu})
       else:
-       lu = self.lu[index] #read previous lu
+       lu = self.lu[global_index] #read previous lu
       RHS = self.mfp[m]*theta_factor * (P + D) + TL
       temp = lu.solve(RHS)
    
-      sup = pre_factor * K.dot(temp-TL).sum()/self.mfp[m]
-       #sup_app = pre_factor * K.dot(temp_app-TL).sum()/self.mfp[m]
-       #a1 = abs(sup-sup_fourier)/abs(sup)
-       #contr = self.compute_sup_approximation((TL-temp)/self.mfp[m],self.dom['S'][t][p])
-       #sup_2 = sup_fourier - contr
-       #a2 = abs(sup-sup_2)/abs(sup)
-       #sup_3 = pre_factor * K.dot(-TL).sum()/self.mfp[m]
-       
-       #sup_1 = pre_factor * K.dot(temp_fourier[m]-TL).sum()/self.mfp[m]
-       #sup_2 = suppression_first[m]*ss[0][0]
-       #print(sup/sup_2,sup/(sup_2-sup_1))
-      #+ self.dom['S'][t][p][0]*(TL-)
+      sup = pre_factor * K.dot(temp-TL).sum()/self.mfp[m]*self.kappa_factor
 
       if self.multiscale:
        if not sup == 0.0:
+
+        #sup_fourier = self.compute_diffusive_thermal_conductivity(temp_fourier[m],mat = ss)
+        
         sup_fourier = suppression_first[m]*ss[0][0] #- pre_factor * K.dot(temp_fourier[m]-TL).sum()/self.mfp[m]
-       error = abs(sup-sup_fourier)/abs(sup)
-       if error < 0.05 and self.multiscale:
-        fourier = True
-        ff +=1
-        sup = sup_fourier
-        sup_old = 0.0
+        error = abs(sup-sup_fourier)/abs(sup)
+        if error < 0.1:
+         fourier = True
+         
+         ff +=1
+         sup = sup_fourier
+         sup_old = 0.0
         
      else:
       if not zeroth_order:
-       temp = temp_fourier[m] - np.dot(self.mfp[m]*self.dom['S'][t][p],temp_fourier_gradient[m].T)
-       sup = suppression_first[m]*ss[0][0] #- pre_factor * K.dot(temp_fourier[m]-TL).sum()/self.mfp[m]
-     
+       temp = temp_fourier[m] - self.mfp[m]*np.dot(self.mfp[m]*self.dom['S'][t][p],temp_fourier_gradient[m].T)
+       #sup = suppression_first[m]*ss[0][0] #- pre_factor * K.dot(temp_fourier[m]-TL).sum()/self.mfp[m]
+       sup = self.compute_diffusive_thermal_conductivity(temp_fourier[m],mat = ss)
+       #sup_zeroth = self.compute_diffusive_thermal_conductivity(TL,mat = ss)
+
        sup_zeroth = options['suppression_zeroth']*ss[0][0]
-       if abs(sup - sup_zeroth)/abs(sup) < 0.05 and abs(sup-sup_old)/abs(sup) < 0.01 :
+       if abs(sup - sup_zeroth)/abs(sup) < 0.1 and abs(sup-sup_old)/abs(sup) < 0.01 :
         zeroth_order = True
         ff_0 +=1
        else:
@@ -245,17 +276,21 @@ class BTE(object):
        sup = sup_zeroth
        ff_0 +=1
      #--------------------------
-     TL_new += self.B2[m] * temp * self.dom['d_omega'][t][p]/4.0/np.pi * symmetry
+     TL_new += self.B2[m] * temp * self.dom['d_omega'][t][p]/4.0/np.pi * self.symmetry
      flux += self.B1[m]*np.outer(temp,self.dom['S'][t][p])
-     suppression[m,t,p] += sup
-     temperature_mfp[m] += temp*self.dom['d_omega'][t][p]*symmetry/4.0/np.pi
+     suppression[m,t,p] += sup*3.0/4.0/np.pi
+     temperature_mfp[m] += temp*self.dom['d_omega'][t][p]*self.symmetry/4.0/np.pi
 
-     if symmetry == 2.0:
+     if self.dim == 2:
       suppression[m,self.n_theta -t -1,p] += suppression[m,t,p]
-     
-     TB_new += self.B1[m]*self.dom['at'][t]*np.multiply(temp,HW_PLUS)*symmetry
+      TB_new += self.B1[m]*self.dom['at'][t]*np.multiply(temp,HW_PLUS)*self.symmetry
+     else:
+      TB_new += self.B1[m]*np.multiply(temp,HW_PLUS)*self.symmetry
+
+
+
      #------------------------------------------------------------------------------------
-   suppression *= kappa_factor
+   #suppression *= kappa_factor
 
    output = {'temperature':TL_new,'boundary_temp':TB_new,'suppression':suppression,'flux':flux,'temperature_mfp':temperature_mfp,'ms':np.array([ff]),'ms_0':np.array([ff_0])}
 
@@ -272,7 +307,6 @@ class BTE(object):
   
    previous_kappa = 0.0
    self.current_iter = 0
-   symmetry = 2 
 
    #First Step Fourier----------------- 
    output_fourier = {'suppression':np.array([0.0]),\
@@ -285,7 +319,6 @@ class BTE(object):
    suppression_fourier = self.n_mfp * [output_fourier['suppression'][0]]
    temperature_fourier= self.n_mfp * [output_fourier['temperature'][0]]
    temperature_fourier_gradient = self.n_mfp * [output_fourier['temperature_gradient'][0]]
-
 
    fourier_temp = output_fourier['temperature'][0]
    lattice_temperature = fourier_temp
@@ -304,7 +337,7 @@ class BTE(object):
     #zeroth order---------------------------
 
     if self.multiscale:
-     suppression_zeroth = np.array([self.compute_generic_diffusive_thermal_conductivity(lattice_temperature,np.eye(3))])
+     suppression_zeroth = np.array([self.compute_diffusive_thermal_conductivity(lattice_temperature,np.eye(3))])
 
     #first order------------------------------------------------------------------------
      output_fourier.update({'suppression':np.zeros(self.n_mfp),\
@@ -326,7 +359,6 @@ class BTE(object):
      temperature_fourier = np.zeros((self.n_mfp,self.n_elems))
      suppression_zeroth = np.zeros(1)
      suppression_first = np.zeros(self.n_mfp)
-     
     #----------------------------------------------------------------------------------
     
     #BTE-------------------------------------------------------------------------------
@@ -344,8 +376,8 @@ class BTE(object):
               'temperature_mfp':np.zeros((self.n_mfp,self.n_elems)),\
               'ms':np.zeros(1,dtype=int),\
               'ms_0':np.zeros(1,dtype=int)}
-
-    output = compute_sum(self.solve_bte,self.n_phi,output,options_bte)
+   
+    output = compute_sum(self.solve_bte,self.n_index,output,options_bte)
     #--------------------------------------------------------------------------------
 
     #--------------------------
@@ -353,15 +385,19 @@ class BTE(object):
     kappa = sum([self.B0[m]*directional_suppression[m,:,:].sum() for m in range(self.n_mfp)])
     error = abs((kappa-previous_kappa))/kappa
     if MPI.COMM_WORLD.Get_rank() == 0:
-     ms = output['ms'][0]/float(self.n_mfp)/float(self.n_theta)/float(self.n_phi)*symmetry
-     ms_0 = output['ms_0'][0]/float(self.n_mfp)/float(self.n_theta)/float(self.n_phi)*symmetry
+     ms = output['ms'][0]/float(self.n_mfp)/float(self.n_theta)/float(self.n_phi)*self.symmetry
+     ms_0 = output['ms_0'][0]/float(self.n_mfp)/float(self.n_theta)/float(self.n_phi)*self.symmetry
      print('{0:7d} {1:20.4E} {2:25.4E} {3:10.2E} {4:8.1E} {5:8.1E}'.format(self.current_iter,kappa*self.kappa_bulk, error,ms_0,ms,1.0-ms-ms_0))
     previous_kappa = kappa
     self.current_iter +=1
     #------------------------
 
     boundary_temperature = output['boundary_temp']
+
+
     lattice_temperature = output['temperature']
+    #if MPI.COMM_WORLD.Get_rank() == 0:
+     #print(min(lattice_temperature),max(lattice_temperature))
     #-----------------------
    
 
@@ -372,14 +408,14 @@ class BTE(object):
    #zero_suppression = self.n_mfp * [self.compute_diffusive_thermal_conductivity(previous_temp)]
    #------------------------------
    #Iso suppression---------
-   iso_suppression = [self.compute_diffusive_thermal_conductivity(output['temperature_mfp'][m]) for m in range(self.n_mfp)]
+   #iso_suppression = [self.compute_diffusive_thermal_conductivity(output['temperature_mfp'][m]) for m in range(self.n_mfp)]
 
 
    self.state = {'kappa_bte':kappa*self.kappa_bulk,\
             'directional_suppression':directional_suppression,\
             'suppression_function':suppression,\
             'zero_suppression':suppression_zeroth,\
-            'iso_suppression':iso_suppression,\
+            #'iso_suppression':iso_suppression,\
             'fourier_suppression':suppression_first,\
             'dom':self.dom,\
             'mfp':self.mfp*1e-9,\
@@ -465,7 +501,7 @@ class BTE(object):
     #--------------------------------------
     min_err = 1e-3
     error = 2*min_err
-    max_iter = 10
+    max_iter = 3
     n_iter = 0
     kappa_old = 0
 
@@ -522,41 +558,19 @@ class BTE(object):
     return C,-self.gradT
 
 
-  def compute_diffusive_thermal_conductivity(self,temp):
+  #def compute_diffusive_thermal_conductivity(self,temp):
 
-   kappa = 0
-   for i,j in zip(*self.RHS.nonzero()):
-    kappa += 0.5*self.RHS[i,j]*(temp[j]+self.RHS[i,j]/abs(self.RHS[i,j])-temp[i])*self.mesh.size[0]/self.area_flux
+  # kappa = 0
+  # for i,j in zip(*self.RHS.nonzero()):
+  #  kappa += 0.5*self.RHS[i,j]*(temp[j]+self.RHS[i,j]/abs(self.RHS[i,j])-temp[i])*self.mesh.size[0]/self.area_flux
 
-   return kappa
+  # return kappa
 
-
-  def compute_generic_diffusive_thermal_conductivity(self,temp,mat):
+  def compute_diffusive_thermal_conductivity(self,temp,mat=np.eye(3)):
 
    kappa = 0
    for i,j in zip(*self.PER.nonzero()):
     (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=mat)
-    kappa += 0.5*v_orth*self.PER[i,j]*(temp[j]+self.PER[i,j]-temp[i])*self.mesh.size[0]/self.area_flux
+    kappa += 0.5*v_orth *self.PER[i,j]*(temp[j]+self.PER[i,j]-temp[i])*self.kappa_factor
 
    return kappa
-
-
- # def compute_sup_approximation(self,temp,S) :
-
- #  contr = 0.0
- #  area_tot = 0.0
- #  for s in self.flux_sides:
- #   elems = self.mesh.side_elem_map[s] 
- #   normal = self.mesh.get_side_normal(0,s)  
- #   area = self.mesh.get_side_area(s)
- #   i = elems[0]
- #   j = elems[1]
- #   temp_ave = (temp[j]-self.PER[i,j]+temp[i])/2.0
- #   contr += temp_ave * np.dot(normal,S)*area
- #   area_tot += area
-
- #  return contr/area_tot
-
-
-
-

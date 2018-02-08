@@ -354,19 +354,19 @@ class Plot(object):
    data = dd.io.load('solver.hdf5')
    sup = data['suppression_function']
    sup_fourier = data['fourier_suppression']
-   sup_iso = data['iso_suppression']
-   sup_zero = data['zero_suppression']
+   #sup_iso = data['iso_suppression']
    mfp = data['mfp']*1e6
+   sup_zero = len(mfp) * list(data['zero_suppression'])
    #kappa_bulk = data['kappa_bulk']
    #kappa_fourier = data['kappa_fourier']
    #ratio = kappa_fourier/kappa_bulk   
    plot(mfp,sup,color=c2)
    plot(mfp,sup_fourier,color=c3)
-   #plot(mfp,sup_zero,color=c1)
+   plot(mfp,sup_zero,color=c1)
    ##plot(mfp,sup_iso,color='black')
    #plot([mfp[0],mfp[-1]],[ratio,ratio],color='black',ls='--')
    xscale('log')
-   legend(['S','$S_F$'])#,'S$_0$'])#,'S$_0$','S$_{ISO}$'])
+   legend(['S','$S_F$','$S_0$'])#,'S$_0$'])#,'S$_0$','S$_{ISO}$'])
    #ylim([0,1])
    grid('on')
    xlabel('Mean Free Path [$\mu$ m]')
