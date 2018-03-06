@@ -4,11 +4,13 @@ import subprocess
 from mpi4py import MPI
 from pyvtk import *
 from GenerateAlignedPores import *
+from GenerateRandomPores import *
 import GenerateMesh2D 
 import GenerateMesh3D 
 import GenerateBulk2D 
 import GenerateBulk3D 
 import GenerateInterface2D 
+from nanowire import *
 import deepdish as dd
 from scipy.sparse import csc_matrix
 
@@ -18,13 +20,26 @@ class Geometry(object):
  def __init__(self,**argv):
 
 
+  direction = argv.setdefault('direction','x')
+  if direction == 'x':self.direction = 0
+  if direction == 'y':self.direction = 1
+  if direction == 'z':self.direction = 2
+
+
   if MPI.COMM_WORLD.Get_rank() == 0:
    if argv['model'] == 'load':
-     data = dd.io.load('geometry.hdf5')
+     data = dd.io.load(argv.setdefault('filename','geometry')+ '.hdf5')
    else :
     #porous-----
-    if argv['model'] == 'porous/aligned':
-     frame,polygons = GenerateAlignedPores(argv) 
+    if argv['model'] == 'porous/random' or \
+       argv['model'] == 'porous/aligned':
+
+     if argv['model'] == 'porous/aligned':
+      frame,polygons = GenerateAlignedPores(argv) 
+
+     if argv['model'] == 'porous/random':
+      frame,polygons = GenerateRandomPores(argv) 
+
      if len(argv['frame']) == 3:
       GenerateMesh3D.mesh(polygons,frame,argv)
       self.dim = 3
@@ -32,10 +47,13 @@ class Geometry(object):
       GenerateMesh2D.mesh(polygons,frame,argv)
       self.dim = 2
 
+    if argv['model'] == 'nanowire':
+     nanowire(argv)
+     self.dim = 3
     #Interface----EXPERIMENTAL
-    if argv['model'] == '2DInterface':
-      GenerateInterface2D.mesh(argv)
-      self.dim = 2
+    #if argv['model'] == '2DInterface':
+    #  GenerateInterface2D.mesh(argv)
+    #  self.dim = 2
 
     #bulk----------
     if argv['model'] == 'bulk':
@@ -49,7 +67,7 @@ class Geometry(object):
     data = self.compute_mesh_data()
     #save data
     if argv.setdefault('save',True):
-     dd.io.save('geometry.hdf5', data)
+     dd.io.save(argv.setdefault('filename','geometry')+ '.hdf5', data)
   else: data = None    
   self.state = MPI.COMM_WORLD.bcast(data,root=0)
   self._update_data()
@@ -67,6 +85,8 @@ class Geometry(object):
     self.compute_connecting_matrix()
     self.compute_interpolation_weigths()
     self.compute_contact_areas()
+    self.compute_boundary_condition_data()
+    
 
     data = {'side_list':self.side_list,\
           'exlude':self.exlude,\
@@ -92,7 +112,11 @@ class Geometry(object):
           'side_areas':self.side_areas,\
           'pairs':self.pairs,\
           'boundary_elements':self.boundary_elements,\
-          'side_normals':self.side_normals}
+          'side_normals':self.side_normals,\
+          'grad_direction':self.direction,\
+          'area_flux':self.area_flux,\
+          'flux_sides':self.flux_sides,\
+          'side_periodic_value':self.side_periodic_value}
 
     return data
 
@@ -105,7 +129,10 @@ class Geometry(object):
    data_tmp_b = [] 
 
    for ll in self.side_list['active'] :
-    if not ll in self.side_list['Boundary']:
+    if not ll in self.side_list['Boundary'] and \
+       not ll in self.side_list['Hot'] and\
+       not ll in self.side_list['Cold']:
+
      elems = self.get_elems_from_side(ll)
      kc1 = elems[0]
      kc2 = elems[1]  
@@ -128,18 +155,17 @@ class Geometry(object):
      self.elem_map.setdefault(elem1,[]).append(elem2)
 
 
+ def get_side_orthognal_direction(self,side):
 
- #def get_decomposed_directions_vectorial(self,elem_1,elem_2,rot = np.eye(3)):
-
- #  side = self.get_side_between_two_elements(elem_1,elem_2)  
- #  normal = self.compute_side_normal(elem_1,side)
- #  area = self.compute_side_area(side)
- #  Af = area*normal
- #  c1 = self.get_elem_centroid(elem_1)
- #  c2 = self.get_next_elem_centroid(elem_1,side)
- #  dist = c2-c1
- #  v_orth = Af/np.dot(Af,dist)
- #  return v_orth
+   elem = self.side_elem_map[side][0]
+   c1 = self.get_elem_centroid(elem)
+   c2 = self.get_side_centroid(side)
+   normal = self.compute_side_normal(elem,side)
+   area = self.compute_side_area(side)
+   Af = area*normal
+   dist = c2-c1
+   v_orth = np.dot(Af,Af)/np.dot(Af,dist)
+   return v_orth
 
 
  def get_decomposed_directions(self,elem_1,elem_2,rot = np.eye(3)):
@@ -393,7 +419,16 @@ class Geometry(object):
     self.side_areas = self.state['side_areas']
     self.exlude = self.state['exlude']     
     self.pairs = self.state['pairs']
+    self.direction = self.state['grad_direction']
+    self.area_flux = self.state['area_flux']
+    self.flux_sides = self.state['flux_sides']
+    self.side_periodic_value = self.state['side_periodic_value']
+    #if self.direction == 'x': dd = 0
+    #if self.direction == 'y': dd = 1
+    #if self.direction == 'z': dd = 2
+    self.kappa_factor = self.size[self.direction]/self.area_flux
 
+    
 
  def import_mesh(self):
 
@@ -511,14 +546,16 @@ class Geometry(object):
 
   self.pairs = [] #global (all periodic pairs)
 
+  self.side_list.setdefault('Boundary',[])
   self.periodic_nodes = [] 
   for label in self.side_list.keys():
 
    #Add Cold and Hot to Boundary
-   if label == "Hot" or label == "Cold":
-    tmp = self.side_list.setdefault('Boundary',[])+self.side_list[label]
-    self.side_list['Boundary'] = tmp 
+   #if label == "Hot" or label == "Cold":
+   # tmp = self.side_list.setdefault('Boundary',[])+self.side_list[label]
+   # self.side_list['Boundary'] = tmp 
 
+   
    if str(label.split('_')[0]) == 'Periodic':
     if not int(label.split('_')[1])%2==0: 
      contact_1 = label
@@ -816,10 +853,10 @@ class Geometry(object):
    return volume
 
 
- def get_side_periodic_value(self,ll,elem,side_periodic_value) :
+ def get_side_periodic_value(self,ll,elem) :
   
     ind = self.side_elem_map[ll].index(elem)
-    return side_periodic_value[ll][ind]
+    return self.side_periodic_value[ll][ind]
 
 
  def get_next_elem_centroid(self,elem,side):
@@ -855,7 +892,7 @@ class Geometry(object):
 
   self.interp_weigths = np.zeros(len(self.sides))
   for ll in self.side_list['active']:
-   if not (ll in self.side_list['Boundary']) :
+   if not (ll in (self.side_list['Boundary'] + self.side_list['Hot'] + self.side_list['Cold'])) :
     e0 = self.side_elem_map[ll][0]
     e1 = self.side_elem_map[ll][1]
     P0 = self.get_elem_centroid(e0)
@@ -885,26 +922,25 @@ class Geometry(object):
      s = d/dist 
      #---------------------------------------------------------------
     self.interp_weigths[ll] = s
-    
-   
-
 
 
  def get_interpolation_weigths(self,ll):
 
   return self.interp_weigths[ll]
 
- def compute_boundary_condition_data(self,gradir):
+ def compute_boundary_condition_data(self):
 
-    if gradir == 'x':
+    gradir = self.direction
+
+    if gradir == 0:
      flux_dir = [1,0,0]
      length = self.size[0]
 
-    if gradir == 'y':
+    if gradir == 1:
      flux_dir = [0,1,0]
      length = self.size[1]
 
-    if gradir == 'z':
+    if gradir == 2:
      flux_dir = [0,0,1]
      length = self.size[2]
 
@@ -935,14 +971,14 @@ class Geometry(object):
       side_periodic_value[side[0]][0]= side_value[side[0]]
       side_periodic_value[side[0]][1]= side_value[side[1]]
 
-    #print(area_flux)
-    area_flux = abs(np.dot(flux_dir,self.c_areas))
-   
-    #print(area_flux)
-    #quit()
-    data = {'area_flux':area_flux,'length':length,'flux_sides':flux_sides,'side_periodic_value':side_periodic_value}
+    self.area_flux = abs(np.dot(flux_dir,self.c_areas))
+    self.flux_sides = flux_sides
+    self.side_periodic_value = side_periodic_value
 
-    return data
+
+    #data = {'area_flux':area_flux,'length':length,'flux_sides':flux_sides,'side_periodic_value':side_periodic_value}
+
+    #return data
 
 
  def compute_least_square_weigths(self):
@@ -960,7 +996,7 @@ class Geometry(object):
     c1 = self.compute_elem_centroid(kc1)
     ind1 = self.elem_side_map[kc1].index(ll)
 
-    if not ll in self.side_list['Boundary']: 
+    if not ll in (self.side_list['Boundary'] + self.side_list['Hot'] + self.side_list['Cold']): 
 
      #Diff in the distance
      kc2 = elems[1]
@@ -982,7 +1018,7 @@ class Geometry(object):
     self.weigths.append(np.dot(np.linalg.inv(np.dot(np.transpose(tmp),tmp)),np.transpose(tmp)  ))
 
 
- def compute_grad(self,temp,side_periodic_value,lattice_temp =[]) :
+ def compute_grad(self,temp,lattice_temp =[]) :
 
 
    if len(lattice_temp) == 0: lattice_temp = temp
@@ -1006,13 +1042,13 @@ class Geometry(object):
     c1 = self.get_elem_centroid(kc1)
     ind1 = self.elem_side_map[kc1].index(ll)
 
-    if not ll in self.side_list['Boundary']: 
+    if not ll in (self.side_list['Boundary'] + self.side_list['Hot'] + self.side_list['Cold']) : 
 
      kc2 = elems[1]
      ind2 = self.elem_side_map[kc2].index(ll)
      
      temp_1 = temp[kc1]
-     temp_2 = temp[kc2] + self.get_side_periodic_value(ll,kc2,side_periodic_value)
+     temp_2 = temp[kc2] + self.get_side_periodic_value(ll,kc2)
      diff_t = temp_2 - temp_1    
   
      diff_temp[kc1][ind1]  = diff_t

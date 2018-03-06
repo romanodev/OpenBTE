@@ -8,6 +8,8 @@ def porous(argv):
 
   if argv['submodel'] == 'aligned':
    frame,polygons = GenerateAlignedPores(argv)  
+  if argv['submodel'] == 'random':
+   frame,polygons = GenerateAlignedPores(argv)  
 
 
   return dim,zsymmetry

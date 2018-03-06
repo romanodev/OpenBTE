@@ -27,7 +27,7 @@ def mesh(argv):
   Lz *=Nz
 
 
-  store = open(argv['output_dir'] + '/mesh.geo', 'w+')
+  store = open('mesh.geo', 'w+')
 
   points  = [[-Lx/2,-Ly/2,-Lz/2],\
              [-Lx/2,+Ly/2,-Lz/2],\

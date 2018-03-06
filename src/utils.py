@@ -26,6 +26,8 @@ def compute_parallel_sum(func,n_tot,output,options):
    n_start = 0
    #VARIABLES------------------------------
    for key, value in output.iteritems():
+    strc = r'''output[' ''' + key + r''' '].fill(0)'''
+    exec("".join(strc).replace(" ", ""))
     exec(key + '_tot = value')
    #-------------------------------------
    while n_left > 0:  
@@ -60,13 +62,23 @@ def compute_parallel_sum(func,n_tot,output,options):
    strc = list(strc)
    strc[-1] = '}'
    exec("".join(strc).replace(" ", ""))
+  
+
     
-   output = comm.bcast(data,root=0)
-   return output
+   tmp = comm.bcast(data,root=0)
+   for key, value in tmp.iteritems():
+    if comm.Get_rank() > 0:
+     strc = r'''output[' ''' + key+r''' '] +=tmp[' ''' + key+r''' ']'''
+     exec("".join(strc).replace(" ", ""))
+
+    
  
-def compute_sum(func,n_tot,output,options):
+def compute_sum(func,n_tot,output = {},options = {}):
   if MPI.COMM_WORLD.Get_size() > 1 :
-   return compute_parallel_sum(func,n_tot,output,options)
+   compute_parallel_sum(func,n_tot,output,options)
+   #if 'suppression' in output.keys():
+   # print(output['suppression'])
+
   else: 
    return compute_serial_sum(func,n_tot,output,options)
  

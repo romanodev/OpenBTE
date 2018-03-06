@@ -10,6 +10,11 @@ import subprocess
 def create_structured_bulk(argv):
 
 
+
+ res = argv.setdefault('reservoirs',False)
+ direction = argv['direction']
+  
+
  Lx = argv['frame'][0]
  Ly = argv['frame'][1]
  mesh_ext = argv['step']
@@ -27,19 +32,32 @@ def create_structured_bulk(argv):
 
  bs = []
  if argv.setdefault('Periodic',[True,True,True])[1] :
-  strc = r'''Physical Line('Periodic_1') = {1};''' + '\n'
-  store.write(strc)
-  strc = r'''Physical Line('Periodic_2') = {2};''' + '\n'
-  store.write(strc)
+  if res and direction=='x':
+   strc = r'''Physical Line('Hot') = {1};''' + '\n'
+   store.write(strc)
+   strc = r'''Physical Line('Cold') = {2};''' +'\n'
+   store.write(strc)
+  else:
+   strc = r'''Physical Line('Periodic_1') = {1};''' + '\n'
+   store.write(strc)
+   strc = r'''Physical Line('Periodic_2') = {2};''' + '\n'
+   store.write(strc)
  else:
   bs.append(1)
   bs.append(3)
 
  if argv.setdefault('Periodic',[True,True,True])[0] :
-  strc = r'''Physical Line('Periodic_3') = {3};''' + '\n'
-  store.write(strc)
-  strc = r'''Physical Line('Periodic_4') = {4};''' +'\n'
-  store.write(strc)
+  if res and direction=='y':
+   strc = r'''Physical Line('Cold') = {3};''' + '\n'
+   store.write(strc)
+   strc = r'''Physical Line('Hot') = {4};''' +'\n'
+   store.write(strc)
+  else:
+   strc = r'''Physical Line('Periodic_3') = {3};''' + '\n'
+   store.write(strc)
+   strc = r'''Physical Line('Periodic_4') = {4};''' +'\n'
+   store.write(strc)
+
  else:
   bs.append(2)
   bs.append(4)
@@ -62,6 +80,9 @@ def create_structured_bulk(argv):
  store.close()
 
 def create_unstructured_bulk(argv):
+
+  res = argv.setdefault('reservoirs',False)
+  direction = argv['direction']
 
   Lx = argv['frame'][0]
   Ly = argv['frame'][1]
@@ -105,19 +126,32 @@ def create_unstructured_bulk(argv):
 
   bs = []
   if argv.setdefault('Periodic',[True,True,True])[1] :
-   strc = r'''Physical Line('Periodic_1') = {1};''' + '\n'
-   store.write(strc)
-   strc = r'''Physical Line('Periodic_2') = {3};''' + '\n'
-   store.write(strc)
+
+   if res and direction=='y':
+    strc = r'''Physical Line('Cold') = {2};''' + '\n'
+    store.write(strc)
+    strc = r'''Physical Line('Hot') = {4};''' +'\n'
+   else:
+    strc = r'''Physical Line('Periodic_1') = {1};''' + '\n'
+    store.write(strc)
+    strc = r'''Physical Line('Periodic_2') = {3};''' + '\n'
+    store.write(strc)
   else:
    bs.append(1)
    bs.append(3)
 
   if argv.setdefault('Periodic',[True,True,True])[0] :
-   strc = r'''Physical Line('Periodic_3') = {2};''' + '\n'
-   store.write(strc)
-   strc = r'''Physical Line('Periodic_4') = {4};''' +'\n'
-   store.write(strc)
+
+   if res and direction=='x':
+    strc = r'''Physical Line('Cold') = {2};''' + '\n'
+    store.write(strc)
+    strc = r'''Physical Line('Hot') = {4};''' +'\n'
+    store.write(strc)
+   else:
+    strc = r'''Physical Line('Periodic_3') = {2};''' + '\n'
+    store.write(strc)
+    strc = r'''Physical Line('Periodic_4') = {4};''' +'\n'
+    store.write(strc)
   else:
    bs.append(2)
    bs.append(4)

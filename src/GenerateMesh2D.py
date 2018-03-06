@@ -144,6 +144,8 @@ def PolygonArea(corners):
 
 def mesh(polygons,frame,argv):
 
+
+
   mesh_ext = argv['step']
   include_pores = argv.setdefault('include_pores',False)
   store = open('mesh.geo', 'w+')
@@ -359,8 +361,8 @@ def mesh(polygons,frame,argv):
   else :
    line_check = line_contour
 
-  deltax = (Maxx-Minx)/1e4
-  deltay = (Maxy-Miny)/1e4
+  deltax = (Maxx-Minx)/1e10
+  deltay = (Maxy-Miny)/1e10
 
 
   for l in line_check:

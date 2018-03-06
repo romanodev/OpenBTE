@@ -1,6 +1,6 @@
 from mpi4py import MPI
 from fourier import Fourier
-from bte import BTE
+from solver import Solver
 from pyvtk import *
 import numpy as np
 import deepdish as dd
@@ -352,22 +352,30 @@ class Plot(object):
   if MPI.COMM_WORLD.Get_rank() == 0:
    init_plotting(extra_x_padding = 0.05)
    data = dd.io.load('solver.hdf5')
-   sup = data['suppression_function']
-   sup_fourier = data['fourier_suppression']
+   suppression = data['suppression']
+   sup = [suppression[m,:,:].sum() for m in range(np.shape(suppression)[0])]
+   
+   
+   tmp = data['fourier_suppression']
+   sup_fourier = [tmp[m,:,:].sum() for m in range(np.shape(tmp)[0])]
    #sup_iso = data['iso_suppression']
    mfp = data['mfp']*1e6
    sup_zero = len(mfp) * list(data['zero_suppression'])
    #kappa_bulk = data['kappa_bulk']
    #kappa_fourier = data['kappa_fourier']
    #ratio = kappa_fourier/kappa_bulk   
+   #print(max(sup))
    plot(mfp,sup,color=c2)
+   #print(sup)
+
    plot(mfp,sup_fourier,color=c3)
    plot(mfp,sup_zero,color=c1)
    ##plot(mfp,sup_iso,color='black')
    #plot([mfp[0],mfp[-1]],[ratio,ratio],color='black',ls='--')
    xscale('log')
-   legend(['S','$S_F$','$S_0$'])#,'S$_0$'])#,'S$_0$','S$_{ISO}$'])
-   #ylim([0,1])
+   legend(['S','S$_F$','S$_0$}'])
+   #legend(['S','$S_F$','$S_0$'])#,'S$_0$'])#,'S$_0$','S$_{ISO}$'])
+   ylim([0,1.2])
    grid('on')
    xlabel('Mean Free Path [$\mu$ m]')
    ylabel('Suppression Function')

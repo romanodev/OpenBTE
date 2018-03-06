@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "input.py", line 30, in <module>
+    save_configuration = True)
+  File "/home/microway/projects/OpenBTE/src/geometry.py", line 67, in __init__
+    data = self.compute_mesh_data()
+  File "/home/microway/projects/OpenBTE/src/geometry.py", line 84, in compute_mesh_data
+    self.compute_least_square_weigths()
+  File "/home/microway/projects/OpenBTE/src/geometry.py", line 1002, in compute_least_square_weigths
+    kc2 = elems[1]
+IndexError: list index out of range
+srun: got SIGCONT
+srun: Job step aborted: Waiting up to 2 seconds for job step to finish.
+slurmd[zayak]: error: *** JOB 9 CANCELLED AT 2018-02-28T10:40:56 ***
+srun: forcing job termination
