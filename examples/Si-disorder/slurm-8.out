@@ -1,5 +1,0 @@
-srun: Job step aborted: Waiting up to 2 seconds for job step to finish.
-srun: got SIGCONT
-slurmd[zayak]: error: *** STEP 8.0 CANCELLED AT 2018-02-27T11:12:17 ***
-slurmd[zayak]: error: *** JOB 8 CANCELLED AT 2018-02-27T11:12:17 ***
-srun: forcing job termination

@@ -1,8 +1,0 @@
-#!/bin/bash
-#
-#SBATCH -n 32 # Number of cores
-#SBATCH -p debug # Partition to submit to
-mpirun -np 32 python input.py > out_pores.log
-#mpirun -np 32 python input_bulk.py > out_film.log
-
-
