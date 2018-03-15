@@ -6,7 +6,10 @@ class WriteVtk(object):
 
  def __init__(self,argv):
 
-  self.mesh = argv['geometry']
+  self.mesh = argv['Geometry']
+
+  
+
   self.Nx = argv.setdefault('repeat_x',1)
   self.Ny = argv.setdefault('repeat_y',1)
   self.Nz = argv.setdefault('repeat_z',1)
@@ -22,21 +25,6 @@ class WriteVtk(object):
 
 
 
-
- def get_increment(self,argv):
-
-   gradient = argv.setdefault('gradient','x')
-
-   increment = [0,0,0] 
-   if gradient == 'x': increment = [1,0,0]
-   if gradient == 'y': increment = [0,1,0]
-   if gradient == 'z': increment = [0,0,1]
-   if argv['variable'] == 'bte_flux':
-    increment = [0,0,0]
-   if argv['variable'] == 'fourier_flux':
-    increment = [0,0,0]
-
-   return increment
 
 
  def cell_to_node(self,data):
@@ -117,17 +105,15 @@ class WriteVtk(object):
    for n,variable in enumerate(self.data) :
 
     is_scalar = len(list(np.shape(variable))) == 1
-
     node_data = self.cell_to_node(variable)
     #stored_data.update({self.label[n]:{variable:node_data[:,0],'label':self.label[n]}})
 
     #Get increment for plotting-------------
-    gradient = self.mesh.direction
     increment = [0,0,0] 
+
+    tmp = [[1,0,0],[0,1,0],[0,0,1]]
     if is_scalar:
-     if gradient == 'x': increment = [1,0,0]
-     if gradient == 'y': increment = [0,1,0]
-     if gradient == 'z': increment = [0,0,1]
+     increment = tmp[self.mesh.direction]
     #---------------------------------------
     ss = r'''nodes,cells,output_''' + str(n)+r'''= self.repeat_nodes_and_data(self.Nx,self.Ny,self.Nz,node_data,increment)'''
     exec(ss)

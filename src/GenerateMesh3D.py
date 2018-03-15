@@ -188,7 +188,6 @@ def mesh(polygons,frame,argv):
   for g,region in enumerate(solution) :
 
    #np = len(region)
-
    for kk,z in enumerate(Z):
     p_start = len(points)
     l_start = ll

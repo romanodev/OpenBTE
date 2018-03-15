@@ -1,6 +1,6 @@
 from mpi4py import MPI
 from fourier import Fourier
-from solver import Solver
+from solver2 import Solver
 from pyvtk import *
 import numpy as np
 import deepdish as dd
@@ -53,43 +53,46 @@ class Plot(object):
 
  def __init__(self,**argv):
 
-  if len(argv['plot'].split('/')) == 2:
-   if argv['plot'].split('/')[0] == 'map':
-     self.plot_map(argv)
-   if argv['plot'].split('/')[0] == 'material':
-     self.plot_material(argv)
-   if argv['plot'].split('/')[0] == 'line_plot':
-     self.plot_line_temperature(argv)
+  model= argv['model'].split('/')[0]
+
+
+  if model == 'map':
+   self.plot_map(argv)
+
+  #if len(argv['plot'].split('/')) == 2:
+  # if argv['plot'].split('/')[0] == 'map':
+   #if argv['plot'].split('/')[0] == 'material':
+   #  self.plot_material(argv)
+   #if argv['plot'].split('/')[0] == 'line_plot':
+   #  self.plot_line_temperature(argv)
      #self.plot_material(argv)
 
-  if argv['plot'] == 'suppression_function' :
+  if model == 'suppression_function' :
    self.plot_suppression_function()
 
   #if argv['plot'] == 'line_temperature' :
   # self.plot_line_temperature(argv)
 
-  if argv['plot'] == 'directional_suppression_function' :
-   self.plot_directional_suppression_function(argv)
+  #if argv['plot'] == 'directional_suppression_function' :
+  # self.plot_directional_suppression_function(argv)
 
-  if argv['plot'] == 'distr' :
-   self.plot_distribution()
+  #if argv['plot'] == 'distr' :
+  # self.plot_distribution()
 
  def plot_map(self,argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
-
    
-   var = argv['plot'].split('/')[1]
+   variable = argv['model'].split('/')[1]
    geo = dd.io.load('geometry.hdf5')
-   Nx = argv.setdefault('n_x',1)
-   Ny = argv.setdefault('n_y',1)
-   Ny = argv['n_y']
+   Nx = argv.setdefault('repeat_x',1)
+   Ny = argv.setdefault('repeat_y',1)
+
    increment = [0,0]
    #data = np.ones(len(geo['elems']))
-   variable = argv['plot'].split('/')[1] + '_cell'
    solver = dd.io.load('solver.hdf5')
-   data = solver[variable]['data']
-   model = 'data'
+   
+   data = solver[variable]
    #model = 'geometry'
 
    #if variable == 'temperature':
@@ -97,13 +100,7 @@ class Plot(object):
    # solver = dd.io.load('solver.hdf5')
    # data = solver['bte_temperature']['data']
 
-
-   maxt = max(data)
-   mint = min(data)
-   data -= mint
-   data /= (maxt-mint)
-
-   if len(np.shape(data)) == 1: #It is flux
+   if len(np.shape(data)) == 1: #It is temperature
      increment = [1,0]
      a = 1.0; b = (float(Nx)-1.0)/float(Nx)
      data *= a-b
@@ -111,16 +108,29 @@ class Plot(object):
    else: #it is temperature
      increment = [0,0]
 
-   #if variable == 'flux_magnitude':
-   # model = 'data'
-   # solver = dd.io.load('solver.hdf5')
-   # tmp = solver['bte_flux']
-   # data = []
-   # for t in tmp:
-   #  data.append(np.linalg.norm(t))
-   # maxt = max(data)
-   # mint = min(data)
-   # data = (data-mint)/(maxt-mint) 
+
+   #In case we have flux
+   if variable == 'bte_flux' or variable == 'fourier_flux':
+    component = argv['model'].split('/')[2]
+    if component == 'x':   
+      data = data[0]
+    if component == 'y':   
+      data = data[1]
+    if component == 'z':   
+      data = data[2]
+    if component == 'magnitude':   
+     tmp = []
+     for d in data :
+      tmp.append(np.linalg.norm(d))
+     data = tmp
+    #-------------------------
+
+   #normalization----
+   maxt = max(data)
+   mint = min(data)
+   data -= mint
+   data /= (maxt-mint)
+
 
    mm =1e4
    mm2 =-1e4
@@ -143,10 +153,11 @@ class Plot(object):
        i[0] += Px 
        i[1] += Py 
       path = create_path(p)
-      if model == 'geometry': color = 'gray'
-      if model == 'data': color = color=cmap(data[e]-np.dot(displ,increment))
+      #if model == 'geometry': color = 'gray'
+      #if model == 'data': color = color=cmap(data[e]-np.dot(displ,increment))
+      color = color=cmap(data[e]-np.dot(displ,increment))
   
-      patch = patches.PathPatch(path,linestyle=None,linewidth=0,color=color,zorder=10,alpha=0.5)
+      patch = patches.PathPatch(path,linestyle=None,linewidth=0,color=color,zorder=10,alpha=1.0)
       gca().add_patch(patch) 
       gca().add_patch(patch)
   
@@ -366,7 +377,8 @@ class Plot(object):
    #ratio = kappa_fourier/kappa_bulk   
    #print(max(sup))
    plot(mfp,sup,color=c2)
-   #print(sup)
+   print(sup[0])
+   print(sup[-1])
 
    plot(mfp,sup_fourier,color=c3)
    plot(mfp,sup_zero,color=c1)

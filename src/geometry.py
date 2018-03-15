@@ -5,6 +5,7 @@ from mpi4py import MPI
 from pyvtk import *
 from GenerateAlignedPores import *
 from GenerateRandomPores import *
+from GenerateRandomPoresOverlap import *
 import GenerateMesh2D 
 import GenerateMesh3D 
 import GenerateBulk2D 
@@ -13,7 +14,8 @@ import GenerateInterface2D
 from nanowire import *
 import deepdish as dd
 from scipy.sparse import csc_matrix
-
+import time
+from guppy import hpy
 
 class Geometry(object):
 
@@ -25,11 +27,11 @@ class Geometry(object):
   if direction == 'y':self.direction = 1
   if direction == 'z':self.direction = 2
 
-
-  if MPI.COMM_WORLD.Get_rank() == 0:
-   if argv['model'] == 'load':
-     data = dd.io.load(argv.setdefault('filename','geometry')+ '.hdf5')
-   else :
+  if argv['model'] == 'load':
+   self.state = dd.io.load(argv.setdefault('filename','geometry')+ '.hdf5')
+   self._update_data()
+  else:
+   if MPI.COMM_WORLD.Get_rank() == 0:
     #porous-----
     if argv['model'] == 'porous/random' or \
        argv['model'] == 'porous/aligned':
@@ -38,7 +40,11 @@ class Geometry(object):
       frame,polygons = GenerateAlignedPores(argv) 
 
      if argv['model'] == 'porous/random':
-      frame,polygons = GenerateRandomPores(argv) 
+      #frame,polygons = GenerateRandomPores(argv) 
+      frame,polygons = GenerateRandomPoresOverlap(argv) 
+      #print(polygons) 
+      #quit()
+      polygons = np.array(polygons)
 
      if len(argv['frame']) == 3:
       GenerateMesh3D.mesh(polygons,frame,argv)
@@ -66,15 +72,25 @@ class Geometry(object):
      #-----------------------------------
     data = self.compute_mesh_data()
     #save data
-    if argv.setdefault('save',True):
-     dd.io.save(argv.setdefault('filename','geometry')+ '.hdf5', data)
-  else: data = None    
-  self.state = MPI.COMM_WORLD.bcast(data,root=0)
-  self._update_data()
+    #if argv.setdefault('save',True):
+    dd.io.save(argv.setdefault('filename','geometry') + '.hdf5', data)
+    #h = hpy()
+    #print h.heap()
+  #else: data = None    
+  MPI.COMM_WORLD.Barrier()
+
+  #self.state = MPI.COMM_WORLD.bcast(data,root=0)
+  #self._update_data()
 
  def compute_mesh_data(self):
 
+    
+    #if MPI.COMM_WORLD.Get_rank() == 0:
+    # start = time.time()
     self.import_mesh()
+    #if MPI.COMM_WORLD.Get_rank() == 0:
+    # print(time.time()-start)
+
     self.compute_elem_map()
     self.compute_elem_volumes()
     self.compute_side_areas()
