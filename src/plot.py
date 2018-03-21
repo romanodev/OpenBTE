@@ -68,7 +68,7 @@ class Plot(object):
      #self.plot_material(argv)
 
   if model == 'suppression_function' :
-   self.plot_suppression_function()
+   self.plot_suppression_function(argv)
 
   #if argv['plot'] == 'line_temperature' :
   # self.plot_line_temperature(argv)
@@ -358,11 +358,11 @@ class Plot(object):
    mlab.show()
 
 
- def plot_suppression_function(self):
+ def plot_suppression_function(self,argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
    init_plotting(extra_x_padding = 0.05)
-   data = dd.io.load('solver.hdf5')
+   data = dd.io.load(argv.setdefault('filename','solver.hdf5'))
    suppression = data['suppression']
    sup = [suppression[m,:,:].sum() for m in range(np.shape(suppression)[0])]
    
@@ -371,14 +371,15 @@ class Plot(object):
    sup_fourier = [tmp[m,:,:].sum() for m in range(np.shape(tmp)[0])]
    #sup_iso = data['iso_suppression']
    mfp = data['mfp']*1e6
+
    sup_zero = len(mfp) * list(data['zero_suppression'])
    #kappa_bulk = data['kappa_bulk']
    #kappa_fourier = data['kappa_fourier']
    #ratio = kappa_fourier/kappa_bulk   
    #print(max(sup))
    plot(mfp,sup,color=c2)
-   print(sup[0])
-   print(sup[-1])
+   #print(sup[0])
+   #print(sup[-1])
 
    plot(mfp,sup_fourier,color=c3)
    plot(mfp,sup_zero,color=c1)
@@ -387,11 +388,11 @@ class Plot(object):
    xscale('log')
    legend(['S','S$_F$','S$_0$}'])
    #legend(['S','$S_F$','$S_0$'])#,'S$_0$'])#,'S$_0$','S$_{ISO}$'])
-   ylim([0,1.2])
+   ylim([0,0.5])
    grid('on')
    xlabel('Mean Free Path [$\mu$ m]')
    ylabel('Suppression Function')
-   show()
+   #show()
 
 
 

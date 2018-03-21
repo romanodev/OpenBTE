@@ -18,30 +18,34 @@ class Material(object):
 
   #MFP discretization-----------------------------
   self.state = {}
-  if argv.setdefault('model','isotropic') == 'isotropic':
-    self.import_data(argv)
+
+
   if argv.setdefault('model','isotropic') == 'load':
    #MPI.COMM_WORLD.Barrier()
    if MPI.COMM_WORLD.Get_rank() == 0:
     data = dd.io.load('material.hdf5')
    else: data=None
    self.state.update(MPI.COMM_WORLD.bcast(data,root=0))
-  if argv.setdefault('model','isotropic') == 'gray':
-   self.create_gray_model(argv)
-  #-----------------------------------------------
+  else:
+   if argv.setdefault('model','isotropic') == 'isotropic':
+     self.import_data(argv)
+  
+   if argv.setdefault('model','isotropic') == 'gray':
+    self.create_gray_model(argv)
+   #-----------------------------------------------
 
-  #Angular discretization-------------------------
-  if MPI.COMM_WORLD.Get_rank() == 0:
-   dom = compute_dom_3d(argv) 
-   data = {'dom':dom}
-  else: data=None
-  self.state.update(MPI.COMM_WORLD.bcast(data,root=0))
-  #-----------------------------------------------
-
-  #SAVE FILE--------------------
-  if argv.setdefault('save',True):
+   #Angular discretization-------------------------
    if MPI.COMM_WORLD.Get_rank() == 0:
-    dd.io.save('material.hdf5', self.state)
+    dom = compute_dom_3d(argv) 
+    data = {'dom':dom}
+   else: data=None
+   self.state.update(MPI.COMM_WORLD.bcast(data,root=0))
+
+   #-----------------------------------------------
+   #SAVE FILE--------------------
+   if argv.setdefault('save',True):
+    if MPI.COMM_WORLD.Get_rank() == 0:
+     dd.io.save('material.hdf5', self.state)
 
 
  def create_gray_model(self,argv):

@@ -27,6 +27,8 @@ def compute_dom_3d(argv) :
 
    output.update({'phi_vec':phi_vec})   
    output.update({'d_phi_vec':d_phi_plain})   
+   output.update({'n_phi':n_phi})
+   output.update({'n_theta':n_theta})
    #-----------------------------------------------------------------
 
    d_theta_int = np.zeros(n_theta)

@@ -77,45 +77,44 @@ def GenerateRandomPoresOverlap(argv):
   pbc.append([-Lx,Ly])
   pbc.append([Lx,-Ly])
   #---------------------
-  ext = 3.0/4.0
-  Xmin = - Lx*ext
-  Xmax =  Lx*ext
-  Ymin = - Ly*ext  
-  Ymax =  Ly*ext
+  #ext = 3.0/4.0
+  ext = 0.95
+  Xmin = - Lx/2*ext
+  Xmax =  Lx/2*ext
+  Ymin = - Ly/2*ext  
+  Ymax =  Ly/2*ext
 
   polygons = []
+  final = []
   #pyclipper.SCALING_FACTOR=1e3
 
   #while (area_miss > 1e-4):
   buf = 0.0
   nn = 0
-  while nn < Np:
-  
-   #collision = 1 
-   #while collision == 1 : 
- 
-    #This part helps ensuring to cover the given porosity
-    #if (area_miss > area_bounds[1]+1e-10):
-    #   area = np.random.uniform(area_bounds[0],min(area_bounds[1],area_miss - area_bounds[0]))
-    #else :
-    #  if (area_miss > 2.0 * area_bounds[0]):
-    #   area = np.random.uniform(area_bounds[0],area_miss - area_bounds[0])
-    #  else :
-    #   area = area_miss;
-  
-    area = area_min  
-    #Generate a random pore
-    #if len(Na_p) > 1:
-    # Na = Na_p[np.random.randint(0,len(Na_p)-1)];   
-    #else:
-    Na = Na_p[0]
+  confs = []
+  #while nn < Np:
 
+  area = area_min  
+  Na = Na_p[0]
+
+
+  if argv['manual']:
+   centers = argv['centers']
+  else:
+   centers = []
+   for nn in range(Np):
+    x = np.random.uniform(0,1)
+    y = np.random.uniform(0,1) 
+    centers.append([x,y])
+
+
+  for center in centers:
+    x = Lx*(center[0]-0.5)
+    y = Ly*(center[1]-0.5)
     #Create polygons
     r = math.sqrt(2.0*area/Na/math.sin(2.0 * math.pi/Na))  
     dphi = 2.0*math.pi/Na; 
     r2 = r
-    x = np.random.uniform(Xmin,Xmax)
-    y = np.random.uniform(Ymin,Ymax) 
     poly_clip = []    
     for ka in range(Na+1):
      ph =  dphi/2 + (ka-1) * dphi
@@ -136,7 +135,20 @@ def GenerateRandomPoresOverlap(argv):
         if p1.intersects(p2.buffer(buf)):
          collision.append([n_g,n_p])
      ##If there is no collision with existing pores
+
+     if x < Lx/2.0 and x > -Lx/2.0:
+      if y < Ly/2.0 and y > -Ly/2.0:
+       confs.append([x,y])
+     for kp in range(len(pbc)):
+      cx = x + pbc[kp][0]
+      cy = y + pbc[kp][1]
+      if cx < Lx/2.0 and cx > -Lx/2.0:
+       if cy < Ly/2.0 and cy > -Ly/2.0:
+        confs.append([cx,cy])
+
+
      if len(collision) == 0 :
+
       #polygons.append(poly_clip)
       poly_group = []
       poly_group.append(poly_clip) 
@@ -146,9 +158,13 @@ def GenerateRandomPoresOverlap(argv):
        p2 = np.array(poly_clip).copy()
        p2[:,0] += pbc[kp][0]
        p2[:,1] += pbc[kp][1]
-       poly_group.append(p2) 
+       poly_group.append(p2)
+ 
       polygons.append(poly_group)
+      
+
       print('Coverage: ' + str(area_tmp/area_tot) + ' %')
+
      else:
       if argv['overlap']:
        #Create the multipolygon------
@@ -191,12 +207,24 @@ def GenerateRandomPoresOverlap(argv):
   #-----------------------
  
   #Fill up pores, add only the ones that actually are in the frame
-  #pores = []
   NP = len(polys)
   polygons_final = []
   for k in range(NP) :
    if Polygon(polys[k]).intersects(frame):
      polygons_final.append(polys[k][0:-1])
+
+ 
+  #print(len(confs)) 
+  #os.system('gmsh mesh.geo')
+  #for c in confs:
+  # scatter(c[0],c[1])
+
+  #axis('equal')
+  #xlim([-Lx/2,Lx/2])
+  #ylim([-Ly/2,Ly/2])
+  #show()
+  if argv.setdefault('save_configuration',False):
+   np.array(confs).dump(file('conf.dat','w+'))
 
   return frame_tmp,polygons_final
 

@@ -5,15 +5,16 @@ import numpy as np
  
 def compute_serial_sum(func,n_tot,output,options):
 
+  for key, value in output.iteritems():
+   strc = r'''output[' ''' + key + r''' '].fill(0)'''
+   exec("".join(strc).replace(" ", ""))
   #Do the sum
   for n in range(n_tot):   
    tmp = func(n,options)
    for key, value in output.iteritems():
-    strc = r'''output[' ''' + key + r''' ']+=tmp[' ''' + key +r''' '] ''' 
+    strc = r'''output[' ''' + key + r''' ']+=tmp[' ''' + key +r''' '] '''
     exec(strc.replace(" ", ""))
     
-  return output
-
 
 def compute_parallel_sum(func,n_tot,output,options):
   
@@ -62,8 +63,6 @@ def compute_parallel_sum(func,n_tot,output,options):
    strc = list(strc)
    strc[-1] = '}'
    exec("".join(strc).replace(" ", ""))
-  
-
     
    tmp = comm.bcast(data,root=0)
    for key, value in tmp.iteritems():
@@ -76,10 +75,7 @@ def compute_parallel_sum(func,n_tot,output,options):
 def compute_sum(func,n_tot,output = {},options = {}):
   if MPI.COMM_WORLD.Get_size() > 1 :
    compute_parallel_sum(func,n_tot,output,options)
-   #if 'suppression' in output.keys():
-   # print(output['suppression'])
-
   else: 
-   return compute_serial_sum(func,n_tot,output,options)
+   compute_serial_sum(func,n_tot,output,options)
  
 
