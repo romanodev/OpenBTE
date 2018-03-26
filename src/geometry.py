@@ -4,6 +4,7 @@ import subprocess
 from mpi4py import MPI
 from pyvtk import *
 from GenerateAlignedPores import *
+from GenerateCustomPores import *
 from GenerateRandomPores import *
 from GenerateRandomPoresOverlap import *
 import GenerateMesh2D 
@@ -34,10 +35,14 @@ class Geometry(object):
    if MPI.COMM_WORLD.Get_rank() == 0:
     #porous-----
     if argv['model'] == 'porous/random' or \
-       argv['model'] == 'porous/aligned':
+       argv['model'] == 'porous/aligned' or\
+       argv['model'] == 'porous/custom':
 
      if argv['model'] == 'porous/aligned':
       frame,polygons = GenerateAlignedPores(argv) 
+   
+     if argv['model'] == 'porous/custom':
+      frame,polygons = GenerateCustomPores(argv) 
 
      if argv['model'] == 'porous/random':
       #frame,polygons = GenerateRandomPores(argv) 

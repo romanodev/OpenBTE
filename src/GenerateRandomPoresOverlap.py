@@ -98,7 +98,7 @@ def GenerateRandomPoresOverlap(argv):
   Na = Na_p[0]
 
 
-  if argv['manual']:
+  if argv.setdefault('manual',False):
    centers = argv['centers']
   else:
    centers = []

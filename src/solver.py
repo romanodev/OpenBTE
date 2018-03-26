@@ -318,7 +318,7 @@ class Solver(object):
         sup_fourier = suppression_fourier[m][t][p]
         error = abs(sup-sup_fourier)/abs(sup)
 
-        if error < 0.1:
+        if error < 0.05:
          fourier = True
          
          ff_1 +=1

@@ -1,6 +1,6 @@
 from mpi4py import MPI
 from fourier import Fourier
-from solver2 import Solver
+from solver import Solver
 from pyvtk import *
 import numpy as np
 import deepdish as dd
@@ -76,8 +76,8 @@ class Plot(object):
   #if argv['plot'] == 'directional_suppression_function' :
   # self.plot_directional_suppression_function(argv)
 
-  #if argv['plot'] == 'distr' :
-  # self.plot_distribution()
+  if model == 'distribution' :
+   self.plot_distribution(argv)
 
  def plot_map(self,argv):
 
@@ -276,23 +276,24 @@ class Plot(object):
    return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
  
 
- def plot_distribution(self):
+ def plot_distribution(self,argv):
   if MPI.COMM_WORLD.Get_rank() == 0:
    init_plotting(extra_x_padding = 0.05)
    data = dd.io.load('material.hdf5')
    dis_bulk = list(data['kappa_bulk'])
-   mfp = list(data['mfp_bulk'])
-  
+   mfp = list(data['mfp_bulk']) #m
+ 
    #plot nano------ 
-   solver = dd.io.load('solver.hdf5')
-   mfp_sampled = data['mfp_sampled']
-   sup = solver['suppression_function']
+   solver = dd.io.load(argv.setdefault('filename','solver.hdf5'))
+   mfp_sampled = data['mfp_sampled'] #m
+   suppression = solver['suppression']
+   sup = [suppression[m,:,:].sum() for m in range(np.shape(suppression)[0])]
    kappa_nano = []
    mfp_nano = []
    for n in range(len(mfp)):
     sup_interp = get_suppression(mfp_sampled,sup,mfp[n])
     kappa_nano.append(dis_bulk[n]*sup_interp)
-    mfp_nano.append(mfp[n]*sup_interp*1e6)
+    mfp_nano.append(mfp[n]*sup_interp*1e9)
 
    #reordering-----
    I = np.argsort(np.array(mfp_nano))
@@ -302,14 +303,24 @@ class Plot(object):
    mfp_nano = sorted(mfp_nano)
 
    #----------------
+   mfp_bulk = np.array(mfp)*1e9
+   
 
-   fill([mfp_nano[0]] + mfp_nano + [mfp_nano[-1]],[0] + kappa_sorted + [0])
-
+   #fill([mfp_bulk[0]] + list(mfp_bulk) + [mfp_bulk[-1]+1e-6],[0] + dis_bulk + [0],lw=2,alpha=0.6)
+   fill([mfp_nano[0]] + mfp_nano + [mfp_nano[-1]],[0] + kappa_sorted + [0],color=c2)
+   
+   f = open('mfp_nano.dat','w+')
+   for n in range(len(mfp)):
+    f.write('{0:10.4E} {1:20.4E}'.format(mfp_nano[n]*1e-9,kappa_sorted[n]))
+    f.write('\n')
+   f.close()
 
    xscale('log')
-   xlabel('$\Lambda_{\mathrm{n}}$ [$\mu$ m]')
-   ylabel('$K_{\mathrm{n}}d\Lambda_{\mathrm{n}}$ [Wm$^{-1}$K$^{-1}$]')
-   ylim([0,max(kappa_sorted)*1.3])
+   xlabel('$\Lambda$ [nm]')
+   ylabel('$Kd\Lambda$ [Wm$^{-1}$K$^{-1}$]')
+   #ylim([0,0.75])
+   grid()
+   #xlim([5e-1,4e1]) 
    show()
 
   
@@ -361,7 +372,7 @@ class Plot(object):
  def plot_suppression_function(self,argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
-   init_plotting(extra_x_padding = 0.05)
+   init_plotting(extra_bottom_padding= 0.01,extra_x_padding = 0.02)
    data = dd.io.load(argv.setdefault('filename','solver.hdf5'))
    suppression = data['suppression']
    sup = [suppression[m,:,:].sum() for m in range(np.shape(suppression)[0])]
@@ -377,16 +388,16 @@ class Plot(object):
    #kappa_fourier = data['kappa_fourier']
    #ratio = kappa_fourier/kappa_bulk   
    #print(max(sup))
-   plot(mfp,sup,color=c2)
+   plot(mfp,sup,color=c1)
    #print(sup[0])
    #print(sup[-1])
 
    plot(mfp,sup_fourier,color=c3)
-   plot(mfp,sup_zero,color=c1)
+   #plot(mfp,sup_zero,color=c1)
    ##plot(mfp,sup_iso,color='black')
    #plot([mfp[0],mfp[-1]],[ratio,ratio],color='black',ls='--')
    xscale('log')
-   legend(['S','S$_F$','S$_0$}'])
+   legend(['S','S$_D$'])
    #legend(['S','$S_F$','$S_0$'])#,'S$_0$'])#,'S$_0$','S$_{ISO}$'])
    ylim([0,0.5])
    grid('on')
