@@ -31,7 +31,7 @@ def GenerateCustomPores(argv):
   if 'polygons' in argv:
    polygons = argv['polygons']
   else:
-   tmp = np.loadtxt('poly.dat')
+   tmp = np.loadtxt(argv['polyfile'])
    if len(np.shape(tmp)) == 1:
     N = 1
     M = len(tmp)

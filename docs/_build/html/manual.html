@@ -65,9 +65,10 @@ x0_b ...
 </div>
 <p>We note that in some cases, a pore can lie on the unit-cell boundary hence appearing in multiple locations. In this case, only the full description of the pore intersecting any of the boundary is needed. Any periodic repeation will be performed internally.</p>
 <p>Example:</p>
-<blockquote>
-<div>echo &#8216;-2.5 2.5 2.5 2.5 2.5 -2.5 -2.5 -2.5&#8217; &gt;polygons.dat
-openbte -g -type=porous/custom -filename polygons.dat -lx=10 -ly=10</div></blockquote>
+<div class="highlight-shell"><div class="highlight"><pre><span></span><span class="nb">echo</span> -2.5 2.5 2.5 2.5 2.5 -2.5 -2.5 -2.5 &gt;polygons.dat
+openbte -g -type<span class="o">=</span>porous/custom -polyfile polygons.dat -lx<span class="o">=</span><span class="m">10</span> -ly<span class="o">=</span>10
+</pre></div>
+</div>
 <p>Finally, a bulk system (often used for testing) can be created with <code class="docutils literal"><span class="pre">type=bulk</span></code>.</p>
 <p>Example:</p>
 <div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -g -type<span class="o">=</span>bulk -lx<span class="o">=</span><span class="m">10</span> -ly<span class="o">=</span><span class="m">10</span> -step<span class="o">=</span>1
@@ -92,6 +93,11 @@ mfp_2  kappa_2
 <div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -m -model<span class="o">=</span>gray -n_phi<span class="o">=</span><span class="m">48</span> -n_theta<span class="o">=</span>16
 </pre></div>
 </div>
+<p>To convert data from ShengBTE to OpenBTE format, use</p>
+<div class="highlight-shell"><div class="highlight"><pre><span></span>shengbte2openbte foo
+</pre></div>
+</div>
+<p>where <code class="docutils literal"><span class="pre">foo</span></code> is the file for the scalar cumulative thermal conductivity.</p>
 </div>
 <div class="section" id="solver">
 <h2>Solver<a class="headerlink" href="#solver" title="Permalink to this headline">¶</a></h2>

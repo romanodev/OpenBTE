@@ -14,7 +14,6 @@ for dirName, subdirList, fileList in os.walk(rootDir):
      datafiles.append(dirName + '/' + fname)
 
 
-
 setup(name='openbte',
       version='0.9.0',
       description='Boltzmann Transport Equation for Phonons',
@@ -31,8 +30,16 @@ setup(name='openbte',
                          ],
       license='MIT',\
       #scripts=['src/convertShengBTE.py'],\
-      #packages = find_packages(),
-      packages = ['openbte'],
+      packages = find_packages('openbte',exclude=['solver_full.py',\
+                                                  'fourier_graded.py',\
+                                                  'GenerateInterface2D.py',\
+                                                  'solver_interface.py',\
+                                                  'nanowire.py',\
+                                                  'GenerateRandomPores.py',\
+                                                  'GenerateRandomPoresOverlap.py',\
+                                                  'solver_old.py',\
+                                                  'fourier.py']),
+   #   packages = ['openbte',exclude=['solver_full.py']],
       #data_files = datafiles,
       entry_points = {
      'console_scripts': [

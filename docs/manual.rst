@@ -32,13 +32,16 @@ In order to generate a geometry with arbitrary pore shape and configuration, use
     x0_b ...
     ...
 
+
+
 We note that in some cases, a pore can lie on the unit-cell boundary hence appearing in multiple locations. In this case, only the full description of the pore intersecting any of the boundary is needed. Any periodic repeation will be performed internally. 
 
 Example:
 
+.. code-block:: shell
 
-   echo '-2.5 2.5 2.5 2.5 2.5 -2.5 -2.5 -2.5' >polygons.dat
-   openbte -g -type=porous/custom -filename polygons.dat -lx=10 -ly=10
+   echo -2.5 2.5 2.5 2.5 2.5 -2.5 -2.5 -2.5 >polygons.dat
+   openbte -g -type=porous/custom -polyfile polygons.dat -lx=10 -ly=10
 
 Finally, a bulk system (often used for testing) can be created with ``type=bulk``.
 

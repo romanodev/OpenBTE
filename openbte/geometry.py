@@ -5,18 +5,16 @@ from mpi4py import MPI
 from pyvtk import *
 from GenerateAlignedPores import *
 from GenerateCustomPores import *
-from GenerateRandomPores import *
-from GenerateRandomPoresOverlap import *
+#from GenerateRandomPores import *
+#from GenerateRandomPoresOverlap import *
 import GenerateMesh2D 
 import GenerateMesh3D 
 import GenerateBulk2D 
 import GenerateBulk3D 
-import GenerateInterface2D 
-from nanowire import *
+#import GenerateInterface2D 
+#from nanowire import *
 import deepdish as dd
 from scipy.sparse import csc_matrix
-import time
-from guppy import hpy
 
 class Geometry(object):
 
@@ -37,9 +35,9 @@ class Geometry(object):
   else:
    if MPI.COMM_WORLD.Get_rank() == 0:
     #porous-----
-    if geo_type == 'porous/random' or \
-       geo_type == 'porous/aligned' or\
-       geo_type == 'porous/custom':
+    #if geo_type == 'porous/random' or \
+    if  geo_type == 'porous/aligned' or\
+        geo_type == 'porous/custom':
 
      if geo_type == 'porous/aligned':
       frame,polygons = GenerateAlignedPores(argv) 
@@ -47,12 +45,9 @@ class Geometry(object):
      if geo_type == 'porous/custom':
       frame,polygons = GenerateCustomPores(argv) 
 
-     if geo_type == 'porous/random':
-      #frame,polygons = GenerateRandomPores(argv) 
-      frame,polygons = GenerateRandomPoresOverlap(argv) 
-      #print(polygons) 
-      #quit()
-      polygons = np.array(polygons)
+     #if geo_type == 'porous/random':
+     # frame,polygons = GenerateRandomPoresOverlap(argv) 
+     # polygons = np.array(polygons)
 
      if 'lz' in argv.keys():
       GenerateMesh3D.mesh(polygons,frame,argv)
@@ -79,25 +74,14 @@ class Geometry(object):
       self.dim = 2
      #-----------------------------------
     data = self.compute_mesh_data()
-    #save data
-    #if argv.setdefault('save',True):
     dd.io.save('geometry.hdf5', data)
-    #h = hpy
-    #print h.heap()
-  #else: data = None    
   MPI.COMM_WORLD.Barrier()
 
-  #self.state = MPI.COMM_WORLD.bcast(data,root=0)
-  #self._update_data()
 
  def compute_mesh_data(self):
 
     
-    #if MPI.COMM_WORLD.Get_rank() == 0:
-    # start = time.time()
     self.import_mesh()
-    #if MPI.COMM_WORLD.Get_rank() == 0:
-    # print(time.time()-start)
 
     self.compute_elem_map()
     self.compute_elem_volumes()
@@ -447,9 +431,6 @@ class Geometry(object):
     self.area_flux = self.state['area_flux']
     self.flux_sides = self.state['flux_sides']
     self.side_periodic_value = self.state['side_periodic_value']
-    #if self.direction == 'x': dd = 0
-    #if self.direction == 'y': dd = 1
-    #if self.direction == 'z': dd = 2
     self.kappa_factor = self.size[self.direction]/self.area_flux
 
     
@@ -864,16 +845,8 @@ class Geometry(object):
     y.append(p[1])
 
    return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
-  # return PolyArea(x,y)
 
 
-
-   #volume = abs((points[1][0]*points[0][1] - points[0][0]*points[1][1])\
-   #      + (points[2][0]*points[1][1] - points[1][0]*points[2][1])\
-   #      + (points[0][0]*points[2][1] - points[2][0]*points[0][1])  )/2
- 
-   #print(volume)
-   #quit()    
    return volume
 
 
@@ -1000,9 +973,6 @@ class Geometry(object):
     self.side_periodic_value = side_periodic_value
 
 
-    #data = {'area_flux':area_flux,'length':length,'flux_sides':flux_sides,'side_periodic_value':side_periodic_value}
-
-    #return data
 
 
  def compute_least_square_weigths(self):
