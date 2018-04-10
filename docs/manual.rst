@@ -84,9 +84,9 @@ To convert data from ShengBTE to OpenBTE format, use
 
 .. code-block:: shell
 
- shengbte2openbte foo
+ shengbte2openbte
 
-where ``foo`` is the file for the scalar cumulative thermal conductivity.
+from the directory containing the file ``BTE.cumulative_kappa_scalar``. The output file is named ``mat.dat``.
 
  
 Solver
