@@ -1,17 +1,17 @@
-from material import *
-from geometry import *
-from solver import *
-from plot import *
+from openbte.material import *
+#from geometry import *
+#from solver import *
+#from plot import *
 #import mpi4py		
 #import time
 
 #mat = Material(filename='Si-300K',grid=[30,12,48],delta=0.0,min_mfp=1e-12)
 
-geo = Geometry(model='porous/custom',
-              frame = [10.0,10.0,3.0],
-              polygons = [[[-0.5,-0.5],[-0.5,0.5],[0.5,0.5],[0.5,-0.5]]],
+#geo = Geometry(model='porous/custom',
+#              frame = [10.0,10.0,3.0],
+#              polygons = [[[-0.5,-0.5],[-0.5,0.5],[0.5,0.5],[0.5,-0.5]]],
               #porosity = 0.25,
-              step = 1.0)
+#              step = 1.0)
               #shape = 'square')
 
 #geo = Geometry(model='porous/aligned',

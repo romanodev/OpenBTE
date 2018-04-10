@@ -25,17 +25,17 @@ setup(name='openbte',
                         'shapely',
                         'h5py',
                         'pyvtk',
-                        'termocolor',
+                        'termcolor',
                         'mpi4py',
                         'matplotlib',         
                          ],
       license='MIT',\
       #scripts=['src/convertShengBTE.py'],\
-      packages = find_packages(),
-      #packages = ['openbte'],
+      #packages = find_packages(),
+      packages = ['openbte'],
       #data_files = datafiles,
       entry_points = {
      'console_scripts': [
-      'openbte=src.__main__:main'],
+      'openbte=openbte.__main__:main','shengbte2openbte=openbte.shengbte2openbte:main'],
       },
       zip_safe=False)

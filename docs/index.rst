@@ -10,6 +10,7 @@ Welcome to OpenBTE's documentation!
    :hidden:
    
    gettingstarted
+   manual
    theory
    citingopenbte
 

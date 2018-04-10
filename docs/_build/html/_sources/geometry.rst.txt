@@ -1,0 +1,32 @@
+.. OpenBTE documentation master file, created by
+   sphinx-quickstart on Mon Dec  4 16:00:38 2017.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
+Geometry
+===================================
+
+.. toctree::
+   :hidden:
+
+OpenBTE has flexible models to create porous geometries. Aligned configurations are specificed with the model ``porous/aligned`` along with the options ``porosity``, ``frame=[Lx,Ly,Lz]`` and ``shape = square | circle``. The temperature gradient is assumed to be applied along the x-direction. When ``Lz`` is not specified, then the sample is infinite along z and only a two-dimensional simulation is performed. Periodic boundary conditions are applied along both x- and y- directions. Below is an example
+
+.. code-block:: shell
+
+   openbte -g -model porous/aligned -shape circle -porosity=0.25 -frame=[10,10]
+
+This command generates the file ``geometry.hdf5``.
+
+In order to generate a geometry with arbitrary pore shape and configuration, one can use the model ``porous\custom``. In this case the option ``frame=[Lx,Ly,Lz]`` still needs to be specified but the pores are given in terms of a list, i.e. ``pores = [ [[x0_a,y0_a],[x1_a,y1_a],[x2_a,y2_a],[x3_a,y3_a]],[x0_b... ]]``. Alternatively, a file can be given. The accepted format is
+
+
+.. code-block:: shell
+
+    x0_a y0_a x1_a y1_a x2_a y2_a x3_a y3_a 
+    x0_b ...
+    ...
+
+We note that in some cases, a pore can lie on the unit-cell boundary hence appearing in multiple locations. In this case, only the full description of the pore intersecting any of the boundary is needed. Any periodic repeation will be performed internally. Finally, a bulk system (often used for testing) can be created with ``model=bulk`` along with ``frame=[Lx,Ly,Lz]``.
+   
+
+
