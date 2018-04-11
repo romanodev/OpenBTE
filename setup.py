@@ -38,6 +38,7 @@ setup(name='openbte',
                                                   'GenerateRandomPores.py',\
                                                   'GenerateRandomPoresOverlap.py',\
                                                   'solver_old.py',\
+                                                  'plot_old.py',\
                                                   'fourier.py']),
    #   packages = ['openbte',exclude=['solver_full.py']],
       #data_files = datafiles,
