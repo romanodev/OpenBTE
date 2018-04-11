@@ -15,7 +15,7 @@ for dirName, subdirList, fileList in os.walk(rootDir):
 
 
 setup(name='openbte',
-      version='0.9.0',
+      version='0.9.2',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',
@@ -28,20 +28,9 @@ setup(name='openbte',
                         'mpi4py',
                         'matplotlib',         
                          ],
-      license='MIT',\
-      #scripts=['src/convertShengBTE.py'],\
-      packages = find_packages('openbte',exclude=['solver_full.py',\
-                                                  'fourier_graded.py',\
-                                                  'GenerateInterface2D.py',\
-                                                  'solver_interface.py',\
-                                                  'nanowire.py',\
-                                                  'GenerateRandomPores.py',\
-                                                  'GenerateRandomPoresOverlap.py',\
-                                                  'solver_old.py',\
-                                                  'plot_old.py',\
-                                                  'fourier.py']),
-   #   packages = ['openbte',exclude=['solver_full.py']],
-      #data_files = datafiles,
+      license='GPLv2',\
+
+      packages = find_packages(exclude=['openbte_new']),
       entry_points = {
      'console_scripts': [
       'openbte=openbte.__main__:main','shengbte2openbte=openbte.shengbte2openbte:main'],
