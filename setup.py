@@ -15,10 +15,12 @@ for dirName, subdirList, fileList in os.walk(rootDir):
 
 
 setup(name='openbte',
-      version='0.9.4',
+      version='0.9.8',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',
+      classifiers=['Programming Language :: Python :: 2.7'],
+      long_description=open('README.rst').read(),
       install_requires=['numpy', 
                         'scipy',
                         'shapely',

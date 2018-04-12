@@ -3,25 +3,23 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to OpenBTE's documentation!
+Download
 ===================================
 
 .. toctree::
    :hidden:
 
-   download
-   gettingstarted
-   manual
-   theory
-   citingopenbte
+To install OpenBTE simply type
+ 
+.. code-block:: shell
+
+  pip install openbte
 
 
-OpenBTE is writted in Python and runs both in serial and parallel. The main elements are Material, Geometry and Solver.
+Prerequisites
+----------------------------------
 
-.. image:: myfile.svg
-   :width: 80 %
-   :align: center
-
+OpenBTE runs with Python 2.7. 
 
 
 

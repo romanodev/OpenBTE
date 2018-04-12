@@ -2,7 +2,7 @@
 Citing OpenBTE
 =============================
 
-If you use the code, it would be nice if you cite 
+If you use the code, please considering citing 
 
 G. Romano and J. C. Grossman, J. Heat Transfer 137(7), 071302 (link_) 
 

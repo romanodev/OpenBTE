@@ -1,24 +1,41 @@
 Description
 ===========
 
-Tool for calculate tile bounding box (in geodesic coordinates) by specified XYZ (x - column, y - row, z - zoom) of tile.
+Space-dependent Boltzmann transport equation solver for phonons
 
 
 Installation
 ============
 
-::
+.. code-block:: shell
 
-  pip install sphericalmercator
-
+  pip install openbte
 
 Usage
 =====
 
-::
+.. code-block:: python
 
-  from sphericalmercator import SphericalMercator
+ from openbte.material import *
+ from openbte.geometry import *
+ from openbte.solver import *
+ from openbte.plot import *
 
-  merc = SphericalMercator(levels=15, size=256)
-  print merc.xyz_to_envelope(x=2474, y=1280, zoom=12)
-  # outputs (37.44140625, 55.727110085045986, 37.529296875, 55.7765730186677)
+ mat = Material(matfile='Si-300K.dat',n_mfp=10,n_theta=6,n_phi=32)
+
+ geo = Geometry(type='porous/aligned',lx=10,ly=10,
+               porosity = 0.25,
+               step = 1.0,
+               shape = 'square')
+
+ sol = Solver()
+
+ Plot(variable='map/flux_bte/magnitude')
+
+Author
+======
+
+Giuseppe Romano (romanog@mit.edu)
+
+
+
