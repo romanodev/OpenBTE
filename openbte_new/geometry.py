@@ -3,7 +3,8 @@ import numpy as np
 import subprocess
 from mpi4py import MPI
 from pyvtk import *
-from GenerateAlignedPores import *
+from GenerateSquareLatticePores import *
+from GenerateHexagonalLatticePores import *
 from GenerateCustomPores import *
 #from GenerateRandomPores import *
 #from GenerateRandomPoresOverlap import *
@@ -36,12 +37,16 @@ class Geometry(object):
    if MPI.COMM_WORLD.Get_rank() == 0:
     #porous-----
     #if geo_type == 'porous/random' or \
-    if  geo_type == 'porous/aligned' or\
+    if  geo_type == 'porous/square_lattice' or\
+        geo_type == 'porous/hexagonal_lattice' or\
         geo_type == 'porous/custom':
 
-     if geo_type == 'porous/aligned':
-      frame,polygons = GenerateAlignedPores(argv) 
+     if geo_type == 'porous/square_lattice':
+      frame,polygons = GenerateSquareLatticePores(argv) 
    
+     if geo_type == 'porous/hexagonal_lattice':
+      frame,polygons = GenerateHexagonalLatticePores(argv) 
+
      if geo_type == 'porous/custom':
       frame,polygons = GenerateCustomPores(argv) 
 

@@ -359,8 +359,8 @@ def mesh(polygons,frame,argv):
   else :
    line_check = line_contour
 
-  deltax = (Maxx-Minx)/1e10
-  deltay = (Maxy-Miny)/1e10
+  deltax = (Maxx-Minx)/1e5
+  deltay = (Maxy-Miny)/1e5
 
 
   for l in line_check:

@@ -4,6 +4,12 @@ Description
 Space-dependent Boltzmann transport equation solver for phonons
 
 
+Community
+============
+
+`Mailing list <https://groups.google.com/forum/#!forum/openbte>`_
+
+
 Installation
 ============
 
@@ -23,14 +29,14 @@ Usage
 
  mat = Material(matfile='Si-300K.dat',n_mfp=10,n_theta=6,n_phi=32)
 
- geo = Geometry(type='porous/aligned',lx=10,ly=10,
+ geo = Geometry(type='porous/square_lattice',lx=10,ly=10,
                porosity = 0.25,
                step = 1.0,
                shape = 'square')
 
  sol = Solver()
 
- Plot(variable='map/flux_bte/magnitude')
+ Plot(variable='map/bte_flux/magnitude')
 
 Author
 ======

@@ -15,7 +15,7 @@ for dirName, subdirList, fileList in os.walk(rootDir):
 
 
 setup(name='openbte',
-      version='0.9.8',
+      version='0.9.9',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',

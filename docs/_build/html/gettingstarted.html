@@ -49,10 +49,10 @@
 <div class="toctree-wrapper compound">
 </div>
 <p>The first step for setting up a OpenBTE simulation is creating a geometry. This can be done by the command</p>
-<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -g -type<span class="o">=</span>porous/aligned -shape circle -porosity<span class="o">=</span>0.25 -lx<span class="o">=</span><span class="m">10</span> -ly<span class="o">=</span>10
+<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -g -type<span class="o">=</span>porous/square_lattice -shape circle -porosity<span class="o">=</span>0.25 -lx<span class="o">=</span><span class="m">10</span> -ly<span class="o">=</span>10
 </pre></div>
 </div>
-<p>where <code class="docutils literal"><span class="pre">porous/aligned</span></code> is the geometry model for a two-dimensional porous material. In this case, the shape of the pore is circular, the porosity is 0.25 and the periodicity is 10 nm in both Cartesian directions. Essentially, we simulate only one pore with periodic boundary conditions. The keywords and relative options for other geometry models are listed in the Reference. Once this command is run, the file <code class="docutils literal"><span class="pre">geometry.hdf5</span></code> is created in the current directory.</p>
+<p>where <code class="docutils literal"><span class="pre">porous/square_lattice</span></code> is the geometry model for a two-dimensional porous material. In this case, the shape of the pore is circular, the porosity is 0.25 and the periodicity is 10 nm in both Cartesian directions. Essentially, we simulate only one pore with periodic boundary conditions. The keywords and relative options for other geometry models are listed in the Reference. Once this command is run, the file <code class="docutils literal"><span class="pre">geometry.hdf5</span></code> is created in the current directory.</p>
 <p>To plot the geometry, type the command</p>
 <div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -p -variable<span class="o">=</span>map/geometry
 </pre></div>
@@ -69,7 +69,7 @@
 </div>
 <p>The solver will first solve the diffusion equation to provide the first guess for the pseudotemperature, then it will solve the BTE. If you run it in serial on your laptop, it should take a few minutes.</p>
 <p>To plot the mangnitude of heat flux, we type</p>
-<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -p map/flux_bte/magnitude
+<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -p map/bte_flux/magnitude
 </pre></div>
 </div>
 <a class="reference internal image-reference" href="_images/GettingStarted_3.png"><img alt="_images/GettingStarted_3.png" class="align-center" src="_images/GettingStarted_3.png" style="width: 60%;" /></a>
@@ -126,7 +126,6 @@
 <h3>Navigation</h3>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="download.html">Download</a></li>
-<li class="toctree-l1"><a class="reference internal" href="download.html#prerequisites">Prerequisites</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Getting Started</a><ul class="simple">
 </ul>
 </li>

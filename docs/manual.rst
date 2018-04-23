@@ -14,13 +14,13 @@ Below we'll go through OpenBTE's main blocks: Geometry, Material, Solver and Plo
 Geometry
 ------------------------------------
 
-OpenBTE has flexible models to create porous geometries. Aligned configurations are specificed with the keyword ``type = porous/aligned`` along with the options ``porosity``, ``lx``, ``ly``, ``lz`` and ``shape = square | circle``. The temperature gradient is assumed to be applied along the x-direction. When ``lz`` is not specified, then the sample is infinite along z and only a two-dimensional simulation is performed. Periodic boundary conditions are applied along both x- and y- directions. 
+OpenBTE has flexible models to create porous geometries. Aligned configurations with square lattice are specificed with the keyword ``type = porous/square_lattice`` along with the options ``porosity``, ``lx``, ``ly``, ``lz`` and ``shape = square | circle``. The temperature gradient is assumed to be applied along the x-direction. When ``lz`` is not specified, then the sample is infinite along z and only a two-dimensional simulation is performed. Periodic boundary conditions are applied along both x- and y- directions. 
 
 Example:
 
 .. code-block:: shell
 
-   openbte -g -type=porous/aligned -shape=circle -porosity=0.25 -lx=10 -ly=10
+   openbte -g -type=porous/square_lattice -shape=circle -porosity=0.25 -lx=10 -ly=10
 
 This command generates the file ``geometry.hdf5``.
 
@@ -99,11 +99,7 @@ Example:
 
    openbte -s -multiscale -max_bte_iter = 10
 
-Once the simulation is finished, two files will be saved: 
-
-``solver.hdf5``: This file will be used my plot-related commands (see below).
-
-``output.vtk``: Data and mesh info to be used with VTK visualizers. We recommend Paraview.
+Once the simulation is finished, the file ``solver.hdf5`` is created.
 
 
 Plot
@@ -113,6 +109,9 @@ Once the simulation is over it is possible to plot relevant results by means of 
 
 ``suppression``: Phonon suppression function in the MFP space.
 ``map\fourier_flux|thermal_flux|fourier_temperature|bte_temperature``: Map of a given variable. Currently it works only in 2D. In case of a flux, it is also possible to specify either the Cartesian axis or the magnitude.
+``vtk``: the ``output.vtk`` is created with all the relevant variables. We recommend using Paraview.
+   
+Note: for both ``map\xxx`` and ``vtk`` options, it is possible to repeat the unit-cell in ``x`` and ``y`` with ``repeat_x`` and ``repeat_y``, respectively. OpenBTE handles the cell-to-node conversion internally, also including the periodicity. 
 
 Example:
 

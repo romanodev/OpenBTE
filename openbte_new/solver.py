@@ -77,6 +77,7 @@ class Solver(object):
      shutil.rmtree(directory)
     os.makedirs(directory)
     #compute matrix--------
+   argv.setdefault('max_bte_iter',10)
    if argv['max_bte_iter'] > 0:
     output = compute_sum(self.compute_directional_connections,self.n_index)
 

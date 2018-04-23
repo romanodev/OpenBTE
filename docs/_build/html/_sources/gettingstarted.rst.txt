@@ -14,9 +14,9 @@ The first step for setting up a OpenBTE simulation is creating a geometry. This 
 
 .. code-block:: shell
 
-   openbte -g -type=porous/aligned -shape circle -porosity=0.25 -lx=10 -ly=10
+   openbte -g -type=porous/square_lattice -shape circle -porosity=0.25 -lx=10 -ly=10
 
-where ``porous/aligned`` is the geometry model for a two-dimensional porous material. In this case, the shape of the pore is circular, the porosity is 0.25 and the periodicity is 10 nm in both Cartesian directions. Essentially, we simulate only one pore with periodic boundary conditions. The keywords and relative options for other geometry models are listed in the Reference. Once this command is run, the file ``geometry.hdf5`` is created in the current directory. 
+where ``porous/square_lattice`` is the geometry model for a two-dimensional porous material. In this case, the shape of the pore is circular, the porosity is 0.25 and the periodicity is 10 nm in both Cartesian directions. Essentially, we simulate only one pore with periodic boundary conditions. The keywords and relative options for other geometry models are listed in the Reference. Once this command is run, the file ``geometry.hdf5`` is created in the current directory. 
 
 To plot the geometry, type the command
 
@@ -51,7 +51,7 @@ To plot the mangnitude of heat flux, we type
 
 .. code-block:: shell
 
-   openbte -p map/flux_bte/magnitude
+   openbte -p map/bte_flux/magnitude
 
  
 .. image:: images/GettingStarted_3.png

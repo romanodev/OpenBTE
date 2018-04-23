@@ -51,9 +51,9 @@
 <p>Below we&#8217;ll go through OpenBTE&#8217;s main blocks: Geometry, Material, Solver and Plot.</p>
 <div class="section" id="geometry">
 <h2>Geometry<a class="headerlink" href="#geometry" title="Permalink to this headline">¶</a></h2>
-<p>OpenBTE has flexible models to create porous geometries. Aligned configurations are specificed with the keyword <code class="docutils literal"><span class="pre">type</span> <span class="pre">=</span> <span class="pre">porous/aligned</span></code> along with the options <code class="docutils literal"><span class="pre">porosity</span></code>, <code class="docutils literal"><span class="pre">lx</span></code>, <code class="docutils literal"><span class="pre">ly</span></code>, <code class="docutils literal"><span class="pre">lz</span></code> and <code class="docutils literal"><span class="pre">shape</span> <span class="pre">=</span> <span class="pre">square</span> <span class="pre">|</span> <span class="pre">circle</span></code>. The temperature gradient is assumed to be applied along the x-direction. When <code class="docutils literal"><span class="pre">lz</span></code> is not specified, then the sample is infinite along z and only a two-dimensional simulation is performed. Periodic boundary conditions are applied along both x- and y- directions.</p>
+<p>OpenBTE has flexible models to create porous geometries. Aligned configurations with square lattice are specificed with the keyword <code class="docutils literal"><span class="pre">type</span> <span class="pre">=</span> <span class="pre">porous/square_lattice</span></code> along with the options <code class="docutils literal"><span class="pre">porosity</span></code>, <code class="docutils literal"><span class="pre">lx</span></code>, <code class="docutils literal"><span class="pre">ly</span></code>, <code class="docutils literal"><span class="pre">lz</span></code> and <code class="docutils literal"><span class="pre">shape</span> <span class="pre">=</span> <span class="pre">square</span> <span class="pre">|</span> <span class="pre">circle</span></code>. The temperature gradient is assumed to be applied along the x-direction. When <code class="docutils literal"><span class="pre">lz</span></code> is not specified, then the sample is infinite along z and only a two-dimensional simulation is performed. Periodic boundary conditions are applied along both x- and y- directions.</p>
 <p>Example:</p>
-<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -g -type<span class="o">=</span>porous/aligned -shape<span class="o">=</span>circle -porosity<span class="o">=</span>0.25 -lx<span class="o">=</span><span class="m">10</span> -ly<span class="o">=</span>10
+<div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -g -type<span class="o">=</span>porous/square_lattice -shape<span class="o">=</span>circle -porosity<span class="o">=</span>0.25 -lx<span class="o">=</span><span class="m">10</span> -ly<span class="o">=</span>10
 </pre></div>
 </div>
 <p>This command generates the file <code class="docutils literal"><span class="pre">geometry.hdf5</span></code>.</p>
@@ -106,15 +106,15 @@ mfp_2  kappa_2
 <div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -s -multiscale -max_bte_iter <span class="o">=</span> 10
 </pre></div>
 </div>
-<p>Once the simulation is finished, two files will be saved:</p>
-<p><code class="docutils literal"><span class="pre">solver.hdf5</span></code>: This file will be used my plot-related commands (see below).</p>
-<p><code class="docutils literal"><span class="pre">output.vtk</span></code>: Data and mesh info to be used with VTK visualizers. We recommend Paraview.</p>
+<p>Once the simulation is finished, the file <code class="docutils literal"><span class="pre">solver.hdf5</span></code> is created.</p>
 </div>
 <div class="section" id="plot">
 <h2>Plot<a class="headerlink" href="#plot" title="Permalink to this headline">¶</a></h2>
 <p>Once the simulation is over it is possible to plot relevant results by means of the module <code class="docutils literal"><span class="pre">Plot</span></code>. The possible plots are:</p>
 <p><code class="docutils literal"><span class="pre">suppression</span></code>: Phonon suppression function in the MFP space.
-<code class="docutils literal"><span class="pre">map\fourier_flux|thermal_flux|fourier_temperature|bte_temperature</span></code>: Map of a given variable. Currently it works only in 2D. In case of a flux, it is also possible to specify either the Cartesian axis or the magnitude.</p>
+<code class="docutils literal"><span class="pre">map\fourier_flux|thermal_flux|fourier_temperature|bte_temperature</span></code>: Map of a given variable. Currently it works only in 2D. In case of a flux, it is also possible to specify either the Cartesian axis or the magnitude.
+<code class="docutils literal"><span class="pre">vtk</span></code>: the <code class="docutils literal"><span class="pre">output.vtk</span></code> is created with all the relevant variables. We recommend using Paraview.</p>
+<p>Note: for both <code class="docutils literal"><span class="pre">map\xxx</span></code> and <code class="docutils literal"><span class="pre">vtk</span></code> options, it is possible to repeat the unit-cell in <code class="docutils literal"><span class="pre">x</span></code> and <code class="docutils literal"><span class="pre">y</span></code> with <code class="docutils literal"><span class="pre">repeat_x</span></code> and <code class="docutils literal"><span class="pre">repeat_y</span></code>, respectively. OpenBTE handles the cell-to-node conversion internally, also including the periodicity.</p>
 <p>Example:</p>
 <div class="highlight-shell"><div class="highlight"><pre><span></span>openbte -p -variable/fourier_flux/magnitude
 </pre></div>
@@ -139,6 +139,7 @@ mfp_2  kappa_2
 
 <h3>Navigation</h3>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="download.html">Download</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gettingstarted.html">Getting Started</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Manual</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#geometry">Geometry</a></li>

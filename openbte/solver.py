@@ -77,6 +77,7 @@ class Solver(object):
      shutil.rmtree(directory)
     os.makedirs(directory)
     #compute matrix--------
+   argv.setdefault('max_bte_iter',10)
    if argv['max_bte_iter'] > 0:
     output = compute_sum(self.compute_directional_connections,self.n_index)
 
@@ -95,15 +96,15 @@ class Solver(object):
 
 
    #Write data-------  
-   argv.update({'Geometry':self.mesh})
-   vw = WriteVtk(argv)
-   vw.add_variable(self.state['fourier_temperature'],label = 'Fourier Temperature [K]')
-   vw.add_variable(self.state['fourier_flux'],label = r'''Thermal Flux [W/m/m]''')
+   #argv.update({'Geometry':self.mesh})
+   #vw = WriteVtk(argv)
+   #vw.add_variable(self.state['fourier_temperature'],label = 'Fourier Temperature [K]')
+   #vw.add_variable(self.state['fourier_flux'],label = r'''Thermal Flux [W/m/m]''')
 
-   if argv['max_bte_iter'] > 0:
-    vw.add_variable(self.state['bte_temperature'],label = r'''BTE Temperature [K]''')
-    vw.add_variable(self.state['bte_flux'],label = r'''BTE Thermal Flux [W/m/m]''')
-   vw.write_vtk()  
+   #if argv['max_bte_iter'] > 0:
+   # vw.add_variable(self.state['bte_temperature'],label = r'''BTE Temperature [K]''')
+   # vw.add_variable(self.state['bte_flux'],label = r'''BTE Thermal Flux [W/m/m]''')
+   #vw.write_vtk()  
    #----------------
 
    #SAVE FILE--------------------

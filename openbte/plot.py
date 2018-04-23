@@ -11,6 +11,8 @@ from fig_maker import *
 from shapely import geometry,wkt
 from shapely.geometry import MultiPoint,Point,Polygon,LineString
 from scipy.interpolate import BarycentricInterpolator
+from WriteVTK import *
+from geometry import *
 
 def get_suppression(mfps,sup,mfp):
 
@@ -63,6 +65,24 @@ class Plot(object):
   if argv['variable'] == 'distribution' :
    self.plot_distribution(argv)
 
+  if argv['variable'] == 'vtk' :
+   self.save_vtk(argv)
+
+
+ def save_vtk(self,argv):
+
+   #Write data-------  
+   #geo = dd.io.load('geometry.hdf5')
+   geo = Geometry(type='load')
+   solver = dd.io.load('solver.hdf5')
+   argv.update({'Geometry':geo})
+   vw = WriteVtk(argv)
+   vw.add_variable(solver['fourier_temperature'],label = 'Fourier Temperature [K]')
+   vw.add_variable(solver['fourier_flux'],label = r'''Thermal Flux [W/m/m]''')
+
+   vw.add_variable(solver['bte_temperature'],label = r'''BTE Temperature [K]''')
+   vw.add_variable(solver['bte_flux'],label = r'''BTE Thermal Flux [W/m/m]''')
+   vw.write_vtk()  
 
 
  def plot_map(self,argv):
@@ -134,8 +154,10 @@ class Plot(object):
        i[0] += Px 
        i[1] += Py 
       path = create_path(p)
-      if variable == 'geometry': color = 'gray'
-      if variable == 'data': color = color=cmap(data[e]-np.dot(displ,increment))
+      if variable == 'geometry': 
+        color = 'gray'
+      else:
+        color = color=cmap(data[e]-np.dot(displ,increment))
   
       patch = patches.PathPatch(path,linestyle=None,linewidth=0,color=color,zorder=10,alpha=1.0)
       gca().add_patch(patch) 

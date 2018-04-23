@@ -134,8 +134,10 @@ class Plot(object):
        i[0] += Px 
        i[1] += Py 
       path = create_path(p)
-      if variable == 'geometry': color = 'gray'
-      if variable == 'data': color = color=cmap(data[e]-np.dot(displ,increment))
+      if variable == 'geometry': 
+        color = 'gray'
+      else:
+        color = color=cmap(data[e]-np.dot(displ,increment))
   
       patch = patches.PathPatch(path,linestyle=None,linewidth=0,color=color,zorder=10,alpha=1.0)
       gca().add_patch(patch) 

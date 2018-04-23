@@ -151,10 +151,11 @@ def mesh(polygons,frame,argv):
   # Lx *=sqrt(2)
   # Ly *=sqrt(2)
 
-  Lz = argv['frame'][2]
-  Lx = -frame[0][0]*2
-  Ly = frame[0][1]*2
+  Lx = -frame[0][0]*2.0
+  Ly = frame[0][1]*2.0
+  Lz = argv['lz']
   
+
   store = open('mesh.geo', 'w+')
   #CREATE BULK SURFACE------------------------------------
   c = pyclipper.Pyclipper()

@@ -1,7 +1,7 @@
 import numpy as np
 import math
 
-def GenerateAlignedPores(argv):
+def GenerateSquareLatticePores(argv):
     
   Lx = float(argv['lx'])
   Ly = float(argv['ly'])
