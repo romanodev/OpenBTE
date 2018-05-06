@@ -1,3 +1,5 @@
+from __future__ import print_function
+from __future__ import absolute_import
 from scipy.sparse.linalg import spsolve
 import os,sys
 import numpy as np 
@@ -11,14 +13,13 @@ from scipy.sparse import diags
 from scipy.io import *
 import scipy.io
 import h5py
-from utils import *
+from .utils import *
 import deepdish as dd
-import sparse
 import time
 from termcolor import colored
-from WriteVTK import *
-from geometry import *
-from material import *
+from .WriteVTK import *
+from .geometry import *
+from .material import *
 
 
 class Solver(object):
@@ -410,7 +411,7 @@ class Solver(object):
    if MPI.COMM_WORLD.Get_rank() == 0:
     if max_iter > 0:
      print('')
-     print colored('Solving BTE... started', 'green')
+     print(colored('Solving BTE... started', 'green'))
      print('')
      print('    Iter    Thermal Conductivity [W/m/K]      Error       Zeroth - Fourier - BTE')
      print('   ------------------------------------------------------------------------------------')
@@ -481,7 +482,7 @@ class Solver(object):
             'zero_suppression':suppression_zeroth,\
             'fourier_suppression':suppression_fourier,\
             'dom':self.dom,\
-            'kappa_fourier':kappa,\
+            'kappa_fourier':kappa_fourier,\
             'mfp':self.mfp*1e-9,\
             'bte_temperature':lattice_temperature,\
             'fourier_temperature':fourier_temp,\
@@ -495,7 +496,7 @@ class Solver(object):
    if max_iter > 0:
     if MPI.COMM_WORLD.Get_rank() == 0:
      print('')
-     print colored('Solving BTE... done', 'green')
+     print(colored('Solving BTE... done', 'green'))
      print('')
 
 

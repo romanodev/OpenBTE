@@ -1,5 +1,3 @@
-from __future__ import print_function
-from __future__ import absolute_import
 from scipy.sparse.linalg import spsolve
 import os,sys
 import numpy as np 
@@ -9,7 +7,7 @@ from mpi4py import MPI
 from scipy.sparse.linalg import *
 from scipy.sparse import diags
 from mpi4py import MPI
-from .utils import *
+from utils import *
 
 
 

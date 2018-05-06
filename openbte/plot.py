@@ -1,5 +1,6 @@
+from __future__ import absolute_import
 from mpi4py import MPI
-from solver import Solver
+from .solver import Solver
 from pyvtk import *
 import numpy as np
 import deepdish as dd
@@ -7,12 +8,12 @@ import os
 import matplotlib
 import matplotlib.patches as patches
 from matplotlib.path import Path
-from fig_maker import *
+from .fig_maker import *
 from shapely import geometry,wkt
 from shapely.geometry import MultiPoint,Point,Polygon,LineString
 from scipy.interpolate import BarycentricInterpolator
-from WriteVTK import *
-from geometry import *
+from .WriteVTK import *
+from .geometry import *
 
 def get_suppression(mfps,sup,mfp):
 

@@ -1,8 +1,9 @@
+from __future__ import absolute_import
 import argparse
-from material import *
-from geometry import *
-from solver import *
-from plot import *
+from .material import *
+from .geometry import *
+from .solver import *
+from .plot import *
 
 def main(args=None):
 

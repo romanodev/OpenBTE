@@ -1,17 +1,19 @@
+from __future__ import print_function
+from __future__ import absolute_import
 import os,sys
 import numpy as np
 import subprocess
 from mpi4py import MPI
 from pyvtk import *
-from GenerateSquareLatticePores import *
-from GenerateHexagonalLatticePores import *
-from GenerateCustomPores import *
+from .GenerateSquareLatticePores import *
+from .GenerateHexagonalLatticePores import *
+from .GenerateCustomPores import *
 #from GenerateRandomPores import *
-#from GenerateRandomPoresOverlap import *
-import GenerateMesh2D 
-import GenerateMesh3D 
-import GenerateBulk2D 
-import GenerateBulk3D 
+from .GenerateRandomPoresOverlap import *
+from . import GenerateMesh2D 
+from . import GenerateMesh3D 
+from . import GenerateBulk2D 
+from . import GenerateBulk3D 
 #import GenerateInterface2D 
 #from nanowire import *
 import deepdish as dd
@@ -36,8 +38,8 @@ class Geometry(object):
   else:
    if MPI.COMM_WORLD.Get_rank() == 0:
     #porous-----
-    #if geo_type == 'porous/random' or \
-    if  geo_type == 'porous/square_lattice' or\
+    if  geo_type == 'porous/random' or \
+        geo_type == 'porous/square_lattice' or\
         geo_type == 'porous/hexagonal_lattice' or\
         geo_type == 'porous/custom':
 
@@ -50,9 +52,9 @@ class Geometry(object):
      if geo_type == 'porous/custom':
       frame,polygons = GenerateCustomPores(argv) 
 
-     #if geo_type == 'porous/random':
-     # frame,polygons = GenerateRandomPoresOverlap(argv) 
-     # polygons = np.array(polygons)
+     if geo_type == 'porous/random':
+      frame,polygons = GenerateRandomPoresOverlap(argv) 
+      polygons = np.array(polygons)
 
      if 'lz' in argv.keys():
       GenerateMesh3D.mesh(polygons,frame,argv)

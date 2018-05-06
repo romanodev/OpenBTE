@@ -1,6 +1,5 @@
-from __future__ import absolute_import
 from mpi4py import MPI
-from .solver import Solver
+from solver import Solver
 from pyvtk import *
 import numpy as np
 import deepdish as dd
@@ -8,10 +7,12 @@ import os
 import matplotlib
 import matplotlib.patches as patches
 from matplotlib.path import Path
-from .fig_maker import *
+from fig_maker import *
 from shapely import geometry,wkt
 from shapely.geometry import MultiPoint,Point,Polygon,LineString
 from scipy.interpolate import BarycentricInterpolator
+from WriteVTK import *
+from geometry import *
 
 def get_suppression(mfps,sup,mfp):
 
@@ -65,18 +66,23 @@ class Plot(object):
    self.plot_distribution(argv)
 
 
-  #if len(argv['plot'].split('/')) == 2:
-  # if argv['plot'].split('/')[0] == 'map':
-   #if argv['plot'].split('/')[0] == 'material':
-   #  self.plot_material(argv)
-   #if argv['plot'].split('/')[0] == 'line_plot':
-   #  self.plot_line_temperature(argv)
-     #self.plot_material(argv)
-  #if argv['plot'] == 'line_temperature' :
-  # self.plot_line_temperature(argv)
-  #if argv['plot'] == 'directional_suppression_function' :
-  # self.plot_directional_suppression_function(argv)
+  if argv['variable'] == 'vtk' :
+   self.save_vtk(argv)
 
+ def save_vtk(self,argv):
+
+   #Write data-------  
+   #geo = dd.io.load('geometry.hdf5')
+   geo = Geometry(type='load')
+   solver = dd.io.load('solver.hdf5')
+   argv.update({'Geometry':geo})
+   vw = WriteVtk(argv)
+   vw.add_variable(solver['fourier_temperature'],label = 'Fourier Temperature [K]')
+   vw.add_variable(solver['fourier_flux'],label = r'''Thermal Flux [W/m/m]''')
+
+   vw.add_variable(solver['bte_temperature'],label = r'''BTE Temperature [K]''')
+   vw.add_variable(solver['bte_flux'],label = r'''BTE Thermal Flux [W/m/m]''')
+   vw.write_vtk()  
 
  def plot_map(self,argv):
 
@@ -147,26 +153,15 @@ class Plot(object):
        i[0] += Px 
        i[1] += Py 
       path = create_path(p)
-      if variable == 'geometry': color = 'gray'
-      if variable == 'data': color = color=cmap(data[e]-np.dot(displ,increment))
-      #color = color=cmap(data[e]-np.dot(displ,increment))
+      if variable == 'geometry': 
+        color = 'gray'
+      else:
+        color = color=cmap(data[e]-np.dot(displ,increment))
   
       patch = patches.PathPatch(path,linestyle=None,linewidth=0,color=color,zorder=10,alpha=1.0)
       gca().add_patch(patch) 
       gca().add_patch(patch)
   
-   #if variable == 'geometry':
-   # for ll in geo['side_list']['Periodic'] + \
-   #           geo['side_list']['Inactive']:
-   #  p1 = geo['nodes'][geo['sides'][ll][0]]
-   #  p2 = geo['nodes'][geo['sides'][ll][1]]
-   #  plot([p1[0],p2[0]],[p1[1],p2[1]],c2,lw=3,zorder=0)
-
-   # for ll in geo['side_list']['Boundary'] :
-   #  p1 = geo['nodes'][geo['sides'][ll][0]]
-   #  p2 = geo['nodes'][geo['sides'][ll][1]]
-   #  plot([p1[0],p2[0]],[p1[1],p2[1]],c3,lw=3,zorder=0)
- 
    axis('off')
    axis('equal')
    show() 
@@ -190,74 +185,6 @@ class Plot(object):
    ylim([0,max(dis_bulk)*1.3])
    show()
 
-
-
- def plot_line_temperature(self,argv):
-
-  if MPI.COMM_WORLD.Get_rank() == 0:
-   geo = dd.io.load('geometry.hdf5')
-   solver = dd.io.load('solver.hdf5')
-   data = solver[argv['plot'].split('/')[1]+'_nodal']['data']
-
-  #['data']
-   N = argv.setdefault('N',100)
-
-   #Compute the closest element on the left-----
-   y0 = argv.setdefault('y0',0)
-   m = argv.setdefault('m',0)
-   Lx = geo['size'][0]   
-   Ly = geo['size'][1]   
-   p1 = Point(-Lx,-m*Lx+y0)
-   p2 = Point(Lx,m*Lx+y0)
-   poly = Polygon([(-Lx/2.0,-Ly/2.0),(Lx/2.0,-Ly/2.0),(Lx/2.0,Ly/2.0),(-Lx/2.0,Ly/2.0)])
-   l =  LineString([p1, p2])
-   isp = l.intersection(poly.boundary)
-   P1 = np.array([list(isp)[0].x,list(isp)[0].y])
-   P2 = np.array([list(isp)[1].x,list(isp)[1].y])
-
-
-   elems = range(len(geo['elems']))
-   line_data = np.zeros(N)
-   x = []
-   x_old = 0.0
-  
-   P_old = P1 
-   for k in range(N):
-    tmp = P1 + (1e-4 + float(k)/float(N-1))*(P2-P1) 
-    dx = np.linalg.norm(tmp-P_old)
-    x.append(x_old + dx)
-    P_old = tmp
-    x_old = x[-1]
-
-    p = Point(tmp[0],tmp[1])
-    for e in elems:   
-     elem = geo['elems'][e]
-     nodes = geo['nodes'][elem][:,0:2]
-     polygon = geometry.Polygon(nodes)
-     if p.within(polygon):
-      #Barycentric interpolation------
-      area = geo['elem_volumes'][e]
-      v = 0
-      for n in range(3):
-       n1 = (n+1)%3    
-       n2 = (n+2)%3   
-       new_nodes = [[p.x,p.y],list(nodes[n1,:]),list(nodes[n2,:])]
-       partial_area = self.compute_area(new_nodes)
-       coeff = partial_area/area
-       v += coeff * data[elem[n]]
-      break
-
-    line_data[k] = v
-
-   init_plotting(extra_x_padding = 0.05)
-   plot(x,line_data,color=c1)  
-   grid(which='both')
-   xlabel('Distance [nm]')
-   
-   yl = solver[argv['plot'].split('/')[1]+'_nodal']['label']
-   ylabel(yl)
-   show()   
-  
 
 
 
@@ -312,56 +239,10 @@ class Plot(object):
    xscale('log')
    xlabel('$\Lambda$ [nm]')
    ylabel('$Kd\Lambda$ [Wm$^{-1}$K$^{-1}$]')
-   #ylim([0,0.75])
    grid()
-   #xlim([5e-1,4e1]) 
    show()
 
   
- def plot_directional_suppression_function(self,argv):
-
-  if MPI.COMM_WORLD.Get_rank() == 0:
-   from mayavi import mlab
-   #init_plotting()
-   data = dd.io.load('solver.hdf5')
-   sup = data['directional_suppression']
-   mat = dd.io.load('material.hdf5')
-   n_theta = mat['dom']['n_theta'] 
-   phonon_dir = mat['dom']['phonon_dir'] 
-   n_phi = mat['dom']['n_phi'] 
-   n_mfp = len(mat['mfp_sampled'])
-
-   sup_sph = np.zeros((n_mfp,n_theta,n_phi))
-   for m in range(n_mfp):
-    for t in range(n_theta):
-     for p in range(n_phi):
-      sup_sph[m][t][p] +=abs(sup[m][t][p])
-
-
-   delta= 1.2
-   cg = mlab.figure(bgcolor=(1,1,1), fgcolor=None, engine=None, size=(400, 250)) 
-    
-   m = argv.setdefault('plot_m',0)
-   z =  np.zeros((n_theta,n_phi))
-   y =  np.zeros((n_theta,n_phi))
-   x =  np.zeros((n_theta,n_phi))
-   s =  np.zeros((n_theta,n_phi))
-   for t in range(n_theta):
-    for p in range(n_phi):
-     tmp = phonon_dir[t][p] 
-     x[t][p] = tmp[0]*sup_sph[m][t][p] 
-     y[t][p] = tmp[1]*sup_sph[m][t][p]
-     z[t][p] = tmp[2]*sup_sph[m][t][p]
-     s[t][p] = sup_sph[m][t][p]
-   mlab.mesh(x,y,z,scalars = s,colormap="blue-red")
-
-   #mlab.orientation_axes('off')
-   #mlab.view(azimuth=90, elevation=180)
-   cam = cg.scene.camera
-   cam.zoom(1.4)
-   mlab.savefig('tmp.png',size=(800,500))
-   mlab.show()
-
 
  def plot_suppression_function(self,argv):
 
@@ -373,31 +254,15 @@ class Plot(object):
    
    
    tmp = data['fourier_suppression']
-   sup_fourier = [tmp[m,:,:].sum() for m in range(np.shape(tmp)[0])]
    mfp = data['mfp']*1e6
 
    
-   #sup_zero = len(mfp) * list(data['zero_suppression'])
-   #kappa_bulk = data['kappa_bulk']
-   #kappa_fourier = data['kappa_fourier']
-   #ratio = kappa_fourier/kappa_bulk   
-   #print(max(sup))
    plot(mfp,sup,color=c1)
-   #print(sup[0])
-   #print(sup[-1])
-
-   plot(mfp,sup_fourier,color=c3)
-   #plot(mfp,sup_zero,color=c1)
-   ##plot(mfp,sup_iso,color='black')
-   #plot([mfp[0],mfp[-1]],[ratio,ratio],color='black',ls='--')
    xscale('log')
-   legend(['S','S$_D$'])
-   #legend(['S','$S_F$','$S_0$'])#,'S$_0$'])#,'S$_0$','S$_{ISO}$'])
-   ylim([0,0.5])
    grid('on')
    xlabel('Mean Free Path [$\mu$ m]')
    ylabel('Suppression Function')
-   #show()
+   show()
 
 
 

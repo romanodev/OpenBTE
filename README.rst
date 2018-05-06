@@ -5,20 +5,26 @@ Space-dependent Boltzmann transport equation solver for phonons
 
 
 Community
-============
+=========
 
 `Mailing list <https://groups.google.com/forum/#!forum/openbte>`_
 
 
-Installation
-============
+Installation $ Usage
+====================
 
 .. code-block:: shell
 
-  pip install openbte
+  pip install --upgrade openbte
 
-Usage
-=====
+  mkdir -p example_openbte && cd example_openbte
+
+  download_openbte_example
+
+  python example.py
+
+Example
+=======
 
 .. code-block:: python
 

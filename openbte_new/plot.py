@@ -1,5 +1,6 @@
+from __future__ import absolute_import
 from mpi4py import MPI
-from solver import Solver
+from .solver import Solver
 from pyvtk import *
 import numpy as np
 import deepdish as dd
@@ -7,10 +8,12 @@ import os
 import matplotlib
 import matplotlib.patches as patches
 from matplotlib.path import Path
-from fig_maker import *
+from .fig_maker import *
 from shapely import geometry,wkt
 from shapely.geometry import MultiPoint,Point,Polygon,LineString
 from scipy.interpolate import BarycentricInterpolator
+from .WriteVTK import *
+from .geometry import *
 
 def get_suppression(mfps,sup,mfp):
 
@@ -64,6 +67,23 @@ class Plot(object):
    self.plot_distribution(argv)
 
 
+  if argv['variable'] == 'vtk' :
+   self.save_vtk(argv)
+
+ def save_vtk(self,argv):
+
+   #Write data-------  
+   #geo = dd.io.load('geometry.hdf5')
+   geo = Geometry(type='load')
+   solver = dd.io.load('solver.hdf5')
+   argv.update({'Geometry':geo})
+   vw = WriteVtk(argv)
+   vw.add_variable(solver['fourier_temperature'],label = 'Fourier Temperature [K]')
+   vw.add_variable(solver['fourier_flux'],label = r'''Thermal Flux [W/m/m]''')
+
+   vw.add_variable(solver['bte_temperature'],label = r'''BTE Temperature [K]''')
+   vw.add_variable(solver['bte_flux'],label = r'''BTE Thermal Flux [W/m/m]''')
+   vw.write_vtk()  
 
  def plot_map(self,argv):
 

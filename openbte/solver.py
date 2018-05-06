@@ -1,3 +1,5 @@
+from __future__ import print_function
+from __future__ import absolute_import
 from scipy.sparse.linalg import spsolve
 import os,sys
 import numpy as np 
@@ -11,14 +13,13 @@ from scipy.sparse import diags
 from scipy.io import *
 import scipy.io
 import h5py
-from utils import *
+from .utils import *
 import deepdish as dd
-import sparse
 import time
 from termcolor import colored
-from WriteVTK import *
-from geometry import *
-from material import *
+from .WriteVTK import *
+from .geometry import *
+from .material import *
 
 
 class Solver(object):
@@ -214,22 +215,22 @@ class Solver(object):
    K = csc_matrix( (dk,(rk,ck)), shape=(self.n_elems,self.n_elems) )
    scipy.io.mmwrite('tmp/A_' + str(index) + r'.mtx',A) 
    scipy.io.mmwrite('tmp/K_' + str(index) + r'.mtx',K) 
-   P.dump(file('tmp/P_' + str(index) +r'.np','wb+'))
-   HW_minus.dump(file('tmp/HW_MINUS_' + str(index) +r'.np','w+'))
-   HW_plus.dump(file('tmp/HW_PLUS_' + str(index) +r'.np','w+'))
-   Hot.dump(file('tmp/Hot_' + str(index) +r'.np','w+'))
-   Cold.dump(file('tmp/Cold_' + str(index) +r'.np','w+'))
+   P.dump(open('tmp/P_' + str(index) +r'.np','wb+'))
+   HW_minus.dump(open('tmp/HW_MINUS_' + str(index) +r'.np','w+'))
+   HW_plus.dump(open('tmp/HW_PLUS_' + str(index) +r'.np','w+'))
+   Hot.dump(open('tmp/Hot_' + str(index) +r'.np','w+'))
+   Cold.dump(open('tmp/Cold_' + str(index) +r'.np','w+'))
 
   def solve_bte(self,index,options):
 
    #if self.current_iter == 0:
    A = scipy.io.mmread('tmp/A_' + str(index) + '.mtx').tocsc()
-   P = np.load(file('tmp/P_' + str(index) +r'.np','rb'))
-   HW_MINUS = np.load(file('tmp/HW_MINUS_' + str(index) +r'.np','r'))
-   HW_PLUS = np.load(file('tmp/HW_PLUS_' + str(index) +r'.np','r'))
+   P = np.load(open('tmp/P_' + str(index) +r'.np','rb'))
+   HW_MINUS = np.load(open('tmp/HW_MINUS_' + str(index) +r'.np','r'))
+   HW_PLUS = np.load(open('tmp/HW_PLUS_' + str(index) +r'.np','r'))
    K = scipy.io.mmread('tmp/K_' + str(index) + '.mtx').tocsc()
-   Hot = np.load(file('tmp/Hot_' + str(index) +r'.np','r'))
-   Cold = np.load(file('tmp/Cold_' + str(index) +r'.np','r'))
+   Hot = np.load(open('tmp/Hot_' + str(index) +r'.np','r'))
+   Cold = np.load(open('tmp/Cold_' + str(index) +r'.np','r'))
 
 
    TB = options['boundary_temperature']
@@ -410,7 +411,7 @@ class Solver(object):
    if MPI.COMM_WORLD.Get_rank() == 0:
     if max_iter > 0:
      print('')
-     print colored('Solving BTE... started', 'green')
+     print(colored('Solving BTE... started', 'green'))
      print('')
      print('    Iter    Thermal Conductivity [W/m/K]      Error       Zeroth - Fourier - BTE')
      print('   ------------------------------------------------------------------------------------')
@@ -481,7 +482,7 @@ class Solver(object):
             'zero_suppression':suppression_zeroth,\
             'fourier_suppression':suppression_fourier,\
             'dom':self.dom,\
-            'kappa_fourier':kappa,\
+            'kappa_fourier':kappa_fourier,\
             'mfp':self.mfp*1e-9,\
             'bte_temperature':lattice_temperature,\
             'fourier_temperature':fourier_temp,\
@@ -495,7 +496,7 @@ class Solver(object):
    if max_iter > 0:
     if MPI.COMM_WORLD.Get_rank() == 0:
      print('')
-     print colored('Solving BTE... done', 'green')
+     print(colored('Solving BTE... done', 'green'))
      print('')
 
 
