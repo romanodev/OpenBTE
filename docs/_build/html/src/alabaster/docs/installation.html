@@ -1,0 +1,200 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Installation &mdash; OpenBTE 0.9.0 documentation</title>
+    
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../',
+        VERSION:     '0.9.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <link rel="top" title="OpenBTE 0.9.0 documentation" href="../../../index.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
+<p>The bare minimum required to install Alabaster is as follows:</p>
+<ul>
+<li><p class="first">If you&#8217;re on <strong>Sphinx 1.2 or older</strong>:</p>
+<blockquote>
+<div><ul>
+<li><p class="first"><tt class="docutils literal"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">alabaster</span></tt> or equivalent.</p>
+</li>
+<li><p class="first">Add the following to your <tt class="docutils literal"><span class="pre">conf.py</span></tt> so Alabaster&#8217;s theme location &amp;
+mini-extension are located &amp; loaded:</p>
+<blockquote>
+<div><div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">alabaster</span>
+
+<span class="n">html_theme_path</span> <span class="o">=</span> <span class="p">[</span><span class="n">alabaster</span><span class="o">.</span><span class="n">get_path</span><span class="p">()]</span>
+<span class="n">extensions</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;alabaster&#39;</span><span class="p">]</span>
+<span class="n">html_theme</span> <span class="o">=</span> <span class="s">&#39;alabaster&#39;</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p class="first">If you&#8217;ve installed Alabaster by hand (without using <tt class="docutils literal"><span class="pre">pip</span></tt>) and/or are
+doing funky things to your PYTHONPATH, you may need to replace the
+<tt class="docutils literal"><span class="pre">alabaster.get_path()</span></tt> call with your own explicit string, as per <a class="reference external" href="http://sphinx-doc.org/config.html#confval-html_theme_path">the
+Sphinx config docs</a>.</p>
+</li>
+</ul>
+</div></blockquote>
+</li>
+<li><p class="first">If you have <strong>Sphinx 1.3 or above</strong>:</p>
+<blockquote>
+<div><ul>
+<li><p class="first">You already have Alabaster installed as a dependency! No need to manually
+install it or explicitly load it.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>If you distribute your documentation via the excellent <a class="reference external" href="https://readthedocs.org">Read the Docs</a>, you may need to explicitly enable
+Alabaster (as RTD defaults to using its own theme) by adding this line
+to your <tt class="docutils literal"><span class="pre">conf.py</span></tt>:</p>
+<div class="last highlight-python"><div class="highlight"><pre><span class="n">html_theme</span> <span class="o">=</span> <span class="s">&#39;alabaster&#39;</span>
+</pre></div>
+</div>
+</div>
+</li>
+</ul>
+</div></blockquote>
+</li>
+<li><p class="first"><strong>Either way</strong>, add an explicit <tt class="docutils literal"><span class="pre">html_sidebars</span></tt> setting so Alabaster&#8217;s
+customized sidebar templates are loaded:</p>
+<blockquote>
+<div><div class="highlight-python"><div class="highlight"><pre><span class="n">html_sidebars</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s">&#39;**&#39;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="s">&#39;about.html&#39;</span><span class="p">,</span>
+        <span class="s">&#39;navigation.html&#39;</span><span class="p">,</span>
+        <span class="s">&#39;relations.html&#39;</span><span class="p">,</span>
+        <span class="s">&#39;searchbox.html&#39;</span><span class="p">,</span>
+        <span class="s">&#39;donate.html&#39;</span><span class="p">,</span>
+    <span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ul>
+<p>That&#8217;s it! You now have the standard Alabaster theme set up. Read on for more
+core configuration concerns, or see <a class="reference internal" href="customization.html"><em>Customization</em></a> for feature/style
+options.</p>
+<div class="section" id="sidebars">
+<h2>Sidebars<a class="headerlink" href="#sidebars" title="Permalink to this headline">¶</a></h2>
+<p>Feel free to adjust <tt class="docutils literal"><span class="pre">html_sidebars</span></tt> as desired - the theme is designed
+assuming you&#8217;ll always have <tt class="docutils literal"><span class="pre">about.html</span></tt> activated, but otherwise it doesn&#8217;t
+care much.</p>
+<ul class="simple">
+<li>See <a class="reference external" href="http://sphinx-doc.org/config.html#confval-html_sidebars">the Sphinx docs</a> for details on
+how this setting behaves.</li>
+<li>Alabaster provides <tt class="docutils literal"><span class="pre">about.html</span></tt> (logo, github button + blurb),
+<tt class="docutils literal"><span class="pre">donate.html</span></tt> (Gratipay blurb/button) and <tt class="docutils literal"><span class="pre">navigation.html</span></tt> (a more
+flexible version of the builtin <tt class="docutils literal"><span class="pre">localtoc</span></tt>/<tt class="docutils literal"><span class="pre">globaltoc</span></tt> templates).
+<tt class="docutils literal"><span class="pre">searchbox.html</span></tt> comes with Sphinx itself.</li>
+</ul>
+</div>
+<div class="section" id="static-path-for-images-and-or-custom-stylesheet">
+<span id="static-path"></span><h2>Static path for images and/or custom stylesheet<a class="headerlink" href="#static-path-for-images-and-or-custom-stylesheet" title="Permalink to this headline">¶</a></h2>
+<p>If you&#8217;re using any of the image-related options listed on <a class="reference internal" href="customization.html"><em>Customization</em></a>
+(<tt class="docutils literal"><span class="pre">logo</span></tt> or <tt class="docutils literal"><span class="pre">touch-icon</span></tt>) or a <a class="reference internal" href="customization.html#custom-stylesheet"><em>custom stylesheet</em></a>,
+you&#8217;ll also want to tell Sphinx where to get these files from. If so, add a
+line like this (changing the path if necessary; see <a class="reference external" href="http://sphinx-doc.org/config.html?highlight=static#confval-html_static_path">the Sphinx docs for
+&#8216;html_static_path&#8217;</a>) to your <tt class="docutils literal"><span class="pre">conf.py</span></tt>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">html_static_path</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;_static&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">OpenBTE</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../download.html">Download</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../gettingstarted.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../manual.html">Manual</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../theory.html">Theory</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../citingopenbte.html">Citing OpenBTE</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, Giuseppe Romano.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.2.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="../../../_sources/src/alabaster/docs/installation.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

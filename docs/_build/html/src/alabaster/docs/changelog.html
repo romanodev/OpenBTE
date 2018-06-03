@@ -1,0 +1,398 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Changelog &mdash; OpenBTE 0.9.0 documentation</title>
+    
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../',
+        VERSION:     '0.9.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <link rel="top" title="OpenBTE 0.9.0 documentation" href="../../../index.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="changelog">
+<h1>Changelog<a class="headerlink" href="#changelog" title="Permalink to this headline">¶</a></h1>
+<ul>
+<li><p class="first"><a href="#id1"><span class="problematic" id="id2">:bug:`73`</span></a> Clean up some problematic font issues:</p>
+<ul class="simple">
+<li>Remove the outright broken Goudy Old Style, plus other mostly Adobe-only
+fonts, from the <tt class="docutils literal"><span class="pre">font_family</span></tt> config setting; it is now simply <tt class="docutils literal"><span class="pre">Georgia,</span>
+<span class="pre">serif</span></tt> which is what the majority of users were rendering anyways.</li>
+<li>Clear out the default value of <tt class="docutils literal"><span class="pre">head_font_family</span></tt> (which contained
+<tt class="docutils literal"><span class="pre">Garamond</span></tt>, a nice but also Adobe only font)</li>
+<li>Set <tt class="docutils literal"><span class="pre">head_font_family</span></tt> so it falls back to the value of <tt class="docutils literal"><span class="pre">font_family</span></tt>
+unless a user has explicitly set it themselves.</li>
+</ul>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>You can always go back to the old values by <a class="reference internal" href="customization.html#theme-options"><em>explicitly setting</em></a> <tt class="docutils literal"><span class="pre">font_family</span></tt> and/or <tt class="docutils literal"><span class="pre">head_font_family</span></tt> in your
+<tt class="docutils literal"><span class="pre">conf.py</span></tt>&#8216;s <tt class="docutils literal"><span class="pre">html_theme_options</span></tt>, e.g.:</p>
+<div class="last highlight-python"><div class="highlight"><pre><span class="n">html_theme_options</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s">&#39;description&#39;</span><span class="p">:</span> <span class="s">&#39;My awesome project&#39;</span><span class="p">,</span>
+    <span class="s">&#39;font_family&#39;</span><span class="p">:</span> <span class="s">&quot;goudy old style, minion pro, bell mt, Georgia, Hiragino Mincho Pro, serif&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p>Depending on individual viewers&#8217; systems, this change <em>may</em> be <strong>visually</strong>
+backwards incompatible if you were not already overriding the font
+settings and those users had the fonts in question (which are not default
+on most systems).</p>
+<p class="last">As seen in the note above, you can <strong>always</strong> override the new defaults to
+go back to the old behavior, using your config file.</p>
+</div>
+</li>
+<li><p class="first"><a href="#id3"><span class="problematic" id="id4">:feature:`18 backported`</span></a> (via <a href="#id5"><span class="problematic" id="id6">:issue:`101`</span></a>) Add optional <em>next</em> and
+<em>previous</em> links at the top and bottom of page content. Use theme option
+<tt class="docutils literal"><span class="pre">show_relbars</span></tt> to enable these. Credit: William Minchin.</p>
+</li>
+<li><p class="first"><a href="#id7"><span class="problematic" id="id8">:support:`- backported`</span></a> Miscellaneous project maintenance updates such as
+adding to Travis CI and enforcing the use of <tt class="docutils literal"><span class="pre">flake8</span></tt>.</p>
+</li>
+<li><p class="first"><a href="#id9"><span class="problematic" id="id10">:feature:`110 backported`</span></a> Add <tt class="docutils literal"><span class="pre">badge_branch</span></tt> option allowing
+configurability of which specific Git branch the Travis, Codecov, etc buttons
+default to. Credit: <tt class="docutils literal"><span class="pre">&#64;TitanSnow</span></tt>.</p>
+</li>
+<li><p class="first"><a href="#id11"><span class="problematic" id="id12">:support:`111 backported`</span></a> Add setuptools-level entrypoint for improved theme
+distribution compatibility. Thanks to Aaron Carlisle for the patch.</p>
+</li>
+<li><p class="first"><a href="#id13"><span class="problematic" id="id14">:release:`0.7.10 &lt;2017-02-28&gt;`</span></a></p>
+</li>
+<li><p class="first"><a href="#id15"><span class="problematic" id="id16">:bug:`32`</span></a> Update styling of various block-level elements such as admonitions
+(<tt class="docutils literal"><span class="pre">..</span> <span class="pre">note::</span></tt>, <tt class="docutils literal"><span class="pre">..</span> <span class="pre">warning::</span></tt>, etc) and code blocks (<tt class="docutils literal"><span class="pre">..</span> <span class="pre">code::</span></tt>) so
+they are no longer &#8216;dedented&#8217; outside the main column of text they&#8217;re
+embedded in. This is both a stylistic change and a bugfix, since e.g. nesting
+code blocks <em>within</em> note blocks looks actively broken. Thanks to Takayuki
+Shimizukawa for the report.</p>
+</li>
+<li><p class="first"><a href="#id17"><span class="problematic" id="id18">:bug:`96`</span></a> <tt class="docutils literal"><span class="pre">admonition_xref</span></tt> had a template typo preventing it from
+receiving styling; this has been fixed. Credit: Kenzie Togami.</p>
+</li>
+<li><p class="first"><a href="#id19"><span class="problematic" id="id20">:bug:`95`</span></a> Independently ran across
+<a class="reference external" href="https://github.com/sphinx-doc/sphinx/issues/3276">sphinx-doc/sphinx#3276</a>,
+namely that parameter lists become squashed together if one is running on
+Sphinx 1.4.x. While that fix was merged in Sphinx itself, we felt it prudent
+to include it in our own stylesheet as well, for immediate relief.</p>
+</li>
+<li><p class="first"><a href="#id21"><span class="problematic" id="id22">:release:`0.7.9 &lt;2016-07-25&gt;`</span></a></p>
+</li>
+<li><p class="first"><a href="#id23"><span class="problematic" id="id24">:feature:`6`</span></a> (and <a href="#id25"><span class="problematic" id="id26">:issue:`70`</span></a>, both via <a href="#id27"><span class="problematic" id="id28">:issue:`84`</span></a>) Make all remaining
+hardcoded style colors configurable, plus related cleanup (such as improving
+differentiation of some admonition blocks such as <tt class="docutils literal"><span class="pre">warn</span></tt> and <tt class="docutils literal"><span class="pre">note</span></tt>,
+ensuring generic admonitions are left untouched, etc). Credit:
+<tt class="docutils literal"><span class="pre">&#64;ShadowKyogre</span></tt>.</p>
+</li>
+<li><p class="first"><a href="#id29"><span class="problematic" id="id30">:feature:`83`</span></a> Expose Sphinx&#8217;s toctree <tt class="docutils literal"><span class="pre">collapse</span></tt> option as the new
+<tt class="docutils literal"><span class="pre">sidebar_collapse</span></tt> config option. Credit: Eric Holscher.</p>
+</li>
+<li><p class="first"><a href="#id31"><span class="problematic" id="id32">:feature:`80`</span></a> Add support for <tt class="docutils literal"><span class="pre">&lt;link</span> <span class="pre">rel=&quot;canonical&quot;&gt;</span></tt> (i.e. canonical
+URLs). Thanks to Ben Gamari for the patch.</p>
+</li>
+<li><p class="first"><a href="#id33"><span class="problematic" id="id34">:support:`7`</span></a> Generate real documentation site, both because the README is
+just too big now, and so we can <a class="reference external" href="https://en.wikipedia.org/wiki/Eating_your_own_dog_food">eat our own dog food</a>.</p>
+</li>
+<li><p class="first"><a href="#id35"><span class="problematic" id="id36">:release:`0.7.8 &lt;2016-05-05&gt;`</span></a></p>
+</li>
+<li><p class="first">#51 (via #67): Hide Github button if <tt class="docutils literal"><span class="pre">github_user</span></tt> and <tt class="docutils literal"><span class="pre">github_repo</span></tt>
+aren&#8217;t set. This is necessary since <tt class="docutils literal"><span class="pre">github_button</span></tt> defaults to True.
+Thanks to Sam Whited for the report &amp; Dmitry Shachnev for the patch.</p>
+</li>
+<li><p class="first">#75: Use SVG version of the Travis-CI button. Thanks to Sebastian Wiesner for
+the patch.</p>
+</li>
+<li><p class="first">#41: Update the Github buttons to use a newer linked image &amp; change the link
+to their docs. Thanks to Tomi Hukkalainen.</p>
+</li>
+<li><p class="first">#45 (via #46) Tweak styling of nested bullet lists to prevent an issue where
+they all collapse to the same indent level when viewed on smaller display
+sizes. Thanks to Bram Geron for catch &amp; patch, and to Jochen Kupperschmidt
+for review/discussion.</p>
+</li>
+<li><p class="first">#44 (partial; via #57) Add an opt-in fixed sidebar behavior for users who
+prefer a sidebar that never scrolls out of view. Credit: Joe Cross.</p>
+</li>
+<li><p class="first">#61: Set a small-but-nonzero footnote width to work around a common browser
+display bug. Thanks to Konstantin Molchanov for catch &amp; patch.</p>
+</li>
+<li><p class="first">#64: Add config options for font size and caption font size/family. Credit:
+Marçal Solà.</p>
+</li>
+<li><p class="first">#78: Add custom stylesheet support. (This release will thus be the last to
+merge simplistic style tweaks as feature toggles - only thorny CSS issues or
+actual template-related changes will be merged afterwards.)</p>
+</li>
+<li><p class="first">#65: Wrap the sidebar&#8217;s &#8220;Navigation&#8221; header in Sphinx&#8217;s translation helper so
+it gets translated if possible. Thanks to <tt class="docutils literal"><span class="pre">&#64;uralbash</span></tt>.</p>
+</li>
+<li><p class="first">#77: Fix image link styling to remove a bottom border which appears in some
+situations. Thanks to Eric Holscher for the patch &amp; <tt class="docutils literal"><span class="pre">&#64;barbara-sfx</span></tt> for the
+report.</p>
+</li>
+<li><p class="first"><a href="#id37"><span class="problematic" id="id38">:release:`0.7.7 &lt;2015-12-21&gt;`</span></a></p>
+</li>
+<li><p class="first">Add some <tt class="docutils literal"><span class="pre">margin-bottom</span></tt> to <tt class="docutils literal"><span class="pre">table.field-list</span> <span class="pre">p</span></tt> so field lists (e.g.
+Python function parameter lists in docstrings) written as multiple
+paragraphs, look like actual paragraphs instead of all globbing together.</p>
+</li>
+<li><p class="first">Fix incorrect notes in README re: renamed <tt class="docutils literal"><span class="pre">github_button_*</span></tt> options - the
+<tt class="docutils literal"><span class="pre">button_</span></tt> was dropped but docs did not reflect this. Thanks to Nik Nyby.</p>
+</li>
+<li><p class="first">Fix <tt class="docutils literal"><span class="pre">sidebar_hr</span></tt> setting - stylesheet wasn&#8217;t correctly referencing the
+right variable name. Thanks to Jannis Leidel.</p>
+</li>
+<li><p class="first">Allow configuring body text-align via <tt class="docutils literal"><span class="pre">body_text_align</span></tt>. Credit to Marçal
+Solà.</p>
+</li>
+<li><p class="first">Fix a handful of mismatched/unclosed HTML tags in the templates. Thanks to
+Marvin Pinto for catch &amp; patch.</p>
+</li>
+<li><p class="first">Add <a class="reference external" href="https://codecov.io">Codecov</a> badge support to sidebar.</p>
+</li>
+<li><p class="first"><a href="#id39"><span class="problematic" id="id40">:release:`0.7.6 &lt;2015-06-22&gt;`</span></a></p>
+</li>
+<li><p class="first">Update how <tt class="docutils literal"><span class="pre">setup.py</span></tt> handles the <tt class="docutils literal"><span class="pre">README.rst</span></tt> file - load it explicitly
+as UTF-8 so the changelog containing non-ASCII characters doesn&#8217;t generate
+<tt class="docutils literal"><span class="pre">UnicodeDecodeError</span></tt> in terminal environments whose default encoding is not
+UTF-8 or other Unicode-compatible encodings. Thanks to Arun Persaud for the
+report and Max Tepkeev for the suggested fix.</p>
+</li>
+<li><p class="first">Fix left-margin &amp; padding styling for code blocks within list-item elements,
+making them consistent with earlier changes applied to top-level code blocks.</p>
+</li>
+<li><p class="first">Expose page &amp; sidebar widths as theme options <tt class="docutils literal"><span class="pre">page_width</span></tt> and
+<tt class="docutils literal"><span class="pre">sidebar_width</span></tt>. Their defaults are the same as the previously static
+values.</p>
+</li>
+<li><p class="first"><a href="#id41"><span class="problematic" id="id42">:release:`0.7.5 &lt;2015-06-15&gt;`</span></a></p>
+</li>
+<li><p class="first">Honor Sphinx&#8217;s core <tt class="docutils literal"><span class="pre">html_show_copyright</span></tt> option when rendering page
+footer. Thanks to Marcin Wojdyr for the report.</p>
+</li>
+<li><p class="first">Pre-history versions of Alabaster attempted to remove the &#8220;related&#8221;
+sub-navigation (typically found as next/previous links in other themes) but
+this didn&#8217;t work right for mobile-oriented styling.</p>
+<p>This has been fixed by (re-)adding an improved sidebar nav element for these
+links and making its display controllable via the new <tt class="docutils literal"><span class="pre">show_related</span></tt> theme
+option (which defaults to <tt class="docutils literal"><span class="pre">false</span></tt> for backwards compatibility).</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">To enable the related-links nav, you&#8217;ll need to set <tt class="docutils literal"><span class="pre">show_related</span></tt> to
+<tt class="docutils literal"><span class="pre">true</span></tt> <strong>and</strong> add <tt class="docutils literal"><span class="pre">relations.html</span></tt> to your <tt class="docutils literal"><span class="pre">html_sidebars</span></tt> (we&#8217;ve
+updated the example config in this README to indicate this for new
+installs).</p>
+</div>
+<p>Thanks to Tomi Pieviläinen for the bug report.</p>
+</li>
+<li><p class="first">Update the &#8220;Fork me on Github&#8221; banner image to use an <tt class="docutils literal"><span class="pre">https://</span></tt> URI so
+sites hosted over HTTPS don&#8217;t encounter mixed-content errors. Thanks to
+<tt class="docutils literal"><span class="pre">&#64;nikolas</span></tt> for the patch.</p>
+</li>
+<li><p class="first">Remove an orphaned <tt class="docutils literal"><span class="pre">&lt;/li&gt;</span></tt> from the footer &#8216;show source&#8217; section. Credit to
+Marcin Wojdyr.</p>
+</li>
+<li><p class="first"><a href="#id43"><span class="problematic" id="id44">:release:`0.7.4 &lt;2015-05-03&gt;`</span></a></p>
+</li>
+<li><p class="first">Add <tt class="docutils literal"><span class="pre">code_highlight</span></tt> option (which includes general fixes to styling of
+code blocks containing highlighted lines). Thanks to Steven Loria.</p>
+</li>
+<li><p class="first"><a href="#id45"><span class="problematic" id="id46">:release:`0.7.3 &lt;2015-03-20&gt;`</span></a></p>
+</li>
+<li><p class="first">Hide <tt class="docutils literal"><span class="pre">shadow</span></tt> related styles on bibliography elements, in addition to the
+earlier change re: <tt class="docutils literal"><span class="pre">border</span></tt>. Thanks again to Philippe Dessus.</p>
+</li>
+<li><p class="first"><a href="#id47"><span class="problematic" id="id48">:release:`0.7.2 &lt;2015-03-10&gt;`</span></a></p>
+</li>
+<li><p class="first">Updated CSS stylesheets to apply monospace styling to both <tt class="docutils literal"><span class="pre">tt</span></tt> and
+<tt class="docutils literal"><span class="pre">code</span></tt> elements, instead of just to <tt class="docutils literal"><span class="pre">tt</span></tt>. This addresses a change in HTML
+generation in Sphinx 1.3 while retaining support for Sphinx 1.2. Thanks to
+Eric Holscher for the heads up.</p>
+</li>
+<li><p class="first"><a href="#id49"><span class="problematic" id="id50">:release:`0.7.1 &lt;2015-02-27&gt;`</span></a></p>
+</li>
+<li><p class="first">Finally add a changelog. To the README, for now, because a full doc site
+isn&#8217;t worthwhile just yet.</p>
+</li>
+<li><p class="first">Allow configuring a custom Github banner image (instead of simply toggling a
+default on or off). Thanks to Nicola Iarocci for the original patch.</p>
+</li>
+<li><p class="first">Explicitly note Python version support in the README and <tt class="docutils literal"><span class="pre">setup.py</span></tt>.</p>
+</li>
+<li><p class="first">Update Github button image link to use the newly-available HTTPS version of
+the URL; this helps prevent errors on doc pages served via HTTPS. Thanks to
+Gustavo Narea for the report.</p>
+</li>
+<li><p class="first">Add control over the font size &amp; family of code blocks. Credit to Steven
+Loria.</p>
+</li>
+<li><p class="first">Allow control over font family of body text and headings. Thanks to Georg
+Brandl.</p>
+</li>
+<li><p class="first">Stylize <tt class="docutils literal"><span class="pre">..</span> <span class="pre">seealso::</span></tt> blocks same as <tt class="docutils literal"><span class="pre">..</span> <span class="pre">note::</span></tt> blocks for
+consistency&#8217;s sake (previously, <tt class="docutils literal"><span class="pre">..</span> <span class="pre">seealso::</span></tt> used the Sphinx default
+styling, which clashed). We may update these again later but for now, this is
+an improvement! Thanks again to Steven Loria.</p>
+</li>
+<li><p class="first">Allow control over CSS <tt class="docutils literal"><span class="pre">font-style</span></tt> for the site description/tagline
+element. Credit: Steven Loria.</p>
+</li>
+<li><p class="first">Add styling to disable default cell borders on <tt class="docutils literal"><span class="pre">..</span> <span class="pre">bibliography::</span></tt>
+directives&#8217; output. Thanks to Philippe Dessus for the report.</p>
+</li>
+<li><p class="first"><a href="#id51"><span class="problematic" id="id52">:release:`0.6.2 &lt;2014-11-25&gt;`</span></a></p>
+</li>
+<li><p class="first">Make <tt class="docutils literal"><span class="pre">..</span> <span class="pre">warn::</span></tt> blocks have a pink background (instead of having no
+background, which was apparently an oversight of the themes Alabaster is
+based on) and also make that color configurable.</p>
+</li>
+<li><p class="first"><a href="#id53"><span class="problematic" id="id54">:release:`0.6.1 &lt;2014-09-04&gt;`</span></a></p>
+</li>
+<li><p class="first">Update Gittip support to acknowledge the service&#8217;s rename to Gratipay.</p>
+</li>
+<li><p class="first"><a href="#id55"><span class="problematic" id="id56">:release:`0.6.0 &lt;2014-04-17&gt;`</span></a></p>
+</li>
+<li><p class="first">Allow hiding the &#8216;powered by&#8217; section of the footer.</p>
+</li>
+<li><p class="first">Fix outdated name in <tt class="docutils literal"><span class="pre">setup.py</span></tt> URL field.</p>
+</li>
+<li><p class="first"><a href="#id57"><span class="problematic" id="id58">:release:`0.5.1 &lt;2014-04-15&gt;`</span></a></p>
+</li>
+<li><p class="first">Fix a bug in the new Travis support, re: its default value.</p>
+</li>
+<li><p class="first"><a href="#id59"><span class="problematic" id="id60">:release:`0.5.0 &lt;2014-04-09&gt;`</span></a></p>
+</li>
+<li><p class="first">Add support for sidebar Travis status buttons.</p>
+</li>
+<li><p class="first"><a href="#id61"><span class="problematic" id="id62">:release:`0.4.1 &lt;2014-04-06&gt;`</span></a></p>
+</li>
+<li><p class="first">Fix an inaccuracy in the description of <tt class="docutils literal"><span class="pre">logo_text_align</span></tt>.</p>
+</li>
+<li><p class="first">Update logo &amp; text styling to be more sensible.</p>
+</li>
+<li><p class="first"><a href="#id63"><span class="problematic" id="id64">:release:`0.4.0 &lt;2014-04-06&gt;`</span></a></p>
+</li>
+<li><p class="first">Add an option to allow un-hiding one&#8217;s toctree.</p>
+</li>
+<li><p class="first"><a href="#id65"><span class="problematic" id="id66">:release:`0.3.1 &lt;2014-03-13&gt;`</span></a></p>
+</li>
+<li><p class="first">Improved Python 3 compatibility.</p>
+</li>
+<li><p class="first">Update styling of changelog pages generated by <a class="reference external" href="https://github.com/bitprophet/releases">bitprophet/releases</a>.</p>
+</li>
+<li><p class="first"><a href="#id67"><span class="problematic" id="id68">:release:`0.3.0 &lt;2014-02-03&gt;`</span></a></p>
+</li>
+<li><p class="first">Display Alabaster version in footers alongside Sphinx version (necessitating
+use of a mini Sphinx extension) plus other footer tweaks.</p>
+</li>
+<li><p class="first"><a href="#id69"><span class="problematic" id="id70">:release:`0.2.0 &lt;2014-01-28&gt;`</span></a></p>
+</li>
+<li><p class="first">Allow control of logo replacement text&#8217;s alignment.</p>
+</li>
+<li><p class="first">Add customized navigation sidebar element.</p>
+</li>
+<li><p class="first">Tweak page margins a bit.</p>
+</li>
+<li><p class="first">Add a 3rd level of medium-gray to the stylesheet &amp; apply in a few places.</p>
+</li>
+<li><p class="first"><a href="#id71"><span class="problematic" id="id72">:release:`0.1.0 &lt;2013-12-31&gt;`</span></a></p>
+</li>
+<li><p class="first">First tagged/PyPI&#8217;d version.</p>
+</li>
+</ul>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">OpenBTE</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../download.html">Download</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../gettingstarted.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../manual.html">Manual</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../theory.html">Theory</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../citingopenbte.html">Citing OpenBTE</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, Giuseppe Romano.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.2.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="../../../_sources/src/alabaster/docs/changelog.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
