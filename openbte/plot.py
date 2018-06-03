@@ -66,9 +66,9 @@ class Plot(object):
   if argv['variable'] == 'distribution' :
    self.plot_distribution(argv)
 
+
   if argv['variable'] == 'vtk' :
    self.save_vtk(argv)
-
 
  def save_vtk(self,argv):
 
@@ -85,19 +85,20 @@ class Plot(object):
    vw.add_variable(solver['bte_flux'],label = r'''BTE Thermal Flux [W/m/m]''')
    vw.write_vtk()  
 
-
  def plot_map(self,argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
-   
+  
+   init_plotting() 
    variable = argv['variable'].split('/')[1]
    geo = dd.io.load('geometry.hdf5')
-   Nx = argv.setdefault('repeat_x',3)
-   Ny = argv.setdefault('repeat_y',3)
+   Nx = argv.setdefault('repeat_x',1)
+   Ny = argv.setdefault('repeat_y',1)
 
    increment = [0,0]
    #data = np.ones(len(geo['elems']))
-   solver = dd.io.load('solver.hdf5')
+   if not variable == 'geometry': 
+    solver = dd.io.load('solver.hdf5')
   
    if not variable == 'geometry': 
     data = solver[variable]
@@ -160,13 +161,19 @@ class Plot(object):
       else:
         color = color=cmap(data[e]-np.dot(displ,increment))
   
-      patch = patches.PathPatch(path,linestyle=None,linewidth=0,color=color,zorder=10,alpha=1.0)
+      patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=10,alpha=1.0,joinstyle='miter')
       gca().add_patch(patch) 
       gca().add_patch(patch)
   
    axis('off')
    axis('equal')
-   show() 
+   xlim([-Lx/2,Lx/2])
+   ylim([-Ly/2,Ly/2])
+   if argv['save_fig']:
+    savefig(argv.setdefault('namefile','geometry.png'))
+    close()
+   else:
+    show() 
 
  def plot_material(self,argv):
   if MPI.COMM_WORLD.Get_rank() == 0:

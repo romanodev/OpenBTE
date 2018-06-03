@@ -143,7 +143,67 @@ def PolygonArea(corners):
     area = abs(area) / 2.0
     return area
 
+
+
+
+def already_included(all_points,new_point): 
+
+
+ for n,p in enumerate(all_points):
+  d = np.linalg.norm(np.array(p)-np.array(new_point))
+  if d < 1e-4:
+   return n
+
+ return -1
+
+
+def regularize_polygons(polygons):
+
+
+ #cut redundant points
+ new_poly = []
+ for poly in polygons:
+  N = len(poly)
+  tmp = []
+  for n in range(N):
+   p1 = poly[n]
+   p2 = poly[(n+1)%(N-1)]
+   if np.linalg.norm(np.array(p1)-np.array(p2)) >1e-4:
+    tmp.append(p1)  
+  new_poly.append(tmp)
+
+
+ #eliminate useless points
+ #cut redundant points
+ #new_poly2 = []
+ #for poly in new_poly:
+ # poly.append(poly[-1])
+ # N = len(poly)
+ # tmp = []
+ # for n in range(N):
+ #  p1 = np.array(poly[(n-1)%N])
+ #  p2 = np.array(poly[n])
+ #  p3 = np.array(poly[(n+1)%N])
+   
+ #  l1 = (p2-p1)/np.linalg.norm(p2-p1)
+ #  l2 = (p3-p2)/np.linalg.norm(p3-p2)
+ #  print(np.linalg.norm(cross(l1,l2)))
+#    tmp.append(p1)  
+#   else:
+#    print('ggg')
+ # new_poly2.append(tmp)
+
+
+ return new_poly
+
+
+
 def mesh(polygons,frame,argv):
+ 
+
+  polygons = regularize_polygons(polygons)
+
+  #quit()
 
   mesh_ext = argv['step']
   include_pores = argv.setdefault('include_pores',False)
@@ -165,20 +225,22 @@ def mesh(polygons,frame,argv):
   p_start = 0
   for g,region in enumerate(solution) :
    #p_start = len(points)
-
    #Write Points
-   
    region_points = []
    for p,point in enumerate(region) :
-
     new_point = [round(point[0],4),round(point[1],4)]
-    if not new_point in points:
+
+   # point_exists(p,points):
+    tmp = already_included(points,new_point)
+    if tmp == -1: 
+    #if not new_point in points:
      points.append(new_point)
      #region_points.append(new_point)
      region_points.append(len(points)-1)
      store.write( 'Point('+str(len(points)-1) +') = {' + str(new_point[0]) +','+ str(new_point[1])+',0,'+ str(mesh_ext) +'};\n')
     else:
-     region_points.append(points.index(new_point))
+     #region_points.append(points.index(new_point))
+     region_points.append(tmp)
 
    #Write lines   
    local_line_list = []
@@ -194,6 +256,8 @@ def mesh(polygons,frame,argv):
      line_contour.append([ll,p1,p2])
      ll += 1
     else:
+     print(p1)
+     print(p2)
      print('here')
 
    #create the loop
@@ -297,6 +361,8 @@ def mesh(polygons,frame,argv):
     tmp = []
     for point in region:
      #Create Points
+
+    # index =  already_included(points,point)
      index = point_exists(point,points)
      #index = point_exists(point,new_points)
      tmp.append(index)

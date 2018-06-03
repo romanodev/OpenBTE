@@ -77,7 +77,7 @@ class Material(object):
     if '/' in argv['matfile']:
      filename = argv['matfile'] 
     else:
-     filename = os.path.dirname(__file__) + '/../materials/'+ argv['matfile'] 
+     filename = os.path.dirname(__file__) + '/materials/'+ argv['matfile'] 
 
     data = {}
     #[n_mfp,n_theta,n_phi] = argv['grid']

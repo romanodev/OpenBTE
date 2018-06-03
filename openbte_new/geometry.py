@@ -9,7 +9,7 @@ from .GenerateSquareLatticePores import *
 from .GenerateHexagonalLatticePores import *
 from .GenerateCustomPores import *
 #from GenerateRandomPores import *
-from .GenerateRandomPoresOverlap import *
+from .GenerateRandomPoresOverlap3 import *
 from . import GenerateMesh2D 
 from . import GenerateMesh3D 
 from . import GenerateBulk2D 

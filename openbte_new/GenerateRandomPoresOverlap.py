@@ -9,6 +9,8 @@ from shapely.geometry import Point
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
 
+random.seed(3)
+
 def GenerateRandomPoresOverlap(argv):
 
 
@@ -24,14 +26,14 @@ def GenerateRandomPoresOverlap(argv):
 
   random_phi =  argv.setdefault('random_angle',False)
 
-
   Lxp =  argv['lx']
   Lyp =  argv['ly']
-  #Nx =  argv.setdefault('Nx',4)
-  #Ny =  argv.setdefault('Ny',4)
   Nx = 1
   Ny = 1
-  phi =  argv.setdefault('porosity',0.3)
+  phi_mean =  argv.setdefault('porosity',0.3)
+  spread =  argv.setdefault('spread',0.0)
+  
+
 
   frame_tmp = []
   frame_tmp.append([float(-Lxp * Nx)/2,float(Lyp * Ny)/2])
@@ -46,16 +48,17 @@ def GenerateRandomPoresOverlap(argv):
   area_tot = Lx*Ly
 
   
-  area_tmp = 0.0;
+  #area_tmp = 0.0;
 
  
-  area_max = Lx*phi/float(Np)
+  #area_max = Lx*phi/float(Np)
 
-  area_min = Lx*Ly*phi/float(Np)
+  
+  #area_min = Lx*Ly*phi/float(Np)
 
-  area_bounds = range(2);
-  area_bounds[0] = area_min;
-  area_bounds[1] = area_max;
+  #area_bounds = range(2);
+  #area_bounds[0] = area_min;
+  #area_bounds[1] = area_max;
      
   #f1 = 1.5
   area_tmp = 0.0;
@@ -67,7 +70,7 @@ def GenerateRandomPoresOverlap(argv):
   phis = []
   pores = [];
   nt_max = 3000
-  area_miss = area_tot - area_tmp
+  area_miss = area_tot 
  
   pbc = []
   pbc.append([0,0])
@@ -97,7 +100,7 @@ def GenerateRandomPoresOverlap(argv):
   confs = []
   #while nn < Np:
 
-  area = area_min  
+  #area = area_min  
   Na = Na_p[0]
 
 
@@ -110,7 +113,17 @@ def GenerateRandomPoresOverlap(argv):
     y = np.random.uniform(0,1) 
     centers.append([x,y])
 
-  for center in centers:
+  n_coll = 1
+ 
+  while n_coll > 0:
+
+   area_tmp = 0.0
+   n_coll = 0
+
+   for nc,center in enumerate(centers):
+    phi = random.uniform(phi_mean - spread, phi_mean + spread)
+    area = Lx*Ly*phi/float(Np)
+
     x = Lx*(center[0]-0.5)
     y = Ly*(center[1]-0.5)
     #Create polygons
@@ -125,7 +138,16 @@ def GenerateRandomPoresOverlap(argv):
      poly_clip.append([px,py])
     p1 = Polygon(poly_clip)
 
-    if p1.intersects(frame):
+    d =  argv['step']/2.0
+    #Avoid ultra-small elements
+    thin = Polygon(frame_tmp).buffer(0.01).difference(frame)
+    tt = p1.distance(thin)
+    if tt < d and p1.distance(thin) > 0.0:
+     p1 = p1.buffer(d, resolution=1,mitre_limit=20.0,join_style=2)
+      
+
+    #if p1.intersects(frame):
+    if 1 ==1:
      nn += 1
 
      #Write configuration-------------
@@ -137,39 +159,48 @@ def GenerateRandomPoresOverlap(argv):
         confs.append([cx,cy])
       #---------------------------------  
 
-     #Check for collision before repeating it             
+     #Inflate pores to avoid small elements
+     
+     d = argv['step']/2.0
      collision = []
+     max_d = 0
      if not len(polygons) == 0:
       for n_g,poly_group in enumerate(polygons):
        for n_p,poly in enumerate(poly_group):
         p2 = Polygon(poly)
-        if p1.intersects(p2.buffer(buf)):
+        if p1.intersects(p2):
          collision.append([n_g,n_p])
+        else:
+         if p1.distance(p2) < d :
+          max_d = max([max_d,p1.distance(p2)])
 
+     p1 = p1.buffer(max_d, resolution=1,mitre_limit=20.0,join_style=2)
+     area = p1.area
 
      if len(collision) == 0 :
 
-      #Add the pore and its repeatitions--------------------------
+      #Add the pore and its repeatitions-------------------------
+   
+      tmp = np.array(list(p1.exterior.coords))
+
       poly_group = []
       area_tmp +=area;
       area_miss = area_tot - area_tmp
       for kp in range(len(pbc)):
-       p2 = np.array(poly_clip).copy()
+       p2 = tmp.copy()
+
        p2[:,0] += pbc[kp][0]
        p2[:,1] += pbc[kp][1]
        p = Polygon(p2)
-       if p.intersects(frame):
-        poly_group.append(p2)
+       poly_group.append(p2)
       polygons.append(poly_group)
       print('Coverage: ' + str(area_tmp/area_tot) + ' %')
       #------------------------------------------------------------
-
      else:
-
+      n_coll +=1
       if argv['overlap']:
        #Create the multipolygon------
        tmp = [p1]
-       print(collision)
        for p in collision:
         tmp.append(Polygon(polygons[p[0]][p[1]]).buffer(buf))
        m = MultiPolygon(tmp)
@@ -195,9 +226,9 @@ def GenerateRandomPoresOverlap(argv):
         p2[:,0] += pbc[kp][0]
         p2[:,1] += pbc[kp][1]
         p = Polygon(p2)
-        if p.intersects(frame):
-         if kp == 0 or (kp > 0 and not p.intersects(Polygon(new_p))):
-          poly_group.append(p2)
+        #if p.intersects(frame):
+        if kp == 0 or (kp > 0 and not p.intersects(Polygon(new_p))):
+         poly_group.append(p2)
        polygons.append(poly_group)
        print('Coverage (overlap): ' + str(area_tmp/area_tot) + ' %')
 
@@ -205,7 +236,9 @@ def GenerateRandomPoresOverlap(argv):
   polys = []
   for poly_group in polygons:
    for poly in poly_group:
-    polys.append(poly)
+     p = Polygon(poly)
+     if p.intersects(frame):
+      polys.append(poly)
   #-----------------------
  
  

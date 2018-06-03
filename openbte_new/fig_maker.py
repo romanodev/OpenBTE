@@ -20,7 +20,7 @@ def savefigure(prefix = './'):
 
 
 
-def init_plotting(extra_x_padding = 0.0,extra_y_padding=0.0,extra_bottom_padding = 0.0,extra_top_padding=  0.0,paraview=False,square=False,delta_square = 0,presentation=False):
+def init_plotting(extra_x_padding = 0.0,extra_y_padding=0.0,extra_bottom_padding = 0.0,extra_top_padding=  0.0,paraview=False,square=True,delta_square = 0,presentation=False):
 
  rc('font',**{'family':'serif','serif':['Computer Modern Roman']})
  rc('font',**{'family':'serif','sans-serif':['Computer Modern Sans serif']})
@@ -57,7 +57,8 @@ def init_plotting(extra_x_padding = 0.0,extra_y_padding=0.0,extra_bottom_padding
  rcParams['legend.frameon'] = False
  rcParams['legend.fontsize'] = 25
  rcParams['axes.linewidth'] = 1
- axes([0.15+extra_x_padding,0.20+extra_bottom_padding,0.78-extra_x_padding-extra_y_padding,0.75-extra_bottom_padding-extra_top_padding])
+ #axes([0.15+extra_x_padding,0.20+extra_bottom_padding,0.78-extra_x_padding-extra_y_padding,0.75-extra_bottom_padding-extra_top_padding])
+ axes([0,0,1.0,1.0])
 
 
 

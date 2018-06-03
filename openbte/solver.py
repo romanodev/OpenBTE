@@ -28,6 +28,7 @@ class Solver(object):
 
    self.mesh = Geometry(type='load',filename = argv.setdefault('geometry_filename','geometry'))
 
+   self.cache = '.cache'
    self.n_elems = len(self.mesh.elems)
    self.dim = self.mesh.dim
    self.mfe = False
@@ -73,7 +74,7 @@ class Solver(object):
 
    #if self.compute_matrix:
    if MPI.COMM_WORLD.Get_rank() == 0:
-    directory = 'tmp'
+    directory = self.cache
     if os.path.exists(directory):
      shutil.rmtree(directory)
     os.makedirs(directory)
@@ -92,8 +93,8 @@ class Solver(object):
 
 
    if MPI.COMM_WORLD.Get_rank() == 0:
-    if os.path.isdir('tmp'):
-     shutil.rmtree('tmp')
+    if os.path.isdir(self.cache):
+     shutil.rmtree(self.cache)
 
 
    #Write data-------  
@@ -131,7 +132,7 @@ class Solver(object):
      data_tmp.append(self.mesh.get_side_periodic_value(ll,kc2)*v_orth)
     RHS = csc_matrix( (np.array(data_tmp),(np.array(row_tmp),np.array(col_tmp))), shape=(self.n_elems,self.n_elems) )
 
-    scipy.io.mmwrite('tmp/RHS_DIFF_' + str(t) + '_' + str(p) + r'.mtx',RHS) 
+    scipy.io.mmwrite(self.cache + '/RHS_DIFF_' + str(t) + '_' + str(p) + r'.mtx',RHS) 
 
 
   def compute_directional_connections(self,index,options):
@@ -213,24 +214,24 @@ class Solver(object):
    #--------------------------WRITE FILES---------------------
    A = csc_matrix( (d,(r,c)), shape=(self.n_elems,self.n_elems) )
    K = csc_matrix( (dk,(rk,ck)), shape=(self.n_elems,self.n_elems) )
-   scipy.io.mmwrite('tmp/A_' + str(index) + r'.mtx',A) 
-   scipy.io.mmwrite('tmp/K_' + str(index) + r'.mtx',K) 
-   P.dump(open('tmp/P_' + str(index) +r'.np','wb+'))
-   HW_minus.dump(open('tmp/HW_MINUS_' + str(index) +r'.np','w+'))
-   HW_plus.dump(open('tmp/HW_PLUS_' + str(index) +r'.np','w+'))
-   Hot.dump(open('tmp/Hot_' + str(index) +r'.np','w+'))
-   Cold.dump(open('tmp/Cold_' + str(index) +r'.np','w+'))
+   scipy.io.mmwrite(self.cache + '/A_' + str(index) + r'.mtx',A) 
+   scipy.io.mmwrite(self.cache + '/K_' + str(index) + r'.mtx',K) 
+   P.dump(open(self.cache +'/P_' + str(index) +r'.np','wb+'))
+   HW_minus.dump(open(self.cache + '/HW_MINUS_' + str(index) +r'.np','w+'))
+   HW_plus.dump(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','w+'))
+   Hot.dump(open(self.cache + '/Hot_' + str(index) +r'.np','w+'))
+   Cold.dump(open(self.cache + '/Cold_' + str(index) +r'.np','w+'))
 
   def solve_bte(self,index,options):
 
    #if self.current_iter == 0:
-   A = scipy.io.mmread('tmp/A_' + str(index) + '.mtx').tocsc()
-   P = np.load(open('tmp/P_' + str(index) +r'.np','rb'))
-   HW_MINUS = np.load(open('tmp/HW_MINUS_' + str(index) +r'.np','r'))
-   HW_PLUS = np.load(open('tmp/HW_PLUS_' + str(index) +r'.np','r'))
-   K = scipy.io.mmread('tmp/K_' + str(index) + '.mtx').tocsc()
-   Hot = np.load(open('tmp/Hot_' + str(index) +r'.np','r'))
-   Cold = np.load(open('tmp/Cold_' + str(index) +r'.np','r'))
+   A = scipy.io.mmread(self.cahce + '/A_' + str(index) + '.mtx').tocsc()
+   P = np.load(open(self.cache + '/P_' + str(index) +r'.np','rb'))
+   HW_MINUS = np.load(open(self.cache + '/HW_MINUS_' + str(index) +r'.np','r'))
+   HW_PLUS = np.load(open(self.cache +'/HW_PLUS_' + str(index) +r'.np','r'))
+   K = scipy.io.mmread(self.cache + '/K_' + str(index) + '.mtx').tocsc()
+   Hot = np.load(open(self.cache + '/Hot_' + str(index) +r'.np','r'))
+   Cold = np.load(open(self.cache + '/Cold_' + str(index) +r'.np','r'))
 
 
    TB = options['boundary_temperature']
