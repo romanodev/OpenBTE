@@ -13,6 +13,9 @@ Community
 Installation $ Usage
 ====================
 
+
+Install `gmsh <http://gmsh.info/>`_
+
 .. code-block:: shell
 
   pip install --upgrade openbte
