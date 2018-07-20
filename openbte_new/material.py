@@ -54,16 +54,17 @@ class Material(object):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
     data = {}
-    mfp = argv.setdefault('mfp',100)
+    mfp = argv.setdefault('mfps',[100e-9])
+    n_mfp = len(mfp)
     kappa = argv.setdefault('kappa',1.0)
 
     data.update({'kappa_bulk_tot':kappa})
-    data.update({'mfp_bulk':[mfp]})
+    data.update({'mfp_bulk':mfp})
     data.update({'kappa_bulk':[kappa]})
-    data.update({'B0':[1]})
-    data.update({'B1':[1]})
-    data.update({'B2':[1]})
-    data.update({'mfp_sampled':[mfp]})
+    data.update({'B0':np.array(n_mfp*[1.0/n_mfp])})
+    data.update({'B1':np.eye(n_mfp)})
+    data.update({'B2':np.eye(n_mfp)})
+    data.update({'mfp_sampled':mfp})
   else: data=None
   self.state = MPI.COMM_WORLD.bcast(data,root=0)
 
@@ -142,9 +143,12 @@ class Material(object):
     data.update({'mfp_bulk':mfp_bulk_new})
     data.update({'kappa_bulk':kappa_bulk_new})
     data.update({'B0':B0})
-    data.update({'B1':B1})
-    data.update({'B2':B2})
+    data.update({'B1':np.tile(B1,(n_mfp,1))})
+    data.update({'B2':np.tile(B2,(n_mfp,1))})
+    #data.update({'B1':B1})
+    #data.update({'B2':B2})
     data.update({'mfp_sampled':mfp_sampled})
+
   else: data=None
   self.state = MPI.COMM_WORLD.bcast(data,root=0)
 

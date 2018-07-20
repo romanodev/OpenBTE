@@ -4,7 +4,6 @@ from scipy.sparse.linalg import spsolve
 import os,sys
 import numpy as np 
 from scipy.sparse import csc_matrix
-from pyvtk import *
 import numpy as np
 from mpi4py import MPI
 import shutil
@@ -96,18 +95,6 @@ class Solver(object):
     if os.path.isdir(self.cache):
      shutil.rmtree(self.cache)
 
-
-   #Write data-------  
-   #argv.update({'Geometry':self.mesh})
-   #vw = WriteVtk(argv)
-   #vw.add_variable(self.state['fourier_temperature'],label = 'Fourier Temperature [K]')
-   #vw.add_variable(self.state['fourier_flux'],label = r'''Thermal Flux [W/m/m]''')
-
-   #if argv['max_bte_iter'] > 0:
-   # vw.add_variable(self.state['bte_temperature'],label = r'''BTE Temperature [K]''')
-   # vw.add_variable(self.state['bte_flux'],label = r'''BTE Thermal Flux [W/m/m]''')
-   #vw.write_vtk()  
-   #----------------
 
    #SAVE FILE--------------------
    if argv.setdefault('save',True):
@@ -225,7 +212,7 @@ class Solver(object):
   def solve_bte(self,index,options):
 
    #if self.current_iter == 0:
-   A = scipy.io.mmread(self.cahce + '/A_' + str(index) + '.mtx').tocsc()
+   A = scipy.io.mmread(self.cache + '/A_' + str(index) + '.mtx').tocsc()
    P = np.load(open(self.cache + '/P_' + str(index) +r'.np','rb'))
    HW_MINUS = np.load(open(self.cache + '/HW_MINUS_' + str(index) +r'.np','r'))
    HW_PLUS = np.load(open(self.cache +'/HW_PLUS_' + str(index) +r'.np','r'))
@@ -328,22 +315,6 @@ class Solver(object):
 
    return output
   
-  def  compute_diff(self,x,TL,mm):
-
-   m = mm[0]
-   t = mm[1]
-   p = mm[2]
- 
-   sup = 0.0   
-   for side in self.mesh.side_list['Cold']:
-    (coeff,elem) = self.mesh.get_side_coeff(side)
-    tmp = np.dot(coeff,self.dom['S'][t][p])*self.mesh.get_elem_volume(elem)
-    
-    sup += tmp*(x[elem]-0.5)/2.0
-    
-   return sup/self.mfp[m]
-
-
 
   def compute_function(self,**argv):
  
@@ -455,7 +426,6 @@ class Solver(object):
 
      #--------------------------------------------------------------------------------
      lattice_temperature = np.sum([self.B2[m]*temperature[m,:] for m in range(self.n_mfp)],axis=0)
-
     #--------------------------
 
     kappa = sum([self.B0[m]*suppression[m,:,:].sum() for m in range(self.n_mfp)])

@@ -66,9 +66,18 @@ class Plot(object):
   if argv['variable'] == 'distribution' :
    self.plot_distribution(argv)
 
-
   if argv['variable'] == 'vtk' :
    self.save_vtk(argv)
+
+
+  if argv['variable'] == 'kappa_bte' :
+   solver = dd.io.load('solver.hdf5')
+   kappa_bte = solver['kappa_bte']
+   print(kappa_bte)
+   if argv.setdefault('save',True) :
+    f = open('kappa_bte.dat','w+')  
+    f.write(str(kappa_bte))
+    f.close()
 
  def save_vtk(self,argv):
 
@@ -169,7 +178,7 @@ class Plot(object):
    axis('equal')
    xlim([-Lx/2,Lx/2])
    ylim([-Ly/2,Ly/2])
-   if argv['save_fig']:
+   if argv.setdefault('save_fig',False):
     savefig(argv.setdefault('namefile','geometry.png'))
     close()
    else:

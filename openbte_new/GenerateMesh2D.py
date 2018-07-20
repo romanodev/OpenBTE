@@ -196,7 +196,39 @@ def regularize_polygons(polygons):
 
  return new_poly
 
+def on_boundary(p1,p2,frame):
 
+
+ Lx = frame[0][1]*2.0
+ Ly = frame[0][1]*2.0
+
+
+ p1_left = False
+ p2_left = False
+ p1_right = False
+ p2_right = False
+ p1_top = False
+ p2_top = False
+ p1_bottom = False
+ p2_bottom = False
+
+ if abs(p1[0] -Lx/2.0) < 1e-4 : p1_right = True
+ if abs(p2[0] -Lx/2.0) < 1e-4 : p2_right = True
+ if abs(p1[0] +Lx/2.0) < 1e-4 : p1_left = True
+ if abs(p2[0] +Lx/2.0) < 1e-4 : p2_left = True
+ if abs(p1[1] -Ly/2.0) < 1e-4 : p1_top = True
+ if abs(p2[1] -Ly/2.0) < 1e-4 : p2_top = True
+ if abs(p1[1] +Ly/2.0) < 1e-4 : p1_bottom = True
+ if abs(p2[1] +Ly/2.0) < 1e-4 : p2_bottom = True
+
+
+ boundary = False
+ if p1_top and p2_top: boundary = True
+ if p1_bottom and p2_bottom: boundary = True
+ if p1_left and p2_left: boundary = True
+ if p1_right and p2_right: boundary = True
+
+ return boundary
 
 def mesh(polygons,frame,argv):
  
@@ -205,6 +237,7 @@ def mesh(polygons,frame,argv):
 
   #quit()
 
+  pore_wall = []
   mesh_ext = argv['step']
   include_pores = argv.setdefault('include_pores',False)
   store = open('mesh.geo', 'w+')
@@ -254,6 +287,11 @@ def mesh(polygons,frame,argv):
      local_line_list.append(ll)
      store.write( 'Line('+str(ll) +') = {' + str(p1) +','+ str(p2)+'};\n')
      line_contour.append([ll,p1,p2])
+     if not on_boundary(points[p1],points[p2],frame):
+      pore_wall.append(ll)
+
+
+
      ll += 1
     else:
      print(p1)
@@ -355,7 +393,7 @@ def mesh(polygons,frame,argv):
   c.AddPaths(scale_to_clipper(polygons),pyclipper.PT_SUBJECT,True) 
   solution = scale_from_clipper(c.Execute(pyclipper.CT_INTERSECTION,pyclipper.PFT_EVENODD,pyclipper.PFT_EVENODD))
 
-  pore_wall = []
+  #pore_wall = []
   pore_surface = []
   for region in solution:
     tmp = []
@@ -375,7 +413,7 @@ def mesh(polygons,frame,argv):
  
      index =  line_exists(line,lines)
      if not index==0:
-      pore_wall.append(index[0])
+      #pore_wall.append(index[0])
       line_loop.append(index)
      
  
