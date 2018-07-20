@@ -314,7 +314,6 @@ class Solver(object):
      else:
       flux += self.B1[m]*np.outer(temp,self.dom['S'][t][p])
 
-
      suppression[m,t,p] += sup
      temperature_mfp[m] += temp*self.dom['d_omega'][t][p]*self.symmetry/4.0/np.pi
 
@@ -328,7 +327,6 @@ class Solver(object):
    output = {'boundary_temperature':TB_new,'suppression':suppression,'flux':flux,'temperature':temperature_mfp,'ms':np.array([float(ff_0),float(ff_1)])}
 
    return output
-
   
   def  compute_diff(self,x,TL,mm):
 
@@ -416,8 +414,6 @@ class Solver(object):
      print('')
      print('    Iter    Thermal Conductivity [W/m/K]      Error       Zeroth - Fourier - BTE')
      print('   ------------------------------------------------------------------------------------')
-
-
 
    flux = np.zeros((self.n_elems,3))
    kappa = 0.0

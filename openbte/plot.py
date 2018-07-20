@@ -251,7 +251,6 @@ class Plot(object):
    grid()
    show()
 
-  
 
  def plot_suppression_function(self,argv):
 
@@ -259,14 +258,17 @@ class Plot(object):
    init_plotting(extra_bottom_padding= 0.01,extra_x_padding = 0.02)
    data = dd.io.load(argv.setdefault('filename','solver.hdf5'))
    suppression = data['suppression']
-   sup = [suppression[m,:,:].sum() for m in range(np.shape(suppression)[0])]
-   
-   
    tmp = data['fourier_suppression']
+   sup = [suppression[m,:,:].sum() for m in range(np.shape(suppression)[0])]
+   sup_fourier = [tmp[m,:,:].sum() for m in range(np.shape(tmp)[0])]
+   
+   
    mfp = data['mfp']*1e6
 
    
    plot(mfp,sup,color=c1)
+   plot(mfp,sup_fourier,color=c2)
+
    xscale('log')
    grid('on')
    xlabel('Mean Free Path [$\mu$ m]')

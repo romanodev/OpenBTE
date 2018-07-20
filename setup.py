@@ -3,7 +3,7 @@ import os
 
 
 setup(name='openbte',
-      version='0.9.20',
+      version='0.9.21',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',
