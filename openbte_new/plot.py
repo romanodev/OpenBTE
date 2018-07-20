@@ -14,6 +14,8 @@ from shapely.geometry import MultiPoint,Point,Polygon,LineString
 from scipy.interpolate import BarycentricInterpolator
 from .WriteVTK import *
 from .geometry import *
+from pypapers.common_fig import *
+
 
 def get_suppression(mfps,sup,mfp):
 
@@ -59,6 +61,8 @@ class Plot(object):
    model= argv['variable'].split('/')[0]
    if model == 'map':
     self.plot_map(argv)
+   if model == 'node_map':
+    self.plot_node_data(argv)
 
   if argv['variable'] == 'suppression_function' :
    self.plot_suppression_function(argv)
@@ -66,9 +70,9 @@ class Plot(object):
   if argv['variable'] == 'distribution' :
    self.plot_distribution(argv)
 
-
   if argv['variable'] == 'vtk' :
    self.save_vtk(argv)
+  
 
  def save_vtk(self,argv):
 
@@ -80,16 +84,67 @@ class Plot(object):
    vw = WriteVtk(argv)
    vw.add_variable(solver['fourier_temperature'],label = 'Fourier Temperature [K]')
    vw.add_variable(solver['fourier_flux'],label = r'''Thermal Flux [W/m/m]''')
-
    vw.add_variable(solver['bte_temperature'],label = r'''BTE Temperature [K]''')
    vw.add_variable(solver['bte_flux'],label = r'''BTE Thermal Flux [W/m/m]''')
    vw.write_vtk()  
+
+
+
+ def plot_node_data(self,argv):
+
+  if MPI.COMM_WORLD.Get_rank() == 0:
+   variable = argv['variable'].split('/')[1]
+
+   init_plotting(extra_bottom_padding = -0.15,extra_x_padding = -0.1)
+   geo = Geometry(type='load')
+   solver = dd.io.load('solver.hdf5')
+   argv.update({'Geometry':geo})
+   vw = WriteVtk(argv)
+   (triangulation,data) = vw.get_node_data(solver[variable])
+   ddd = []
+   for d in data:
+    ddd.append(d[0])
+
+   tripcolor(triangulation,np.array(ddd),shading='gouraud',norm=mpl.colors.Normalize(vmin=-0.6,vmax=0.6))
+   #baxes = gcf().add_axes([0.88, 0.05, 0.035, 0.865])
+   colorbar(norm=mpl.colors.Normalize(vmin=-1.0,vmax=1.0))
+
+   t = tricontour(triangulation,np.array(ddd),levels=np.linspace(-0.7,0.7,10),colors='black',linewidths=1.5)
+   clabel(t, inline=True, fontsize=14,colors=['w','w','w','w','black','black','black','black','black'])
+   axis('equal')
+   axis('off')
+   text(-0.6,0.04,'HOT',rotation=90,color='r') 
+   text(0.5,0.05,'COLD',rotation=-90,color='blue') 
+   #xlim([-0.3,0.3])
+   #ylim([-0.3,0.3])
+
+   x = 0.45
+   y = 0.45
+   size_axis = 0.1
+   [xmin,xmax] = gca().get_xlim()
+   dx = xmax-xmin
+   [ymin,ymax] = gca().get_ylim()
+   dy = ymax-ymin
+   x0 = xmin + x*dx
+   y0 = ymin + y*dy
+   sx = size_axis*(xmax-xmin)
+   sy = size_axis*(ymax-ymin)
+
+   arrow(x0, y0, 0, sy, head_width=sx/5, head_length=sy/5, fc='k', ec='k',zorder=10)
+   arrow(x0, y0, sx, 0, head_width=sy/5, head_length=sx/5, fc='k', ec='k')
+   text(x0-dx*0.05,y0+sy,'$\hat{\mathbf{y}}$',fontsize=22)
+   text(x0 + sx,y0+dx*0.02,'$\hat{\mathbf{x}}$',fontsize=22)
+
+
+   savefigure(filename ='figure_1b.png')
+   show()
+
 
  def plot_map(self,argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
   
-   init_plotting() 
+   #init_plotting(square=True) 
    variable = argv['variable'].split('/')[1]
    geo = dd.io.load('geometry.hdf5')
    Nx = argv.setdefault('repeat_x',1)
@@ -256,23 +311,35 @@ class Plot(object):
  def plot_suppression_function(self,argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
-   init_plotting(extra_bottom_padding= 0.01,extra_x_padding = 0.02)
    data = dd.io.load(argv.setdefault('filename','solver.hdf5'))
    suppression = data['suppression']
    sup = [suppression[m,:,:].sum() for m in range(np.shape(suppression)[0])]
-   
+  
    
    tmp = data['fourier_suppression']
    mfp = data['mfp']*1e6
 
-   
-   plot(mfp,sup,color=c1)
-   xscale('log')
-   grid('on')
-   xlabel('Mean Free Path [$\mu$ m]')
-   ylabel('Suppression Function')
-   show()
+   if argv['show'] == True:
+    init_plotting(extra_bottom_padding= 0.01,extra_x_padding = 0.02)
+    ylim([0,1.2]) 
+    plot(mfp,sup,color=c1)
+    xscale('log')
+    grid('on')
+    xlabel('Mean Free Path [$\mu$ m]')
+    ylabel('Suppression Function')
+    show()
 
+   
+   if argv['write'] == True:
+    f = open('suppression.dat','w+')
+   
+    for a,b in zip(mfp,sup):
+     f.write(str(a))
+     f.write(' ')
+     f.write(str(b))
+     f.write('\n')
+     
+    f.close()
 
 
   

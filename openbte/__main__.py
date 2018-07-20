@@ -7,6 +7,7 @@ from .plot import *
 
 def main(args=None):
 
+
  parser = argparse.ArgumentParser()
 
  #Geometry---------
@@ -55,4 +56,5 @@ def main(args=None):
   Plot(**vars(args))
 
 if __name__ == "__main__":
+
     main()

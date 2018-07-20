@@ -7,7 +7,7 @@ from mpi4py import MPI
 from pyvtk import *
 from .GenerateSquareLatticePores import *
 from .GenerateHexagonalLatticePores import *
-#from .GenerateCustomPores import *
+from .GenerateCustomPores import *
 #from GenerateRandomPores import *
 #from GenerateRandomPoresOverlap import *
 from . import GenerateMesh2D 
@@ -49,8 +49,8 @@ class Geometry(object):
      if geo_type == 'porous/hexagonal_lattice':
       frame,polygons = GenerateHexagonalLatticePores(argv) 
 
-     #if geo_type == 'porous/custom':
-     # frame,polygons = GenerateCustomPores(argv) 
+     if geo_type == 'porous/custom':
+      frame,polygons = GenerateCustomPores(argv) 
 
      #if geo_type == 'porous/random':
      # frame,polygons = GenerateRandomPoresOverlap(argv) 
