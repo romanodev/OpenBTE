@@ -73,7 +73,6 @@ class Plot(object):
   if argv['variable'] == 'kappa_bte' :
    solver = dd.io.load('solver.hdf5')
    kappa_bte = solver['kappa_bte']
-   print(kappa_bte)
    if argv.setdefault('save',True) :
     f = open('kappa_bte.dat','w+')  
     f.write(str(kappa_bte))
@@ -264,7 +263,7 @@ class Plot(object):
 
  def plot_suppression_function(self,argv):
 
-  if MPI.COMM_WORLD.Get_rank() == 0:
+  #if MPI.COMM_WORLD.Get_rank() == 0:
    init_plotting(extra_bottom_padding= 0.01,extra_x_padding = 0.02)
    data = dd.io.load(argv.setdefault('filename','solver.hdf5'))
    suppression = data['suppression']
@@ -274,7 +273,8 @@ class Plot(object):
    tmp = data['fourier_suppression']
    mfp = data['mfp']*1e6
 
-   
+  
+   #print(mfp) 
    plot(mfp,sup,color=c1)
    xscale('log')
    grid('on')
