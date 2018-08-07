@@ -313,16 +313,21 @@ class Plot(object):
   if MPI.COMM_WORLD.Get_rank() == 0:
    data = dd.io.load(argv.setdefault('filename','solver.hdf5'))
    suppression = data['suppression']
+   tmp = data['fourier_suppression']
    sup = [suppression[m,:,:].sum() for m in range(np.shape(suppression)[0])]
+   sup_fourier = [tmp[m,:,:].sum() for m in range(np.shape(tmp)[0])]
   
+   #print(sup_fourier)
+   #quit()
    
    tmp = data['fourier_suppression']
    mfp = data['mfp']*1e6
 
-   if argv['show'] == True:
+   if argv.setdefault('show',True) == True:
     init_plotting(extra_bottom_padding= 0.01,extra_x_padding = 0.02)
-    ylim([0,1.2]) 
+    #ylim([0,1.2]) 
     plot(mfp,sup,color=c1)
+    plot(mfp,sup_fourier,color=c2)
     xscale('log')
     grid('on')
     xlabel('Mean Free Path [$\mu$ m]')
@@ -330,7 +335,7 @@ class Plot(object):
     show()
 
    
-   if argv['write'] == True:
+   if argv.setdefault('write',False) == True:
     f = open('suppression.dat','w+')
    
     for a,b in zip(mfp,sup):

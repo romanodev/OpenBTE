@@ -35,7 +35,8 @@ def GenerateSquareLatticePores(argv):
      dphi = 2.0*math.pi/Na;
      p = []    
      for ka in range(Na):
-      ph =  dphi/2 + (ka-1) * dphi + phi0*np.pi/180.0
+      #ph =  dphi/2 + (ka-1) * dphi + phi0*np.pi/180.0
+      ph =   (ka-1) * dphi + phi0*np.pi/180.0
       px  = cx + r * math.cos(ph)
       py  = cy + r * math.sin(ph)
       p.append([px,py])

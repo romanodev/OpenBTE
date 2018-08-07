@@ -18,6 +18,7 @@ from . import GenerateBulk3D
 #from nanowire import *
 import deepdish as dd
 from scipy.sparse import csc_matrix
+from matplotlib.pylab import *
 
 class Geometry(object):
 
@@ -55,6 +56,7 @@ class Geometry(object):
      #if geo_type == 'porous/random':
      # frame,polygons = GenerateRandomPoresOverlap(argv) 
      # polygons = np.array(polygons)
+
 
      if 'lz' in argv.keys():
       GenerateMesh3D.mesh(polygons,frame,argv)
@@ -615,7 +617,7 @@ class Geometry(object):
      for s in pairs: 
       s1 = s[0]
       s2 = s[1]
-   
+ 
       #Change side in elem 2
       elem2 = self.side_elem_map[s2][0]
       index = self.elem_side_map[elem2].index(s2)

@@ -115,8 +115,6 @@ class Material(object):
      mfp_sampled.append(pow(10,m))
     #--------------------------------------------------------
 
-
-
     #MFP interpolation---------------------------
     B0 = np.zeros(n_mfp) 
     B1 = np.zeros(n_mfp) 

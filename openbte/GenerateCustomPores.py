@@ -18,18 +18,25 @@ def GenerateCustomPores(argv):
   #Periodicity------------
   pbc = []
   pbc.append([0,0])
-  pbc.append([Lx,0])
-  pbc.append([-Lx,0])
-  pbc.append([0,Ly])
-  pbc.append([0,-Ly])
-  pbc.append([Lx,Ly])
-  pbc.append([-Lx,-Ly])
-  pbc.append([-Lx,Ly])
-  pbc.append([Lx,-Ly])
-  #---------------------
+  if argv.setdefault('automatic_periodic',True):
+   pbc.append([Lx,0])
+   pbc.append([-Lx,0])
+   pbc.append([0,Ly])
+   pbc.append([0,-Ly])
+   pbc.append([Lx,Ly])
+   pbc.append([-Lx,-Ly])
+   pbc.append([-Lx,Ly])
+   pbc.append([Lx,-Ly])
+   #---------------------
 
   if 'polygons' in argv:
-   polygons = argv['polygons']
+   polygons = np.array(argv['polygons'])
+   for poly in polygons:
+    for p in poly:
+     p[0] *=Lx   
+     p[1] *=Ly
+     #p[0] -=Lx/2.0
+     #p[1] -=Ly/2.0
   else:
    tmp = np.loadtxt(argv['polyfile'])
    if len(np.shape(tmp)) == 1:
