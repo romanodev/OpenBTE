@@ -62,8 +62,21 @@ class Material(object):
     data.update({'mfp_bulk':mfp})
     data.update({'kappa_bulk':[kappa]})
     data.update({'B0':np.array(n_mfp*[1.0/n_mfp])})
-    data.update({'B1':np.eye(n_mfp)})
-    data.update({'B2':np.eye(n_mfp)})
+
+    if 'special_point' in argv.keys():
+     sp = argv['special_point']
+     tmp = np.zeros(n_mfp)
+     tmp[sp] = 1.0
+     tmp = np.tile(tmp,[n_mfp,1])
+     #print(data)
+     #quit()
+     data.update({'B1':tmp})
+     data.update({'B2':tmp})
+    else:    
+     data.update({'B1':np.eye(n_mfp)})
+     data.update({'B2':np.eye(n_mfp)})
+
+
     data.update({'mfp_sampled':mfp})
   else: data=None
   self.state = MPI.COMM_WORLD.bcast(data,root=0)
@@ -78,7 +91,7 @@ class Material(object):
     if '/' in argv['matfile']:
      filename = argv['matfile'] 
     else:
-     filename = os.path.dirname(__file__) + '/../materials/'+ argv['matfile'] 
+     filename = os.path.dirname(__file__) + '/materials/'+ argv['matfile'] 
 
     data = {}
     #[n_mfp,n_theta,n_phi] = argv['grid']
@@ -147,7 +160,7 @@ class Material(object):
     data.update({'B2':np.tile(B2,(n_mfp,1))})
     #data.update({'B1':B1})
     #data.update({'B2':B2})
-    data.update({'mfp_sampled':mfp_sampled})
+    data.update({'mfp_sampled':np.array(mfp_sampled)})
 
   else: data=None
   self.state = MPI.COMM_WORLD.bcast(data,root=0)

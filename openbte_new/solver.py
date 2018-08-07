@@ -377,8 +377,10 @@ class Solver(object):
    #---------------------------------------------------------------------
    #---------------------------------------------------------------------
 
-   #kappa = suppression_fourier[0,:,:].sum() 
+
    kappa = suppression_fourier[0,:,:].sum() 
+
+
 
    kappa_fourier = kappa
    suppression = np.array(self.n_mfp * [suppression_fourier[0]])
@@ -425,9 +427,8 @@ class Solver(object):
     #zeroth order---------------------------
     suppression_zeroth = np.array([self.compute_diffusive_thermal_conductivity(lattice_temperature[0],mat = np.eye(3))])
 
-
     if self.multiscale:
-       compute_sum(self.solve_fourier,self.n_mfp,output =  {'suppression':suppression_fourier,\
+     compute_sum(self.solve_fourier,self.n_mfp,output =  {'suppression':suppression_fourier,\
                                                             'temperature':temperature_fourier,\
                                                             'temperature_gradient':temperature_gradient,\
                                                             'flux':flux},\
@@ -466,7 +467,7 @@ class Solver(object):
     #--------------------------
 
     kappa = sum([self.B0[m]*suppression[m,:,:].sum() for m in range(self.n_mfp)])
-    error = abs((kappa-previous_kappa))/kappa
+    error = abs((kappa-previous_kappa))/abs(kappa)
    
     if MPI.COMM_WORLD.Get_rank() == 0:
      #print(kappa*self.kappa_bulk)
@@ -478,6 +479,20 @@ class Solver(object):
     previous_kappa = kappa
     self.current_iter +=1
     #------------------------
+
+
+
+   compute_sum(self.solve_fourier,self.n_mfp,output =  {'suppression':suppression_fourier,\
+                                                        'temperature':temperature_fourier,\
+                                                        'temperature_gradient':temperature_gradient,\
+                                                        'flux':flux},\
+                                                 options = {'boundary_temperature':boundary_temperature.copy(),\
+                                                            'lattice_temperature':lattice_temperature.copy(),\
+                                                            'interface_conductance': 3.0/2.0/self.mfp,\
+                                                            'kappa_bulk':np.square(self.mfp)/3.0,\
+                                                            'mfe_factor':1.0})
+
+        
 
 
 
@@ -565,14 +580,15 @@ class Solver(object):
     #Update matrices-------
     kappa_bulk = options['kappa_bulk'][n]
     G = options.setdefault('interface_conductance',np.zeros(self.n_mfp))[n]
-    TL = options.setdefault('lattice_temperature',np.zeros(self.n_el))
+    TL = options.setdefault('lattice_temperature',np.zeros((self.n_mfp,self.n_el)))
     TB = options.setdefault('boundary_temperature',np.zeros((self.n_mfp,self.n_el)))
     mfe_factor = options.setdefault('mfe_factor',0.0)
 
-
+    #G = 0.0
+    #mfe_factor = 0.0
     diag_1 = diags([self.FF],[0]).tocsc()
     A = (self.F + diag_1*G)   + mfe_factor * csc_matrix(scipy.sparse.eye(self.n_elems))/kappa_bulk
-    B = (self.B + np.multiply(self.FF,TB[n])*G)  + mfe_factor * TL/kappa_bulk
+    B = (self.B + np.multiply(self.FF,TB[n])*G)  + mfe_factor * TL[n]/kappa_bulk
     if mfe_factor == 0.0:
      A[10,10] = 1.0
     #----------------------------------------------------
@@ -593,9 +609,11 @@ class Solver(object):
     gradient_temperature_mfp = np.zeros((len(options['kappa_bulk']),self.n_elems,3)) 
     while error > min_err and n_iter < max_iter :
 
+
      RHS = B + C#*kappa_bulk
      if mfe_factor == 0.0:
        RHS[10] = 0.0
+
      temp = SU.solve(RHS)
      temp = temp - (max(temp)+min(temp))/2.0
    

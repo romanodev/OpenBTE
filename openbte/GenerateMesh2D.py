@@ -200,21 +200,21 @@ def regularize_polygons(polygons):
 
  #eliminate useless points
  #cut redundant points
- new_poly2 = []
- for poly in new_poly:
-  poly.append(poly[-1])
-  N = len(poly)
-  tmp = []
-  for n in range(N):
-   p1 = np.array(poly[(n-1)%N])
-   p2 = np.array(poly[n])
-   p3 = np.array(poly[(n+1)%N])
+ #new_poly2 = []
+ #for poly in new_poly:
+ # poly.append(poly[-1])
+ # N = len(poly)
+ # tmp = []
+ # for n in range(N):
+ #  p1 = np.array(poly[(n-1)%N])
+ #  p2 = np.array(poly[n])
+ #  p3 = np.array(poly[(n+1)%N])
  
-   l1 = (p2-p1)/np.linalg.norm(p2-p1)
-   l2 = (p3-p2)/np.linalg.norm(p3-p2)
+ #  l1 = (p2-p1)/np.linalg.norm(p2-p1)
+ #  l2 = (p3-p2)/np.linalg.norm(p3-p2)
 
-   theta = np.arccos(np.dot(l1,l2))
-   tmp.append(p1)  
+ #  theta = np.arccos(np.dot(l1,l2))
+ #  tmp.append(p1)  
 #   else:
 #    print('ggg')
  # new_poly2.append(tmp)

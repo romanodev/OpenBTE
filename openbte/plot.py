@@ -274,7 +274,6 @@ class Plot(object):
    
    mfp = data['mfp']*1e6
 
-   
    plot(mfp,sup,color=c1)
    plot(mfp,sup_fourier,color=c2)
 
