@@ -238,8 +238,14 @@ class Solver(object):
    temperature_mfp = np.zeros((self.n_mfp,self.n_elems))
    ff_1 = 0
    ff_0 = 0
-  
+ 
+   p_test = 8
+   t_test = 7
    #for t in range(int(self.n_theta/2.0)): #We take into account the symmetry
+   tt1 = []
+   tt2 = []
+   tt3 = []
+   tt4 = []
    for tt in range(self.n_theta_irr): #We take into account the symmetry
     
     if self.dim == 2:
@@ -256,9 +262,13 @@ class Solver(object):
     fourier = False
     zeroth_order = False
     #RHS_DIFF = scipy.io.mmread('tmp/RHS_DIFF_' + str(t) + '_' + str(p) + '.mtx').tocsc()
+
+    
     for m in range(self.n_mfp)[::-1]:
      #----------------------------------------------------------------------------------
      if not fourier:
+
+ 
       D = np.multiply(TB[m],HW_MINUS)
       global_index = m*self.dom['n_theta']*self.dom['n_phi'] +t*self.dom['n_phi']+p
       F = scipy.sparse.eye(self.n_elems) + theta_factor * self.mfp[m] * A
@@ -268,35 +278,58 @@ class Solver(object):
    
       #sup = pre_factor * K.dot(temp-temp_mfp[m]).sum()/self.mfp[m]*self.kappa_factor
       sup = pre_factor * K.dot(temp-TL[m]).sum()/self.mfp[m]*self.kappa_factor
+      
+      if t == t_test and p == p_test:
+       tt1.append(self.mfp[m])
+       tt2.append(sup)
+       tt3.append(suppression_fourier[m][t][p])
+       tt4.append(0)
+      #if t == 6 and p == 27:
+      # print(' ')
+      # print(sup)
+      # print(suppression_fourier[m][t][p])
 
       if self.multiscale:
        if not sup == 0.0:
         sup_fourier = suppression_fourier[m][t][p]
         error = abs(sup-sup_fourier)/abs(sup)
+        #error = abs(sup-sup_fourier)
 
-        if error < 0.05:
+        if error < 0.1:
          fourier = True
          
          ff_1 +=1
          sup = sup_fourier
          sup_old = 0.0
-        
+       else:
+         fourier = True
+         sup_old = 0.0
+       
+ 
      else:
+      if t == t_test and p == p_test:
+       tt1.append(self.mfp[m])
+       tt2.append(suppression_fourier[m][t][p])
+       tt3.append(suppression_fourier[m][t][p])
+       tt4.append(1)
+       print('g')
       if not zeroth_order:
        temp = temp_fourier[m] - self.mfp[m]*np.dot(self.mfp[m]*self.dom['S'][t][p],temp_fourier_gradient[m].T)
-       sup = suppression_fourier[m][t][p]
 
-       sup_zeroth = options['suppression_zeroth']*ss[self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
+       if not sup == 0.0 :
+        sup = suppression_fourier[m][t][p]
+   
+       #sup_zeroth = options['suppression_zeroth']*ss[self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
 
-       if abs(sup - sup_zeroth)/abs(sup) < 0.1 and abs(sup-sup_old)/abs(sup) < 0.01 :
-        zeroth_order = True
-        ff_0 +=1
-       else:
-        ff_1 +=1
-       sup_old = sup
-      else:
-       sup = sup_zeroth
-       ff_0 +=1
+       #if abs(sup - sup_zeroth)/abs(sup) < 0.1 and abs(sup-sup_old)/abs(sup) < 0.01 :
+       # zeroth_order = True
+       # ff_0 +=1
+       #else:
+       # ff_1 +=1
+       #sup_old = sup
+      #else:
+      # sup = sup_zeroth
+      # ff_0 +=1
      #--------------------------
      #TL_new += self.B2[m] * temp * self.dom['d_omega'][t][p]/4.0/np.pi * self.symmetry
      if self.symmetry == 2.0:
@@ -309,6 +342,7 @@ class Solver(object):
      suppression[m,t,p] += sup
      temperature_mfp[m] += temp*self.dom['d_omega'][t][p]*self.symmetry/4.0/np.pi
 
+    
      if self.dim == 2:
       suppression[m,self.n_theta -t -1,p] += suppression[m,t,p]
       #TB_new += np.mean(self.B1[0,m])*self.dom['at'][t]*np.multiply(temp,HW_PLUS)*self.symmetry
@@ -319,6 +353,12 @@ class Solver(object):
 
      #------------------------------------------------------------------------------------
    output = {'boundary_temperature':TB_new,'suppression':suppression,'flux':flux,'temperature':temperature_mfp,'ms':np.array([float(ff_0),float(ff_1)])}
+  
+ 
+   if p == p_test:
+    dd.io.save('test.hdf5',{'mfp':tt1,'sup':tt2,'sup_fourier':tt3,'ms':tt4})
+    
+
 
    return output
 
@@ -379,7 +419,6 @@ class Solver(object):
 
 
    kappa = suppression_fourier[0,:,:].sum() 
-
 
 
    kappa_fourier = kappa
@@ -586,6 +625,8 @@ class Solver(object):
 
     #G = 0.0
     #mfe_factor = 0.0
+    #print(G)
+    #G = 0.0
     diag_1 = diags([self.FF],[0]).tocsc()
     A = (self.F + diag_1*G)   + mfe_factor * csc_matrix(scipy.sparse.eye(self.n_elems))/kappa_bulk
     B = (self.B + np.multiply(self.FF,TB[n])*G)  + mfe_factor * TL[n]/kappa_bulk

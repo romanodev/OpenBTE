@@ -273,11 +273,6 @@ class Plot(object):
    
    mfp = data['mfp']*1e6
 
-<<<<<<< HEAD
-  
-   #print(mfp) 
-=======
->>>>>>> a3dd095d1eaa22356ffa78066eb67318f609c4be
    plot(mfp,sup,color=c1)
    plot(mfp,sup_fourier,color=c2)
 
@@ -285,6 +280,7 @@ class Plot(object):
    grid('on')
    xlabel('Mean Free Path [$\mu$ m]')
    ylabel('Suppression Function')
+   print('ff')
    show()
 
 

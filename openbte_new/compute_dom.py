@@ -28,8 +28,7 @@ def compute_dom_3d(argv) :
    output.update({'d_phi':Dphi})  
    #phi_vec = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True) #this is the correct one
    phi_vec = np.linspace(0.0,2.0*np.pi,n_phi,endpoint=False) 
-   #print(phi_vec*180.0/np.pi)
-   #quit()
+
 
 
    output.update({'phi_vec':phi_vec})   
