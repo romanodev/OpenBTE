@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 import numpy as np
+
 import math
 from .compute_dom import *
 from mpi4py import MPI

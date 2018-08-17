@@ -5,8 +5,6 @@ import numpy as np
 import random
 import math
 from matplotlib.pylab import *
-import pyclipper
-from pyclipper import *
 import subprocess
 from shapely.ops import cascaded_union
 from shapely.geometry import Point
@@ -29,8 +27,8 @@ def line_exists_ordered(l,lines):
   if (line[0] == l[1] and line[1] == l[0]) :
    return -n
 
- return 0 
-     
+ return 0
+
 
 def line_exists(l,lines):
 
@@ -54,13 +52,13 @@ def get_line_from_points(p1,p2,all_lines,points):
  #Get indexes
  for t,p in enumerate(points):
   if p == p1 :
-   t1 = t 
+   t1 = t
   if p == p2 :
-   t2 = t 
+   t2 = t
 
 
  for t,l in enumerate(all_lines):
-  if (t1 == l[1] and t2 == l[2]) :  
+  if (t1 == l[1] and t2 == l[2]) :
    line = [l[0],t1,t2]
    break
   if (t2 == l[1] and t1 == l[2])  :
@@ -86,14 +84,14 @@ def GetSampleList(output_dir) :
     for n in range(len(tmp)) :
      tmp2 = tmp[n].split('/')
      tmp3 = tmp2[-1].split('.')
-     tmp4 = tmp3[0].split('_') 
+     tmp4 = tmp3[0].split('_')
      index = max([int(tmp4[1]),index])
     index +=1
 
 
    return index
 
- 
+
 
 def plot_region(region):
 
@@ -106,23 +104,23 @@ def plot_region(region):
 
 def FindPeriodic(control,others,points,lines):
 
-    
-     
- delta = 1e-3   
+
+
+ delta = 1e-3
  p1c = points[lines[control][0]]
  p2c = points[lines[control][1]]
  for n in range(len(others)):
    p1 = points[lines[others[n]][0]]
    p2 = points[lines[others[n]][1]]
-   #Positive  
-   pd1 = [p1c[0]-p1[0],p1c[1]-p1[1]]  
-   pd2 = [p2c[0]-p2[0],p2c[1]-p2[1]]  
+   #Positive
+   pd1 = [p1c[0]-p1[0],p1c[1]-p1[1]]
+   pd2 = [p2c[0]-p2[0],p2c[1]-p2[1]]
    if abs(pd1[0] - pd2[0]) < delta and abs(pd1[1] - pd2[1]) <delta :
      return others[n]
-   
-   #Negative  
-   pd1 = [p1c[0]-p2[0],p1c[1]-p2[1]]   
-   pd2 = [p2c[0]-p1[0],p2c[1]-p1[1]]   
+
+   #Negative
+   pd1 = [p1c[0]-p2[0],p1c[1]-p2[1]]
+   pd2 = [p2c[0]-p1[0],p2c[1]-p1[1]]
    if abs(pd1[0] - pd2[0])<delta and abs(pd1[1] - pd2[1])<delta :
      return -others[n]
 
@@ -130,16 +128,16 @@ def FindPeriodic(control,others,points,lines):
  #If no periodic line has been found
  print("NO PERIODIC LINES HAS BEEN FOUND")
  quit()
- 
+
 def LineOrdering(lines) :
 
   new_lines = []
   new_lines.append(lines[0])
   check = np.ones(len(lines))
   check[0] = 0
-  n_check = 0 
+  n_check = 0
   while len(lines) > len(new_lines) :
-   n_check +=1 
+   n_check +=1
    line = new_lines[len( new_lines)-1]
    for k in range(len(lines)):
     if check[k] == 1:
@@ -172,7 +170,7 @@ def PolygonArea(corners):
 
 
 
-def already_included(all_points,new_point): 
+def already_included(all_points,new_point):
 
  for n,p in enumerate(all_points):
   d = np.linalg.norm(np.array(p)-np.array(new_point))
@@ -209,12 +207,12 @@ def regularize_polygons(polygons):
  #  p1 = np.array(poly[(n-1)%N])
  #  p2 = np.array(poly[n])
  #  p3 = np.array(poly[(n+1)%N])
- 
+
  #  l1 = (p2-p1)/np.linalg.norm(p2-p1)
  #  l2 = (p3-p2)/np.linalg.norm(p3-p2)
 
  #  theta = np.arccos(np.dot(l1,l2))
- #  tmp.append(p1)  
+ #  tmp.append(p1)
 #   else:
 #    print('ggg')
  # new_poly2.append(tmp)
@@ -231,12 +229,12 @@ def prune(solution):
  #Eliminate unnecessary points---
  tmp = []
  for region in solution:
-  points = []   
+  points = []
   for p,point in enumerate(region):
-   if p > 0:   
+   if p > 0:
     if already_included([points[-1]],point) == -1:
      points.append(point)
-   else:  
+   else:
     points.append(point)
   tmp.append(points)
 
@@ -244,9 +242,9 @@ def prune(solution):
  polygons = []
  for n,region in enumerate(tmp):
 
-  area = PolyArea(np.array(region)[:,0],np.array(region)[:,1]) 
+  area = PolyArea(np.array(region)[:,0],np.array(region)[:,1])
   if area > 1e-2:
-   points = []  
+   points = []
 
    for p,new_point in enumerate(region):
     tmp = already_included(points,new_point)
@@ -266,11 +264,11 @@ def prune(solution):
  # show()
 
  return polygons
- 
+
 
 def plot_region(dd,color='r'):
 
- dd.append(dd[0])    
+ dd.append(dd[0])
  dd = np.array(dd)
  x = dd[:,0]
  y = dd[:,1]
@@ -284,27 +282,27 @@ def plot_region(dd,color='r'):
 def create_line_list(pp,points,lines,store,mesh_ext):
 
    p_list = []
-   for p in pp: 
+   for p in pp:
     tmp = already_included(points,p)
     if tmp == -1:
-     points.append(p)   
+     points.append(p)
      store.write( 'Point('+str(len(points)-1) +') = {' + str(p[0]) +','+ str(p[1])+',0,'+ str(mesh_ext) +'};\n')
      p_list.append(len(points)-1)
-    else: 
+    else:
      p_list.append(tmp)
 
 
    line_list = []
    for l in range(len(p_list)):
-    p1 = p_list[l] 
+    p1 = p_list[l]
     p2 = p_list[(l+1)%len(p_list)]
     tmp = line_exists_ordered([p1,p2],lines)
 
     if tmp == 0 : #craete line
-     lines.append([p1,p2])   
+     lines.append([p1,p2])
      store.write( 'Line('+str(len(lines)-1) +') = {' + str(p1) +','+ str(p2)+'};\n')
      line_list.append(len(lines)-1)
-    else: 
+    else:
      line_list.append(tmp)
 
     #print(' ')
@@ -320,7 +318,7 @@ def create_line_list(pp,points,lines,store,mesh_ext):
 
 def create_loop(loops,line_list,store):
 
-   #create external loop 
+   #create external loop
    strc = 'Line Loop(' + str(loops)+ ') = {'
    for n in range(len(line_list)):
     strc +=str(line_list[n])
@@ -328,7 +326,7 @@ def create_loop(loops,line_list,store):
      strc += '};\n'
     else:
      strc += ','
-   store.write(strc)   
+   store.write(strc)
 
    return strc
 
@@ -337,7 +335,7 @@ def create_loop(loops,line_list,store):
 def create_surface(ss,bulk_surface,store):
 
 
-  strc = r'''Plane Surface(''' + str(bulk_surface) + ')= {'  
+  strc = r'''Plane Surface(''' + str(bulk_surface) + ')= {'
   for n,s in enumerate(ss):
    strc += str(s)
    if n == len(ss)-1:
@@ -348,7 +346,7 @@ def create_surface(ss,bulk_surface,store):
 
 
 def mesh(polygons,frame,argv):
- 
+
 
   polygons = regularize_polygons(polygons)
 
@@ -369,37 +367,37 @@ def mesh(polygons,frame,argv):
    #Points-------
    pp = list(thin.exterior.coords)[:-1]
 
-   #for p in pp: 
-   # points.append(p)   
+   #for p in pp:
+   # points.append(p)
    # store.write( 'Point('+str(len(points)-1) +') = {' + str(p[0]) +','+ str(p[1])+',0,'+ str(mesh_ext) +'};\n')
 
    #Lines--------
    #for n in range(len(pp)):
    # p1 = len(points) + n - len(pp)
    # p2 = len(points) + (n+1)%len(pp) - len(pp)
-   # lines.append([p1,p2])   
+   # lines.append([p1,p2])
    # store.write( 'Line('+str(len(lines)-1) +') = {' + str(p1) +','+ str(p2)+'};\n')
-    
+
    #Line loops
    #loops += 1
    #strc = 'Line Loop(' + str(loops-1)+ ') = {'
    #for n in range(len(pp)):
-   # strc +=str(len(lines)-len(pp)+n) 
+   # strc +=str(len(lines)-len(pp)+n)
    # if n == len(pp)-1:
    #  strc += '};\n'
    # else:
    #  strc += ','
-   #store.write(strc)   
+   #store.write(strc)
 
    #Pores surfaces--
    #ss +=1
    #strc = 'Plane Surface(' + str(ss-1)+ ') = {' + str(loops-1) + '};\n'
-   #store.write(strc)   
+   #store.write(strc)
 
    #plot_region(points)
 
   #show()
-  #strc = r'''Physical Surface('Pores') = {'''  
+  #strc = r'''Physical Surface('Pores') = {'''
   #for n in range(ss):
   # strc += str(n)
   # if n == ss-1:
@@ -414,22 +412,22 @@ def mesh(polygons,frame,argv):
   ly = frame[1][1]*2.0
   pore_wall = []
   delta = 1e-2
-  #strc = r'''Physical Line('Boundary') = {'''  
+  #strc = r'''Physical Line('Boundary') = {'''
   for l,line in enumerate(lines):
-   p1 = points[line[0]]  
+   p1 = points[line[0]]
    p2 = points[line[1]]
    on_wall = True
    if abs(p1[0] + lx/2.0) < delta and abs(p2[0] + lx/2.0) < delta: on_wall=False
    if abs(p1[0] - lx/2.0) < delta and abs(p2[0] - lx/2.0) < delta: on_wall=False
    if abs(p1[1] - ly/2.0) < delta and abs(p2[1] - ly/2.0) < delta: on_wall=False
    if abs(p1[1] + ly/2.0) < delta and abs(p2[1] + ly/2.0) < delta: on_wall=False
-   if on_wall:   
-   # if len(pore_walls) > 0:   
-   #  strc += ',' 
-   # strc += str(l) 
+   if on_wall:
+   # if len(pore_walls) > 0:
+   #  strc += ','
+   # strc += str(l)
     pore_wall.append(l)
   #strc += '};\n'
-  #store.write(strc) 
+  #store.write(strc)
   #-------------------------
 
   MP = MultiPolygon(polypores)
@@ -439,7 +437,7 @@ def mesh(polygons,frame,argv):
 
   if not (isinstance(bulk, shapely.geometry.multipolygon.MultiPolygon)):
    bulk = [bulk]
-  
+
   bulk_surface = []
   for region in bulk:
 
@@ -461,19 +459,19 @@ def mesh(polygons,frame,argv):
     loops +=1
     local_loops.append(loops)
     create_loop(loops,line_list,store)
-   
+
    ss +=1
    bulk_surface.append(ss)
    create_surface(local_loops,ss,store)
-  
-  strc = r'''Physical Surface('Bulk') = {'''  
+
+  strc = r'''Physical Surface('Bulk') = {'''
   for n,s in enumerate(bulk_surface):
    strc += str(s)
    if n == len(bulk_surface)-1:
      strc += '};\n'
    else:
      strc += ','
-     
+
   store.write(strc)
 
 
@@ -485,8 +483,8 @@ def mesh(polygons,frame,argv):
 
   hot = []
   cold = []
-  upper = [] 
-  lower = [] 
+  upper = []
+  lower = []
 
   deltax = (Maxx-Minx)/1e5
   deltay = (Maxy-Miny)/1e5
@@ -508,7 +506,7 @@ def mesh(polygons,frame,argv):
    if abs(p1[1] - Maxy)<deltay and  abs(p2[1] - Maxy)<deltay :
     upper.append(l)
     is_on_boundary = True
-   if not is_on_boundary: 
+   if not is_on_boundary:
     pore_wall.append(l)
 
 
@@ -519,7 +517,7 @@ def mesh(polygons,frame,argv):
     strc += str(hot[n]) + ','
    strc += str(hot[-1]) + '};\n'
    store.write(strc)
-  
+
    strc = r'''Physical Line('Periodic_2') = {'''
    for n in range(len(cold)-1):
     strc += str(cold[n]) + ','
@@ -549,12 +547,12 @@ def mesh(polygons,frame,argv):
    for k in upper:
     additional_boundary.append(k)
 
-  
+
   #Collect Wall
   boundary_surfaces = pore_wall + additional_boundary
-  strc = r'''Physical Line('Boundary') = {''' 
+  strc = r'''Physical Line('Boundary') = {'''
   for r,region in enumerate(boundary_surfaces) :
-   strc += str(region) 
+   strc += str(region)
    if r == len(boundary_surfaces)-1:
     strc += '};\n'
     store.write(strc)
@@ -566,13 +564,11 @@ def mesh(polygons,frame,argv):
    periodic = FindPeriodic(hot[n],cold,points,lines)
    strc = 'Periodic Line{' + str(hot[n]) + '}={' + str(periodic) + '};\n'
    store.write(strc)
-  
+
   for n in range(len(lower)):
    periodic = FindPeriodic(lower[n],upper,points,lines)
    strc = 'Periodic Line{' + str(lower[n]) + '}={' + str(periodic) + '};\n'
    store.write(strc)
-  
+
 #-------------------------------------------------------
   store.close()
- 
-

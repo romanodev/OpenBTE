@@ -39,15 +39,15 @@ def get_suppression(mfps,sup,mfp):
 def create_path(obj):
 
    codes = [Path.MOVETO]
-   for n in range(len(obj)-1): 
+   for n in range(len(obj)-1):
     codes.append(Path.LINETO)
    codes.append(Path.CLOSEPOLY)
 
    verts = []
    for tmp in obj:
-     verts.append(tmp) 
-   verts.append(verts[0]) 
-   
+     verts.append(tmp)
+   verts.append(verts[0])
+
    path = Path(verts,codes)
    return path
 
@@ -58,7 +58,9 @@ class Plot(object):
   if '/' in argv['variable']:
    model= argv['variable'].split('/')[0]
    if model == 'map':
-    self.plot_map(argv)
+    #self.plot_map(argv)
+
+    self.plot_node_map(argv)
 
   if argv['variable'] == 'suppression_function' :
    self.plot_suppression_function(argv)
@@ -74,13 +76,13 @@ class Plot(object):
    solver = dd.io.load('solver.hdf5')
    kappa_bte = solver['kappa_bte']
    if argv.setdefault('save',True) :
-    f = open('kappa_bte.dat','w+')  
+    f = open('kappa_bte.dat','w+')
     f.write(str(kappa_bte))
     f.close()
 
  def save_vtk(self,argv):
 
-   #Write data-------  
+   #Write data-------
    #geo = dd.io.load('geometry.hdf5')
    geo = Geometry(type='load')
    solver = dd.io.load('solver.hdf5')
@@ -91,13 +93,13 @@ class Plot(object):
 
    vw.add_variable(solver['bte_temperature'],label = r'''BTE Temperature [K]''')
    vw.add_variable(solver['bte_flux'],label = r'''BTE Thermal Flux [W/m/m]''')
-   vw.write_vtk()  
+   vw.write_vtk()
 
  def plot_map(self,argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
-  
-   init_plotting() 
+
+   init_plotting()
    variable = argv['variable'].split('/')[1]
    geo = dd.io.load('geometry.hdf5')
    Nx = argv.setdefault('repeat_x',1)
@@ -105,10 +107,10 @@ class Plot(object):
 
    increment = [0,0]
    #data = np.ones(len(geo['elems']))
-   if not variable == 'geometry': 
+   if not variable == 'geometry':
     solver = dd.io.load('solver.hdf5')
-  
-   if not variable == 'geometry': 
+
+   if not variable == 'geometry':
     data = solver[variable]
 
     if len(np.shape(data)) == 1: #It is temperature
@@ -123,13 +125,13 @@ class Plot(object):
     #In case we have flux
     if variable == 'bte_flux' or variable == 'fourier_flux':
      component = argv['variable'].split('/')[2]
-     if component == 'x':   
+     if component == 'x':
        data = data[0]
-     if component == 'y':   
+     if component == 'y':
        data = data[1]
-     if component == 'z':   
+     if component == 'z':
        data = data[2]
-     if component == 'magnitude':   
+     if component == 'magnitude':
       tmp = []
       for d in data :
        tmp.append(np.linalg.norm(d))
@@ -161,18 +163,18 @@ class Plot(object):
        poly.append(geo['nodes'][n][0:2])
       p = np.array(poly).copy()
       for i in p:
-       i[0] += Px 
-       i[1] += Py 
+       i[0] += Px
+       i[1] += Py
       path = create_path(p)
-      if variable == 'geometry': 
+      if variable == 'geometry':
         color = 'gray'
       else:
         color = color=cmap(data[e]-np.dot(displ,increment))
-  
+
       patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=10,alpha=1.0,joinstyle='miter')
-      gca().add_patch(patch) 
       gca().add_patch(patch)
-  
+      gca().add_patch(patch)
+
    axis('off')
    axis('equal')
    xlim([-Lx/2,Lx/2])
@@ -181,7 +183,7 @@ class Plot(object):
     savefig(argv.setdefault('namefile','geometry.png'))
     close()
    else:
-    show() 
+    show()
 
  def plot_material(self,argv):
   if MPI.COMM_WORLD.Get_rank() == 0:
@@ -192,7 +194,7 @@ class Plot(object):
    mfp = list(np.multiply(data['mfp_bulk'],1e6))
    #mfp_nano = list(np.multiply(data['mfp_sampled'],1e6))
    fill([mfp[0]] + mfp + [mfp[-1]],[0] + dis_bulk + [0])
-   
+
    #fill([mfp_nano[0]] + mfp_nano + [mfp_nano[-1]],[0] + dis_nano + [0],color=c2,alpha=0.3)
 
    xscale('log')
@@ -212,7 +214,7 @@ class Plot(object):
     x.append(p[0])
     y.append(p[1])
    return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
- 
+
 
  def plot_distribution(self,argv):
   if MPI.COMM_WORLD.Get_rank() == 0:
@@ -220,8 +222,8 @@ class Plot(object):
    data = dd.io.load('material.hdf5')
    dis_bulk = list(data['kappa_bulk'])
    mfp = list(data['mfp_bulk']) #m
- 
-   #plot nano------ 
+
+   #plot nano------
    solver = dd.io.load(argv.setdefault('filename','solver.hdf5'))
    mfp_sampled = data['mfp_sampled'] #m
    suppression = solver['suppression']
@@ -242,11 +244,11 @@ class Plot(object):
 
    #----------------
    mfp_bulk = np.array(mfp)*1e9
-   
+
 
    #fill([mfp_bulk[0]] + list(mfp_bulk) + [mfp_bulk[-1]+1e-6],[0] + dis_bulk + [0],lw=2,alpha=0.6)
    fill([mfp_nano[0]] + mfp_nano + [mfp_nano[-1]],[0] + kappa_sorted + [0],color=c2)
-   
+
    f = open('mfp_nano.dat','w+')
    for n in range(len(mfp)):
     f.write('{0:10.4E} {1:20.4E}'.format(mfp_nano[n]*1e-9,kappa_sorted[n]))
@@ -260,6 +262,54 @@ class Plot(object):
    show()
 
 
+ def plot_node_map(self,argv):
+
+  geo = Geometry(type='load')
+  if MPI.COMM_WORLD.Get_rank() == 0:
+   variable = argv['variable'].split('/')[1]
+
+
+   init_plotting(extra_bottom_padding = -0.15,extra_x_padding = -0.1)
+
+
+   #geo = dd.io.load('geometry.hdf5')
+
+   solver = dd.io.load('solver.hdf5')
+   argv.update({'Geometry':geo})
+
+   vw = WriteVtk(argv)
+
+
+
+   (triangulation,tmp) = vw.get_node_data(solver[variable])
+
+   if 'direction' in argv.keys():
+    if argv['direction'] == 'x':
+     data = np.array(tmp).T[0]
+    if argv['direction'] == 'y':
+     data = np.array(tmp).T[1]
+    if argv['direction'] == 'z':
+     data = np.array(tmp).T[2]
+    if argv['direction'] == 'magnitude':
+      data = []
+      for d in tmp:
+       data.append(np.linalg.norm(d))
+   else:
+    data = np.array(tmp).T[0]
+
+
+   vmin = argv.setdefault('vmin',min(data))
+   vmax = argv.setdefault('vmax',max(data))
+
+   tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax))
+
+   axis('equal')
+   axis('off')
+
+
+   show()
+
+
  def plot_suppression_function(self,argv):
 
   #if MPI.COMM_WORLD.Get_rank() == 0:
@@ -269,8 +319,8 @@ class Plot(object):
    tmp = data['fourier_suppression']
    sup = [suppression[m,:,:].sum() for m in range(np.shape(suppression)[0])]
    sup_fourier = [tmp[m,:,:].sum() for m in range(np.shape(tmp)[0])]
-   
-   
+
+
    mfp = data['mfp']*1e6
 
    plot(mfp,sup,color=c1)
@@ -282,9 +332,3 @@ class Plot(object):
    ylabel('Suppression Function')
    print('ff')
    show()
-
-
-
-  
-
-

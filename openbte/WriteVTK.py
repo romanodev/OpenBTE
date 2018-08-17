@@ -1,12 +1,16 @@
 from mpi4py import MPI
 from pyvtk import *
 import numpy as np
+from matplotlib.tri import Triangulation
 
 class WriteVtk(object):
 
  def __init__(self,argv):
 
   self.mesh = argv['Geometry']
+
+  
+
   self.Nx = argv.setdefault('repeat_x',1)
   self.Ny = argv.setdefault('repeat_y',1)
   self.Nz = argv.setdefault('repeat_z',1)
@@ -19,8 +23,6 @@ class WriteVtk(object):
 
   self.data.append(variable)
   self.label.append(argv['label'])
-
-
 
 
 
@@ -42,7 +44,7 @@ class WriteVtk(object):
 
    return node_data
 
- def repeat_nodes_and_data(self,Nx,Ny,Nz,data_uc,increment):
+ def repeat_nodes_and_data(self,data_uc,increment):
 
    periodic_nodes = np.array(self.mesh.periodic_nodes)
    periodic_1 = [i[0] for i in periodic_nodes]
@@ -54,13 +56,13 @@ class WriteVtk(object):
    nodes = []
    data = []
    #add nodes---
-   corr = np.zeros(n_nodes*Nx*Ny*Nz,dtype=np.int)
+   corr = np.zeros(n_nodes*self.Nx*self.Ny*self.Nz,dtype=np.int)
    index = 0
-   for nx in range(Nx):
-    for ny in range(Ny):
-     for nz in range(Nz):
+   for nx in range(self.Nx):
+    for ny in range(self.Ny):
+     for nz in range(self.Nz):
       dd = nx*increment[0] + ny*increment[1] + nz*increment[2]
-      index = nx * Ny * Nz * n_nodes +  ny *  Nz * n_nodes + nz * n_nodes
+      index = nx * self.Ny * self.Nz * n_nodes +  ny *  self.Nz * n_nodes + nz * n_nodes
       P = [round(self.mesh.size[0]*nx,3),round(self.mesh.size[1]*ny,3),round(self.mesh.size[2]*nz,3)]
       for n in range(n_nodes):
        #index += 1
@@ -78,11 +80,11 @@ class WriteVtk(object):
   
    cells_uc = self.mesh.elems
    cells = []
-   for nx in range(Nx):
-    for ny in range(Ny):
-     for nz in range(Nz):
+   for nx in range(self.Nx):
+    for ny in range(self.Ny):
+     for nz in range(self.Nz):
       P = [self.mesh.size[0]*nx,self.mesh.size[1]*ny,self.mesh.size[2]*nz]
-      index = nx * Ny * Nz * n_nodes +  ny *  Nz * n_nodes + nz * n_nodes
+      index = nx * self.Ny * self.Nz * n_nodes +  ny *  self.Nz * n_nodes + nz * n_nodes
       #add cells
       for gg in cells_uc:
        tmp = []
@@ -92,7 +94,22 @@ class WriteVtk(object):
 
 
    return nodes,cells,data
+
+
+ def get_node_data(self,variable):
  
+    node_data = self.cell_to_node(variable)
+    is_scalar = len(list(np.shape(variable))) == 1
+    increment = [0,0,0] 
+    tmp = [[1,0,0],[0,1,0],[0,0,1]]
+    if is_scalar:
+     increment = tmp[self.mesh.direction]
+    nodes,cells,data = self.repeat_nodes_and_data(node_data,increment)
+
+    return Triangulation(np.array(nodes)[:,0],np.array(nodes)[:,1], triangles=cells, mask=None),data
+
+
+
  def write_vtk(self,filename='output.vtk'):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
@@ -107,12 +124,11 @@ class WriteVtk(object):
 
     #Get increment for plotting-------------
     increment = [0,0,0] 
-
     tmp = [[1,0,0],[0,1,0],[0,0,1]]
     if is_scalar:
      increment = tmp[self.mesh.direction]
     #---------------------------------------
-    ss = r'''nodes,cells,output_''' + str(n)+r'''= self.repeat_nodes_and_data(self.Nx,self.Ny,self.Nz,node_data,increment)'''
+    ss = r'''nodes,cells,output_''' + str(n)+r'''= self.repeat_nodes_and_data(node_data,increment)'''
     exec(ss)
     #nodes,cells,output = self.repeat_nodes_and_data(self.Nx,self.Ny,self.Nz,node_data,increment)
     if is_scalar:
@@ -126,6 +142,8 @@ class WriteVtk(object):
      strc += ','
 
    exec(strc)
+
+
    if self.mesh.dim == 3:
     vtk = VtkData(UnstructuredGrid(nodes,tetra=cells),data)
    else :

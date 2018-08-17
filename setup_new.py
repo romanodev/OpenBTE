@@ -28,6 +28,8 @@ setup(name='openbte_new',
                         'pyvtk',
                         'termcolor',
                         'mpi4py',
+                        'sympy',
+                        'networkx',
                         'matplotlib',         
                          ],
       license='GPLv2',\

@@ -4,7 +4,6 @@ import numpy as np
 import random
 import math
 from matplotlib.pylab import *
-import pyclipper
 import subprocess
 
 def create_structured_bulk(argv):
@@ -13,7 +12,7 @@ def create_structured_bulk(argv):
 
  res = argv.setdefault('reservoirs',False)
  direction = argv['direction']
-  
+
 
  Lx = argv['lx']
  Ly = argv['ly']
@@ -26,7 +25,7 @@ def create_structured_bulk(argv):
  store.write('out[] = Extrude{' + str(Lx) + r''',0,0}{ Line{out[0]};Layers{''' + str(layers_y) + r'''};Recombine;};''' + '\n')
 
  #Create Surface
- strc = r'''Physical Surface('bulk') = {out[1]};'''+'\n' 
+ strc = r'''Physical Surface('bulk') = {out[1]};'''+'\n'
  store.write(strc)
 
 
@@ -61,9 +60,9 @@ def create_structured_bulk(argv):
  else:
   bs.append(2)
   bs.append(4)
-  
+
  if len(bs) > 0:
-  strc = r'''Physical Line('Boundary') = {''' 
+  strc = r'''Physical Line('Boundary') = {'''
   for p,side in enumerate(bs) :
    strc +=str(side)
    if p == len(bs)-1:
@@ -76,7 +75,7 @@ def create_structured_bulk(argv):
  store.write(strc)
  strc = 'Periodic Line{2}={-4};\n'
  store.write(strc)
-  
+
  store.close()
 
 def create_unstructured_bulk(argv):
@@ -87,7 +86,7 @@ def create_unstructured_bulk(argv):
   Lx = float(argv['lx'])
   Ly = float(argv['ly'])
   frame = []
-  
+
   frame.append([-Lx/2,Ly/2])
   frame.append([Lx/2,Ly/2])
   frame.append([Lx/2,-Ly/2])
@@ -103,7 +102,7 @@ def create_unstructured_bulk(argv):
   for k,p in enumerate(frame) :
    store.write( 'Point('+str(k) +') = {' + str(p[0]) +','+ str(p[1])+',0,'+ str(mesh_ext) +'};\n')
 
-  ll = 0 
+  ll = 0
   for k,p in enumerate(frame) :
    p1 = k
    p2 = (k+1)%len(frame)
@@ -118,11 +117,11 @@ def create_unstructured_bulk(argv):
    else :
     strc += ','
   store.write(strc)
-  
+
   #Create Surface
-  strc = 'Plane Surface(0) = {0};\n' 
+  strc = 'Plane Surface(0) = {0};\n'
   store.write(strc)
-  strc = r'''Physical Surface('bulk') = {0};'''+'\n' 
+  strc = r'''Physical Surface('bulk') = {0};'''+'\n'
   store.write(strc)
 
   bs = []
@@ -156,10 +155,10 @@ def create_unstructured_bulk(argv):
   else:
    bs.append(2)
    bs.append(4)
-  
+
 
   if len(bs) > 0:
-   strc = r'''Physical Line('Boundary') = {''' 
+   strc = r'''Physical Line('Boundary') = {'''
    for p,side in enumerate(bs) :
     strc +=str(side)
     if p == len(bs)-1:
@@ -173,10 +172,10 @@ def create_unstructured_bulk(argv):
   store.write(strc)
   strc = 'Periodic Line{2}={-4};\n'
   store.write(strc)
-  
+
 #-------------------------------------------------------
   store.close()
- 
+
 
 
 
@@ -186,7 +185,3 @@ def mesh(argv):
    create_unstructured_bulk(argv)
   else:
    create_structured_bulk(argv)
-
-
-
-

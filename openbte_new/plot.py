@@ -14,7 +14,7 @@ from shapely.geometry import MultiPoint,Point,Polygon,LineString
 from scipy.interpolate import BarycentricInterpolator
 from .WriteVTK import *
 from .geometry import *
-from pypapers.common_fig import *
+from common_fig import *
 
 
 def get_suppression(mfps,sup,mfp):
