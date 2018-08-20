@@ -279,8 +279,6 @@ class Plot(object):
 
    vw = WriteVtk(argv)
 
-
-
    (triangulation,tmp) = vw.get_node_data(solver[variable])
 
    if 'direction' in argv.keys():
@@ -313,9 +311,12 @@ class Plot(object):
  def plot_suppression_function(self,argv):
 
   #if MPI.COMM_WORLD.Get_rank() == 0:
-   init_plotting(extra_bottom_padding= 0.01,extra_x_padding = 0.02)
+   #init_plotting(extra_bottom_padding= 0.01,extra_x_padding = 0.02)
    data = dd.io.load(argv.setdefault('filename','solver.hdf5'))
+
    suppression = data['suppression']
+   #print(suppression)
+   #quit()
    tmp = data['fourier_suppression']
    sup = [suppression[m,:,:].sum() for m in range(np.shape(suppression)[0])]
    sup_fourier = [tmp[m,:,:].sum() for m in range(np.shape(tmp)[0])]
@@ -330,5 +331,4 @@ class Plot(object):
    grid('on')
    xlabel('Mean Free Path [$\mu$ m]')
    ylabel('Suppression Function')
-   print('ff')
    show()

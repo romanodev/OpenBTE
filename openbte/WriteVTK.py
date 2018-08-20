@@ -9,7 +9,7 @@ class WriteVtk(object):
 
   self.mesh = argv['Geometry']
 
-  
+
 
   self.Nx = argv.setdefault('repeat_x',1)
   self.Ny = argv.setdefault('repeat_y',1)
@@ -32,6 +32,7 @@ class WriteVtk(object):
    n_col = len(np.shape(data))
    if n_col == 2: n_col = 3
    node_data = np.zeros((n_nodes,n_col))
+
    
    conn = np.zeros(n_nodes)
    for n in self.mesh.node_elem_map.keys():
@@ -40,7 +41,7 @@ class WriteVtk(object):
      conn[n] +=1
 
    for n in range(n_nodes):
-    node_data[n] /= conn[n]   
+    node_data[n] /= conn[n]
 
    return node_data
 
@@ -77,7 +78,7 @@ class WriteVtk(object):
        else:
         corr[index+n] = nodes.index(node_trial)
 
-  
+
    cells_uc = self.mesh.elems
    cells = []
    for nx in range(self.Nx):
@@ -97,10 +98,10 @@ class WriteVtk(object):
 
 
  def get_node_data(self,variable):
- 
+
     node_data = self.cell_to_node(variable)
     is_scalar = len(list(np.shape(variable))) == 1
-    increment = [0,0,0] 
+    increment = [0,0,0]
     tmp = [[1,0,0],[0,1,0],[0,0,1]]
     if is_scalar:
      increment = tmp[self.mesh.direction]
@@ -123,7 +124,7 @@ class WriteVtk(object):
     #stored_data.update({self.label[n]:{variable:node_data[:,0],'label':self.label[n]}})
 
     #Get increment for plotting-------------
-    increment = [0,0,0] 
+    increment = [0,0,0]
     tmp = [[1,0,0],[0,1,0],[0,0,1]]
     if is_scalar:
      increment = tmp[self.mesh.direction]
@@ -138,7 +139,7 @@ class WriteVtk(object):
 
     if n == len(self.data)-1:
      strc += ')'
-    else:   
+    else:
      strc += ','
 
    exec(strc)

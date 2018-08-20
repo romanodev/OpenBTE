@@ -92,27 +92,32 @@ def compute_dom_3d(argv) :
      ss[t][p][1][1] = int_sin_theta_3*int_cos_phi_2
      ss[t][p][2][2] = int_cos_theta_2_sin_theta*d_phi_plain[p]
 
-   tot = np.zeros((3,3))
-   tots = np.zeros(3)
-   for t in range(n_theta):
-    for p in range(n_phi):
-     tots += integrated_dir[t][p]
-     #print(np.linalg.det(ss[t][p]))
-     #print(a)
-     for i in range(3):
-      for j in range(3):
-       tot[i][j] +=ss[t][p][i][j]
 
-
-
-   tot /=4.0*np.pi
-   tot *=3
 
    d_omega = np.outer(d_theta_int,d_phi_int)
+
+   ss2 = np.zeros((n_theta,n_phi,3,3))
+   #tmp = np.zeros((3,3))
+   #tmp2 = np.zeros((3,3))
+   for t in range(n_theta):
+    for p in range(n_phi):
+     ss2[t,p] =  np.outer(integrated_dir[t,p],integrated_dir[t,p])/d_omega[t,p]
+    # tmp += a
+     #tmp2 += ss[t][p]
+     #print(abs(a[0,0]-ss[t][p][0][0])/abs(a[0,0]))
+   #print(tmp/4.0/np.pi*3)
+   #print(tmp2/4.0/np.pi*3)
+   #quit()
+
+
+
+
+
 
    output.update({'d_omega':d_omega})
    output.update({'d_theta_vec':d_theta_int})
    output.update({'ss':ss})
+   output.update({'ss2':ss2})
    output.update({'n_theta':n_theta})
    output.update({'n_phi':n_phi})
    output.update({'phonon_dir':phonon_dir})
