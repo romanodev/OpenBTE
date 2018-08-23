@@ -588,6 +588,7 @@ class Solver(object):
     #mfe_factor = 0.0
     #print(G)
     #G = 0.0
+    G *= self.dom['correction']
     diag_1 = diags([self.FF],[0]).tocsc()
     A = (self.F + diag_1*G)   + mfe_factor * csc_matrix(scipy.sparse.eye(self.n_elems))/kappa_bulk
     B = (self.B + np.multiply(self.FF,TB[n])*G)  + mfe_factor * TL[n]/kappa_bulk

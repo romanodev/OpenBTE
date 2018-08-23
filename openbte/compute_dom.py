@@ -26,8 +26,8 @@ def compute_dom_3d(argv) :
    d_phi_plain = Dphi*np.ones(n_phi)
    d_phi_int = Dphi*np.ones(n_phi)
    output.update({'d_phi':Dphi})
-   #phi_vec = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True) #this is the correct one
-   phi_vec = np.linspace(0.0,2.0*np.pi,n_phi,endpoint=False)
+   phi_vec = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True) #this is the correct one
+   #phi_vec = np.linspace(0.0,2.0*np.pi,n_phi,endpoint=False)
 
 
 
@@ -97,24 +97,25 @@ def compute_dom_3d(argv) :
    d_omega = np.outer(d_theta_int,d_phi_int)
 
    ss2 = np.zeros((n_theta,n_phi,3,3))
-   #tmp = np.zeros((3,3))
-   #tmp2 = np.zeros((3,3))
+
+   tmp = np.zeros((3,3))
+   tmp2 = 0.0
    for t in range(n_theta):
     for p in range(n_phi):
      ss2[t,p] =  np.outer(integrated_dir[t,p],integrated_dir[t,p])/d_omega[t,p]
-    # tmp += a
-     #tmp2 += ss[t][p]
-     #print(abs(a[0,0]-ss[t][p][0][0])/abs(a[0,0]))
-   #print(tmp/4.0/np.pi*3)
-   #print(tmp2/4.0/np.pi*3)
-   #quit()
+     tmp += ss2[t][p]
+     if np.dot(phonon_dir[t][p],[1,0,0]) >= 0:
+      tmp2 +=integrated_dir[t,p][0]
 
+
+   correction = 4.0*tmp2/np.trace(tmp)
 
 
 
 
 
    output.update({'d_omega':d_omega})
+   output.update({'correction':correction})
    output.update({'d_theta_vec':d_theta_int})
    output.update({'ss':ss})
    output.update({'ss2':ss2})
