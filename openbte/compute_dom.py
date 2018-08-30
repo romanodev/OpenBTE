@@ -35,6 +35,7 @@ def compute_dom_3d(argv) :
    output.update({'d_phi_vec':d_phi_plain})
    output.update({'n_phi':n_phi})
    output.update({'n_theta':n_theta})
+   output.update({'d_phi':Dphi})
    #-----------------------------------------------------------------
 
    d_theta_int = np.zeros(n_theta)
@@ -43,6 +44,8 @@ def compute_dom_3d(argv) :
    phonon_dir = np.zeros((n_theta,n_phi,3))
    integrated_dir = np.zeros((n_theta,n_phi,3))
    phi_dir = np.zeros((n_phi,3))
+   polar_dir = np.zeros((n_phi,2))
+
    at = np.zeros(n_theta)
    for t in range(n_theta):
     theta = theta_vec[t]
@@ -73,7 +76,7 @@ def compute_dom_3d(argv) :
      y = sin(theta) * cos(phi)
      z = cos(theta)
      phonon_dir[t][p] = np.array([x,y,z])
-
+     polar_dir[p] = [sin(phi),cos(phi)]
      at[t] = int_sin_theta_2
 
      phi_dir[p] = [int_sin_phi,int_cos_phi,Dphi]
@@ -127,6 +130,7 @@ def compute_dom_3d(argv) :
    output.update({'s':phonon_dir})
    output.update({'norm_dom':norm_dom})
    output.update({'phi_dir':phi_dir})
+   output.update({'polar_dir':polar_dir})
    output.update({'at':at})
 
 

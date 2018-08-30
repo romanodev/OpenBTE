@@ -216,8 +216,28 @@ class Geometry(object):
    normal = self.compute_side_normal(elem_1,side)
    area = self.compute_side_area(side)
 
-
    return normal*area/vol
+
+ def get_aa(self,elem_1,elem_2,phi_dir,dphi):
+
+   side = self.get_side_between_two_elements(elem_1,elem_2)
+   vol = self.get_elem_volume(elem_1)
+   normal = self.compute_side_normal(elem_1,side)
+
+   gamma = arcsin(np.dot(phi_dir,normal[0:2]))
+
+   if gamma >= 0.0:
+     p_plus = 0.5 + min([gamma,dphi/2.0])/dphi
+     p_minus = 1.0-p_plus
+
+
+   if gamma < 0.0:
+     p_minus = 0.5 + min([-gamma,dphi/2.0])/dphi
+     p_plus = 1.0-p_minus
+
+   return p_minus,p_plus
+
+
 
  def get_af(self,elem_1,elem_2):
 

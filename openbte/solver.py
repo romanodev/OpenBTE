@@ -43,6 +43,7 @@ class Solver(object):
 
    self.lu = {}
 
+
    self.mfp = np.array(mat.state['mfp_sampled'])/1e-9 #In nm
    self.n_mfp = len(self.B0)
 
@@ -79,11 +80,12 @@ class Solver(object):
     os.makedirs(directory)
     #compute matrix--------
    argv.setdefault('max_bte_iter',10)
+
    if argv['max_bte_iter'] > 0:
     output = compute_sum(self.compute_directional_connections,self.n_index)
 
 
-
+   quit()
    self.assemble_fourier()
 
    #solve the BTE
@@ -123,6 +125,7 @@ class Solver(object):
   def compute_directional_connections(self,index,options):
 
 
+
    Diff = []
    Fminus = []
    Fplus = []
@@ -134,9 +137,11 @@ class Solver(object):
    if self.dim == 2:
     p = index
     angle_factor = self.dom['phi_dir'][index]/self.dom['d_phi_vec'][index]
+
    else:
     t = int(index/self.n_phi)
     p = index%self.n_phi
+
 
     angle_factor = self.dom['S'][t][p]/self.dom['d_omega'][t][p]
 
@@ -144,6 +149,8 @@ class Solver(object):
 
     side = self.mesh.get_side_between_two_elements(i,j)
     coeff = np.dot(angle_factor,self.mesh.get_coeff(i,j))
+    aa = self.mesh.get_aa(i,j,self.dom['polar_dir'][p],self.dom['d_phi'])
+
 
     if coeff > 0:
      r.append(i); c.append(i); d.append(coeff)
