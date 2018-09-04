@@ -218,6 +218,39 @@ class Geometry(object):
 
    return normal*area/vol
 
+ def get_angular_coeff(self,elem_1,elem_2,index):
+
+  side = self.get_side_between_two_elements(elem_1,elem_2)
+  vol = self.get_elem_volume(elem_1)
+  normal = self.compute_side_normal(elem_1,side)
+  area = self.compute_side_area(side)
+
+  if self.dim == 2:
+   p = index
+   angle_factor = self.dom['phi_dir'][index]/self.dom['d_phi_vec'][index]
+   tmp  = np.dot(self.dom['polar_dir'][p],normal[0:2])
+   gamma = arcsin(tmp)
+
+  else:
+   t = int(index/self.dom['self.n_phi'])
+   p = index%self.dom['n_phi']
+   angle_factor = self.dom['S'][t][p]/self.dom['d_omega'][t][p]
+   tmp  = np.dot(self.dom['phonon_dir'][p],normal)
+   gamma = arcsin(tmp)
+
+  coeff = np.dot(angle_factor,normal)*area/vol
+
+  cm = 0.0
+  cp = 0.0
+  if gamma > 0:
+   cp = gamma
+  else :
+   cm = gamma
+
+  return cm,cp
+
+
+
  def get_aa(self,elem_1,elem_2,phi_dir,dphi):
 
    side = self.get_side_between_two_elements(elem_1,elem_2)

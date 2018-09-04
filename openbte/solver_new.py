@@ -27,6 +27,7 @@ class Solver(object):
 
    self.mesh = Geometry(type='load',filename = argv.setdefault('geometry_filename','geometry'))
 
+
    self.n_elems = len(self.mesh.elems)
    self.dim = self.mesh.dim
    self.mfe = False
@@ -43,7 +44,6 @@ class Solver(object):
 
    self.lu = {}
 
-
    self.mfp = np.array(mat.state['mfp_sampled'])/1e-9 #In nm
    self.n_mfp = len(self.B0)
 
@@ -58,6 +58,7 @@ class Solver(object):
    self.n_theta = self.dom['n_theta']
    self.n_phi = self.dom['n_phi']
 
+   self.mesh.dom = self.dom
 
    self.print_dof()
 
@@ -85,7 +86,7 @@ class Solver(object):
     output = compute_sum(self.compute_directional_connections,self.n_index)
 
 
-   quit()
+   #quit()
    self.assemble_fourier()
 
    #solve the BTE
@@ -124,8 +125,6 @@ class Solver(object):
 
   def compute_directional_connections(self,index,options):
 
-
-
    Diff = []
    Fminus = []
    Fplus = []
@@ -137,36 +136,40 @@ class Solver(object):
    if self.dim == 2:
     p = index
     angle_factor = self.dom['phi_dir'][index]/self.dom['d_phi_vec'][index]
+#
+   #else:
+#    t = int(index/self.n_phi)#
+#    p = index%self.n_phi
 
-   else:
-    t = int(index/self.n_phi)
-    p = index%self.n_phi
+#    angle_factor = self.dom['S'][t][p]/self.dom['d_omega'][t][p]
 
-
-    angle_factor = self.dom['S'][t][p]/self.dom['d_omega'][t][p]
 
    for i,j in zip(*self.mesh.A.nonzero()):
 
     side = self.mesh.get_side_between_two_elements(i,j)
-    coeff = np.dot(angle_factor,self.mesh.get_coeff(i,j))
+    #coeff = np.dot(angle_factor,self.mesh.get_coeff(i,j))
+    #aa = self.mesh.get_aa(i,j,self.dom['polar_dir'][p],self.dom['d_phi'])
 
-    aa = self.mesh.get_aa(i,j,self.dom['polar_dir'][p],self.dom['d_phi'])
-    print(aa)
+
+    (cm,cp) = self.mesh.get_angular_coeff(i,j,index)
+
+    #print(aa)
+    #quit()
 
     #work here
 
-    if coeff > 0:
-     r.append(i); c.append(i); d.append(coeff)
-     v = self.mesh.get_side_periodic_value(side,i)
-     rk.append(i); ck.append(j);
-     dk.append(v*coeff*self.mesh.get_elem_volume(i))
+    #if coeff > 0:
+    r.append(i); c.append(i); d.append(cp)
+    v = self.mesh.get_side_periodic_value(side,i)
+    rk.append(i); ck.append(j);
+    dk.append(v*cp*self.mesh.get_elem_volume(i))
 
-    if coeff < 0 :
-     r.append(i); c.append(j); d.append(coeff)
-     v = self.mesh.get_side_periodic_value(side,j)
-     P[i] -= v*coeff
-     rk.append(i); ck.append(j);
-     dk.append(-v*coeff*self.mesh.get_elem_volume(i))
+    #if coeff < 0 :
+    r.append(i); c.append(j); d.append(cm)
+    v = self.mesh.get_side_periodic_value(side,j)
+    P[i] -= v*cm
+    rk.append(i); ck.append(j);
+    dk.append(-v*cm*self.mesh.get_elem_volume(i))
 
    #Write the boundaries------
    HW_minus = np.zeros(self.n_elems)
@@ -186,23 +189,23 @@ class Solver(object):
    #-------------
 
    #Thermalize boundaries--------------------------
-   Hot = np.zeros(self.n_elems)
-   for side in self.mesh.side_list['Hot']:
-    (coeff,elem) = self.mesh.get_side_coeff(side)
-    tmp = np.dot(coeff,angle_factor)
-    if tmp < 0:
-     Hot[elem] = -tmp*0.5
-    else:
-     r.append(elem); c.append(elem); d.append(tmp)
+   #Hot = np.zeros(self.n_elems)
+   #for side in self.mesh.side_list['Hot']:
+#    (coeff,elem) = self.mesh.get_side_coeff(side)#
+#    tmp = np.dot(coeff,angle_factor)#
+#    if tmp < 0:
+#     Hot[elem] = -tmp*0.5#
+#    else:
+#     r.append(elem); c.append(elem); d.append(tmp)
 
-   Cold = np.zeros(self.n_elems)
-   for side in self.mesh.side_list['Cold']:
-    (coeff,elem) = self.mesh.get_side_coeff(side)
-    tmp = np.dot(coeff,angle_factor)
-    if tmp < 0:
-     Cold[elem] = tmp*0.5
-    else:
-     r.append(elem); c.append(elem); d.append(tmp)
+ #  Cold = np.zeros(self.n_elems)
+ #  for side in self.mesh.side_list['Cold']:#
+    #(coeff,elem) = self.mesh.get_side_coeff(side)
+    #tmp = np.dot(coeff,angle_factor)
+    #if tmp < 0:
+    # Cold[elem] = tmp*0.5
+    #else:
+    # r.append(elem); c.append(elem); d.append(tmp)
 
    #-----------------------------------------------
 
@@ -214,8 +217,8 @@ class Solver(object):
    P.dump(open(self.cache + '/P_' + str(index) +r'.np','wb+'))
    HW_minus.dump(open(self.cache +'/HW_MINUS_' + str(index) +r'.np','w+'))
    HW_plus.dump(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','w+'))
-   Hot.dump(open(self.cache + '/Hot_' + str(index) +r'.np','w+'))
-   Cold.dump(open(self.cache +'/Cold_' + str(index) +r'.np','w+'))
+   #Hot.dump(open(self.cache + '/Hot_' + str(index) +r'.np','w+'))
+   #Cold.dump(open(self.cache +'/Cold_' + str(index) +r'.np','w+'))
 
   def solve_bte(self,index,options):
 
@@ -225,8 +228,8 @@ class Solver(object):
    HW_MINUS = np.load(open(self.cache + '/HW_MINUS_' + str(index) +r'.np','r'))
    HW_PLUS = np.load(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','r'))
    K = scipy.io.mmread(self.cache + '/K_' + str(index) + '.mtx').tocsc()
-   Hot = np.load(open(self.cache + '/Hot_' + str(index) +r'.np','r'))
-   Cold = np.load(open(self.cache + '/Cold_' + str(index) +r'.np','r'))
+   #Hot = np.load(open(self.cache + '/Hot_' + str(index) +r'.np','r'))
+   #Cold = np.load(open(self.cache + '/Cold_' + str(index) +r'.np','r'))
 
 
    TB = options['boundary_temperature']
