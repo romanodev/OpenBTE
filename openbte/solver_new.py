@@ -150,13 +150,14 @@ class Solver(object):
     #coeff = np.dot(angle_factor,self.mesh.get_coeff(i,j))
     #aa = self.mesh.get_aa(i,j,self.dom['polar_dir'][p],self.dom['d_phi'])
 
-
     (cm,cp) = self.mesh.get_angular_coeff(i,j,index)
 
     #print(aa)
     #quit()
 
     #work here
+
+    #print([coeff,cm,cp])
 
     #if coeff > 0:
     r.append(i); c.append(i); d.append(cp)

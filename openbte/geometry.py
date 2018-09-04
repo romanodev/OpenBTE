@@ -243,9 +243,9 @@ class Geometry(object):
   cm = 0.0
   cp = 0.0
   if gamma > 0:
-   cp = gamma
+   cp = coeff
   else :
-   cm = gamma
+   cm = coeff
 
   return cm,cp
 
