@@ -137,12 +137,9 @@ class Solver(object):
    if self.dim == 2:
     p = index
     angle_factor = self.dom['phi_dir'][index]/self.dom['d_phi_vec'][index]
-
    else:
     t = int(index/self.n_phi)
     p = index%self.n_phi
-
-
     angle_factor = self.dom['S'][t][p]/self.dom['d_omega'][t][p]
 
    for i,j in zip(*self.mesh.A.nonzero()):
@@ -151,8 +148,7 @@ class Solver(object):
     coeff = np.dot(angle_factor,self.mesh.get_coeff(i,j))
 
     aa = self.mesh.get_aa(i,j,self.dom['polar_dir'][p],self.dom['d_phi'])
-    print(aa)
-
+    
     #work here
 
     if coeff > 0:

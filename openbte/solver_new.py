@@ -103,7 +103,7 @@ class Solver(object):
      dd.io.save(argv.setdefault('filename','solver') + '.hdf5', self.state)
 
 
-  def compute_directional_diffusion(self,index,options):
+  def compute_directional_diffusion(self,index):
 
     t = int(index/self.n_phi)
     p = index%self.n_phi
@@ -125,90 +125,33 @@ class Solver(object):
 
   def compute_directional_connections(self,index,options):
 
+
+
+   #------------------------------BULK----------------------------------
    Diff = []
    Fminus = []
    Fplus = []
    r=[];c=[];d=[]
    rk=[]; ck=[]; dk=[]
-
    P = np.zeros(self.n_elems)
-
-   if self.dim == 2:
-    p = index
-    angle_factor = self.dom['phi_dir'][index]/self.dom['d_phi_vec'][index]
-#
-   #else:
-#    t = int(index/self.n_phi)#
-#    p = index%self.n_phi
-
-#    angle_factor = self.dom['S'][t][p]/self.dom['d_omega'][t][p]
-
-
    for i,j in zip(*self.mesh.A.nonzero()):
-
-    side = self.mesh.get_side_between_two_elements(i,j)
-    #coeff = np.dot(angle_factor,self.mesh.get_coeff(i,j))
-    #aa = self.mesh.get_aa(i,j,self.dom['polar_dir'][p],self.dom['d_phi'])
-
-    (cm,cp) = self.mesh.get_angular_coeff(i,j,index)
-
-    #print(aa)
-    #quit()
-
-    #work here
-
-    #print([coeff,cm,cp])
-
-    #if coeff > 0:
+    (cm,cp,dummy,dummy) = self.mesh.get_angular_coeff(i,j,index)
     r.append(i); c.append(i); d.append(cp)
-    v = self.mesh.get_side_periodic_value(side,i)
+    v = self.mesh.get_side_periodic_value(i,j)
     rk.append(i); ck.append(j);
-    dk.append(v*cp*self.mesh.get_elem_volume(i))
-
-    #if coeff < 0 :
+    dk.append(v*(cp+cm)*self.mesh.get_elem_volume(i))
     r.append(i); c.append(j); d.append(cm)
-    v = self.mesh.get_side_periodic_value(side,j)
-    P[i] -= v*cm
-    rk.append(i); ck.append(j);
-    dk.append(-v*cm*self.mesh.get_elem_volume(i))
+    P[i] += v*cm
 
-   #Write the boundaries------
+   #------------------------------BOUNDARY-------------------------------
    HW_minus = np.zeros(self.n_elems)
    HW_plus = np.zeros(self.n_elems)
-   for side in self.mesh.side_list['Boundary']:
-    (coeff,elem) = self.mesh.get_side_coeff(side)
-    tmp = np.dot(coeff,angle_factor)
-    if tmp > 0:
-     r.append(elem); c.append(elem); d.append(tmp)
-     if self.dim == 2:
-      HW_plus[elem] = np.dot(self.dom['phi_dir'][p],self.mesh.get_side_normal(0,side))/np.pi
-     else:
-      HW_plus[elem] = np.dot(self.dom['S'][t][p],self.mesh.get_side_normal(0,side))/np.pi
-    else :
-     HW_minus[elem] = -tmp
+   for elem in self.mesh.boundary_elements:
+    (cm,cp,cmb,cpb) = self.mesh.get_angular_coeff(elem,elem,index)
+    HW_plus[elem] =  cpb/np.pi
+    HW_minus[elem] = -cmb
+   #--------------------------------------------------------------
 
-   #-------------
-
-   #Thermalize boundaries--------------------------
-   #Hot = np.zeros(self.n_elems)
-   #for side in self.mesh.side_list['Hot']:
-#    (coeff,elem) = self.mesh.get_side_coeff(side)#
-#    tmp = np.dot(coeff,angle_factor)#
-#    if tmp < 0:
-#     Hot[elem] = -tmp*0.5#
-#    else:
-#     r.append(elem); c.append(elem); d.append(tmp)
-
- #  Cold = np.zeros(self.n_elems)
- #  for side in self.mesh.side_list['Cold']:#
-    #(coeff,elem) = self.mesh.get_side_coeff(side)
-    #tmp = np.dot(coeff,angle_factor)
-    #if tmp < 0:
-    # Cold[elem] = tmp*0.5
-    #else:
-    # r.append(elem); c.append(elem); d.append(tmp)
-
-   #-----------------------------------------------
 
    #--------------------------WRITE FILES---------------------
    A = csc_matrix( (d,(r,c)), shape=(self.n_elems,self.n_elems) )
@@ -546,6 +489,7 @@ class Solver(object):
     B = np.zeros(self.n_elems)
     for kc1,kc2 in zip(*self.mesh.A.nonzero()):
      ll = self.mesh.get_side_between_two_elements(kc1,kc2)
+
      (v_orth,dummy) = self.mesh.get_decomposed_directions(kc1,kc2)
      vol1 = self.mesh.get_elem_volume(kc1)
      vol2 = self.mesh.get_elem_volume(kc2)
@@ -558,10 +502,10 @@ class Solver(object):
      #----------------------
      row_tmp_b.append(kc1)
      col_tmp_b.append(kc2)
-     data_tmp_b.append(self.mesh.get_side_periodic_value(ll,kc2)*v_orth)
-     data_tmp_b2.append(self.mesh.get_side_periodic_value(ll,kc2))
+     data_tmp_b.append(self.mesh.get_side_periodic_value(kc2,kc1)*v_orth)
+     data_tmp_b2.append(self.mesh.get_side_periodic_value(kc2,kc1))
      #---------------------
-     B[kc1] += self.mesh.get_side_periodic_value(ll,kc2)*v_orth/vol1
+     B[kc1] += self.mesh.get_side_periodic_value(kc2,kc1)*v_orth/vol1
 
     #Boundary_elements
     FF = np.zeros(self.n_elems)
@@ -659,15 +603,18 @@ class Solver(object):
     self.gradT = self.mesh.compute_grad(temp)
     C = np.zeros(self.n_el)
     for i,j in zip(*self.mesh.A.nonzero()):
-     #Get agerage gradient----
-     side = self.mesh.get_side_between_two_elements(i,j)
-     w = self.mesh.get_interpolation_weigths(side)
-     grad_ave = w*self.gradT[i] + (1.0-w)*self.gradT[j]
-     #------------------------
-     (dumm,v_non_orth) = self.mesh.get_decomposed_directions(i,j)
 
-     C[i] += np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(i)
-     C[j] -= np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(j)
+     if not i==j:
+
+      #Get agerage gradient----
+      side = self.mesh.get_side_between_two_elements(i,j)
+      w = self.mesh.get_interpolation_weigths(side)
+      grad_ave = w*self.gradT[i] + (1.0-w)*self.gradT[j]
+      #------------------------
+      (dumm,v_non_orth) = self.mesh.get_decomposed_directions(i,j)
+
+      C[i] += np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(i)
+      C[j] -= np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(j)
 
     return C,-self.gradT
 
@@ -705,3 +652,26 @@ class Solver(object):
     print('Polar angles:      ' + str(self.n_phi))
     print('Mean-free-paths:   ' + str(self.n_mfp))
     print('Degree-of-freedom: ' + str(self.n_mfp*self.n_theta*self.n_phi*self.n_el))
+
+
+
+      #Thermalize boundaries--------------------------
+      #Hot = np.zeros(self.n_elems)
+      #for side in self.mesh.side_list['Hot']:
+   #    (coeff,elem) = self.mesh.get_side_coeff(side)#
+   #    tmp = np.dot(coeff,angle_factor)#
+   #    if tmp < 0:
+   #     Hot[elem] = -tmp*0.5#
+   #    else:
+   #     r.append(elem); c.append(elem); d.append(tmp)
+
+    #  Cold = np.zeros(self.n_elems)
+    #  for side in self.mesh.side_list['Cold']:#
+       #(coeff,elem) = self.mesh.get_side_coeff(side)
+       #tmp = np.dot(coeff,angle_factor)
+       #if tmp < 0:
+       # Cold[elem] = tmp*0.5
+       #else:
+       # r.append(elem); c.append(elem); d.append(tmp)
+
+      #-----------------------------------------------

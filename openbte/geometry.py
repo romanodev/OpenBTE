@@ -89,12 +89,18 @@ class Geometry(object):
   MPI.COMM_WORLD.Barrier()
 
 
+ def adjust_boundary_elements(self):
+
+  for side in self.side_list['Boundary']:
+   self.side_elem_map[side].append(self.side_elem_map[side][0])
+
  def compute_mesh_data(self):
 
 
     self.import_mesh()
 
     self.compute_elem_map()
+    self.adjust_boundary_elements()
     self.compute_elem_volumes()
     self.compute_side_areas()
     self.compute_side_normals()
@@ -105,6 +111,8 @@ class Geometry(object):
     self.compute_interpolation_weigths()
     self.compute_contact_areas()
     self.compute_boundary_condition_data()
+
+
 
 
     data = {'side_list':self.side_list,\
@@ -148,9 +156,12 @@ class Geometry(object):
    data_tmp_b = []
 
    for ll in self.side_list['active'] :
-    if not ll in self.side_list['Boundary'] and \
-       not ll in self.side_list['Hot'] and\
-       not ll in self.side_list['Cold']:
+    #if not ll in self.side_list['Boundary'] and \
+    #   not ll in self.side_list['Hot'] and\
+    #   not ll in self.side_list['Cold']:
+
+    if not ll in self.side_list['Hot'] and\
+     not ll in self.side_list['Cold']:
 
      elems = self.get_elems_from_side(ll)
      kc1 = elems[0]
@@ -161,6 +172,7 @@ class Geometry(object):
      row_tmp.append(kc2)
      col_tmp.append(kc1)
      data_tmp.append(1)
+
 
    self.A = csc_matrix( (np.array(data_tmp),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) ).todense()
 
@@ -189,16 +201,19 @@ class Geometry(object):
 
  def get_decomposed_directions(self,elem_1,elem_2,rot = np.eye(3)):
 
-   side = self.get_side_between_two_elements(elem_1,elem_2)
-   normal = self.compute_side_normal(elem_1,side)
-   area = self.compute_side_area(side)
-   Af = area*normal
-   c1 = self.get_elem_centroid(elem_1)
-   c2 = self.get_next_elem_centroid(elem_1,side)
-   dist = c2-c1
-   v_orth = np.dot(Af,np.dot(rot,Af))/np.dot(Af,dist)
-   v_non_orth = np.dot(rot,Af) - dist*v_orth
-   return v_orth,v_non_orth
+   if elem_1 == elem_2:
+    return 0.0,0.0
+   else:
+    side = self.get_side_between_two_elements(elem_1,elem_2)
+    normal = self.compute_side_normal(elem_1,side)
+    area = self.compute_side_area(side)
+    Af = area*normal
+    c1 = self.get_elem_centroid(elem_1)
+    c2 = self.get_next_elem_centroid(elem_1,side)
+    dist = c2-c1
+    v_orth = np.dot(Af,np.dot(rot,Af))/np.dot(Af,dist)
+    v_non_orth = np.dot(rot,Af) - dist*v_orth
+    return v_orth,v_non_orth
 
 
  def get_side_coeff(self,side):
@@ -207,16 +222,16 @@ class Geometry(object):
   vol = self.get_elem_volume(elem)
   normal = self.compute_side_normal(elem,side)
   area = self.get_side_area(side)
-  return normal*area/vol,elem #This is specific to boundaries
+  return normal*area/vol #This is specific to boundaries
 
- def get_coeff(self,elem_1,elem_2):
+ #def get_coeff(self,elem_1,elem_2):
 
-   side = self.get_side_between_two_elements(elem_1,elem_2)
-   vol = self.get_elem_volume(elem_1)
-   normal = self.compute_side_normal(elem_1,side)
-   area = self.compute_side_area(side)
+ #  side = self.get_side_between_two_elements(elem_1,elem_2)
+ #  vol = self.get_elem_volume(elem_1)
+ #  normal = self.compute_side_normal(elem_1,side)
+ #  area = self.compute_side_area(side)
 
-   return normal*area/vol
+ #  return normal*area/vol
 
  def get_angular_coeff(self,elem_1,elem_2,index):
 
@@ -227,14 +242,16 @@ class Geometry(object):
 
   if self.dim == 2:
    p = index
-   angle_factor = self.dom['phi_dir'][index]/self.dom['d_phi_vec'][index]
+   angle = self.dom['phi_dir'][p]
+   angle_factor = angle/self.dom['d_phi_vec'][p]
    tmp  = np.dot(self.dom['polar_dir'][p],normal[0:2])
    gamma = arcsin(tmp)
 
   else:
    t = int(index/self.dom['self.n_phi'])
    p = index%self.dom['n_phi']
-   angle_factor = self.dom['S'][t][p]/self.dom['d_omega'][t][p]
+   angle = self.dom['S'][t][p]
+   angle_factor = angle/self.dom['d_omega'][t][p]
    tmp  = np.dot(self.dom['phonon_dir'][p],normal)
    gamma = arcsin(tmp)
 
@@ -242,12 +259,19 @@ class Geometry(object):
 
   cm = 0.0
   cp = 0.0
+  cmb = 0.0
+  cpb = 0.0
   if gamma > 0:
    cp = coeff
+   cpb = np.dot(angle,normal)
   else :
-   cm = coeff
+   cmb = coeff
+   if not elem_1 == elem_2: #In this case the incoming part is from the boundary
+    cm = coeff
 
-  return cm,cp
+
+
+  return cm,cp,cmb,cpb
 
 
 
@@ -289,12 +313,22 @@ class Geometry(object):
 
  def get_side_between_two_elements(self,elem_1,elem_2):
 
+   if elem_1 == elem_2: #Boundary side
+
+    for side in self.elem_side_map[elem_1]:
+     if side in self.side_list['Boundary']:
+      return side
+    print('No boundary side')
+    quit()
+   else:
+
     for side_1 in self.elem_side_map[elem_1]:
      for side_2 in self.elem_side_map[elem_2]:
       if side_1 == side_2:
        return side_1
 
     print('no adjicents elems')
+    assert(1==0)
     quit()
 
 
@@ -914,7 +948,11 @@ class Geometry(object):
    return volume
 
 
- def get_side_periodic_value(self,ll,elem) :
+ def get_side_periodic_value(self,elem,elem_p) :
+
+
+    ll = self.get_side_between_two_elements(elem,elem_p)
+    #print(ll,tmp)
 
     ind = self.side_elem_map[ll].index(elem)
     return self.side_periodic_value[ll][ind]
@@ -1106,7 +1144,7 @@ class Geometry(object):
      ind2 = self.elem_side_map[kc2].index(ll)
 
      temp_1 = temp[kc1]
-     temp_2 = temp[kc2] + self.get_side_periodic_value(ll,kc2)
+     temp_2 = temp[kc2] + self.get_side_periodic_value(kc2,kc1)
      diff_t = temp_2 - temp_1
 
      diff_temp[kc1][ind1]  = diff_t

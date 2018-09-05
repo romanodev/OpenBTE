@@ -27,6 +27,7 @@ def compute_dom_3d(argv) :
    d_phi_int = Dphi*np.ones(n_phi)
    output.update({'d_phi':Dphi})
    phi_vec = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True) #this is the correct one
+   phi_vec += argv.setdefault('polar_offset',0.0)*np.pi/180.0
    #phi_vec = np.linspace(0.0,2.0*np.pi,n_phi,endpoint=False)
 
 
@@ -60,6 +61,8 @@ def compute_dom_3d(argv) :
     int_cos_theta_sin_theta = np.sin(d_theta_plain[t])*np.sin(theta)*np.cos(theta)
 
     d_theta_int[t] = int_sin_theta
+    at[t] = int_sin_theta_2
+
 
     for p in range(n_phi):
 
@@ -77,7 +80,6 @@ def compute_dom_3d(argv) :
      z = cos(theta)
      phonon_dir[t][p] = np.array([x,y,z])
      polar_dir[p] = [sin(phi),cos(phi)]
-     at[t] = int_sin_theta_2
 
      phi_dir[p] = [int_sin_phi,int_cos_phi,Dphi]
      integrated_dir[t][p][0] = phi_dir[p][0]*at[t]
