@@ -233,46 +233,166 @@ class Geometry(object):
 
  #  return normal*area/vol
 
+ def compute_2D_adjusment(self,normal,phi_s,dphi):
+
+  tmp =  np.arctan2(normal[1],normal[0])
+  if not tmp == 0.0:
+   tmp = (tmp + np.pi*(1.0-np.sign(tmp)))%(2.0*np.pi)
+
+  phi_normal = (np.pi/2.0-tmp)%(2.0*np.pi)
+
+  phi_right = (phi_normal+np.pi/2.0)%(2.0*np.pi)
+  phi_left = (phi_normal-np.pi/2.0)%(2.0*np.pi)
+
+  phi_1 = 0.0
+  phi_2 = 0.0
+  phi_left = round(phi_left,8)
+  phi_right = round(phi_right,8)
+  phi_normal = round(phi_normal,8)
+
+
+  case = 0
+  if phi_s <= phi_right and phi_s > (phi_right - dphi/2.0)%(2.0*np.pi):
+   phi_1 = phi_right
+   phi_2 = (phi_s + dphi/2.0)%(2.0*np.pi)
+   case = 1
+
+  elif phi_s > phi_right and phi_s < (phi_right + dphi/2.0)%(2.0*np.pi):
+   phi_1 = (phi_s-dphi/2.0)%(2.0*np.pi)
+   phi_2 = phi_right
+   case = 2
+
+  elif phi_s < phi_left and phi_s > (phi_left - dphi/2.0)%(2.0*np.pi):
+   phi_1 = phi_left
+   phi_2 = (phi_s + dphi/2.0)%(2.0*np.pi)
+   case = 3
+
+  elif phi_s >= phi_left and phi_s < (phi_left + dphi/2.0)%(2.0*np.pi):
+   phi_1 = (phi_s-dphi/2.0)%(2.0*np.pi)
+   phi_2 = phi_left
+   case = 4
+
+  #if phi_2 < phi_1:
+#    print(case)#
+    #print([phi_1*180.0/np.pi,phi_2*180.0/np.pi])
+    #quit()
+
+  phi_dir_adj = [np.cos(phi_1) - np.cos(phi_2),np.sin(phi_2) - np.sin(phi_1),0.0]
+  return phi_dir_adj,case
+
  def get_angular_coeff(self,elem_1,elem_2,index):
 
   side = self.get_side_between_two_elements(elem_1,elem_2)
   vol = self.get_elem_volume(elem_1)
   normal = self.compute_side_normal(elem_1,side)
+  for i in range(3):
+   normal[i] = round(normal[i],8)
   area = self.compute_side_area(side)
+
 
   if self.dim == 2:
    p = index
    angle = self.dom['phi_dir'][p]
-   angle_factor = angle/self.dom['d_phi_vec'][p]
-   tmp  = np.dot(self.dom['polar_dir'][p],normal[0:2])
-   gamma = arcsin(tmp)
 
-  else:
+   angle_factor = self.dom['phi_dir'][p]/self.dom['d_phi_vec'][p]
+   control  = np.dot(self.dom['polar_dir'][p],normal[0:2])
+  else :
    t = int(index/self.dom['self.n_phi'])
    p = index%self.dom['n_phi']
    angle = self.dom['S'][t][p]
-   angle_factor = angle/self.dom['d_omega'][t][p]
-   tmp  = np.dot(self.dom['phonon_dir'][p],normal)
-   gamma = arcsin(tmp)
+   angle_factor = self.dom['S'][t][p]/self.dom['d_omega'][t][p]
+   control  = np.dot(self.dom['phonon_dir'][p],normal)
 
+  control = round(control,8)
   coeff = np.dot(angle_factor,normal)*area/vol
+  coeff = round(coeff,8)
+  #anti aliasing---
+  extra_coeff = 0.0
+  extra_angle = 0.0
+  case = 0
+  if self.dim == 2:
+
+   (phi_dir_adj,case) = self.compute_2D_adjusment(normal,round(self.dom['phi_vec'][p],8),self.dom['d_phi'])
+   extra_coeff = np.dot(phi_dir_adj,normal)*area/vol/self.dom['d_phi_vec'][p]
+   extra_angle = np.dot(phi_dir_adj,normal)
+
+
+
 
   cm = 0.0
   cp = 0.0
   cmb = 0.0
   cpb = 0.0
-  if gamma > 0:
-   cp = coeff
-   cpb = np.dot(angle,normal)
+  if control >= 0:
+   #extra coeff always negative
+   if not case in [0,1,4]:
+#     print(case)#
+     print("error")
+     #quit()
+
+   cp = coeff - extra_coeff
+   if not elem_1 == elem_2:
+    cm = extra_coeff
+   else:
+    #if case == 4:
+    # print(self.dom['polar_dir'][p])
+    # print(extra_coeff)
+    cpb = np.dot(angle,normal) - extra_angle
+    cmb = extra_coeff
+
+    #print(extra_coeff)
+
+
   else :
-   cmb = coeff
+   if not case in [0,2,3]:
+    print(control)
+    print(case)
+    print("error")
+    quit()
+   #if not case == 0:
+#       print(extra_coeff)
+
+   cp = extra_coeff
    if not elem_1 == elem_2: #In this case the incoming part is from the boundary
-    cm = coeff
+    cm = coeff  - extra_coeff
+   else:
+    cmb = coeff - extra_coeff
+    cpb = extra_angle
+
+    #if not extra_angle == 0.0:
+    # print(extra_angle)
 
 
+  #if p==0 and elem_1 == elem_2:
+    #if normal[0] == 1.0 and normal[1] == 0.0:
+     #print(self.get_elem_centroid(elem_1))
+    # print(normal)
+    # print(self.dom['polar_dir'][p])
+    # print(case)
+    # print(cm)
+    # print(cp)
+    # print(cmb)
+    # print(cpb)
+    # quit()
+
+  if cpb < 0.0:
+   print(cpb)
+
+  if cmb > 0.0:
+   print(cmb)
+
+  if cm > 0.0:
+   print(cm)
+  # print(extra_coeff)
+  # print(cm)
+  # print(self.dom['polar_dir'][p])
+  # print(normal)
+  # print(control)
+  # quit()
+  if cp < 0.0:#
+     print(cp)
 
   return cm,cp,cmb,cpb
-
 
 
  def get_aa(self,elem_1,elem_2,phi_dir,dphi):

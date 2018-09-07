@@ -125,8 +125,6 @@ class Solver(object):
 
   def compute_directional_connections(self,index,options):
 
-
-
    #------------------------------BULK----------------------------------
    Diff = []
    Fminus = []
@@ -147,11 +145,10 @@ class Solver(object):
    HW_minus = np.zeros(self.n_elems)
    HW_plus = np.zeros(self.n_elems)
    for elem in self.mesh.boundary_elements:
-    (cm,cp,cmb,cpb) = self.mesh.get_angular_coeff(elem,elem,index)
+    (dummy,dummy,cmb,cpb) = self.mesh.get_angular_coeff(elem,elem,index)
     HW_plus[elem] =  cpb/np.pi
     HW_minus[elem] = -cmb
    #--------------------------------------------------------------
-
 
    #--------------------------WRITE FILES---------------------
    A = csc_matrix( (d,(r,c)), shape=(self.n_elems,self.n_elems) )
@@ -161,8 +158,7 @@ class Solver(object):
    P.dump(open(self.cache + '/P_' + str(index) +r'.np','wb+'))
    HW_minus.dump(open(self.cache +'/HW_MINUS_' + str(index) +r'.np','w+'))
    HW_plus.dump(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','w+'))
-   #Hot.dump(open(self.cache + '/Hot_' + str(index) +r'.np','w+'))
-   #Cold.dump(open(self.cache +'/Cold_' + str(index) +r'.np','w+'))
+
 
   def solve_bte(self,index,options):
 
@@ -209,8 +205,10 @@ class Solver(object):
      t = int(index/self.n_phi)
      p = index%self.n_phi
      theta_factor = 1.0
-
     pre_factor = 3.0/4.0/np.pi*0.5*theta_factor * self.dom['d_omega'][t][p]#  self.dom['d_theta_vec'][t]*self.dom['d_phi_vec'][p]
+
+
+
     #ss = self.dom['ss'][t][p]
     fourier = False
     zeroth_order = False
@@ -220,7 +218,6 @@ class Solver(object):
     for m in range(self.n_mfp)[::-1]:
      #----------------------------------------------------------------------------------
      if not fourier:
-
 
       D = np.multiply(TB[m],HW_MINUS)
       global_index = m*self.dom['n_theta']*self.dom['n_phi'] +t*self.dom['n_phi']+p
@@ -288,12 +285,7 @@ class Solver(object):
    output = {'boundary_temperature':TB_new,'suppression':suppression,'flux':flux,'temperature':temperature_mfp,'ms':np.array([float(ff_0),float(ff_1)])}
 
 
-
-
-
    return output
-
-
 
 
 
@@ -306,12 +298,10 @@ class Solver(object):
    previous_kappa = 0.0
    self.current_iter = 0
 
-
    if MPI.COMM_WORLD.Get_rank() == 0:
       print('  ')
       print('   Bulk Thermal Conductivity:    ' + str(round(self.kappa_bulk,4)) + ' W/m/K')
    #Solve standard Fourier---------------------------------------------------------
-
 
    #Initalization-----------------------------------------------------------
    suppression = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
@@ -675,3 +665,5 @@ class Solver(object):
        # r.append(elem); c.append(elem); d.append(tmp)
 
       #-----------------------------------------------
+  #Hot.dump(open(self.cache + '/Hot_' + str(index) +r'.np','w+'))
+  #Cold.dump(open(self.cache +'/Cold_' + str(index) +r'.np','w+'))
