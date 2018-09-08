@@ -31,14 +31,14 @@ class Material(object):
   else:
    if argv['model'] == 'nongray':
     self.import_data(argv)
-  
+
    if argv['model'] == 'gray':
     self.create_gray_model(argv)
    #-----------------------------------------------
 
    #Angular discretization-------------------------
    if MPI.COMM_WORLD.Get_rank() == 0:
-    dom = compute_dom_3d(argv) 
+    dom = compute_dom_3d(argv)
     data = {'dom':dom}
    else: data=None
    self.state.update(MPI.COMM_WORLD.bcast(data,root=0))
@@ -72,7 +72,7 @@ class Material(object):
      #quit()
      data.update({'B1':tmp})
      data.update({'B2':tmp})
-    else:    
+    else:
      data.update({'B1':np.eye(n_mfp)})
      data.update({'B2':np.eye(n_mfp)})
 
@@ -89,9 +89,9 @@ class Material(object):
   if MPI.COMM_WORLD.Get_rank() == 0:
 
     if '/' in argv['matfile']:
-     filename = argv['matfile'] 
+     filename = argv['matfile']
     else:
-     filename = os.path.dirname(__file__) + '/materials/'+ argv['matfile'] 
+     filename = os.path.dirname(__file__) + '/materials/'+ argv['matfile']
 
     data = {}
     #[n_mfp,n_theta,n_phi] = argv['grid']
@@ -113,7 +113,7 @@ class Material(object):
       mfp_bulk_new.append(mfp_bulk[m])
       kappa_bulk_new.append(kappa_bulk[m])
      acc += kappa_bulk[m]
-   
+
 
 
     min_mfp = min(mfp_bulk_new)
@@ -132,9 +132,9 @@ class Material(object):
 
 
     #MFP interpolation---------------------------
-    B0 = np.zeros(n_mfp) 
-    B1 = np.zeros(n_mfp) 
-    B2 = np.zeros(n_mfp) 
+    B0 = np.zeros(n_mfp)
+    B1 = np.zeros(n_mfp)
+    B2 = np.zeros(n_mfp)
     kappa_tot = 0
     for m in range(len(mfp_bulk_new)):
      kappa = kappa_bulk_new[m]
@@ -168,16 +168,16 @@ class Material(object):
 
  def get_mfp_interpolation(self,mfp_sampled,mfp_bulk) :
 
-   n_mfp = len(mfp_sampled) 
+   n_mfp = len(mfp_sampled)
    findm = 0
    for m in range(n_mfp-1) :
-    if (mfp_bulk >= mfp_sampled[m]) and (mfp_bulk <= mfp_sampled[m+1]) : 
-         
+    if (mfp_bulk >= mfp_sampled[m]) and (mfp_bulk <= mfp_sampled[m+1]) :
+
      #get data for mfp interpolation
      m1 = m
      m2 = m+1
      mfp1 = mfp_sampled[m1]
-     mfp2 = mfp_sampled[m2] 
+     mfp2 = mfp_sampled[m2]
      fm = (mfp_bulk-mfp1)/(mfp2 - mfp1) #for interpolation
      findm = 1
      m_par = [m1,m2,1-fm,fm]
@@ -187,5 +187,5 @@ class Material(object):
      return m_par
 
    assert findm == 1
-     
+
 

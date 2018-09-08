@@ -33,7 +33,7 @@ class WriteVtk(object):
    if n_col == 2: n_col = 3
    node_data = np.zeros((n_nodes,n_col))
 
-   
+
    conn = np.zeros(n_nodes)
    for n in self.mesh.node_elem_map.keys():
     for elem in self.mesh.node_elem_map[n]:
@@ -119,7 +119,10 @@ class WriteVtk(object):
    strc = 'data = PointData('
    for n,variable in enumerate(self.data) :
 
+
+
     is_scalar = len(list(np.shape(variable))) == 1
+    
     node_data = self.cell_to_node(variable)
     #stored_data.update({self.label[n]:{variable:node_data[:,0],'label':self.label[n]}})
 

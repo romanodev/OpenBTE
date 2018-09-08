@@ -81,7 +81,7 @@ class Plot(object):
     f.close()
 
  def save_vtk(self,argv):
-
+  #if MPI.COMM_WORLD.Get_rank() == 0:
    #Write data-------
    #geo = dd.io.load('geometry.hdf5')
    geo = Geometry(type='load')
@@ -323,7 +323,7 @@ class Plot(object):
 
 
    mfp = data['mfp']*1e6
-
+   print(sup_fourier[0])
    plot(mfp,sup,color=c1)
    plot(mfp,sup_fourier,color=c2)
 

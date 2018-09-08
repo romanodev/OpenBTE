@@ -92,6 +92,7 @@ class Solver(object):
    #solve the BTE
    self.compute_function(**argv)
 
+  
 
    if MPI.COMM_WORLD.Get_rank() == 0:
     if os.path.isdir(self.cache):
@@ -451,7 +452,7 @@ class Solver(object):
             'kappa_fourier':kappa_fourier,\
             'mfp':self.mfp*1e-9,\
             'bte_temperature':lattice_temperature[0],\
-            'fourier_temperature':fourier_temp[0],\
+            'fourier_temperature':fourier_temp,\
             'fourier_flux':flux_fourier,\
             'bte_flux':flux}
 
