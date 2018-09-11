@@ -10,7 +10,11 @@ def GenerateSquareLatticePores(argv):
   #Read shape
   shape = argv['shape']
   if shape == 'circle':
-     Na = 24; phi0= 0.0 #360.0/48.0
+     Na = 24; phi0= 0.0
+
+  if shape == 'circle_refined':
+     Na = 48; phi0= 0.0
+
   if shape == 'square':
      Na = 4; phi0 = 0.0
   if shape == 'triangle':

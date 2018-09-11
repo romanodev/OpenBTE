@@ -351,7 +351,9 @@ class Geometry(object):
     cpb = np.dot(polar_int,normal)*self.dom['d_phi'] - extra_angle
 
     cmb = extra_coeff
-
+    #if extra_coeff < 0.0 :
+    # print(normal)
+    # print(case)
     #print(extra_coeff)
 
 
@@ -385,7 +387,7 @@ class Geometry(object):
    print(cm)
 
   if cp < 0.0:#
-#     print('cp')
+     print('cp')
      print(cp)
      print(extra_coeff)
      print(case)

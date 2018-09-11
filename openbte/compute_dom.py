@@ -119,8 +119,8 @@ def compute_dom_3d(argv) :
 
    correction = 4.0*tmp2/np.trace(tmp)
 
-
-
+   #print(correction)
+   #quit()
 
 
    output.update({'d_omega':d_omega})

@@ -315,6 +315,9 @@ class Plot(object):
    data = dd.io.load(argv.setdefault('filename','solver.hdf5'))
 
    suppression = data['suppression']
+   iso_sup = data['iso_suppression']
+   #iso_sup = [iso_suppression[m].sum() for m in range(np.shape(iso_suppression)[0])]
+
    #print(suppression)
    #quit()
    tmp = data['fourier_suppression']
@@ -323,12 +326,16 @@ class Plot(object):
 
 
    mfp = data['mfp']*1e6
-   print(sup_fourier[0])
-   plot(mfp,sup,color=c1)
-   plot(mfp,sup_fourier,color=c2)
+   #print(sup_fourier[0])
+   if argv.setdefault('show',True):
+    plot(mfp,sup,color=c1)
+    plot(mfp,sup_fourier,color=c2)
+    plot(mfp,iso_sup,color=c3)
 
-   xscale('log')
-   grid('on')
-   xlabel('Mean Free Path [$\mu$ m]')
-   ylabel('Suppression Function')
-   show()
+    xscale('log')
+    grid('on')
+    xlabel('Mean Free Path [$\mu$ m]')
+    ylabel('Suppression Function')
+    show()
+   if argv.setdefault('write',True):
+    suppression.dump('suppression.dat')
