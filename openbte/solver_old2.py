@@ -26,7 +26,6 @@ class Solver(object):
   def __init__(self,**argv):
 
    self.mesh = Geometry(type='load',filename = argv.setdefault('geometry_filename','geometry'))
-   self.ms_error = argv.setdefault('ms_error',0.1)
 
    self.n_elems = len(self.mesh.elems)
    self.dim = self.mesh.dim
@@ -44,6 +43,7 @@ class Solver(object):
 
    self.lu = {}
 
+
    self.mfp = np.array(mat.state['mfp_sampled'])/1e-9 #In nm
    self.n_mfp = len(self.B0)
 
@@ -58,7 +58,6 @@ class Solver(object):
    self.n_theta = self.dom['n_theta']
    self.n_phi = self.dom['n_phi']
 
-   self.mesh.dom = self.dom
 
    self.print_dof()
 
@@ -86,12 +85,11 @@ class Solver(object):
     output = compute_sum(self.compute_directional_connections,self.n_index)
 
 
-   #quit()
+   quit()
    self.assemble_fourier()
 
    #solve the BTE
    self.compute_function(**argv)
-
 
 
    if MPI.COMM_WORLD.Get_rank() == 0:
@@ -104,7 +102,7 @@ class Solver(object):
      dd.io.save(argv.setdefault('filename','solver') + '.hdf5', self.state)
 
 
-  def compute_directional_diffusion(self,index):
+  def compute_directional_diffusion(self,index,options):
 
     t = int(index/self.n_phi)
     p = index%self.n_phi
@@ -126,30 +124,83 @@ class Solver(object):
 
   def compute_directional_connections(self,index,options):
 
-   #------------------------------BULK----------------------------------
+
+
    Diff = []
    Fminus = []
    Fplus = []
    r=[];c=[];d=[]
    rk=[]; ck=[]; dk=[]
-   P = np.zeros(self.n_elems)
-   for i,j in zip(*self.mesh.A.nonzero()):
-    (cm,cp,dummy,dummy) = self.mesh.get_angular_coeff(i,j,index)
-    r.append(i); c.append(i); d.append(cp)
-    v = self.mesh.get_side_periodic_value(i,j)
-    rk.append(i); ck.append(j);
-    dk.append(v*(cp+cm)*self.mesh.get_elem_volume(i))
-    r.append(i); c.append(j); d.append(cm)
-    P[i] += v*cm
 
-   #------------------------------BOUNDARY-------------------------------
+   P = np.zeros(self.n_elems)
+
+   if self.dim == 2:
+    p = index
+    angle_factor = self.dom['phi_dir'][index]/self.dom['d_phi_vec'][index]
+   else:
+    t = int(index/self.n_phi)
+    p = index%self.n_phi
+    angle_factor = self.dom['S'][t][p]/self.dom['d_omega'][t][p]
+
+   for i,j in zip(*self.mesh.A.nonzero()):
+
+    side = self.mesh.get_side_between_two_elements(i,j)
+    coeff = np.dot(angle_factor,self.mesh.get_coeff(i,j))
+
+    aa = self.mesh.get_aa(i,j,self.dom['polar_dir'][p],self.dom['d_phi'])
+    
+    #work here
+
+    if coeff > 0:
+     r.append(i); c.append(i); d.append(coeff)
+     v = self.mesh.get_side_periodic_value(side,i)
+     rk.append(i); ck.append(j);
+     dk.append(v*coeff*self.mesh.get_elem_volume(i))
+
+    if coeff < 0 :
+     r.append(i); c.append(j); d.append(coeff)
+     v = self.mesh.get_side_periodic_value(side,j)
+     P[i] -= v*coeff
+     rk.append(i); ck.append(j);
+     dk.append(-v*coeff*self.mesh.get_elem_volume(i))
+
+   #Write the boundaries------
    HW_minus = np.zeros(self.n_elems)
    HW_plus = np.zeros(self.n_elems)
-   for elem in self.mesh.boundary_elements:
-    (dummy,dummy,cmb,cpb) = self.mesh.get_angular_coeff(elem,elem,index)
-    HW_plus[elem] =  cpb/np.pi
-    HW_minus[elem] = -cmb
-   #--------------------------------------------------------------
+   for side in self.mesh.side_list['Boundary']:
+    (coeff,elem) = self.mesh.get_side_coeff(side)
+    tmp = np.dot(coeff,angle_factor)
+    if tmp > 0:
+     r.append(elem); c.append(elem); d.append(tmp)
+     if self.dim == 2:
+      HW_plus[elem] = np.dot(self.dom['phi_dir'][p],self.mesh.get_side_normal(0,side))/np.pi
+     else:
+      HW_plus[elem] = np.dot(self.dom['S'][t][p],self.mesh.get_side_normal(0,side))/np.pi
+    else :
+     HW_minus[elem] = -tmp
+
+   #-------------
+
+   #Thermalize boundaries--------------------------
+   Hot = np.zeros(self.n_elems)
+   for side in self.mesh.side_list['Hot']:
+    (coeff,elem) = self.mesh.get_side_coeff(side)
+    tmp = np.dot(coeff,angle_factor)
+    if tmp < 0:
+     Hot[elem] = -tmp*0.5
+    else:
+     r.append(elem); c.append(elem); d.append(tmp)
+
+   Cold = np.zeros(self.n_elems)
+   for side in self.mesh.side_list['Cold']:
+    (coeff,elem) = self.mesh.get_side_coeff(side)
+    tmp = np.dot(coeff,angle_factor)
+    if tmp < 0:
+     Cold[elem] = tmp*0.5
+    else:
+     r.append(elem); c.append(elem); d.append(tmp)
+
+   #-----------------------------------------------
 
    #--------------------------WRITE FILES---------------------
    A = csc_matrix( (d,(r,c)), shape=(self.n_elems,self.n_elems) )
@@ -159,7 +210,8 @@ class Solver(object):
    P.dump(open(self.cache + '/P_' + str(index) +r'.np','wb+'))
    HW_minus.dump(open(self.cache +'/HW_MINUS_' + str(index) +r'.np','w+'))
    HW_plus.dump(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','w+'))
-
+   Hot.dump(open(self.cache + '/Hot_' + str(index) +r'.np','w+'))
+   Cold.dump(open(self.cache +'/Cold_' + str(index) +r'.np','w+'))
 
   def solve_bte(self,index,options):
 
@@ -169,8 +221,8 @@ class Solver(object):
    HW_MINUS = np.load(open(self.cache + '/HW_MINUS_' + str(index) +r'.np','r'))
    HW_PLUS = np.load(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','r'))
    K = scipy.io.mmread(self.cache + '/K_' + str(index) + '.mtx').tocsc()
-   #Hot = np.load(open(self.cache + '/Hot_' + str(index) +r'.np','r'))
-   #Cold = np.load(open(self.cache + '/Cold_' + str(index) +r'.np','r'))
+   Hot = np.load(open(self.cache + '/Hot_' + str(index) +r'.np','r'))
+   Cold = np.load(open(self.cache + '/Cold_' + str(index) +r'.np','r'))
 
 
    TB = options['boundary_temperature']
@@ -197,6 +249,7 @@ class Solver(object):
    #for t in range(int(self.n_theta/2.0)): #We take into account the symmetry
 
    for tt in range(self.n_theta_irr): #We take into account the symmetry
+
     if self.dim == 2:
      t = tt
      p = index
@@ -205,9 +258,8 @@ class Solver(object):
      t = int(index/self.n_phi)
      p = index%self.n_phi
      theta_factor = 1.0
+
     pre_factor = 3.0/4.0/np.pi*0.5*theta_factor * self.dom['d_omega'][t][p]#  self.dom['d_theta_vec'][t]*self.dom['d_phi_vec'][p]
-
-
     #ss = self.dom['ss'][t][p]
     fourier = False
     zeroth_order = False
@@ -217,6 +269,7 @@ class Solver(object):
     for m in range(self.n_mfp)[::-1]:
      #----------------------------------------------------------------------------------
      if not fourier:
+
 
       D = np.multiply(TB[m],HW_MINUS)
       global_index = m*self.dom['n_theta']*self.dom['n_phi'] +t*self.dom['n_phi']+p
@@ -228,19 +281,12 @@ class Solver(object):
       sup = pre_factor * K.dot(temp-TL[m]).sum()/self.mfp[m]*self.kappa_factor
 
 
-
       if self.multiscale:
        if not sup == 0.0:
         sup_fourier = suppression_fourier[m][t][p]
         error = abs(sup-sup_fourier)/abs(sup)
 
-        #f t==6 and p==15:
-         #print(sup,sup_fourier,error)
-        if m == 0:
-             print(m)
-
-        if error < self.ms_error:
-
+        if error < 0.1:
           fourier = True
           ff_1 +=1
         # sup = sup_fourier
@@ -261,7 +307,7 @@ class Solver(object):
        # zeroth_order = True
        # ff_0 +=1
        #else:
-       ff_1 +=1
+       # ff_1 +=1
        #sup_old = sup
       #else:
       # sup = sup_zeroth
@@ -278,6 +324,7 @@ class Solver(object):
      suppression[m,t,p] += sup
      temperature_mfp[m] += temp*self.dom['d_omega'][t][p]*self.symmetry/4.0/np.pi
 
+
      if self.dim == 2:
       suppression[m,self.n_theta -t -1,p] += suppression[m,t,p]
       #TB_new += np.mean(self.B1[0,m])*self.dom['at'][t]*np.multiply(temp,HW_PLUS)*self.symmetry
@@ -290,7 +337,12 @@ class Solver(object):
    output = {'boundary_temperature':TB_new,'suppression':suppression,'flux':flux,'temperature':temperature_mfp,'ms':np.array([float(ff_0),float(ff_1)])}
 
 
+
+
+
    return output
+
+
 
 
 
@@ -303,10 +355,12 @@ class Solver(object):
    previous_kappa = 0.0
    self.current_iter = 0
 
+
    if MPI.COMM_WORLD.Get_rank() == 0:
       print('  ')
       print('   Bulk Thermal Conductivity:    ' + str(round(self.kappa_bulk,4)) + ' W/m/K')
    #Solve standard Fourier---------------------------------------------------------
+
 
    #Initalization-----------------------------------------------------------
    suppression = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
@@ -373,7 +427,6 @@ class Solver(object):
    flux = np.zeros((self.n_elems,3))
    kappa = 0.0
    suppression_zeroth = np.zeros(self.n_mfp)
-   iso_suppression = np.zeros(self.n_mfp)
    while error > max_error and self.current_iter < max_iter:
 
     #zeroth order---------------------------
@@ -412,14 +465,8 @@ class Solver(object):
      for n in range(self.n_mfp):
       lattice_temperature[n,:] = np.sum([self.B2[n,m]*temperature[m,:] for m in range(self.n_mfp)],axis=0)
       boundary_temperature[n,:] = np.sum([self.B1[n,m]*b_temperature[m,:] for m in range(self.n_mfp)],axis=0)
-      if argv.setdefault('compute_iso',False):
-       iso_suppression[n] = self.compute_diffusive_thermal_conductivity(temperature[n])
-#Compute iso suppression------
 
- # suppression_iso = np.zeros(self.n_mfp)
- # for m in range(self.n_mfp):
 
-#-----------------------------
      #lattice_temperature = np.dot(self.B2,temperature[m,:],axis=0)
 
     #--------------------------
@@ -446,7 +493,7 @@ class Solver(object):
                                                         'flux':flux},
                                                  options = {'boundary_temperature':boundary_temperature.copy(),\
                                                             'lattice_temperature':lattice_temperature.copy(),\
-                                                            'interface_conductance': 1.0/2.0/self.mfp,\
+                                                            'interface_conductance': 3.0/2.0/self.mfp,\
                                                             #'interface_conductance': np.zeros(self.n_mfp),\
                                                             'kappa_bulk':np.square(self.mfp)/3.0,\
                                                             'mfe_factor':1.0})
@@ -459,12 +506,11 @@ class Solver(object):
             'suppression':suppression,\
             'zero_suppression':suppression_zeroth,\
             'fourier_suppression':suppression_fourier,\
-            'iso_suppression':iso_suppression,\
             'dom':self.dom,\
             'kappa_fourier':kappa_fourier,\
             'mfp':self.mfp*1e-9,\
             'bte_temperature':lattice_temperature[0],\
-            'fourier_temperature':fourier_temp,\
+            'fourier_temperature':fourier_temp[0],\
             'fourier_flux':flux_fourier,\
             'bte_flux':flux}
 
@@ -492,7 +538,6 @@ class Solver(object):
     B = np.zeros(self.n_elems)
     for kc1,kc2 in zip(*self.mesh.A.nonzero()):
      ll = self.mesh.get_side_between_two_elements(kc1,kc2)
-
      (v_orth,dummy) = self.mesh.get_decomposed_directions(kc1,kc2)
      vol1 = self.mesh.get_elem_volume(kc1)
      vol2 = self.mesh.get_elem_volume(kc2)
@@ -505,10 +550,10 @@ class Solver(object):
      #----------------------
      row_tmp_b.append(kc1)
      col_tmp_b.append(kc2)
-     data_tmp_b.append(self.mesh.get_side_periodic_value(kc2,kc1)*v_orth)
-     data_tmp_b2.append(self.mesh.get_side_periodic_value(kc2,kc1))
+     data_tmp_b.append(self.mesh.get_side_periodic_value(ll,kc2)*v_orth)
+     data_tmp_b2.append(self.mesh.get_side_periodic_value(ll,kc2))
      #---------------------
-     B[kc1] += self.mesh.get_side_periodic_value(kc2,kc1)*v_orth/vol1
+     B[kc1] += self.mesh.get_side_periodic_value(ll,kc2)*v_orth/vol1
 
     #Boundary_elements
     FF = np.zeros(self.n_elems)
@@ -549,7 +594,7 @@ class Solver(object):
     #mfe_factor = 0.0
     #print(G)
     #G = 0.0
-    #G *= self.dom['correction']/2.0
+    G *= self.dom['correction']
     diag_1 = diags([self.FF],[0]).tocsc()
     A = (self.F + diag_1*G)   + mfe_factor * csc_matrix(scipy.sparse.eye(self.n_elems))/kappa_bulk
     B = (self.B + np.multiply(self.FF,TB[n])*G)  + mfe_factor * TL[n]/kappa_bulk
@@ -606,18 +651,15 @@ class Solver(object):
     self.gradT = self.mesh.compute_grad(temp)
     C = np.zeros(self.n_el)
     for i,j in zip(*self.mesh.A.nonzero()):
+     #Get agerage gradient----
+     side = self.mesh.get_side_between_two_elements(i,j)
+     w = self.mesh.get_interpolation_weigths(side)
+     grad_ave = w*self.gradT[i] + (1.0-w)*self.gradT[j]
+     #------------------------
+     (dumm,v_non_orth) = self.mesh.get_decomposed_directions(i,j)
 
-     if not i==j:
-
-      #Get agerage gradient----
-      side = self.mesh.get_side_between_two_elements(i,j)
-      w = self.mesh.get_interpolation_weigths(side)
-      grad_ave = w*self.gradT[i] + (1.0-w)*self.gradT[j]
-      #------------------------
-      (dumm,v_non_orth) = self.mesh.get_decomposed_directions(i,j)
-
-      C[i] += np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(i)
-      C[j] -= np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(j)
+     C[i] += np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(i)
+     C[j] -= np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(j)
 
     return C,-self.gradT
 
@@ -655,28 +697,3 @@ class Solver(object):
     print('Polar angles:      ' + str(self.n_phi))
     print('Mean-free-paths:   ' + str(self.n_mfp))
     print('Degree-of-freedom: ' + str(self.n_mfp*self.n_theta*self.n_phi*self.n_el))
-
-
-
-      #Thermalize boundaries--------------------------
-      #Hot = np.zeros(self.n_elems)
-      #for side in self.mesh.side_list['Hot']:
-   #    (coeff,elem) = self.mesh.get_side_coeff(side)#
-   #    tmp = np.dot(coeff,angle_factor)#
-   #    if tmp < 0:
-   #     Hot[elem] = -tmp*0.5#
-   #    else:
-   #     r.append(elem); c.append(elem); d.append(tmp)
-
-    #  Cold = np.zeros(self.n_elems)
-    #  for side in self.mesh.side_list['Cold']:#
-       #(coeff,elem) = self.mesh.get_side_coeff(side)
-       #tmp = np.dot(coeff,angle_factor)
-       #if tmp < 0:
-       # Cold[elem] = tmp*0.5
-       #else:
-       # r.append(elem); c.append(elem); d.append(tmp)
-
-      #-----------------------------------------------
-  #Hot.dump(open(self.cache + '/Hot_' + str(index) +r'.np','w+'))
-  #Cold.dump(open(self.cache +'/Cold_' + str(index) +r'.np','w+'))

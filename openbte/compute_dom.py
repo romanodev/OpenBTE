@@ -121,6 +121,12 @@ def compute_dom_3d(argv) :
 
    #print(correction)
    #quit()
+   #for t in range(n_theta):
+#    for p in range(n_phi):#
+      #print(np.cross(integrated_dir[t][p][0:2],phonon_dir[t][p][0:2]))
+
+
+   
 
 
    output.update({'d_omega':d_omega})
