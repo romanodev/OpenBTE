@@ -135,6 +135,7 @@ class Solver(object):
       kappa_1 = self.materials[region_1]['kappa_bulk_tot']
       region_2 = self.mesh.get_region_from_elem(elem2)
       kappa_2 = self.materials[region_2]['kappa_bulk_tot']
+
       s =  self.mesh.get_interpolation_weigths(ll,elem1)
       L = self.mesh.get_distance_between_centroids_of_two_elements_from_side(ll)
       L_1 = s*L
@@ -145,7 +146,10 @@ class Solver(object):
        self.elem_kappa_map.update({elem1:kappa_1})
       if not elem2 in self.elem_kappa_map.keys():
        self.elem_kappa_map.update({elem2:kappa_2})
-
+     else:
+      (elem1,elem2) = self.mesh.side_elem_map[ll]
+      if not elem1 in self.elem_kappa_map.keys():
+       self.elem_kappa_map.update({elem1:kappa_1})
     #else:
 
 
