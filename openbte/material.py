@@ -13,22 +13,24 @@ class Material(object):
 
  def __init__(self,**argv):
 
-
   #defaults--
   #argv.setdefault('grid',[50,12,24])
 
   #MFP discretization-----------------------------
   self.state = {}
 
-  argv.setdefault('model','nongray')
 
+  argv.setdefault('model','nongray')
   if argv['model'] == 'load':
    #MPI.COMM_WORLD.Barrier()
    if MPI.COMM_WORLD.Get_rank() == 0:
-    data = dd.io.load('material.hdf5')
+    data = dd.io.load(argv.setdefault('filename','material.hdf5'))
    else: data=None
    self.state.update(MPI.COMM_WORLD.bcast(data,root=0))
+   #print(self.state['region'])
   else:
+
+
    if argv['model'] == 'nongray':
     self.import_data(argv)
 
@@ -38,8 +40,12 @@ class Material(object):
 
    #Angular discretization-------------------------
    if MPI.COMM_WORLD.Get_rank() == 0:
+    region = argv.setdefault('region','Bulk')
+
     dom = compute_dom_3d(argv)
-    data = {'dom':dom}
+    data = {'dom':dom,'region':region}
+
+
    else: data=None
    self.state.update(MPI.COMM_WORLD.bcast(data,root=0))
 
@@ -47,8 +53,11 @@ class Material(object):
    #SAVE FILE--------------------
    if argv.setdefault('save',True):
     if MPI.COMM_WORLD.Get_rank() == 0:
-     dd.io.save('material.hdf5', self.state)
+     dd.io.save(argv.setdefault('filename','material') + '.hdf5', self.state)
 
+
+ #def get_region(self):
+     #return self.region
 
  def create_gray_model(self,argv):
 
@@ -187,5 +196,3 @@ class Material(object):
      return m_par
 
    assert findm == 1
-
-

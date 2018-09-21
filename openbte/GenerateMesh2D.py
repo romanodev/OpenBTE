@@ -335,7 +335,7 @@ def create_loop(loops,line_list,store):
 def create_surface(ss,bulk_surface,store):
 
 
-  strc = r'''Plane Surface(''' + str(bulk_surface) + ')= {'
+  strc = '''Plane Surface(''' + str(bulk_surface) + ')= {'
   for n,s in enumerate(ss):
    strc += str(s)
    if n == len(ss)-1:
@@ -367,67 +367,24 @@ def mesh(polygons,frame,argv):
    #Points-------
    pp = list(thin.exterior.coords)[:-1]
 
-   #for p in pp:
-   # points.append(p)
-   # store.write( 'Point('+str(len(points)-1) +') = {' + str(p[0]) +','+ str(p[1])+',0,'+ str(mesh_ext) +'};\n')
-
-   #Lines--------
-   #for n in range(len(pp)):
-   # p1 = len(points) + n - len(pp)
-   # p2 = len(points) + (n+1)%len(pp) - len(pp)
-   # lines.append([p1,p2])
-   # store.write( 'Line('+str(len(lines)-1) +') = {' + str(p1) +','+ str(p2)+'};\n')
-
-   #Line loops
-   #loops += 1
-   #strc = 'Line Loop(' + str(loops-1)+ ') = {'
-   #for n in range(len(pp)):
-   # strc +=str(len(lines)-len(pp)+n)
-   # if n == len(pp)-1:
-   #  strc += '};\n'
-   # else:
-   #  strc += ','
-   #store.write(strc)
-
-   #Pores surfaces--
-   #ss +=1
-   #strc = 'Plane Surface(' + str(ss-1)+ ') = {' + str(loops-1) + '};\n'
-   #store.write(strc)
-
-   #plot_region(points)
-
-  #show()
-  #strc = r'''Physical Surface('Pores') = {'''
-  #for n in range(ss):
-  # strc += str(n)
-  # if n == ss-1:
-  #   strc += '};\n'
-  # else:
-  #   strc += ','
-  #store.write(strc)
-
-
   #Get boundary wall
   lx = frame[0][1]*2.0
   ly = frame[1][1]*2.0
   pore_wall = []
   delta = 1e-2
-  #strc = r'''Physical Line('Boundary') = {'''
-  for l,line in enumerate(lines):
-   p1 = points[line[0]]
-   p2 = points[line[1]]
-   on_wall = True
-   if abs(p1[0] + lx/2.0) < delta and abs(p2[0] + lx/2.0) < delta: on_wall=False
-   if abs(p1[0] - lx/2.0) < delta and abs(p2[0] - lx/2.0) < delta: on_wall=False
-   if abs(p1[1] - ly/2.0) < delta and abs(p2[1] - ly/2.0) < delta: on_wall=False
-   if abs(p1[1] + ly/2.0) < delta and abs(p2[1] + ly/2.0) < delta: on_wall=False
-   if on_wall:
-   # if len(pore_walls) > 0:
-   #  strc += ','
-   # strc += str(l)
-    pore_wall.append(l)
-  #strc += '};\n'
-  #store.write(strc)
+
+  #for l,line in enumerate(lines):
+  # p1 = points[line[0]]
+  # p2 = points[line[1]]
+  # on_wall = True
+  # if abs(p1[0] + lx/2.0) < delta and abs(p2[0] + lx/2.0) < delta: on_wall=False
+  # if abs(p1[0] - lx/2.0) < delta and abs(p2[0] - lx/2.0) < delta: on_wall=False
+  # if abs(p1[1] - ly/2.0) < delta and abs(p2[1] - ly/2.0) < delta: on_wall=False
+  # if abs(p1[1] + ly/2.0) < delta and abs(p2[1] + ly/2.0) < delta: on_wall=False
+  # if on_wall:
+
+#    pore_wall.append(l)
+
   #-------------------------
 
   MP = MultiPolygon(polypores)
@@ -439,6 +396,7 @@ def mesh(polygons,frame,argv):
    bulk = [bulk]
 
   bulk_surface = []
+  inclusions = []
   for region in bulk:
 
    pp = list(region.exterior.coords)[:-1]
@@ -451,18 +409,49 @@ def mesh(polygons,frame,argv):
    create_loop(loops,line_list,store)
 
 
+   #Create internal loops-------------
    internal_loops = []
    for interior in region.interiors:
-
     pp = list(interior.coords)[:-1]
     line_list = create_line_list(pp,points,lines,store,mesh_ext)
     loops +=1
     local_loops.append(loops)
     create_loop(loops,line_list,store)
+    #if argv.setdefault('inclusion',False):
+    # ss +=1
+    # inclusions.append(ss)
+    # create_surface([loops],ss,store)
+   #---------------------------------
 
    ss +=1
    bulk_surface.append(ss)
    create_surface(local_loops,ss,store)
+
+  #Create Inclusion surfaces--------
+  if argv.setdefault('inclusion',False):
+
+   for poly in polygons:
+    thin = Polygon(poly).intersection(Frame)
+
+    #Points-------
+    pp = list(thin.exterior.coords)[:-1]
+    line_list = create_line_list(pp,points,lines,store,mesh_ext)
+    loops +=1
+    create_loop(loops,line_list,store)
+    ss +=1
+    create_surface([loops],ss,store)
+    inclusions.append(ss)
+
+   strc = r'''Physical Surface('Inclusion') = {'''
+   for n,s in enumerate(inclusions):
+    strc += str(s)
+    if n == len(inclusions)-1:
+     strc += '};\n'
+    else:
+      strc += ','
+   store.write(strc)
+  #-------------------------------
+
 
   strc = r'''Physical Surface('Bulk') = {'''
   for n,s in enumerate(bulk_surface):
@@ -471,7 +460,6 @@ def mesh(polygons,frame,argv):
      strc += '};\n'
    else:
      strc += ','
-
   store.write(strc)
 
 
@@ -547,17 +535,36 @@ def mesh(polygons,frame,argv):
    for k in upper:
     additional_boundary.append(k)
 
-
   #Collect Wall
-  boundary_surfaces = pore_wall + additional_boundary
-  strc = r'''Physical Line('Boundary') = {'''
-  for r,region in enumerate(boundary_surfaces) :
-   strc += str(region)
-   if r == len(boundary_surfaces)-1:
-    strc += '};\n'
-    store.write(strc)
-   else :
-    strc += ','
+  if argv.setdefault('inclusion',False):
+   interface_surfaces = pore_wall
+   boundary_surfaces = additional_boundary
+  else:
+   boundary_surfaces = pore_wall + additional_boundary
+   interface_surfaces = []
+
+
+  #Interface surface
+  if len(boundary_surfaces)> 0:
+   strc = r'''Physical Line('Boundary') = {'''
+   for r,region in enumerate(boundary_surfaces) :
+    strc += str(region)
+    if r == len(boundary_surfaces)-1:
+     strc += '};\n'
+     store.write(strc)
+    else :
+     strc += ','
+
+
+  if len(interface_surfaces)> 0:
+   strc = r'''Physical Line('Interface') = {'''
+   for r,region in enumerate(interface_surfaces) :
+    strc += str(region)
+    if r == len(interface_surfaces)-1:
+     strc += '};\n'
+     store.write(strc)
+    else :
+     strc += ','
 
 
   for n in range(len(hot)):
@@ -572,3 +579,41 @@ def mesh(polygons,frame,argv):
 
 #-------------------------------------------------------
   store.close()
+#for p in pp:
+# points.append(p)
+# store.write( 'Point('+str(len(points)-1) +') = {' + str(p[0]) +','+ str(p[1])+',0,'+ str(mesh_ext) +'};\n')
+
+#Lines--------
+#for n in range(len(pp)):
+# p1 = len(points) + n - len(pp)
+# p2 = len(points) + (n+1)%len(pp) - len(pp)
+# lines.append([p1,p2])
+# store.write( 'Line('+str(len(lines)-1) +') = {' + str(p1) +','+ str(p2)+'};\n')
+
+#Line loops
+#loops += 1
+#strc = 'Line Loop(' + str(loops-1)+ ') = {'
+#for n in range(len(pp)):
+# strc +=str(len(lines)-len(pp)+n)
+# if n == len(pp)-1:
+#  strc += '};\n'
+# else:
+#  strc += ','
+#store.write(strc)
+
+#Pores surfaces--
+#ss +=1
+#strc = 'Plane Surface(' + str(ss-1)+ ') = {' + str(loops-1) + '};\n'
+#store.write(strc)
+
+#plot_region(points)
+
+#show()
+#strc = r'''Physical Surface('Pores') = {'''
+#for n in range(ss):
+# strc += str(n)
+# if n == ss-1:
+#   strc += '};\n'
+# else:
+#   strc += ','
+#store.write(strc)

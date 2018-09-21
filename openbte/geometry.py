@@ -9,7 +9,7 @@ from .GenerateSquareLatticePores import *
 from .GenerateHexagonalLatticePores import *
 from .GenerateCustomPores import *
 #from GenerateRandomPores import *
-#from GenerateRandomPoresOverlap import *
+from .GenerateRandomPoresOverlap import *
 from . import GenerateMesh2D
 from . import GenerateMesh3D
 from . import GenerateBulk2D
@@ -44,6 +44,7 @@ class Geometry(object):
     #if geo_type == 'porous/random' or \
     if  geo_type == 'porous/square_lattice' or\
         geo_type == 'porous/hexagonal_lattice' or\
+        geo_type == 'porous/random' or\
         geo_type == 'porous/custom':
 
      if geo_type == 'porous/square_lattice':
@@ -55,10 +56,10 @@ class Geometry(object):
      if geo_type == 'porous/custom':
       frame,polygons = GenerateCustomPores(argv)
 
-     #if geo_type == 'porous/random':
-     # frame,polygons = GenerateRandomPoresOverlap(argv)
-     # polygons = np.array(polygons)
+     if geo_type == 'porous/random':
+      frame,polygons = GenerateRandomPoresOverlap(argv)
 
+      
 
      if 'lz' in argv.keys():
       GenerateMesh3D.mesh(polygons,frame,argv)
@@ -118,6 +119,7 @@ class Geometry(object):
     data = {'side_list':self.side_list,\
           'exlude':self.exlude,\
           'elem_side_map':self.elem_side_map,\
+          'elem_region_map':self.elem_region_map,\
           'side_elem_map':self.side_elem_map,\
           'side_node_map':self.side_node_map,\
           'node_elem_map':self.node_elem_map,\
@@ -198,6 +200,16 @@ class Geometry(object):
    v_orth = np.dot(Af,Af)/np.dot(Af,dist)
    return v_orth
 
+
+ def get_distance_between_centroids_of_two_elements_from_side(self,ll):
+
+
+   (elem_1,elem_2) = self.side_elem_map[ll]
+   c1 = self.get_elem_centroid(elem_1)
+   c2 = self.get_next_elem_centroid(elem_1,ll)
+   dist = np.linalg.norm(c2-c1)
+
+   return dist
 
  def get_decomposed_directions(self,elem_1,elem_2,rot = np.eye(3)):
 
@@ -449,7 +461,7 @@ class Geometry(object):
       if side_1 == side_2:
        return side_1
 
-    print('no adjicents elems')
+    print('no adjacents elems')
     assert(1==0)
     quit()
 
@@ -631,6 +643,7 @@ class Geometry(object):
     self.size = self.state['size']
     self.dim = self.state['dim']
     self.weigths = self.state['weigths']
+    self.elem_region_map = self.state['elem_region_map']
     self.elem_side_map = self.state['elem_side_map']
     self.side_node_map = self.state['side_node_map']
     self.node_elem_map = self.state['node_elem_map']
@@ -668,16 +681,20 @@ class Geometry(object):
   f.readline()
   f.readline()
   f.readline()
-  blabels = {}
-  nb =  int(f.readline())-1
+  self.blabels = {}
+  nb =  int(f.readline())
   for n in range(nb):
    tmp = f.readline().split()
    l = tmp[2].replace('"',r'')
-   blabels.update({int(tmp[1]):l})
+   self.blabels.update({int(tmp[1]):l})
+
+
   #------------------------------------------
+  self.elem_region_map = {}
+
 
   #import nodes------------------------
-  f.readline()
+  #f.readline()
   f.readline()
   f.readline()
   n_nodes = int(f.readline())
@@ -713,8 +730,11 @@ class Geometry(object):
   self.node_elem_map = {}
   self.side_list = {}
   node_side_map = {}
+
+
   for n in range(n_tot):
    tmp = f.readline().split()
+
    #Get sides------------------------------------------------------------
    if self.dim == 3 and int(tmp[1]) == 2: #2D area
      n = sorted([int(tmp[5])-1,int(tmp[6])-1,int(tmp[7])-1])
@@ -725,6 +745,8 @@ class Geometry(object):
    b_sides.append(n)
    nr.append(int(tmp[3]))
 
+
+
    if self.dim == 3 and int(tmp[1]) == 4: #3D Elem
      node_indexes = [int(tmp[5])-1,int(tmp[6])-1,int(tmp[7])-1,int(tmp[8])-1]
      n = sorted(node_indexes)
@@ -733,19 +755,23 @@ class Geometry(object):
              [n[0],n[1],n[3]],\
              [n[1],n[2],n[3]],\
              [n[0],n[2],n[3]]]
-     self._update_map(perm_n,b_sides,blabels,nr,node_indexes)
+     self._update_map(perm_n,b_sides,nr,node_indexes)
+     self.elem_region_map.update({len(self.elems)-1:self.blabels[int(tmp[3])]})
 
 
-   if self.dim == 2 and int(tmp[1]) == 2: #2D Elem
+   if self.dim == 2 and int(tmp[1]) == 2: #2D Elem (triangle)
      node_indexes = [int(tmp[5])-1,int(tmp[6])-1,int(tmp[7])-1]
      n = sorted(node_indexes)
      self.elems.append(n)
      perm_n =[[n[0],n[1]],\
              [n[0],n[2]],\
              [n[1],n[2]]]
-     self._update_map(perm_n,b_sides,blabels,nr,node_indexes)
 
-   if self.dim == 2 and int(tmp[1]) == 3: #2D Elem
+     self.elem_region_map.update({len(self.elems)-1:self.blabels[int(tmp[3])]})
+
+     self._update_map(perm_n,b_sides,nr,node_indexes)
+
+   if self.dim == 2 and int(tmp[1]) == 3: #2D Elem (quadrangle)
      n = [int(tmp[5])-1,int(tmp[6])-1,int(tmp[7])-1,int(tmp[8])-1]
 
      #n = sorted(node_indexes)
@@ -754,13 +780,16 @@ class Geometry(object):
               sorted([n[1],n[2]]),\
               sorted([n[2],n[3]]),\
               sorted([n[3],n[0]])]
-     self._update_map(perm_n,b_sides,blabels,nr,n)
+     self._update_map(perm_n,b_sides,nr,n)
 
-
+     self.elem_region_map.update({len(self.elems)-1:self.blabels[int(tmp[3])]})
   #------------------------------------------------------------
   #Set default for hot and cold
   self.side_list.setdefault('Hot',[])
   self.side_list.setdefault('Cold',[])
+
+
+
 
   #Apply Periodic Boundary Conditions
   self.side_list.update({'active':range(len(self.sides))})
@@ -772,6 +801,7 @@ class Geometry(object):
   self.pairs = [] #global (all periodic pairs)
 
   self.side_list.setdefault('Boundary',[])
+  self.side_list.setdefault('Interface',[])
   self.periodic_nodes = []
   for label in self.side_list.keys():
 
@@ -779,7 +809,6 @@ class Geometry(object):
    #if label == "Hot" or label == "Cold":
    # tmp = self.side_list.setdefault('Boundary',[])+self.side_list[label]
    # self.side_list['Boundary'] = tmp
-
 
    if str(label.split('_')[0]) == 'Periodic':
     if not int(label.split('_')[1])%2==0:
@@ -842,6 +871,8 @@ class Geometry(object):
 
       #Delete s2 from active list
       self.side_list['active'].remove(s2)
+
+
       self.exlude.append(s2)
       tmp = self.side_list.setdefault('Inactive',[]) + [s2]
       self.side_list['Inactive'] = tmp
@@ -872,7 +903,7 @@ class Geometry(object):
   return self.side_elem_map[ll]
 
 
- def _update_map(self,perm_n,b_sides,blabels,nr,node_indexes):
+ def _update_map(self,perm_n,b_sides,nr,node_indexes):
 
 
     #UPDATE NODE_ELEM_MAP-------------------
@@ -900,8 +931,7 @@ class Geometry(object):
       try:
        k = b_sides.index(new_n)
 
-
-       self.side_list.setdefault(blabels[nr[k]],[]).append(index)
+       self.side_list.setdefault(self.blabels[nr[k]],[]).append(index)
       except:
        a = 1
       #------------------------------------------------------
@@ -1111,7 +1141,7 @@ class Geometry(object):
 
  def compute_interpolation_weigths(self):
 
-  self.interp_weigths = np.zeros(len(self.sides))
+  self.interp_weigths = {}# np.zeros(len(self.sides))
   for ll in self.side_list['active']:
    if not (ll in (self.side_list['Boundary'] + self.side_list['Hot'] + self.side_list['Cold'])) :
     e0 = self.side_elem_map[ll][0]
@@ -1142,12 +1172,23 @@ class Geometry(object):
      d = np.linalg.norm(P - P1)
      s = d/dist
      #---------------------------------------------------------------
-    self.interp_weigths[ll] = s
+    self.interp_weigths.update({ll:s})
+   else:
+    #self.interp_weigths.update({ll:0.0})
+    self.interp_weigths.update({ll:1.0})
 
 
- def get_interpolation_weigths(self,ll):
+ def get_region_from_elem(self,elem):
+  return self.elem_region_map[elem]
 
-  return self.interp_weigths[ll]
+
+ def get_interpolation_weigths(self,ll,elem):
+
+  #return self.interp_weigths[ll]
+  if self.side_elem_map[ll][0] == elem:
+   return self.interp_weigths[ll]
+  else:
+   return 1.0-self.interp_weigths[ll]
 
  def compute_boundary_condition_data(self):
 

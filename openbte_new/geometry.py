@@ -10,11 +10,11 @@ from .GenerateHexagonalLatticePores import *
 from .GenerateCustomPores import *
 #from GenerateRandomPores import *
 from .GenerateRandomPoresOverlap3 import *
-from . import GenerateMesh2D 
-from . import GenerateMesh3D 
-from . import GenerateBulk2D 
-from . import GenerateBulk3D 
-#import GenerateInterface2D 
+from . import GenerateMesh2D
+from . import GenerateMesh3D
+from . import GenerateBulk2D
+from . import GenerateBulk3D
+#import GenerateInterface2D
 #from nanowire import *
 import deepdish as dd
 from scipy.sparse import csc_matrix
@@ -44,16 +44,16 @@ class Geometry(object):
         geo_type == 'porous/custom':
 
      if geo_type == 'porous/square_lattice':
-      frame,polygons = GenerateSquareLatticePores(argv) 
-   
+      frame,polygons = GenerateSquareLatticePores(argv)
+
      if geo_type == 'porous/hexagonal_lattice':
-      frame,polygons = GenerateHexagonalLatticePores(argv) 
+      frame,polygons = GenerateHexagonalLatticePores(argv)
 
      if geo_type == 'porous/custom':
-      frame,polygons = GenerateCustomPores(argv) 
+      frame,polygons = GenerateCustomPores(argv)
 
      if geo_type == 'porous/random':
-      frame,polygons = GenerateRandomPoresOverlap(argv) 
+      frame,polygons = GenerateRandomPoresOverlap(argv)
       polygons = np.array(polygons)
 
      if 'lz' in argv.keys():
@@ -87,7 +87,7 @@ class Geometry(object):
 
  def compute_mesh_data(self):
 
-    
+
     self.import_mesh()
 
     self.compute_elem_map()
@@ -101,7 +101,7 @@ class Geometry(object):
     self.compute_interpolation_weigths()
     self.compute_contact_areas()
     self.compute_boundary_condition_data()
-    
+
 
     data = {'side_list':self.side_list,\
           'exlude':self.exlude,\
@@ -140,8 +140,8 @@ class Geometry(object):
    nc = len(self.elems)
    row_tmp = []
    col_tmp = []
-   data_tmp = [] 
-   data_tmp_b = [] 
+   data_tmp = []
+   data_tmp_b = []
 
    for ll in self.side_list['active'] :
     if not ll in self.side_list['Boundary'] and \
@@ -150,14 +150,14 @@ class Geometry(object):
 
      elems = self.get_elems_from_side(ll)
      kc1 = elems[0]
-     kc2 = elems[1]  
+     kc2 = elems[1]
      row_tmp.append(kc1)
      col_tmp.append(kc2)
      data_tmp.append(1)
      row_tmp.append(kc2)
      col_tmp.append(kc1)
      data_tmp.append(1)
-  
+
    self.A = csc_matrix( (np.array(data_tmp),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) ).todense()
 
 
@@ -185,7 +185,7 @@ class Geometry(object):
 
  def get_decomposed_directions(self,elem_1,elem_2,rot = np.eye(3)):
 
-   side = self.get_side_between_two_elements(elem_1,elem_2)  
+   side = self.get_side_between_two_elements(elem_1,elem_2)
    normal = self.compute_side_normal(elem_1,side)
    area = self.compute_side_area(side)
    Af = area*normal
@@ -206,18 +206,18 @@ class Geometry(object):
   return normal*area/vol,elem #This is specific to boundaries
 
  def get_coeff(self,elem_1,elem_2):
-   
-   side = self.get_side_between_two_elements(elem_1,elem_2)  
-   vol = self.get_elem_volume(elem_1)  
+
+   side = self.get_side_between_two_elements(elem_1,elem_2)
+   vol = self.get_elem_volume(elem_1)
    normal = self.compute_side_normal(elem_1,side)
    area = self.compute_side_area(side)
 
-    
+
    return normal*area/vol
 
  def get_af(self,elem_1,elem_2):
 
-   side = self.get_side_between_two_elements(elem_1,elem_2)  
+   side = self.get_side_between_two_elements(elem_1,elem_2)
    normal = self.compute_side_normal(elem_1,side)
    area = self.compute_side_area(side)
    return normal*area
@@ -225,15 +225,15 @@ class Geometry(object):
 
  def get_normal_between_elems(self,elem_1,elem_2):
 
-   side = self.get_side_between_two_elements(elem_1,elem_2)  
+   side = self.get_side_between_two_elements(elem_1,elem_2)
    normal = self.compute_side_normal(elem_1,side)
    return normal
 
 
- def get_side_between_two_elements(self,elem_1,elem_2):   
+ def get_side_between_two_elements(self,elem_1,elem_2):
 
     for side_1 in self.elem_side_map[elem_1]:
-     for side_2 in self.elem_side_map[elem_2]: 
+     for side_2 in self.elem_side_map[elem_2]:
       if side_1 == side_2:
        return side_1
 
@@ -252,7 +252,7 @@ class Geometry(object):
    #Build tempreature matrix--------------------------
    diff_temp = np.zeros(self.dim + 1)
    grad = np.zeros(3)
-   for s in self.elem_side_map[kc1]: 
+   for s in self.elem_side_map[kc1]:
     if s in self.side_list['Boundary']:
      temp_2 = temp_1
     else:
@@ -287,7 +287,7 @@ class Geometry(object):
     #Build tempreature matrix--------------------------
     diff_temp = np.zeros(self.dim + 1)
     grad = np.zeros(self.dim)
-    for s in self.elem_side_map[kc1]: 
+    for s in self.elem_side_map[kc1]:
      if s in self.side_list['Boundary']:
       temp_2 = temp_2
      else:
@@ -359,12 +359,12 @@ class Geometry(object):
    return temp
 
 
-  
+
 
 
  def compute_contact_areas(self):
 
-  self.c_areas = np.zeros(3)  
+  self.c_areas = np.zeros(3)
 
   nodesT = self.nodes.copy().T
 
@@ -404,11 +404,11 @@ class Geometry(object):
   for k in range(len(self.sides)):
    self.side_areas[k] = self.compute_side_area(k)
 
- 
+
  def get_dim(self):
    return self.dim
 
- def _update_data(self):   
+ def _update_data(self):
     self.nodes = self.state['nodes']
     self.dim = self.state['dim']
     self.A = self.state['A']
@@ -432,7 +432,7 @@ class Geometry(object):
     self.boundary_elements = self.state['boundary_elements']
     self.side_normals = self.state['side_normals']
     self.side_areas = self.state['side_areas']
-    self.exlude = self.state['exlude']     
+    self.exlude = self.state['exlude']
     self.pairs = self.state['pairs']
     self.direction = self.state['grad_direction']
     self.area_flux = self.state['area_flux']
@@ -440,7 +440,7 @@ class Geometry(object):
     self.side_periodic_value = self.state['side_periodic_value']
     self.kappa_factor = self.size[self.direction]/self.area_flux
 
-    
+
 
  def import_mesh(self):
 
@@ -472,8 +472,8 @@ class Geometry(object):
   for n in range(n_nodes):
    tmp = f.readline().split()
    nodes.append([float(tmp[1]),float(tmp[2]),float(tmp[3])])
-   
-  nodes = np.array(nodes) 
+
+  nodes = np.array(nodes)
 
   if self.dim == 3:
    self.size = np.array([ max(nodes[:,0]) - min(nodes[:,0]),\
@@ -502,7 +502,7 @@ class Geometry(object):
   node_side_map = {}
   for n in range(n_tot):
    tmp = f.readline().split()
-   #Get sides------------------------------------------------------------   
+   #Get sides------------------------------------------------------------
    if self.dim == 3 and int(tmp[1]) == 2: #2D area
      n = sorted([int(tmp[5])-1,int(tmp[6])-1,int(tmp[7])-1])
 
@@ -511,7 +511,7 @@ class Geometry(object):
 
    b_sides.append(n)
    nr.append(int(tmp[3]))
-   
+
    if self.dim == 3 and int(tmp[1]) == 4: #3D Elem
      node_indexes = [int(tmp[5])-1,int(tmp[6])-1,int(tmp[7])-1,int(tmp[8])-1]
      n = sorted(node_indexes)
@@ -522,7 +522,7 @@ class Geometry(object):
              [n[0],n[2],n[3]]]
      self._update_map(perm_n,b_sides,blabels,nr,node_indexes)
 
-   
+
    if self.dim == 2 and int(tmp[1]) == 2: #2D Elem
      node_indexes = [int(tmp[5])-1,int(tmp[6])-1,int(tmp[7])-1]
      n = sorted(node_indexes)
@@ -550,7 +550,7 @@ class Geometry(object):
   self.side_list.setdefault('Cold',[])
 
   #Apply Periodic Boundary Conditions
-  self.side_list.update({'active':range(len(self.sides))})  
+  self.side_list.update({'active':range(len(self.sides))})
   self.side_periodicity = np.zeros((len(self.sides),2,3))
   group_1 = []
   group_2 = []
@@ -559,23 +559,23 @@ class Geometry(object):
   self.pairs = [] #global (all periodic pairs)
 
   self.side_list.setdefault('Boundary',[])
-  self.periodic_nodes = [] 
+  self.periodic_nodes = []
   for label in self.side_list.keys():
 
    #Add Cold and Hot to Boundary
    #if label == "Hot" or label == "Cold":
    # tmp = self.side_list.setdefault('Boundary',[])+self.side_list[label]
-   # self.side_list['Boundary'] = tmp 
+   # self.side_list['Boundary'] = tmp
 
-   
+
    if str(label.split('_')[0]) == 'Periodic':
-    if not int(label.split('_')[1])%2==0: 
+    if not int(label.split('_')[1])%2==0:
      contact_1 = label
      contact_2 = 'Periodic_' + str(int(label.split('_')[1])+1)
      group_1 = self.side_list[contact_1]
      group_2 = self.side_list[contact_2]
      pairs = []
-     
+
      #compute tangential unity vector
      tmp = self.nodes[self.sides[group_2[0]][0]] - self.nodes[self.sides[group_2[0]][1]]
      t = tmp/np.linalg.norm(tmp)
@@ -592,7 +592,7 @@ class Geometry(object):
         s2 = s
 
       #if abs(np.dot(pp,self.nodes[self.sides[s1][0]]-self.nodes[self.sides[s1][1]]))>1e-4:
-      pairs.append([s1,s2])   
+      pairs.append([s1,s2])
       self.side_periodicity[s1][1] = pp
       self.side_periodicity[s2][1] = -pp
 
@@ -606,16 +606,16 @@ class Geometry(object):
 
      plot_sides = False
      if plot_sides:
-      for s in pairs: 
+      for s in pairs:
        c1 = self.compute_side_centroid(s[0])
        c2 = self.compute_side_centroid(s[1])
        plot([c1[0],c2[0]],[c1[1],c2[1]],color='r')
       show()
      #Amend map
-     for s in pairs: 
+     for s in pairs:
       s1 = s[0]
       s2 = s[1]
-   
+
       #Change side in elem 2
       elem2 = self.side_elem_map[s2][0]
       index = self.elem_side_map[elem2].index(s2)
@@ -623,24 +623,24 @@ class Geometry(object):
       self.side_elem_map[s1].append(elem2)
 
       #To get hflux sides right-----
-      self.side_elem_map[s2].append(self.side_elem_map[s1][0])      
+      self.side_elem_map[s2].append(self.side_elem_map[s1][0])
 
       #-------------------------
- 
+
       #Delete s2 from active list
       self.side_list['active'].remove(s2)
       self.exlude.append(s2)
       tmp = self.side_list.setdefault('Inactive',[]) + [s2]
-      self.side_list['Inactive'] = tmp 
+      self.side_list['Inactive'] = tmp
 
      #Polish sides
      tmp = self.side_list.setdefault('Periodic',[])+self.side_list[contact_1]
-     self.side_list['Periodic'] = tmp 
+     self.side_list['Periodic'] = tmp
 
 
      del self.side_list[contact_1]
      del self.side_list[contact_2]
-     self.pairs += pairs 
+     self.pairs += pairs
 
   #Create boundary_elements--------------------
   self.boundary_elements = []
@@ -650,10 +650,10 @@ class Geometry(object):
   #delete MESH-----
   #a=subprocess.check_output(['rm','-f','mesh.geo'])
   #a=subprocess.check_output(['rm','-f','mesh.msh'])
-  
+
   #----------------
 
- 
+
  def get_elems_from_side(self,ll):
 
   return self.side_elem_map[ll]
@@ -676,7 +676,7 @@ class Geometry(object):
        if k in self.node_side_map.keys():
         for s in self.node_side_map[k]:
          if np.allclose(self.sides[s],new_n):
-          index = s 
+          index = s
           break
 
      if index == -1:
@@ -686,7 +686,7 @@ class Geometry(object):
       #add boundary--------------------------------------
       try:
        k = b_sides.index(new_n)
-     
+
 
        self.side_list.setdefault(blabels[nr[k]],[]).append(index)
       except:
@@ -745,7 +745,7 @@ class Geometry(object):
 
   c = (c_side - c_el)
   if np.dot(normal,c) < 0: normal = - normal
- 
+
 
   return normal
 
@@ -770,7 +770,7 @@ class Geometry(object):
    return abs(result/2)
 
 
- def write_vtk(self,file_name,data) : 
+ def write_vtk(self,file_name,data) :
 
    points = self.nodes
    el = self.elems
@@ -836,7 +836,7 @@ class Geometry(object):
 
   if self.dim == 3: #Assuming Tetraedron
    ns = self.elems[kc1]
-   m = np.ones((4,4))   
+   m = np.ones((4,4))
    m[0,0:3] = self.nodes[ns[0]]
    m[1,0:3] = self.nodes[ns[1]]
    m[2,0:3] = self.nodes[ns[2]]
@@ -858,13 +858,13 @@ class Geometry(object):
 
 
  def get_side_periodic_value(self,ll,elem) :
-  
+
     ind = self.side_elem_map[ll].index(elem)
     return self.side_periodic_value[ll][ind]
 
 
  def get_next_elem_centroid(self,elem,side):
-  
+
   centroid1 = self.get_elem_centroid(elem)
   elem2 = self.get_neighbor_elem(elem,side)
   centroid2 = self.get_elem_centroid(elem2)
@@ -875,7 +875,7 @@ class Geometry(object):
 
 
  def compute_centroid(self,side):
-   
+
   node = np.zeros(3)
   for p in side:
    node += self.nodes[p]
@@ -884,12 +884,12 @@ class Geometry(object):
 
 
  def get_neighbor_elem(self,elem,ll) :
-     
+
     if not (elem in self.side_elem_map[ll]) : print('error')
 
     for tmp in self.side_elem_map[ll] :
        if not (tmp == elem) :
-         return tmp 
+         return tmp
 
 
  def compute_interpolation_weigths(self):
@@ -922,8 +922,8 @@ class Geometry(object):
       print('ERROR in the skew parameter')
       return
      dist = np.linalg.norm(P1-P0)
-     d = np.linalg.norm(P - P1) 
-     s = d/dist 
+     d = np.linalg.norm(P - P1)
+     s = d/dist
      #---------------------------------------------------------------
     self.interp_weigths[ll] = s
 
@@ -950,9 +950,9 @@ class Geometry(object):
 
     delta = 1e-2
     nsides = len(self.sides)
-    flux_sides = [] #where flux goes 
+    flux_sides = [] #where flux goes
     side_value = np.zeros(nsides)
-    
+
     tmp = self.side_list.setdefault('Periodic',[]) + self.exlude
 
 
@@ -985,7 +985,7 @@ class Geometry(object):
  def compute_least_square_weigths(self):
 
    n_el = len(self.elems)
-  
+
    nd = len(self.elems[0])
    diff_dist = np.zeros((n_el,nd,self.dim))
 
@@ -997,7 +997,7 @@ class Geometry(object):
     c1 = self.compute_elem_centroid(kc1)
     ind1 = self.elem_side_map[kc1].index(ll)
 
-    if not ll in (self.side_list['Boundary'] + self.side_list['Hot'] + self.side_list['Cold']): 
+    if not ll in (self.side_list['Boundary'] + self.side_list['Hot'] + self.side_list['Cold']):
 
      #Diff in the distance
      kc2 = elems[1]
@@ -1008,7 +1008,7 @@ class Geometry(object):
      for i in range(self.dim):
       diff_dist[kc1][ind1][i] = dist[i]
       diff_dist[kc2][ind2][i] = -dist[i]
-    else : 
+    else :
      dist = self.compute_side_centroid(ll) - c1
      for i in range(self.dim):
       diff_dist[kc1][ind1][i] = dist[i]
@@ -1043,18 +1043,18 @@ class Geometry(object):
     c1 = self.get_elem_centroid(kc1)
     ind1 = self.elem_side_map[kc1].index(ll)
 
-    if not ll in (self.side_list['Boundary'] + self.side_list['Hot'] + self.side_list['Cold']) : 
+    if not ll in (self.side_list['Boundary'] + self.side_list['Hot'] + self.side_list['Cold']) :
 
      kc2 = elems[1]
      ind2 = self.elem_side_map[kc2].index(ll)
-     
+
      temp_1 = temp[kc1]
      temp_2 = temp[kc2] + self.get_side_periodic_value(ll,kc2)
-     diff_t = temp_2 - temp_1    
-  
+     diff_t = temp_2 - temp_1
+
      diff_temp[kc1][ind1]  = diff_t
-     diff_temp[kc2][ind2]  = -diff_t 
-    else : 
+     diff_temp[kc2][ind2]  = -diff_t
+    else :
      if ll in self.side_list['Hot'] :
       diff_temp[kc1][ind1]  = 0.5-temp[kc1]
 
@@ -1072,4 +1072,4 @@ class Geometry(object):
      gradT[k][2] = tmp[2]
 
    return gradT
- 
+

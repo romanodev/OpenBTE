@@ -268,7 +268,6 @@ class Plot(object):
   if MPI.COMM_WORLD.Get_rank() == 0:
    variable = argv['variable'].split('/')[1]
 
-
    init_plotting(extra_bottom_padding = -0.15,extra_x_padding = -0.1)
 
 
@@ -278,6 +277,7 @@ class Plot(object):
    argv.update({'Geometry':geo})
 
    vw = WriteVtk(argv)
+
 
    (triangulation,tmp) = vw.get_node_data(solver[variable])
 
@@ -300,6 +300,14 @@ class Plot(object):
    vmax = argv.setdefault('vmax',max(data))
 
    tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax))
+
+
+   #colorbar(norm=mpl.colors.Normalize(vmin=min(data),vmax=max(data)))
+
+    #Contour-----
+   t = tricontour(triangulation,data,levels=np.linspace(min(data),max(data),10),colors='black',linewidths=1.5)
+
+
 
    axis('equal')
    axis('off')

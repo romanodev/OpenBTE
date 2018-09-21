@@ -20,7 +20,7 @@ class WriteVtk(object):
 
  def add_variable(self,variable,**argv):
 
-
+  
   self.data.append(variable)
   self.label.append(argv['label'])
 
@@ -122,7 +122,7 @@ class WriteVtk(object):
 
 
     is_scalar = len(list(np.shape(variable))) == 1
-    
+
     node_data = self.cell_to_node(variable)
     #stored_data.update({self.label[n]:{variable:node_data[:,0],'label':self.label[n]}})
 
