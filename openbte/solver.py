@@ -545,7 +545,7 @@ class Solver(object):
     B = np.zeros(self.n_elems)
     for kc1,kc2 in zip(*self.mesh.A.nonzero()):
      ll = self.mesh.get_side_between_two_elements(kc1,kc2)
-    
+
      kappa = self.side_kappa_map[ll]
      #kappa = 100.0
      #print(kappa)
@@ -631,6 +631,7 @@ class Solver(object):
     temperature_mfp = np.zeros((n_kappa,self.n_elems))
     gradient_temperature_mfp = np.zeros((len(options['kappa_bulk']),self.n_elems,3))
     #max_iter=1
+    min_err = 1e-6
     while error > min_err and n_iter < max_iter :
 
 
@@ -645,6 +646,7 @@ class Solver(object):
 
      kappa = self.compute_diffusive_thermal_conductivity(temp)
      error = abs((kappa - kappa_old)/kappa)
+     #print(error)
      kappa_old = kappa
      n_iter +=1
     suppression = np.zeros(len(options['kappa_bulk']))
@@ -683,7 +685,7 @@ class Solver(object):
       C[j] -= np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(j)*kappa
 
 
-    return C,[-self.elem_kappa_map[n]*tmp for n,tmp in enumerate(self.gradT)]
+    return C, [-self.elem_kappa_map[n]*tmp for n,tmp in enumerate(self.gradT)]
 
 
   def compute_diffusive_thermal_conductivity(self,temp,mat=np.eye(3)):

@@ -14,6 +14,7 @@ from shapely.geometry import MultiPoint,Point,Polygon,LineString
 from scipy.interpolate import BarycentricInterpolator
 from .WriteVTK import *
 from .geometry import *
+from scipy.interpolate import griddata
 
 def get_suppression(mfps,sup,mfp):
 
@@ -268,8 +269,10 @@ class Plot(object):
   if MPI.COMM_WORLD.Get_rank() == 0:
    variable = argv['variable'].split('/')[1]
 
-   init_plotting(extra_bottom_padding = -0.15,extra_x_padding = -0.1)
+   #init_plotting(extra_bottom_padding = -0.0,extra_x_padding = -0.0)
+   figure(num=None, figsize=(5, 5), dpi=80, facecolor='w', edgecolor='k')
 
+   axes([0,0,1.0,1.0])
 
    #geo = dd.io.load('geometry.hdf5')
 
@@ -279,7 +282,7 @@ class Plot(object):
    vw = WriteVtk(argv)
 
 
-   (triangulation,tmp) = vw.get_node_data(solver[variable])
+   (triangulation,tmp,nodes) = vw.get_node_data(solver[variable])
 
    if 'direction' in argv.keys():
     if argv['direction'] == 'x':
@@ -305,13 +308,48 @@ class Plot(object):
    #colorbar(norm=mpl.colors.Normalize(vmin=min(data),vmax=max(data)))
 
     #Contour-----
-   t = tricontour(triangulation,data,levels=np.linspace(min(data),max(data),10),colors='black',linewidths=1.5)
+   if argv.setdefault('iso_values',False):
+    t = tricontour(triangulation,data,levels=np.linspace(min(data),max(data),10),colors='black',linewidths=1.5)
+
+   if argv.setdefault('streamlines',False) and (variable == 'fourier_flux' or variable == 'bte_flux' ):
+       n_lines = argv.setdefault('n_lines',10)
+       xi = np.linspace(-5.0,5,200)
+       yi = np.linspace(-5.0,5,200)
+       x = np.array(nodes)[:,0]
+       y = np.array(nodes)[:,1]
+       z = np.array(tmp).T[0]
+       Fx = griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
+       z = np.array(tmp).T[1]
+       Fy = griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
+       sx = np.concatenate((-5*np.ones(n_lines),5*np.ones(n_lines)))
+       sy = np.concatenate((np.linspace(-4.8,4.8,n_lines),np.linspace(-4.8,4.8,n_lines)))
+       #seed_points = np.array([sx,sy])
+       #seed_points = np.array([4.99*np.ones(10),np.linspace(-4.9,4.9,10)])
+       #streamplot(xi, yi, Fx, Fy,maxlength = 1e28,start_points=seed_points.T,integration_direction='backward',color='r')
+
+       seed_points = np.array([-4.99*np.ones(n_lines),np.linspace(-4.8,4.8,n_lines)])
+       ss = streamplot(xi, yi, Fx, Fy,maxlength = 1e8,start_points=seed_points.T,integration_direction='forward',color='r',minlength=1)
+       #a = np.shape(np.array(ss.lines.get_segments()))
+       #print(a)
+
+       #quit()
+
+   if argv.setdefault('plot_interfaces',False):
+    for ll in geo.side_list['Interface']:
+      p1 = geo.state['nodes'][geo.state['sides'][ll][0]][:2]
+      p2 = geo.state['nodes'][geo.state['sides'][ll][1]][:2]
+
+      plot([p1[0],p2[0]],[p1[1],p2[1]],color='w',ls='--',zorder=1)
 
 
+       #plot(seed_points[0], seed_points[1], 'bo')
 
+
+   xlim([-5,5])
+   ylim([-5,5])
    axis('equal')
    axis('off')
-
+   tight_layout()
 
    show()
 

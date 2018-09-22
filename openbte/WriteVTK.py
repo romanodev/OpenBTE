@@ -20,7 +20,7 @@ class WriteVtk(object):
 
  def add_variable(self,variable,**argv):
 
-  
+
   self.data.append(variable)
   self.label.append(argv['label'])
 
@@ -107,7 +107,7 @@ class WriteVtk(object):
      increment = tmp[self.mesh.direction]
     nodes,cells,data = self.repeat_nodes_and_data(node_data,increment)
 
-    return Triangulation(np.array(nodes)[:,0],np.array(nodes)[:,1], triangles=cells, mask=None),data
+    return Triangulation(np.array(nodes)[:,0],np.array(nodes)[:,1], triangles=cells, mask=None),data,nodes
 
 
 

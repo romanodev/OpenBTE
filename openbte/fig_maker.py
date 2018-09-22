@@ -11,10 +11,10 @@ c3 = '#2ca02c'
 
 
 def savefigure(prefix = './'):
-  
+
 
  namefile =  prefix + sys.argv[0].split('.')[0]+'.png'
- 
+
  savefig(namefile,dpi=300)
 
 
