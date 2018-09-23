@@ -20,19 +20,48 @@ class WriteVtk(object):
 
  def add_variable(self,variable,**argv):
 
-
   self.data.append(variable)
   self.label.append(argv['label'])
 
-
-
  def cell_to_node(self,data):
 
+   #n_nodes = len(self.mesh.nodes)
+
+   #print(len(self.mesh.node_list['Interface']))
+   #delta = 2e-6*np.ones(3)
+   #delta[2] = 0.0
+
+   add_nodes = True
+   if add_nodes:
+
+    for node in self.mesh.node_list['Interface']:
+
+     self.mesh.nodes = np.append(self.mesh.nodes,[self.mesh.nodes[node]],axis=0)
+     node_elem_map_1 = []
+     node_elem_map_2 = []
+     for elem in self.mesh.node_elem_map[node]:
+      if self.mesh.get_region_from_elem(elem) == 'Bulk':
+        node_elem_map_1.append(elem)
+      else:
+        node_elem_map_2.append(elem)
+        index = self.mesh.elems[elem].index(node)
+        self.mesh.elems[elem][index]= len(self.mesh.nodes)-1
+
+
+     self.mesh.node_elem_map[node] = node_elem_map_1
+     self.mesh.node_elem_map.update({len(self.mesh.nodes)-1:node_elem_map_2})
+
+
+   #for node  in self.mesh.node_list['Interface']:
+#     print(len(self.mesh.node_elem_map[node]))
+
+   #quit()
    n_nodes = len(self.mesh.nodes)
+    #-----------------------
+    #quit()
    n_col = len(np.shape(data))
    if n_col == 2: n_col = 3
    node_data = np.zeros((n_nodes,n_col))
-
 
    conn = np.zeros(n_nodes)
    for n in self.mesh.node_elem_map.keys():
@@ -99,6 +128,9 @@ class WriteVtk(object):
 
  def get_node_data(self,variable):
 
+
+
+
     node_data = self.cell_to_node(variable)
     is_scalar = len(list(np.shape(variable))) == 1
     increment = [0,0,0]
@@ -106,6 +138,8 @@ class WriteVtk(object):
     if is_scalar:
      increment = tmp[self.mesh.direction]
     nodes,cells,data = self.repeat_nodes_and_data(node_data,increment)
+
+    #return Triangulation(np.array(self.mesh.nodes)[:,0],np.array(self.mesh.nodes)[:,1], triangles=self.mesh.elems, mask=None),node_data,self.mesh.nodes
 
     return Triangulation(np.array(nodes)[:,0],np.array(nodes)[:,1], triangles=cells, mask=None),data,nodes
 

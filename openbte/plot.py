@@ -60,7 +60,6 @@ class Plot(object):
    model= argv['variable'].split('/')[0]
    if model == 'map':
     #self.plot_map(argv)
-
     self.plot_node_map(argv)
 
   if argv['variable'] == 'suppression_function' :
@@ -101,7 +100,7 @@ class Plot(object):
   if MPI.COMM_WORLD.Get_rank() == 0:
 
    init_plotting()
-   variable = argv['variable'].split('/')[1]
+   variable = argv['variable']
    geo = dd.io.load('geometry.hdf5')
    Nx = argv.setdefault('repeat_x',1)
    Ny = argv.setdefault('repeat_y',1)
@@ -112,7 +111,7 @@ class Plot(object):
     solver = dd.io.load('solver.hdf5')
 
    if not variable == 'geometry':
-    data = solver[variable]
+    data = solver['fourier_flux']
 
     if len(np.shape(data)) == 1: #It is temperature
       increment = [1,0]
@@ -125,20 +124,22 @@ class Plot(object):
 
     #In case we have flux
     if variable == 'bte_flux' or variable == 'fourier_flux':
-     component = argv['variable'].split('/')[2]
+     component = argv['direction']
      if component == 'x':
        data = data[0]
      if component == 'y':
        data = data[1]
      if component == 'z':
        data = data[2]
-     if component == 'magnitude':
-      tmp = []
-      for d in data :
-       tmp.append(np.linalg.norm(d))
-      data = tmp
+     #if component == 'magnitude':
+     # print('ss')
+    tmp = []
+    for d in data :
+     tmp.append(np.linalg.norm(d))
+    data = tmp
      #-------------------------
-
+    #print(np.shape(data))
+    #quit()
     #normalization----
     maxt = max(data)
     mint = min(data)

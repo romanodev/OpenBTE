@@ -24,7 +24,6 @@ class Geometry(object):
 
  def __init__(self,**argv):
 
-
   direction = argv.setdefault('direction','x')
   if direction == 'x':self.direction = 0
   if direction == 'y':self.direction = 1
@@ -59,7 +58,7 @@ class Geometry(object):
      if geo_type == 'porous/random':
       frame,polygons = GenerateRandomPoresOverlap(argv)
 
-      
+
 
      if 'lz' in argv.keys():
       GenerateMesh3D.mesh(polygons,frame,argv)
@@ -73,7 +72,7 @@ class Geometry(object):
     # self.dim = 3
     #Interface----EXPERIMENTAL
     #if argv['model'] == '2DInterface':
-    #  GenerateInterface2D.mesh(argv)
+    #  Generate:/2D.mesh(argv)
     #  self.dim = 2
 
     #bulk----------
@@ -117,6 +116,7 @@ class Geometry(object):
 
 
     data = {'side_list':self.side_list,\
+          'node_list':self.node_list,\
           'exlude':self.exlude,\
           'elem_side_map':self.elem_side_map,\
           'elem_region_map':self.elem_region_map,\
@@ -141,6 +141,7 @@ class Geometry(object):
           'side_areas':self.side_areas,\
           'pairs':self.pairs,\
           'boundary_elements':self.boundary_elements,\
+          'interface_elements':self.interface_elements,\
           'side_normals':self.side_normals,\
           'grad_direction':self.direction,\
           'area_flux':self.area_flux,\
@@ -656,12 +657,14 @@ class Geometry(object):
     self.periodic_nodes = self.state['periodic_nodes']
     self.elem_volumes = self.state['elem_volumes']
     self.boundary_elements = self.state['boundary_elements']
+    self.interface_elements = self.state['interface_elements']
     self.side_normals = self.state['side_normals']
     self.side_areas = self.state['side_areas']
     self.exlude = self.state['exlude']
     self.pairs = self.state['pairs']
     self.direction = self.state['grad_direction']
     self.area_flux = self.state['area_flux']
+    self.node_list = self.state['node_list']
     self.flux_sides = self.state['flux_sides']
     self.side_periodic_value = self.state['side_periodic_value']
     self.kappa_factor = self.size[self.direction]/self.area_flux
@@ -802,7 +805,12 @@ class Geometry(object):
 
   self.side_list.setdefault('Boundary',[])
   self.side_list.setdefault('Interface',[])
+  #self.node_list.setdefault('Interface',[])
   self.periodic_nodes = []
+
+
+
+
   for label in self.side_list.keys():
 
    #Add Cold and Hot to Boundary
@@ -887,9 +895,32 @@ class Geometry(object):
      self.pairs += pairs
 
   #Create boundary_elements--------------------
+
   self.boundary_elements = []
+  self.interface_elements = []
+
+  self.node_list = {}
+  boundary_nodes = []
   for ll in self.side_list['Boundary']:
    self.boundary_elements.append(self.side_elem_map[ll][0])
+   for node in self.sides[ll]:
+    if not node in boundary_nodes:
+     boundary_nodes.append(node)
+  self.node_list.update({'Boundary':boundary_nodes})
+
+  interface_nodes = []
+  self.interface_elements = []
+  for ll in self.side_list['Interface']:
+   self.interface_elements.append(self.side_elem_map[ll][0])
+   self.interface_elements.append(self.side_elem_map[ll][1])
+   for node in self.sides[ll]:
+    if not node in interface_nodes:
+     interface_nodes.append(node)
+  self.node_list.update({'Interface':interface_nodes})
+
+
+  #print(self.node_list['Interface'])
+
 
   #delete MESH-----
   #a=subprocess.check_output(['rm','-f','mesh.geo'])
