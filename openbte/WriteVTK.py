@@ -28,7 +28,7 @@ class WriteVtk(object):
    #n_nodes = len(self.mesh.nodes)
 
    #print(len(self.mesh.node_list['Interface']))
-   #delta = 2e-6*np.ones(3)
+   delta = 2e-6*np.ones(3)
    #delta[2] = 0.0
 
    add_nodes = True
@@ -82,7 +82,9 @@ class WriteVtk(object):
 
    #----------------------------------------------
    nodes_uc = self.mesh.nodes
+
    n_nodes = len(nodes_uc)
+
    nodes = []
    data = []
    #add nodes---
@@ -96,19 +98,21 @@ class WriteVtk(object):
       P = [round(self.mesh.size[0]*nx,3),round(self.mesh.size[1]*ny,3),round(self.mesh.size[2]*nz,3)]
       for n in range(n_nodes):
        #index += 1
-       node_trial = [round(nodes_uc[n,0],4) + P[0],\
-                     round(nodes_uc[n,1],4) + P[1],\
-                     round(nodes_uc[n,2],4) + P[2]]
+       node_trial = [round(nodes_uc[n,0],4) + P[0]-(self.Nx-1)*0.5*self.mesh.size[0],\
+                     round(nodes_uc[n,1],4) + P[1]-(self.Nx-1)*0.5*self.mesh.size[1],\
+                     round(nodes_uc[n,2],4) + P[2]-(self.Nx-1)*0.5*self.mesh.size[2]]
 
-       if not node_trial in nodes:
-        nodes.append(node_trial)
-        data.append(data_uc[n]-dd)
-        corr[index+n] = len(nodes)-1
-       else:
-        corr[index+n] = nodes.index(node_trial)
+       #if not node_trial in nodes:
+       nodes.append(node_trial)
+       data.append(data_uc[n]-dd)
+       corr[index+n] = len(nodes)-1
+
+       #else:
+    #    corr[index+n] = nodes.index(node_trial)
 
 
    cells_uc = self.mesh.elems
+
    cells = []
    for nx in range(self.Nx):
     for ny in range(self.Ny):
@@ -123,12 +127,11 @@ class WriteVtk(object):
        cells.append(tmp)
 
 
-   return nodes,cells,data
 
+
+   return np.array(nodes),np.array(cells),np.array(data)
 
  def get_node_data(self,variable):
-
-
 
 
     node_data = self.cell_to_node(variable)
@@ -139,9 +142,11 @@ class WriteVtk(object):
      increment = tmp[self.mesh.direction]
     nodes,cells,data = self.repeat_nodes_and_data(node_data,increment)
 
-    #return Triangulation(np.array(self.mesh.nodes)[:,0],np.array(self.mesh.nodes)[:,1], triangles=self.mesh.elems, mask=None),node_data,self.mesh.nodes
+    #return Triangulation(np.array(self.mesh.nodes)[:,0],np.array(self.nodes)[:,1], triangles=self.mesh.elems, mask=None),node_data,self.mesh.nodes
 
-    return Triangulation(np.array(nodes)[:,0],np.array(nodes)[:,1], triangles=cells, mask=None),data,nodes
+
+
+    return Triangulation(nodes[:,0],nodes[:,1], triangles=cells, mask=None),data,nodes
 
 
 

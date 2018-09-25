@@ -631,7 +631,7 @@ class Solver(object):
     temperature_mfp = np.zeros((n_kappa,self.n_elems))
     gradient_temperature_mfp = np.zeros((len(options['kappa_bulk']),self.n_elems,3))
     #max_iter=1
-    min_err = 1e-6
+    min_err = 1e-8
     while error > min_err and n_iter < max_iter :
 
 

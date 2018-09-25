@@ -266,8 +266,9 @@ class Plot(object):
 
  def plot_node_map(self,argv):
 
-  geo = Geometry(type='load')
+
   if MPI.COMM_WORLD.Get_rank() == 0:
+   geo = Geometry(type='load')
    variable = argv['variable'].split('/')[1]
 
    #init_plotting(extra_bottom_padding = -0.0,extra_x_padding = -0.0)
@@ -281,6 +282,12 @@ class Plot(object):
    argv.update({'Geometry':geo})
 
    vw = WriteVtk(argv)
+
+
+   size = geo.state['size']
+   Nx = argv.setdefault('repeat_x',1)
+   Ny = argv.setdefault('repeat_y',1)
+   Nz = argv.setdefault('repeat_z',1)
 
 
    (triangulation,tmp,nodes) = vw.get_node_data(solver[variable])
@@ -313,34 +320,43 @@ class Plot(object):
     t = tricontour(triangulation,data,levels=np.linspace(min(data),max(data),10),colors='black',linewidths=1.5)
 
    if argv.setdefault('streamlines',False) and (variable == 'fourier_flux' or variable == 'bte_flux' ):
-       n_lines = argv.setdefault('n_lines',10)
-       xi = np.linspace(-5.0,5,200)
-       yi = np.linspace(-5.0,5,200)
+
+       Lx = geo.size[0]*Nx
+       Ly = geo.size[1]*Ny
+       n_lines = argv.setdefault('n_lines',10)*Ny #assuming transport across x
+       xi = np.linspace(-Lx*0.5,Lx*0.5,300*Nx)
+       yi = np.linspace(-Ly*0.5,Ly*0.5,300*Ny)
        x = np.array(nodes)[:,0]
        y = np.array(nodes)[:,1]
        z = np.array(tmp).T[0]
        Fx = griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
        z = np.array(tmp).T[1]
        Fy = griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
-       sx = np.concatenate((-5*np.ones(n_lines),5*np.ones(n_lines)))
-       sy = np.concatenate((np.linspace(-4.8,4.8,n_lines),np.linspace(-4.8,4.8,n_lines)))
-       #seed_points = np.array([sx,sy])
-       #seed_points = np.array([4.99*np.ones(10),np.linspace(-4.9,4.9,10)])
-       #streamplot(xi, yi, Fx, Fy,maxlength = 1e28,start_points=seed_points.T,integration_direction='backward',color='r')
+       #sx = np.concatenate((-Lx*0.5*np.ones(n_lines),Lx*0.5*np.ones(n_lines)))
+       #sy = np.concatenate((np.linspace(-Ly*0.5*0.9,Ly*0.5*0.9,n_lines),np.linspace(-4.8,4.8,n_lines)))
 
-       seed_points = np.array([-4.99*np.ones(n_lines),np.linspace(-4.8,4.8,n_lines)])
-       ss = streamplot(xi, yi, Fx, Fy,maxlength = 1e8,start_points=seed_points.T,integration_direction='forward',color='r',minlength=1)
+       seed_points = np.array([-Lx*0.5*0.99*np.ones(n_lines),np.linspace(-Ly*0.5*0.98,Ly*0.5*0.98,n_lines)])
+       ss = streamplot(xi, yi, Fx, Fy,maxlength = 1e8,start_points=seed_points.T,integration_direction='forward',color='r',minlength=0.95)
        #a = np.shape(np.array(ss.lines.get_segments()))
        #print(a)
 
        #quit()
 
    if argv.setdefault('plot_interfaces',False):
+
     for ll in geo.side_list['Interface']:
       p1 = geo.state['nodes'][geo.state['sides'][ll][0]][:2]
       p2 = geo.state['nodes'][geo.state['sides'][ll][1]][:2]
+      for nx in range(Nx):
+       for ny in range(Ny):
+        for nz in range(Nz):
+         P = np.array([size[0]*(nx-(Nx-1)*0.5),\
+              size[1]*(ny-(Ny-1)*0.5)])
 
-      plot([p1[0],p2[0]],[p1[1],p2[1]],color='w',ls='--',zorder=1)
+         pp1 = np.array(p1) + P
+         pp2 = np.array(p2) + P
+
+         plot([pp1[0],pp2[0]],[pp1[1],pp2[1]],color='w',ls='--',zorder=1)
 
 
        #plot(seed_points[0], seed_points[1], 'bo')
