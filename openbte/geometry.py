@@ -14,11 +14,38 @@ from . import GenerateMesh2D
 from . import GenerateMesh3D
 from . import GenerateBulk2D
 from . import GenerateBulk3D
+import matplotlib.patches as patches
+from .fig_maker import *
+from matplotlib.path import Path
+
+from IPython.display import display, HTML
+
+
+CSS = """
+   .output {
+       align-items: center;
+    }
+    """
 #import GenerateInterface2D
 #from nanowire import *
 import deepdish as dd
 from scipy.sparse import csc_matrix
 from matplotlib.pylab import *
+
+def create_path(obj):
+
+   codes = [Path.MOVETO]
+   for n in range(len(obj)-1):
+    codes.append(Path.LINETO)
+   codes.append(Path.CLOSEPOLY)
+
+   verts = []
+   for tmp in obj:
+     verts.append(tmp)
+   verts.append(verts[0])
+
+   path = Path(verts,codes)
+   return path
 
 class Geometry(object):
 
@@ -41,6 +68,8 @@ class Geometry(object):
    if MPI.COMM_WORLD.Get_rank() == 0:
     #porous-----
     #if geo_type == 'porous/random' or \
+    polygons = []
+
     if  geo_type == 'porous/square_lattice' or\
         geo_type == 'porous/hexagonal_lattice' or\
         geo_type == 'porous/random' or\
@@ -58,15 +87,42 @@ class Geometry(object):
      if geo_type == 'porous/random':
       frame,polygons = GenerateRandomPoresOverlap(argv)
 
+    self.Lz = float(argv.setdefault('z',0.0))
+    if geo_type == 'bulk':
+      Lx = float(argv['lx'])
+      Ly = float(argv['ly'])
+
+      frame = []
+      frame.append([-Lx/2,Ly/2])
+      frame.append([Lx/2,Ly/2])
+      frame.append([Lx/2,-Ly/2])
+      frame.append([-Lx/2,-Ly/2])
+
+    self.frame = frame
+    self.polygons = polygons
+    if argv.setdefault('plot',False):
+     self.plot_polygons(argv)
+
+    if argv.setdefault('mesh',True):
+     self.mesh(**argv)
 
 
-     if 'lz' in argv.keys():
-      GenerateMesh3D.mesh(polygons,frame,argv)
-      self.dim = 3
-     else:
-      GenerateMesh2D.mesh(polygons,frame,argv)
-      self.dim = 2
+ def mesh(self,**argv):
 
+    if self.Lz > 0.0:
+     self.dim = 3
+    else:
+     self.dim = 2
+
+    argv.update({'lz':self.Lz})
+    if len(self.polygons) > 0 and self.dim == 3:
+     GenerateMesh3D.mesh(self.polygons,self.frame,argv)
+    if len(self.polygons) > 0 and self.dim == 2:
+     GenerateMesh2D.mesh(self.polygons,self.frame,argv)
+    if len(self.polygons) == 0 and self.dim == 2:
+     GenerateBulk2D.mesh(argv)
+    if len(self.polygons) == 0 and self.dim == 3:
+     GenerateBulk3D.mesh(argv)
     #if argv['model'] == 'nanowire':
     # nanowire(argv)
     # self.dim = 3
@@ -76,17 +132,53 @@ class Geometry(object):
     #  self.dim = 2
 
     #bulk----------
-    if geo_type == 'bulk':
-     if 'lz' in argv.keys() == 3:
-      GenerateBulk3D.mesh(argv)
-      self.dim = 3
-     else:
-      GenerateBulk2D.mesh(argv)
-      self.dim = 2
+    #if geo_type == 'bulk':
+    # if 'lz' in argv.keys() == 3:
+    #  GenerateBulk3D.mesh(argv)
+    #  self.dim = 3
+    # else:
+    #  GenerateBulk2D.mesh(argv)
+    #  self.dim = 2
      #-----------------------------------
     data = self.compute_mesh_data()
     dd.io.save('geometry.hdf5', data)
-  MPI.COMM_WORLD.Barrier()
+
+ # MPI.COMM_WORLD.Barrier()
+
+ def plot_polygons(self,argv):
+
+
+    lx = -self.frame[0][0]*2
+    ly = -self.frame[0][1]*2
+
+    init_plotting()
+    xlim([-lx/2.0,lx/2.0])
+    ylim([-ly/2.0,ly/2.0])
+    path = create_path(self.frame)
+    patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color='gray',zorder=1,joinstyle='miter')
+    gca().add_patch(patch);
+
+    if argv.setdefault('inclusion',False):
+     color='g'
+    else:
+     color='white'
+    for poly in self.polygons:
+
+     path = create_path(poly)
+     patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=10,joinstyle='miter')
+     gca().add_patch(patch);
+    axis('off')
+
+    show()
+    HTML('<style>{}</style>'.format(CSS))
+
+
+
+
+
+
+
+
 
 
  def adjust_boundary_elements(self):

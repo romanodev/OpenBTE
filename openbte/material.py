@@ -20,7 +20,7 @@ class Material(object):
   self.state = {}
 
 
-  argv.setdefault('model','nongray')
+  argv.setdefault('model','gray')
   if argv['model'] == 'load':
    #MPI.COMM_WORLD.Barrier()
    if MPI.COMM_WORLD.Get_rank() == 0:

@@ -40,7 +40,7 @@ class WriteVtk(object):
      node_elem_map_1 = []
      node_elem_map_2 = []
      for elem in self.mesh.node_elem_map[node]:
-      if self.mesh.get_region_from_elem(elem) == 'Bulk':
+      if self.mesh.get_region_from_elem(elem) == 'Matrix':
         node_elem_map_1.append(elem)
       else:
         node_elem_map_2.append(elem)

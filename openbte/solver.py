@@ -128,10 +128,17 @@ class Solver(object):
 
     self.side_kappa_map = {}
     self.elem_kappa_map = {}
+    self.region_elem_map = {}
+    self.region_kappa_map = {}
     for ll in self.mesh.side_list['active']:
      (elem1,elem2) = self.mesh.side_elem_map[ll]
      region_1 = self.mesh.get_region_from_elem(elem1)
      kappa_1 = self.materials[region_1]['kappa_bulk_tot']
+
+
+     if not region_1 in self.region_kappa_map.keys():
+      self.region_kappa_map.update({region_1:kappa_1})
+
      if not ll in self.mesh.side_list['Boundary'] :
 
       region_2 = self.mesh.get_region_from_elem(elem2)
@@ -147,6 +154,11 @@ class Solver(object):
        self.elem_kappa_map.update({elem1:kappa_1})
       if not elem2 in self.elem_kappa_map.keys():
        self.elem_kappa_map.update({elem2:kappa_2})
+
+      if not region_2 in self.region_kappa_map.keys():
+
+       self.region_kappa_map.update({region_2:kappa_2})
+
      else:
       (elem1,elem2) = self.mesh.side_elem_map[ll]
       if not elem1 in self.elem_kappa_map.keys():
@@ -357,7 +369,12 @@ class Solver(object):
 
    if MPI.COMM_WORLD.Get_rank() == 0:
       print('  ')
-      print('   Bulk Thermal Conductivity:    ' + str(round(self.kappa_bulk,4)) + ' W/m/K')
+      for region in self.region_kappa_map.keys():
+       print(region.ljust(15) +  '{:8.2f}'.format(self.region_kappa_map[region])+ ' W/m/K')
+
+
+
+
    #Solve standard Fourier---------------------------------------------------------
 
    #Initalization-----------------------------------------------------------
@@ -399,7 +416,7 @@ class Solver(object):
 
    if MPI.COMM_WORLD.Get_rank() == 0:
       print('  ')
-      print('   Fourier Thermal Conductivity: ' + str(round(kappa*self.kappa_bulk,4)) + ' W/m/K')
+      print('Effective'.ljust(15) +  '{:8.2f}'.format(kappa*self.kappa_bulk)+ ' W/m/K')
       print('  ')
 
 

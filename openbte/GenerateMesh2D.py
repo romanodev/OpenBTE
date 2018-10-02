@@ -453,7 +453,7 @@ def mesh(polygons,frame,argv):
   #-------------------------------
 
 
-  strc = r'''Physical Surface('Bulk') = {'''
+  strc = r'''Physical Surface('Matrix') = {'''
   for n,s in enumerate(bulk_surface):
    strc += str(s)
    if n == len(bulk_surface)-1:

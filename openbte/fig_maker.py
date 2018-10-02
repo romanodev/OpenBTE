@@ -33,7 +33,7 @@ def init_plotting(extra_x_padding = 0.0,extra_y_padding=0.0,extra_bottom_padding
  rcParams['xtick.labelsize'] = LARGE
  rcParams['ytick.labelsize'] = LARGE
  if square:
-  mpl.rcParams['figure.figsize'] = [5.0, 5.0]
+  mpl.rcParams['figure.figsize'] = [4.0, 4.0]
  else:
   mpl.rcParams['figure.figsize'] = [8.0, 5.0]
  if presentation:
@@ -59,6 +59,3 @@ def init_plotting(extra_x_padding = 0.0,extra_y_padding=0.0,extra_bottom_padding
  rcParams['axes.linewidth'] = 1
  #axes([0.15+extra_x_padding,0.20+extra_bottom_padding,0.78-extra_x_padding-extra_y_padding,0.75-extra_bottom_padding-extra_top_padding])
  axes([0,0,1.0,1.0])
-
-
-
