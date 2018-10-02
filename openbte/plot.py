@@ -272,7 +272,7 @@ class Plot(object):
    variable = argv['variable'].split('/')[1]
 
    #init_plotting(extra_bottom_padding = -0.0,extra_x_padding = -0.0)
-   figure(num=None, figsize=(5, 5), dpi=80, facecolor='w', edgecolor='k')
+   figure(num=None, figsize=(4, 4), dpi=80, facecolor='w', edgecolor='k')
 
    axes([0,0,1.0,1.0])
 
@@ -291,6 +291,16 @@ class Plot(object):
 
 
    (triangulation,tmp,nodes) = vw.get_node_data(solver[variable])
+
+   #flip nodes-----This has to be checked
+
+   #for node in nodes:
+#    node[0] -= node[0]
+    #node[1] -= node[1]
+   #---------------
+
+
+
 
    if 'direction' in argv.keys():
     if argv['direction'] == 'x':
@@ -319,10 +329,11 @@ class Plot(object):
    if argv.setdefault('iso_values',False):
     t = tricontour(triangulation,data,levels=np.linspace(min(data),max(data),10),colors='black',linewidths=1.5)
 
+   Lx = geo.size[0]*Nx
+   Ly = geo.size[1]*Ny
    if argv.setdefault('streamlines',False) and (variable == 'fourier_flux' or variable == 'bte_flux' ):
 
-       Lx = geo.size[0]*Nx
-       Ly = geo.size[1]*Ny
+
        n_lines = argv.setdefault('n_lines',10)*Ny #assuming transport across x
        xi = np.linspace(-Lx*0.5,Lx*0.5,300*Nx)
        yi = np.linspace(-Ly*0.5,Ly*0.5,300*Ny)
@@ -362,12 +373,12 @@ class Plot(object):
        #plot(seed_points[0], seed_points[1], 'bo')
 
 
-   xlim([-5,5])
-   ylim([-5,5])
+   xlim([-Lx*0.5,Lx*0.5])
+   ylim([-Ly*0.5,Ly*0.5])
    axis('equal')
    axis('off')
    tight_layout()
-
+   gca().invert_yaxis()
    show()
 
 

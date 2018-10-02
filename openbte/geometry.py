@@ -151,7 +151,10 @@ class Geometry(object):
     lx = -self.frame[0][0]*2
     ly = -self.frame[0][1]*2
 
-    init_plotting()
+    #init_plotting()
+    figure(num=None, figsize=(4, 4), dpi=80, facecolor='w', edgecolor='k')
+    axes([0,0,1.0,1.0])
+
     xlim([-lx/2.0,lx/2.0])
     ylim([-ly/2.0,ly/2.0])
     path = create_path(self.frame)
@@ -170,7 +173,7 @@ class Geometry(object):
     axis('off')
 
     show()
-    HTML('<style>{}</style>'.format(CSS))
+    #HTML('<style>{}</style>'.format(CSS))
 
 
 

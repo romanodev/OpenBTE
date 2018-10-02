@@ -27,6 +27,7 @@ class Solver(object):
 
    self.mesh = Geometry(type='load',filename = argv.setdefault('geometry_filename','geometry'))
    self.ms_error = argv.setdefault('ms_error',0.1)
+   self.verbose = argv.setdefault('verbose',True)
 
    self.n_elems = len(self.mesh.elems)
    self.dim = self.mesh.dim
@@ -64,7 +65,7 @@ class Solver(object):
 
    self.kappa_factor = self.mesh.kappa_factor
 
-   if argv.setdefault('verbose',True):
+   if self.verbose:
     self.print_logo()
 
    self.dom = mat.state['dom']
@@ -368,6 +369,7 @@ class Solver(object):
    self.current_iter = 0
 
    if MPI.COMM_WORLD.Get_rank() == 0:
+     if self.verbose:
       print('  ')
       for region in self.region_kappa_map.keys():
        print(region.ljust(15) +  '{:8.2f}'.format(self.region_kappa_map[region])+ ' W/m/K')
@@ -416,7 +418,7 @@ class Solver(object):
 
    if MPI.COMM_WORLD.Get_rank() == 0:
       print('  ')
-      print('Effective'.ljust(15) +  '{:8.2f}'.format(kappa*self.kappa_bulk)+ ' W/m/K')
+      print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(kappa*self.kappa_bulk)+ ' W/m/K')
       print('  ')
 
 
@@ -732,12 +734,13 @@ class Solver(object):
   def print_dof(self):
 
    if MPI.COMM_WORLD.Get_rank() == 0:
-    print(' ')
-    print('Elements:          ' + str(self.n_el))
-    print('Azimuthal angles:  ' + str(self.n_theta))
-    print('Polar angles:      ' + str(self.n_phi))
-    print('Mean-free-paths:   ' + str(self.n_mfp))
-    print('Degree-of-freedom: ' + str(self.n_mfp*self.n_theta*self.n_phi*self.n_el))
+    if self.verbose:
+     print(' ')
+     print('Elements:          ' + str(self.n_el))
+     print('Azimuthal angles:  ' + str(self.n_theta))
+     print('Polar angles:      ' + str(self.n_phi))
+     print('Mean-free-paths:   ' + str(self.n_mfp))
+     print('Degree-of-freedom: ' + str(self.n_mfp*self.n_theta*self.n_phi*self.n_el))
 
 
 

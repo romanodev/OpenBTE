@@ -5,9 +5,11 @@ from math import *
 
 def compute_dom_3d(argv) :
 
+   #print(argv.setdefault('n_theta',16))
 
-   n_theta = int(argv.setdefault('n_theta'))
-   n_phi = int(argv.setdefault('n_phi'))
+
+   n_theta = int(argv.setdefault('n_theta',16))
+   n_phi = int(argv.setdefault('n_phi',48))
    #n_phi = int(argv['n_phi'])
 
 
@@ -126,7 +128,7 @@ def compute_dom_3d(argv) :
       #print(np.cross(integrated_dir[t][p][0:2],phonon_dir[t][p][0:2]))
 
 
-   
+
 
 
    output.update({'d_omega':d_omega})
