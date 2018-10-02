@@ -20,7 +20,7 @@ def GenerateSquareLatticePores(argv):
   if shape == 'triangle':
      Na = 3; phi0 = 0.0
 
-
+  phi0 = argv.setdefault('angle',0.0)
   #Read Number of pores
   Nx = argv.setdefault('Nx',1)
   Ny = argv.setdefault('Ny',1)
