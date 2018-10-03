@@ -148,7 +148,12 @@ class Solver(object):
       L = self.mesh.get_distance_between_centroids_of_two_elements_from_side(ll)
       L_1 = s*L
       L_2 = (1.0 - s)*L
-      kappa = L*kappa_1 * kappa_2/(kappa_2 * L_1 + L_2 * kappa_1)# +  kappa_1 * kappa_2/self.interface_conductance)
+      if not (kappa_1 == 0.0 and kappa_2 == 0.0):
+       kappa = L*kappa_1 * kappa_2/(kappa_2 * L_1 + L_2 * kappa_1)# +  kappa_1 * kappa_2/self.interface_conductance)
+      else:
+       kappa = 1e-4
+      #print(kappa_1,kappa_2,kappa)
+
       self.side_kappa_map.update({ll:kappa})
       if not elem1 in self.elem_kappa_map.keys():
        self.elem_kappa_map.update({elem1:kappa_1})
