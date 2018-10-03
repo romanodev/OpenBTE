@@ -19,6 +19,7 @@ setup(name='openbte',
                         'future',
                         'deepdish',
                         'mpi4py',
+                        'networkx',
                         'matplotlib',
                          ],
       license='GPLv2',\
