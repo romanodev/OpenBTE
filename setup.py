@@ -23,7 +23,7 @@ setup(name='openbte',
                          ],
       license='GPLv2',\
       packages = ['openbte'],
-      package_data = {'openbte':['materials/*.dat']},
+      package_data = {'openbte':['materials/*.dat','../extern/gmsh']},
       #packages = find_packages(exclude=['openbte_new']),
       entry_points = {
      'console_scripts': [
