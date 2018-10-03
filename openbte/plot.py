@@ -320,6 +320,7 @@ class Plot(object):
    vmin = argv.setdefault('vmin',min(data))
    vmax = argv.setdefault('vmax',max(data))
 
+
    tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax))
 
 

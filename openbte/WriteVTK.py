@@ -47,7 +47,7 @@ class WriteVtk(object):
         index = self.mesh.elems[elem].index(node)
         self.mesh.elems[elem][index]= len(self.mesh.nodes)-1
 
-
+     
      self.mesh.node_elem_map[node] = node_elem_map_1
      self.mesh.node_elem_map.update({len(self.mesh.nodes)-1:node_elem_map_2})
 
