@@ -151,7 +151,7 @@ class Solver(object):
       if not (kappa_1 == 0.0 and kappa_2 == 0.0):
        kappa = L*kappa_1 * kappa_2/(kappa_2 * L_1 + L_2 * kappa_1)# +  kappa_1 * kappa_2/self.interface_conductance)
       else:
-       kappa = 1e-4
+       kappa = 1e-3
       #print(kappa_1,kappa_2,kappa)
 
       self.side_kappa_map.update({ll:kappa})
@@ -406,7 +406,8 @@ class Solver(object):
 
 
    kappa = suppression_fourier[0,:,:].sum()
-   #print(kappa)
+
+
    #quit()
 
    kappa_fourier = kappa
@@ -422,7 +423,7 @@ class Solver(object):
 
    if MPI.COMM_WORLD.Get_rank() == 0:
       print('  ')
-      print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(kappa*self.kappa_bulk)+ ' W/m/K')
+      print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(kappa)+ ' W/m/K')
       print('  ')
 
 
@@ -667,9 +668,13 @@ class Solver(object):
 
      (C,flux) = self.compute_non_orth_contribution(temp)
 
-     kappa = self.compute_diffusive_thermal_conductivity(temp)
+     #kappa = self.compute_diffusive_thermal_conductivity(temp)
+
+     kappa = self.compute_inho_diffusive_thermal_conductivity(temp)
+
      error = abs((kappa - kappa_old)/kappa)
-     #print(error)
+
+
      kappa_old = kappa
      n_iter +=1
     suppression = np.zeros(len(options['kappa_bulk']))
@@ -682,7 +687,10 @@ class Solver(object):
      for p in range(self.n_phi):
       suppression[n,t,p] = kappa*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
 
-    output = {'suppression':suppression,'temperature':temperature_mfp,'flux':flux,'temperature_gradient':gradient_temperature_mfp}
+
+    fourier_flux = [-self.elem_kappa_map[n]*tmp for n,tmp in enumerate(flux)]
+
+    output = {'suppression':suppression,'temperature':temperature_mfp,'flux':fourier_flux,'temperature_gradient':gradient_temperature_mfp}
 
     return output
 
@@ -708,7 +716,20 @@ class Solver(object):
       C[j] -= np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(j)*kappa
 
 
-    return C, [-self.elem_kappa_map[n]*tmp for n,tmp in enumerate(self.gradT)]
+    return C, self.gradT# [-self.elem_kappa_map[n]*tmp for n,tmp in enumerate(self.gradT)]
+
+
+  def compute_inho_diffusive_thermal_conductivity(self,temp,mat=np.eye(3)):
+
+   kappa = 0
+   for i,j in zip(*self.PER.nonzero()):
+
+    ll = self.mesh.get_side_between_two_elements(i,j)
+    kappa_b = self.side_kappa_map[ll]
+    (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=mat)
+    kappa += 0.5*v_orth *self.PER[i,j]*(temp[j]+self.PER[i,j]-temp[i])*kappa_b
+
+   return kappa*self.kappa_factor
 
 
   def compute_diffusive_thermal_conductivity(self,temp,mat=np.eye(3)):
@@ -717,7 +738,6 @@ class Solver(object):
    for i,j in zip(*self.PER.nonzero()):
     (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=mat)
     kappa += 0.5*v_orth *self.PER[i,j]*(temp[j]+self.PER[i,j]-temp[i])
-
 
    return kappa*self.kappa_factor
 
