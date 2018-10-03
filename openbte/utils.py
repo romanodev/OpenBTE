@@ -11,7 +11,7 @@ def compute_serial_sum(func,n_tot,output,options):
   #Do the sum
   for n in range(n_tot):
    tmp = func(n,options)
-   for key, value in output.iteritems():
+   for key, value in output.items():
     strc = r'''output[' ''' + key + r''' ']+=tmp[' ''' + key +r''' '] '''
     exec(strc.replace(" ", ""))
 
@@ -26,7 +26,7 @@ def compute_parallel_sum(func,n_tot,output,options):
    n_left = n_tot
    n_start = 0
    #VARIABLES------------------------------
-   for key, value in output.iteritems():
+   for key, value in output.items():
     strc = r'''output[' ''' + key + r''' '].fill(0)'''
     exec("".join(strc).replace(" ", ""))
     exec(key + '_tot = value')
@@ -37,19 +37,19 @@ def compute_parallel_sum(func,n_tot,output,options):
      n = n_start + comm.Get_rank()-1
      if n < n_tot:
       tmp = func(n,options)
-      for key, value in output.iteritems():
+      for key, value in output.items():
        strc = key + r''' = tmp[' ''' + key +r''' '] '''
        exec(strc.replace(" ", ""))
      else:
-      for key, value in output.iteritems():
+      for key, value in output.items():
        exec(key + ' = value')
       #----------------------------------
 
     else :
-     for key, value in output.iteritems():
+     for key, value in output.items():
       exec(key + ' = ' + key + '_tot.copy()')
 
-    for key, value in output.iteritems():
+    for key, value in output.items():
      exec('comm.Reduce([' + key+',MPI.DOUBLE],[' + key+'_tot,MPI.DOUBLE],op=MPI.SUM,root=0)')
 
     n_left  -= n_cycle
@@ -58,14 +58,14 @@ def compute_parallel_sum(func,n_tot,output,options):
    comm.Barrier()
 
    strc = r'''data = {   '''
-   for key, value in output.iteritems():
+   for key, value in output.items():
     strc += r''' ' ''' + key + r''' ':  ''' + key +'_tot,'
    strc = list(strc)
    strc[-1] = '}'
    exec("".join(strc).replace(" ", ""))
 
    tmp = comm.bcast(data,root=0)
-   for key, value in tmp.iteritems():
+   for key, value in tmp.items():
     if comm.Get_rank() > 0:
      strc = r'''output[' ''' + key+r''' '] +=tmp[' ''' + key+r''' ']'''
      exec("".join(strc).replace(" ", ""))
