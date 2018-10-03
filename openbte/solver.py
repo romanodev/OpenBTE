@@ -11,7 +11,6 @@ from scipy.sparse.linalg import *
 from scipy.sparse import diags
 from scipy.io import *
 import scipy.io
-import h5py
 from .utils import *
 import deepdish as dd
 import time
