@@ -35,7 +35,7 @@ from matplotlib.pylab import *
 def create_path(obj):
 
    codes = [Path.MOVETO]
-   for n in range(len(obj)-1):
+   for n in list(range(len(obj)-1)):
     codes.append(Path.LINETO)
    codes.append(Path.CLOSEPOLY)
 
@@ -890,7 +890,7 @@ class Geometry(object):
 
 
   #Apply Periodic Boundary Conditions
-  self.side_list.update({'active':range(len(self.sides))})
+  self.side_list.update({'active':list(range(len(self.sides)))})
   self.side_periodicity = np.zeros((len(self.sides),2,3))
   group_1 = []
   group_2 = []
