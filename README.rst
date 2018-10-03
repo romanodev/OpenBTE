@@ -26,6 +26,11 @@ Install `gmsh <http://gmsh.info/>`_
 
   python example.py
 
+Quick Try
+=========
+.. image:: https://mybinder.org/badge.svg :target: https://mybinder.org/v2/gh/romanodev/OpenBTE/master?filepath=notebooks%2FAlignedPores.ipynb
+
+
 Example
 =======
 
