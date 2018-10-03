@@ -313,13 +313,15 @@ class Plot(object):
       data = []
       for d in tmp:
        data.append(np.linalg.norm(d))
+      data = np.array(data)
    else:
     data = np.array(tmp).T[0]
 
-
+   data += 1.0
    vmin = argv.setdefault('vmin',min(data))
    vmax = argv.setdefault('vmax',max(data))
-
+   print(vmin)
+   print(vmax)
 
    tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax))
 
@@ -328,7 +330,7 @@ class Plot(object):
 
     #Contour-----
    if argv.setdefault('iso_values',False):
-    t = tricontour(triangulation,data,levels=np.linspace(min(data),max(data),10),colors='black',linewidths=1.5)
+    t = tricontour(triangulation,data,levels=np.linspace(vmin,vmax,10),colors='black',linewidths=1.5)
 
    Lx = geo.size[0]*Nx
    Ly = geo.size[1]*Ny
