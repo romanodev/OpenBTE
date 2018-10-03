@@ -1,3 +1,2 @@
-mpich
+mpiCC
 gmsh
-apt-utils
