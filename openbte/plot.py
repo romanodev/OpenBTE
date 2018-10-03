@@ -317,11 +317,11 @@ class Plot(object):
    else:
     data = np.array(tmp).T[0]
 
-   data += 1.0
+   #data += 1.0
    vmin = argv.setdefault('vmin',min(data))
    vmax = argv.setdefault('vmax',max(data))
-   print(vmin)
-   print(vmax)
+   #print(vmin)
+   #print(vmax)
 
    tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax))
 
@@ -350,7 +350,7 @@ class Plot(object):
        #sy = np.concatenate((np.linspace(-Ly*0.5*0.9,Ly*0.5*0.9,n_lines),np.linspace(-4.8,4.8,n_lines)))
 
        seed_points = np.array([-Lx*0.5*0.99*np.ones(n_lines),np.linspace(-Ly*0.5*0.98,Ly*0.5*0.98,n_lines)])
-       ss = streamplot(xi, yi, Fx, Fy,maxlength = 1e8,start_points=seed_points.T,integration_direction='forward',color='r',minlength=0.95,linewidth=1)
+       ss = streamplot(xi, yi, Fx, Fy,maxlength = 1e8,start_points=seed_points.T,integration_direction='both',color='r',minlength=0.95,linewidth=1)
        #a = np.shape(np.array(ss.lines.get_segments()))
        #print(a)
 
@@ -380,7 +380,7 @@ class Plot(object):
    ylim([-Ly*0.5,Ly*0.5])
    axis('equal')
    axis('off')
-   tight_layout()
+   #tight_layout()
    gca().invert_yaxis()
    show()
 
