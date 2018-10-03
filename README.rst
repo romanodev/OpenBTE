@@ -28,7 +28,9 @@ Install `gmsh <http://gmsh.info/>`_
 Quick Try
 =========
 
-.. image:: https://mybinder.org/badge.svg :target: https://mybinder.org/v2/gh/romanodev/OpenBTE/master?filepath=notebooks%2FAlignedPores.ipynb
+.. image:: 
+
+ https://mybinder.org/badge.svg :target: https://mybinder.org/v2/gh/romanodev/OpenBTE/master?filepath=notebooks%2FAlignedPores.ipynb
 
 Example
 =======
