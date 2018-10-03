@@ -906,7 +906,7 @@ class Geometry(object):
 
 
 
-  for label in self.side_list.keys():
+  for label in list(self.side_list.keys()):
 
    #Add Cold and Hot to Boundary
    #if label == "Hot" or label == "Cold":
