@@ -377,7 +377,7 @@ class Plot(object):
    ylim([-Ly*0.5,Ly*0.5])
    axis('equal')
    axis('off')
-   tight_layout()
+   #tight_layout()
    gca().invert_yaxis()
    show()
 
