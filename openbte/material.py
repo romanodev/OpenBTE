@@ -5,7 +5,6 @@ from .compute_dom import *
 from mpi4py import MPI
 import os
 import os.path
-import h5py
 import deepdish as dd
 
 
