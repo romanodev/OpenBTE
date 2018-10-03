@@ -1,4 +1,6 @@
 `#!/bin/bash`
 apt-get install gmsh
+apt-get install mpich
+
 `exec "$@"`
 
