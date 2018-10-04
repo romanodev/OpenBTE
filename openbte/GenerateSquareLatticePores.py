@@ -51,4 +51,5 @@ def GenerateSquareLatticePores(argv):
   frame.append([float(Lx * Nx)/2,float(-Ly * Ny)/2])
   frame.append([float(-Lx * Nx)/2,float(-Ly * Ny)/2])
 
+
   return frame,polygons

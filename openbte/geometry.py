@@ -7,6 +7,7 @@ from mpi4py import MPI
 from pyvtk import *
 from .GenerateSquareLatticePores import *
 from .GenerateHexagonalLatticePores import *
+from .GenerateStaggeredLatticePores import *
 from .GenerateCustomPores import *
 #from GenerateRandomPores import *
 from .GenerateRandomPoresOverlap import *
@@ -72,6 +73,7 @@ class Geometry(object):
 
     if  geo_type == 'porous/square_lattice' or\
         geo_type == 'porous/hexagonal_lattice' or\
+        geo_type == 'porous/staggered_lattice' or\
         geo_type == 'porous/random' or\
         geo_type == 'porous/custom':
 
@@ -80,6 +82,9 @@ class Geometry(object):
 
      if geo_type == 'porous/hexagonal_lattice':
       frame,polygons = GenerateHexagonalLatticePores(argv)
+
+     if geo_type == 'porous/staggered_lattice':
+      frame,polygons = GenerateStaggeredLatticePores(argv)
 
      if geo_type == 'porous/custom':
       frame,polygons = GenerateCustomPores(argv)
@@ -148,11 +153,12 @@ class Geometry(object):
  def plot_polygons(self,argv):
 
 
-    lx = -self.frame[0][0]*2
-    ly = -self.frame[0][1]*2
+    lx = abs(self.frame[0][0])*2
+    ly = abs(self.frame[0][1])*2
 
     #init_plotting()
-    figure(num=None, figsize=(4, 4), dpi=80, facecolor='w', edgecolor='k')
+
+    figure(num=None, figsize=(4*lx/ly, 4), dpi=80, facecolor='w', edgecolor='k')
     axes([0,0,1.0,1.0])
 
     xlim([-lx/2.0,lx/2.0])
@@ -206,8 +212,6 @@ class Geometry(object):
     self.compute_interpolation_weigths()
     self.compute_contact_areas()
     self.compute_boundary_condition_data()
-
-
 
 
     data = {'side_list':self.side_list,\

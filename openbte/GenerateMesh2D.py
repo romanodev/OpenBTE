@@ -465,7 +465,7 @@ def mesh(polygons,frame,argv):
 
   Minx= frame[0][0]
   Maxx= frame[2][0]
-  Miny= frame[3][0]
+  Miny= frame[3][1]
   Maxy= frame[1][1]
 
 

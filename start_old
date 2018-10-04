@@ -1,9 +1,0 @@
-
-apt-get install mpich
-apt-get install libglu1-mesa-dev
-apt-get install -y libxrender-dev
-apt-get install libxcursor1
-apt-get install libxft-dev
-apt-get install libxinerama-dev
-apt-get install python-tk
-
