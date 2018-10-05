@@ -106,8 +106,8 @@ class Geometry(object):
     self.frame = frame
     self.polygons = polygons
 
-    if argv.setdefault('plot',False):
-     self.plot_polygons(argv)
+    #if argv.setdefault('plot',False):
+    self.plot_polygons(argv)
 
     if argv.setdefault('mesh',True):
      self.mesh(**argv)
@@ -180,7 +180,12 @@ class Geometry(object):
      gca().add_patch(patch);
     axis('off')
 
-    show()
+    if argv.setdefault('show',False):
+     show()
+    if argv.setdefault('save_fig',False):
+     savefig(argv.setdefault('namefile','geometry.png'))
+
+
     #HTML('<style>{}</style>'.format(CSS))
 
 
