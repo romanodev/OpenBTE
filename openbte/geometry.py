@@ -183,7 +183,7 @@ class Geometry(object):
     if argv.setdefault('show',False):
      show()
     if argv.setdefault('save_fig',False):
-     savefig(argv.setdefault('fig_file',geometry.png'))
+     savefig(argv.setdefault('fig_file','geometry.png'))
 
 
     #HTML('<style>{}</style>'.format(CSS))
