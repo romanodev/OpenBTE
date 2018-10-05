@@ -105,6 +105,7 @@ class Geometry(object):
 
     self.frame = frame
     self.polygons = polygons
+
     if argv.setdefault('plot',False):
      self.plot_polygons(argv)
 
@@ -163,6 +164,7 @@ class Geometry(object):
 
     xlim([-lx/2.0,lx/2.0])
     ylim([-ly/2.0,ly/2.0])
+
     path = create_path(self.frame)
     patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color='gray',zorder=1,joinstyle='miter')
     gca().add_patch(patch);
@@ -171,8 +173,8 @@ class Geometry(object):
      color='g'
     else:
      color='white'
-    for poly in self.polygons:
 
+    for poly in self.polygons:
      path = create_path(poly)
      patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=10,joinstyle='miter')
      gca().add_patch(patch);

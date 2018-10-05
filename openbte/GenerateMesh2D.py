@@ -351,7 +351,6 @@ def mesh(polygons,frame,argv):
   polygons = regularize_polygons(polygons)
 
   mesh_ext = argv['step']
-  include_pores = argv.setdefault('include_pores',False)
   Frame = Polygon(frame)
 
   #CREATE BULK SURFACE------------------------------------
@@ -361,29 +360,25 @@ def mesh(polygons,frame,argv):
   loops = 0
   ss = 0
   polypores = []
+
+
   for poly in polygons:
    thin = Polygon(poly).intersection(Frame)
-   polypores.append(thin)
+   if isinstance(thin, shapely.geometry.multipolygon.MultiPolygon):
+     tmp = list(thin)
+     for t in tmp:
+      polypores.append(t)
+   else:
+    polypores.append(thin)
+
    #Points-------
-   pp = list(thin.exterior.coords)[:-1]
+   #pp = list(thin.exterior.coords)[:-1]
 
   #Get boundary wall
   lx = frame[0][1]*2.0
   ly = frame[1][1]*2.0
   pore_wall = []
   delta = 1e-2
-
-  #for l,line in enumerate(lines):
-  # p1 = points[line[0]]
-  # p2 = points[line[1]]
-  # on_wall = True
-  # if abs(p1[0] + lx/2.0) < delta and abs(p2[0] + lx/2.0) < delta: on_wall=False
-  # if abs(p1[0] - lx/2.0) < delta and abs(p2[0] - lx/2.0) < delta: on_wall=False
-  # if abs(p1[1] - ly/2.0) < delta and abs(p2[1] - ly/2.0) < delta: on_wall=False
-  # if abs(p1[1] + ly/2.0) < delta and abs(p2[1] + ly/2.0) < delta: on_wall=False
-  # if on_wall:
-
-#    pore_wall.append(l)
 
   #-------------------------
 
@@ -399,6 +394,8 @@ def mesh(polygons,frame,argv):
   inclusions = []
   for region in bulk:
 
+
+
    pp = list(region.exterior.coords)[:-1]
 
    line_list = create_line_list(pp,points,lines,store,mesh_ext)
@@ -407,7 +404,6 @@ def mesh(polygons,frame,argv):
    loops +=1
    local_loops = [loops]
    create_loop(loops,line_list,store)
-
 
    #Create internal loops-------------
    internal_loops = []
