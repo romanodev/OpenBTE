@@ -126,18 +126,18 @@ class Solver(object):
 
    if MPI.COMM_WORLD.Get_rank() == 0:
 
-    self.side_kappa_map = {}
-    self.elem_kappa_map = {}
-    self.region_elem_map = {}
-    self.region_kappa_map = {}
+    side_kappa_map = {}
+    elem_kappa_map = {}
+    region_elem_map = {}
+    region_kappa_map = {}
     for ll in self.mesh.side_list['active']:
      (elem1,elem2) = self.mesh.side_elem_map[ll]
      region_1 = self.mesh.get_region_from_elem(elem1)
      kappa_1 = self.materials[region_1]['kappa_bulk_tot']
 
 
-     if not region_1 in self.region_kappa_map.keys():
-      self.region_kappa_map.update({region_1:kappa_1})
+     if not region_1 in region_kappa_map.keys():
+      region_kappa_map.update({region_1:kappa_1})
 
      if not ll in self.mesh.side_list['Boundary'] :
 
@@ -155,22 +155,34 @@ class Solver(object):
 
       #print(kappa_1,kappa_2,kappa)
 
-      self.side_kappa_map.update({ll:kappa})
-      if not elem1 in self.elem_kappa_map.keys():
-       self.elem_kappa_map.update({elem1:kappa_1})
-      if not elem2 in self.elem_kappa_map.keys():
-       self.elem_kappa_map.update({elem2:kappa_2})
+      side_kappa_map.update({ll:kappa})
 
-      if not region_2 in self.region_kappa_map.keys():
+      if not elem1 in elem_kappa_map.keys():
+       elem_kappa_map.update({elem1:kappa_1})
+      if not elem2 in elem_kappa_map.keys():
+       elem_kappa_map.update({elem2:kappa_2})
 
-       self.region_kappa_map.update({region_2:kappa_2})
+      if not region_2 in region_kappa_map.keys():
+       region_kappa_map.update({region_2:kappa_2})
 
      else:
       (elem1,elem2) = self.mesh.side_elem_map[ll]
-      if not elem1 in self.elem_kappa_map.keys():
-        self.elem_kappa_map.update({elem1:kappa_1})
-      self.side_kappa_map.update({ll:0.0})
-    #else:
+      if not elem1 in elem_kappa_map.keys():
+        elem_kappa_map.update({elem1:kappa_1})
+      side_kappa_map.update({ll:0.0})
+
+    data = {'side_kappa_map':side_kappa_map,'elem_kappa_map':elem_kappa_map,\
+              'region_elem_map':region_elem_map,'region_kappa_map':region_kappa_map}
+
+   else: data = None
+
+   data =  MPI.COMM_WORLD.bcast(data,root=0)
+
+   self.side_kappa_map = data['side_kappa_map']
+   self.elem_kappa_map = data['elem_kappa_map']
+   self.region_elem_map = data['region_elem_map']
+   self.region_kappa_map = data['region_kappa_map']
+
 
 
 
@@ -386,7 +398,7 @@ class Solver(object):
 
    #Initalization-----------------------------------------------------------
    suppression = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
-   suppression_fourier = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
+   #suppression_fourier = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
    temperature = np.zeros((self.n_mfp,self.n_el))
    temperature_fourier = np.zeros((self.n_mfp,self.n_el))
    temperature_gradient = np.zeros((self.n_mfp,self.n_el,3))
@@ -501,7 +513,7 @@ class Solver(object):
      #lattice_temperature = np.dot(self.B2,temperature[m,:],axis=0)
 
     #--------------------------
-
+    print(self.B0[m])
     kappa = sum([self.B0[m]*suppression[m,:,:].sum() for m in range(self.n_mfp)])
     error = abs((kappa-previous_kappa))/abs(kappa)
 
@@ -689,7 +701,8 @@ class Solver(object):
       suppression[n,t,p] = kappa*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
 
 
-    fourier_flux = [-self.elem_kappa_map[n]*tmp for n,tmp in enumerate(flux)]
+    fourier_flux = [-self.elem_kappa_map[k]*tmp for k,tmp in enumerate(flux)]
+    fourier_flux = np.array(fourier_flux)
 
     output = {'suppression':suppression,'temperature':temperature_mfp,'flux':fourier_flux,'temperature_gradient':gradient_temperature_mfp}
 

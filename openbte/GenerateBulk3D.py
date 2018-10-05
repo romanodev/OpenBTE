@@ -48,7 +48,7 @@ def mesh(argv):
                                           str(point[1])+',' +\
                                           str(point[2]) + ','+\
                                           str(mesh_ext) +'};\n')
-    
+
   #Write lines
   ll = 1
   store.write( 'Line('+str(ll) +') = {' + str(0) +','+ str(1)+'};\n')
@@ -83,8 +83,8 @@ def mesh(argv):
            [10,6,-11,-2],\
            [12,-7,-11,3],\
            [4,9,-8,-12]]
-           
-  for nloop,loop in enumerate(loops) : 
+
+  for nloop,loop in enumerate(loops) :
    index = nloop + 12
    strc = 'Line Loop(' + str(index)+ ') = {'
    for n,p in enumerate(loop) :
@@ -94,16 +94,16 @@ def mesh(argv):
     else :
      strc += ','
    store.write(strc)
-   strc = 'Plane Surface(' + str(nloop+1)+ ') = {'+ str(index) + '};\n' 
+   strc = 'Plane Surface(' + str(nloop+1)+ ') = {'+ str(index) + '};\n'
    store.write(strc)
 
-  strc = 'Surface Loop(' + str(12)+ ') = {-1,3,4,5,6,2};\n' 
+  strc = 'Surface Loop(' + str(12)+ ') = {-1,3,4,5,6,2};\n'
   store.write(strc)
   strc = 'Volume(0)={12};\n'
   store.write(strc)
-  strc = 'Physical Volume("Bulk")={0};\n'
+  strc = 'Physical Volume("Matrix")={0};\n'
   store.write(strc)
- 
+
 
 
   #Write Periodic Surfaces--------------------------------------------
@@ -114,7 +114,7 @@ def mesh(argv):
   strc = 'Periodic Surface 4 {10,6,-11,-2} = 6 {9,-8,-12,4};\n'
   store.write(strc)
   #------------------------------------------------------------------
- 
+
 
   boundary_surfaces = []
   if argv.setdefault('Periodic',[True,True,True])[0]:
@@ -122,7 +122,7 @@ def mesh(argv):
    store.write(strc)
    strc = r'''Physical Surface('Periodic_2') = {5} ;''' + '\n'
    store.write(strc)
-  else:   
+  else:
    boundary_surfaces.append(3)
    boundary_surfaces.append(5)
 
@@ -131,7 +131,7 @@ def mesh(argv):
    store.write(strc)
    strc = r'''Physical Surface('Periodic_4') = {6} ;''' + '\n'
    store.write(strc)
-  else:   
+  else:
    boundary_surfaces.append(4)
    boundary_surfaces.append(6)
 
@@ -140,14 +140,14 @@ def mesh(argv):
    store.write(strc)
    strc = r'''Physical Surface('Periodic_6') = {2} ;''' +'\n'
    store.write(strc)
-  else:   
+  else:
    boundary_surfaces.append(1)
    boundary_surfaces.append(2)
 
 
   #write Boundary surfaces
   if len(boundary_surfaces) > 0:
-   strc = r'''Physical Surface('Boundary') = {''' 
+   strc = r'''Physical Surface('Boundary') = {'''
    for p,side in enumerate(boundary_surfaces) :
     strc +=str(side)
     if p == len(boundary_surfaces)-1:
@@ -156,5 +156,5 @@ def mesh(argv):
      strc += ','
    store.write(strc)
 
- 
+
    store.close()

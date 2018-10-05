@@ -39,7 +39,7 @@ class Material(object):
 
    #Angular discretization-------------------------
    if MPI.COMM_WORLD.Get_rank() == 0:
-    region = argv.setdefault('region','Bulk')
+    region = argv.setdefault('region','Matrix')
 
     dom = compute_dom_3d(argv)
     data = {'dom':dom,'region':region}

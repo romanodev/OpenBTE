@@ -121,7 +121,7 @@ def create_unstructured_bulk(argv):
   #Create Surface
   strc = 'Plane Surface(0) = {0};\n'
   store.write(strc)
-  strc = r'''Physical Surface('bulk') = {0};'''+'\n'
+  strc = r'''Physical Surface('Matrix') = {0};'''+'\n'
   store.write(strc)
 
   bs = []
