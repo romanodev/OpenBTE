@@ -435,9 +435,10 @@ class Solver(object):
    suppression_fourier = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
 
    if MPI.COMM_WORLD.Get_rank() == 0:
-      print('  ')
-      print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(kappa)+ ' W/m/K')
-      print('  ')
+      if argv['verbose']:
+       print('  ')
+       print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(kappa)+ ' W/m/K')
+       print('  ')
 
 
    #lattice_temperature = fourier_temp.copy()
@@ -513,7 +514,6 @@ class Solver(object):
      #lattice_temperature = np.dot(self.B2,temperature[m,:],axis=0)
 
     #--------------------------
-    print(self.B0[m])
     kappa = sum([self.B0[m]*suppression[m,:,:].sum() for m in range(self.n_mfp)])
     error = abs((kappa-previous_kappa))/abs(kappa)
 

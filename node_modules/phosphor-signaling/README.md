@@ -1,0 +1,266 @@
+phosphor-signaling
+==================
+
+[![Build Status](https://travis-ci.org/phosphorjs/phosphor-signaling.svg)](https://travis-ci.org/phosphorjs/phosphor-signaling?branch=master)
+[![Coverage Status](https://coveralls.io/repos/phosphorjs/phosphor-signaling/badge.svg?branch=master&service=github)](https://coveralls.io/github/phosphorjs/phosphor-signaling?branch=master)
+
+A module for type-safe inter-object communication.
+
+[API Docs](http://phosphorjs.github.io/phosphor-signaling/api/)
+
+
+Package Install
+---------------
+
+**Prerequisites**
+- [node](http://nodejs.org/)
+
+```bash
+npm install --save phosphor-signaling
+```
+
+
+Source Build
+------------
+
+**Prerequisites**
+- [git](http://git-scm.com/)
+- [node](http://nodejs.org/)
+
+```bash
+git clone https://github.com/phosphorjs/phosphor-signaling.git
+cd phosphor-signaling
+npm install
+```
+
+**Rebuild**
+```bash
+npm run clean
+npm run build
+```
+
+
+Run Tests
+---------
+
+Follow the source build instructions first.
+
+```bash
+npm test
+```
+
+
+Build Docs
+----------
+
+Follow the source build instructions first.
+
+```bash
+npm run docs
+```
+
+Navigate to `docs/index.html`.
+
+
+Supported Runtimes
+------------------
+
+The runtime versions which are currently *known to work* are listed below.
+Earlier versions may also work, but come with no guarantees.
+
+- Node 0.12.7+
+- IE 11+
+- Firefox 32+
+- Chrome 38+
+
+
+Bundle for the Browser
+----------------------
+
+Follow the package install instructions first.
+
+```bash
+npm install --save-dev browserify
+browserify myapp.js -o mybundle.js
+```
+
+
+Usage Examples
+--------------
+
+**Note:** This module is fully compatible with Node/Babel/ES6/ES5. Simply
+omit the type declarations when using a language other than TypeScript.
+
+**Recommended Design Patterns:**
+
+Class authors should strive to maintain consistency in how their classes
+expose signals to consumers. The PhosphorJS project has adopted a set of
+conventions which cover signal naming and exposure. It is recommended for
+third party libraries to adopt these same conventions in order to ensure
+API consistency and maximal compatibility with libraries and meta tools
+which rely on these conventions.
+
+When defining a signal for use by instances of the **same** class:
+
+  - Define the signal as a static member of the class.
+
+  - Ensure the class type is used as the signal owner type.
+
+  - Append the suffix `'Signal'` to the static member name.
+
+  - Define a public getter which binds the static signal to
+    the instance. This getter should contain no logic outside
+    of binding the signal.
+
+  - The name of the getter should be the same as the name of
+    the static signal minus the `'Signal'` suffix.
+
+  - Consumers should normally use the getter to access the signal,
+    but meta tools and code generators are free to use the static
+    API directly. This is why the getter must be a pure delegate
+    as described above.
+
+```typescript
+import { ISignal, Signal } from 'phosphor-signaling';
+
+
+class MyClass {
+
+  static valueChangedSignal = new Signal<MyClass, number>();
+
+  constructor(name: string) {
+    this._name = name;
+  }
+
+  get valueChanged(): ISignal<MyClass, number> {
+    return MyClass.valueChangedSignal.bind(this);
+  }
+
+  get name(): string {
+    return this._name;
+  }
+
+  get value(): number {
+    return this._value;
+  }
+
+  set value(value: number) {
+    if (value !== this._value) {
+      this._value = value;
+      this.valueChanged.emit(value);
+    }
+  }
+
+  private _name: string;
+  private _value = 0;
+}
+
+
+class MyHandler {
+
+  constructor(model: MyClass, name: string) {
+    this._model = model;
+    this._name = name;
+    model.valueChanged.connect(this._onValueChanged, this);
+  }
+
+  dispose(): void {
+    this._model.valueChanged.disconnect(this._onValueChanged, this);
+    this._model = null;
+  }
+
+  private _onValueChanged(sender: MyClass, value: number): void {
+    console.log(this._name, value);
+  }
+
+  private _name: string;
+  private _model: MyClass;
+}
+
+
+function logger(sender: MyClass, value: number): void {
+  console.log(sender.name, value);
+}
+
+
+var m1 = new MyClass('foo');
+var m2 = new MyClass('bar');
+
+m1.valueChanged.connect(logger);
+m2.valueChanged.connect(logger);
+
+var h1 = new MyHandler(m1, 'ham');
+var h2 = new MyHandler(m2, 'eggs');
+
+m1.value = 42;  // logs: foo 42, ham 42
+m2.value = 17;  // logs: bar 17, eggs 17
+```
+
+When defining a signal for use by instances of a **different** class:
+
+  - Define the signal as a static member of the class.
+
+  - Ensure the instance type is used as the signal owner type.
+
+  - Append the suffix `'Signal'` to the static member name.
+
+  - Define a static method to get the bound signal for a particular
+    instance of the owner type. This method should contain no logic
+    outside of binding the signal.
+
+  - Name the static method by prepending `'get'` to the capitalized
+    signal name. Omit the `'Signal'` suffix.
+
+  - Consumers should normally use the static method to access the
+    bound signal, but meta tools and code generators are free to
+    use the static API directly. This is why the method must be
+    a pure delegate as described above.
+
+This pattern is referred to as an *attached signal*. The signal is defined
+by one class, but the sender is a foreign instance. This pattern is useful
+when creating container objects which must emit signals for child objects
+in a way which doesn't require polluting the child class with extraneous
+signal definitions.
+
+```typescript
+class MyItem {
+  // ...
+}
+
+
+class MyContainer {
+
+  static valueChangedSignal = new Signal<MyItem, number>();
+
+  static getValueChanged(item: MyItem): ISignal<MyItem, number> {
+    return MyContainer.valueChangedSignal.bind(item);
+  }
+
+  getValue(item: MyItem): number {
+    // ...
+  }
+
+  setValue(item: MyItem, value: number): void {
+    // ...
+    MyContainer.getValueChanged(item).emit(value);
+  }
+}
+```
+
+**Auxiliary API:**
+
+```typescript
+import {
+  clearSignalData, disconnectReceiver, disconnectSender
+} from 'phosphor-signaling';
+
+
+// Disconnect a handler from all models in a single-shot.
+disconnectReceiver(handler);
+
+// Disconnect a particular model from all handlers in a single-shot.
+disconnectSender(model);
+
+// disconnect everything - sender *and* receiver
+clearSignalData(model);
+```

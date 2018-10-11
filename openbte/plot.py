@@ -99,7 +99,7 @@ class Plot(object):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
 
-   init_plotting()
+   #init_plotting()
    variable = argv['variable']
    geo = dd.io.load('geometry.hdf5')
    Nx = argv.setdefault('repeat_x',1)
@@ -268,13 +268,18 @@ class Plot(object):
 
 
   if MPI.COMM_WORLD.Get_rank() == 0:
+
    geo = Geometry(type='load')
    variable = argv['variable'].split('/')[1]
 
    #init_plotting(extra_bottom_padding = -0.0,extra_x_padding = -0.0)
-   figure(num=None, figsize=(4, 4), dpi=80, facecolor='w', edgecolor='k')
+   #figure(num=None, figsize=(4, 4), dpi=80, facecolor='w', edgecolor='k')
+   fig = gcf()
+   #fig.figsize = (10,10)
+   ax = fig.gca()
+   ax.clear()
 
-   axes([0,0,1.0,1.0])
+
 
    #geo = dd.io.load('geometry.hdf5')
 
@@ -299,9 +304,6 @@ class Plot(object):
     #node[1] -= node[1]
    #---------------
 
-
-
-
    if 'direction' in argv.keys():
     if argv['direction'] == 'x':
      data = np.array(tmp).T[0]
@@ -323,7 +325,8 @@ class Plot(object):
    #print(vmin)
    #print(vmax)
 
-   tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax))
+
+   ax.tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),zorder=1)
 
 
    #colorbar(norm=mpl.colors.Normalize(vmin=min(data),vmax=max(data)))
@@ -376,12 +379,13 @@ class Plot(object):
        #plot(seed_points[0], seed_points[1], 'bo')
 
 
-   xlim([-Lx*0.5,Lx*0.5])
-   ylim([-Ly*0.5,Ly*0.5])
+
    axis('equal')
-   axis('off')
+   axis('on')
    #tight_layout()
    gca().invert_yaxis()
+   xlim([-Lx*0.5,Lx*0.5])
+   ylim([-Ly*0.5,Ly*0.5])
    show()
 
 

@@ -1,5 +1,5 @@
 from __future__ import print_function
-get_ipython().magic(u'matplotlib inline')
+get_ipython().magic(u'matplotlib nbagg')
 from openbte.geometry import *
 from openbte.solver import *
 from openbte.material import *
@@ -9,6 +9,8 @@ import ipywidgets as widgets
 from IPython.display import display
 
 
+t = widgets.Text()
+#display(t)
 
 
 def create_geometry(porosity,shape,angle,lattice):
@@ -25,7 +27,7 @@ def create_geometry(porosity,shape,angle,lattice):
 
 
 
-    Geometry(type = type,shape=shape,
+    geo = Geometry(type = type,shape=shape,
                                   lx = 1.0, ly = 1.0,\
                                   step=step,\
                                   angle=angle,\
@@ -34,13 +36,22 @@ def create_geometry(porosity,shape,angle,lattice):
                                   mesh=True,plot=True);
 
 
+
 def create_material(kappa_matrix,kappa_inclusion):
     Material(region='Matrix',kappa = kappa_matrix,filename='material_a');
     Material(region='Inclusion',kappa = kappa_inclusion,filename='material_b');
 
-def run():
- Solver(max_bte_iter = 0,verbose=False);
+
+def run(b):
+
+ sol = Solver(max_bte_iter = 0,verbose=False);
  Plot(variable='map/fourier_flux',direction='magnitude',show=True,write=False,streamlines=False,repeat_x=1,repeat_y =1,plot_interfaces=True)
+ kappa = sol.state['kappa_fourier']
+ if b.value==0:
+  display(t)
+ t.value = 'Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(kappa)+ ' W/m/K'
+ b.value +=1
+
 
 
 
@@ -118,3 +129,25 @@ ki = widgets.BoundedFloatText(
 interact(create_geometry, porosity=w, shape=d, angle=a,lattice=l);
 interact(create_material, kappa_matrix=km,kappa_inclusion=ki);
 button = widgets.Button(description="Run")
+button.value = 0
+
+#out = widgets.Output()
+
+#def on_button_clicked(b):
+    #button.description = 'Run'
+    #with out:
+    # kappa =  run()
+    # print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(3.333)+ ' W/m/K')
+
+
+v = button.on_click(run)
+#widgets.VBox([button, out])
+display(button)
+
+#display(t)
+#def f(kappa):#
+    #print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(3.333)+ ' W/m/K')
+
+#out = widgets.interactive_output(f, {'kappa': 0.0})
+
+#widgets.HBox([widgets.VBox([a, b, c]), out])
