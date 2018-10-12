@@ -271,13 +271,12 @@ class Plot(object):
 
    geo = Geometry(type='load')
    variable = argv['variable'].split('/')[1]
-
    #init_plotting(extra_bottom_padding = -0.0,extra_x_padding = -0.0)
    #figure(num=None, figsize=(4, 4), dpi=80, facecolor='w', edgecolor='k')
-   fig = gcf()
+   #\fig = gcf()
    #fig.figsize = (10,10)
-   ax = fig.gca()
-   ax.clear()
+   ax = gcf().gca()
+   #ax.clear()
 
 
 
@@ -381,7 +380,7 @@ class Plot(object):
 
 
    axis('equal')
-   axis('on')
+   axis('off')
    #tight_layout()
    gca().invert_yaxis()
    xlim([-Lx*0.5,Lx*0.5])

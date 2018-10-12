@@ -56,7 +56,7 @@ class Geometry(object):
   if direction == 'x':self.direction = 0
   if direction == 'y':self.direction = 1
   if direction == 'z':self.direction = 2
-
+  self.argv = argv
 
   geo_type = argv['type']
 
@@ -106,12 +106,13 @@ class Geometry(object):
     self.frame = frame
     self.polygons = polygons
 
-    #if argv.setdefault('plot',False):
-    self.plot_polygons(argv)
+
 
     if argv.setdefault('mesh',True):
      self.mesh(**argv)
 
+  if argv.setdefault('plot',False):
+   self.plot_polygons()
 
  def mesh(self,**argv):
 
@@ -151,7 +152,7 @@ class Geometry(object):
 
  # MPI.COMM_WORLD.Barrier()
 
- def plot_polygons(self,argv):
+ def plot_polygons(self,**argv):
 
 
     lx = abs(self.frame[0][0])*2
@@ -169,7 +170,7 @@ class Geometry(object):
     patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color='gray',zorder=1,joinstyle='miter')
     gca().add_patch(patch);
 
-    if argv.setdefault('inclusion',False):
+    if self.argv.setdefault('inclusion',False):
      color='g'
     else:
      color='white'
@@ -180,17 +181,17 @@ class Geometry(object):
      gca().add_patch(patch);
     axis('off')
 
-    if argv.setdefault('show',False):
+    #if selfargv.setdefault('show',False):
      #print(fig.canvas.toolbar)
      #quit()
-     #show()
-     rcParams['toolbar']='None'
+    show()
+     #rcParams['toolbar']='None'
 
-     fig
+     #fig
     if argv.setdefault('save_fig',False):
      savefig(argv.setdefault('fig_file','geometry.png'))
 
-    return fig
+    #return fig
 
 
     #HTML('<style>{}</style>'.format(CSS))
@@ -259,6 +260,9 @@ class Geometry(object):
           'grad_direction':self.direction,\
           'area_flux':self.area_flux,\
           'flux_sides':self.flux_sides,\
+          'frame':self.frame,\
+          'polygons':self.polygons,\
+          'argv':self.argv,\
           'side_periodic_value':self.side_periodic_value}
 
     return data
@@ -779,6 +783,9 @@ class Geometry(object):
     self.area_flux = self.state['area_flux']
     self.node_list = self.state['node_list']
     self.flux_sides = self.state['flux_sides']
+    self.frame = self.state['frame']
+    self.argv = self.state['argv']
+    self.polygons = self.state['polygons']
     self.side_periodic_value = self.state['side_periodic_value']
     self.kappa_factor = self.size[self.direction]/self.area_flux
 

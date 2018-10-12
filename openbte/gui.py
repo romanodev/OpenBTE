@@ -12,6 +12,14 @@ from IPython.display import display
 t = widgets.Text()
 #display(t)
 
+sel = widgets.Select(
+    options=['Geometry','Flux (X)', 'Flux (Y)', 'Flux (Magnitude)'],
+    value='Geometry',
+    # rows=10,
+    description='Variable',
+    disabled=False
+)
+
 
 def create_geometry(porosity,shape,angle,lattice):
 
@@ -25,33 +33,57 @@ def create_geometry(porosity,shape,angle,lattice):
       type = 'porous/hexagonal_lattice'
       step = 0.1 *np.sqrt(sqrt(3.0))
 
-
-
     geo = Geometry(type = type,shape=shape,
                                   lx = 1.0, ly = 1.0,\
                                   step=step,\
                                   angle=angle,\
                                   porosity=porosity,
                                   inclusion = True,
-                                  mesh=True,plot=True);
-
+                                  mesh=True,plot=False);
+    #geo.plot_polygons()
 
 
 def create_material(kappa_matrix,kappa_inclusion):
     Material(region='Matrix',kappa = kappa_matrix,filename='material_a');
     Material(region='Inclusion',kappa = kappa_inclusion,filename='material_b');
 
+def plot_data(variable):
+
+ print(variable)
+
+ if not variable=='Geometry':
+  if variable == 'Flux (Magnitude)':
+      var = 'map/fourier_flux'
+      direction = 'magnitude'
+  elif variable == 'Flux (X)':
+      var = 'map/fourier_flux'
+      direction = 'x'
+  elif variable == 'Flux (Y)':
+      var = 'map/fourier_flux'
+      direction = 'y'
+
+  #gcf().gca().clear()
+  Plot(variable=var,direction=direction,show=True,write=False,streamlines=False,repeat_x=1,repeat_y =1,plot_interfaces=True)
+  print('g')
+  show()
+ else:
+  #if not fignum_exists(1):
+  Geometry(type='load',filename = 'geometry',plot=True)
+  #geo.plot_polygons()
+   #create_geometry(w.value,d.value,a.value,l.value)
+
 
 def run(b):
-
  sol = Solver(max_bte_iter = 0,verbose=False);
- Plot(variable='map/fourier_flux',direction='magnitude',show=True,write=False,streamlines=False,repeat_x=1,repeat_y =1,plot_interfaces=True)
+
  kappa = sol.state['kappa_fourier']
  if b.value==0:
   display(t)
  t.value = 'Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(kappa)+ ' W/m/K'
  b.value +=1
-
+ #plot_data('Flux (Magnitude)')
+ sel.value = 'Flux (Magnitude)'
+ #display(sel)
 
 
 
@@ -128,7 +160,9 @@ ki = widgets.BoundedFloatText(
 
 interact(create_geometry, porosity=w, shape=d, angle=a,lattice=l);
 interact(create_material, kappa_matrix=km,kappa_inclusion=ki);
-button = widgets.Button(description="Run")
+interact(plot_data,variable=sel);
+
+button = widgets.Button(description="Run");
 button.value = 0
 
 #out = widgets.Output()
@@ -142,7 +176,7 @@ button.value = 0
 
 v = button.on_click(run)
 #widgets.VBox([button, out])
-display(button)
+display(button);
 
 #display(t)
 #def f(kappa):#
