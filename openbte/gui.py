@@ -9,11 +9,14 @@ import ipywidgets as widgets
 from IPython.display import display
 
 
-t = widgets.Text()
-#display(t)
+
+t = widgets.Text(value = 'Thermal Conductivity [W/m/K]: ')
 
 sel = widgets.Select(
-    options=['Geometry','Flux (X)', 'Flux (Y)', 'Flux (Magnitude)'],
+    #options=['Geometry','Flux (X)', 'Flux (Y)', 'Flux (Magnitude)'],
+#        options=['Geometry','Flux (X)', 'Flux (Y)', 'Flux (Magnitude)'],
+    #options={'a':1,'b':2},
+    options=['Geometry',' '],
     value='Geometry',
     # rows=10,
     description='Variable',
@@ -40,6 +43,14 @@ def create_geometry(porosity,shape,angle,lattice):
                                   porosity=porosity,
                                   inclusion = True,
                                   mesh=True,plot=False);
+
+
+    sel.options=['Geometry',' ']
+    sel.value = ' '
+    sel.value = 'Geometry'
+    t.value = 'Thermal Conductivity [W/m/K]: '
+
+
     #geo.plot_polygons()
 
 
@@ -49,9 +60,7 @@ def create_material(kappa_matrix,kappa_inclusion):
 
 def plot_data(variable):
 
- print(variable)
-
- if not variable=='Geometry':
+ if not variable in ['Geometry',' '] :
   if variable == 'Flux (Magnitude)':
       var = 'map/fourier_flux'
       direction = 'magnitude'
@@ -64,9 +73,9 @@ def plot_data(variable):
 
   #gcf().gca().clear()
   Plot(variable=var,direction=direction,show=True,write=False,streamlines=False,repeat_x=1,repeat_y =1,plot_interfaces=True)
-  print('g')
-  show()
- else:
+
+  #show()
+ if variable == 'Geometry':
   #if not fignum_exists(1):
   Geometry(type='load',filename = 'geometry',plot=True)
   #geo.plot_polygons()
@@ -77,11 +86,13 @@ def run(b):
  sol = Solver(max_bte_iter = 0,verbose=False);
 
  kappa = sol.state['kappa_fourier']
- if b.value==0:
-  display(t)
- t.value = 'Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(kappa)+ ' W/m/K'
+ #if b.value==0:
+ # display(t)
+ t.value = 'Thermal Conductivity [W/m/K]: '.ljust(20) +  '{:8.2f}'.format(kappa)
  b.value +=1
  #plot_data('Flux (Magnitude)')
+ sel.options=['Geometry','Flux (X)', 'Flux (Y)', 'Flux (Magnitude)']
+
  sel.value = 'Flux (Magnitude)'
  #display(sel)
 
@@ -178,7 +189,7 @@ v = button.on_click(run)
 #widgets.VBox([button, out])
 display(button);
 
-#display(t)
+display(t)
 #def f(kappa):#
     #print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(3.333)+ ' W/m/K')
 

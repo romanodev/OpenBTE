@@ -270,17 +270,27 @@ class Plot(object):
   if MPI.COMM_WORLD.Get_rank() == 0:
 
    geo = Geometry(type='load')
+   size = geo.state['size']
+   Nx = argv.setdefault('repeat_x',1)
+   Ny = argv.setdefault('repeat_y',1)
+   Nz = argv.setdefault('repeat_z',1)
+   Lx = size[0]*Nx
+   Ly = size[1]*Ny
    variable = argv['variable'].split('/')[1]
    #init_plotting(extra_bottom_padding = -0.0,extra_x_padding = -0.0)
    #figure(num=None, figsize=(4, 4), dpi=80, facecolor='w', edgecolor='k')
+   close()
+   fig = figure(num=' ', figsize=(8*Lx/Ly, 4), dpi=80, facecolor='w', edgecolor='k')
+   axes([0,0,0.5,1.0])
+
    #\fig = gcf()
    #fig.figsize = (10,10)
-   ax = gcf().gca()
+   #ax = gcf().gca()
    #ax.clear()
 
-
-
    #geo = dd.io.load('geometry.hdf5')
+   #gcf().clear()
+   #ax = axes([0,0,1.0,1.0])
 
    solver = dd.io.load('solver.hdf5')
    argv.update({'Geometry':geo})
@@ -288,10 +298,7 @@ class Plot(object):
    vw = WriteVtk(argv)
 
 
-   size = geo.state['size']
-   Nx = argv.setdefault('repeat_x',1)
-   Ny = argv.setdefault('repeat_y',1)
-   Nz = argv.setdefault('repeat_z',1)
+
 
 
    (triangulation,tmp,nodes) = vw.get_node_data(solver[variable])
@@ -321,11 +328,10 @@ class Plot(object):
    #data += 1.0
    vmin = argv.setdefault('vmin',min(data))
    vmax = argv.setdefault('vmax',max(data))
-   #print(vmin)
-   #print(vmax)
 
 
-   ax.tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),zorder=1)
+
+   tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),zorder=1)
 
 
    #colorbar(norm=mpl.colors.Normalize(vmin=min(data),vmax=max(data)))
@@ -334,8 +340,8 @@ class Plot(object):
    if argv.setdefault('iso_values',False):
     t = tricontour(triangulation,data,levels=np.linspace(vmin,vmax,10),colors='black',linewidths=1.5)
 
-   Lx = geo.size[0]*Nx
-   Ly = geo.size[1]*Ny
+
+
    if argv.setdefault('streamlines',False) and (variable == 'fourier_flux' or variable == 'bte_flux' ):
 
 
@@ -385,7 +391,10 @@ class Plot(object):
    gca().invert_yaxis()
    xlim([-Lx*0.5,Lx*0.5])
    ylim([-Ly*0.5,Ly*0.5])
+
    show()
+   #gcf().canvas.draw()
+
 
 
  def plot_suppression_function(self,argv):
