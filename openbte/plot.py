@@ -16,6 +16,7 @@ from .WriteVTK import *
 from .geometry import *
 from scipy.interpolate import griddata
 
+
 def get_suppression(mfps,sup,mfp):
 
 
@@ -59,8 +60,9 @@ class Plot(object):
   if '/' in argv['variable']:
    model= argv['variable'].split('/')[0]
    if model == 'map':
-    #self.plot_map(argv)
-    self.plot_node_map(argv)
+    self.plot_map(argv)
+   if model == 'line':
+    self.plot_over_line(argv)
 
   if argv['variable'] == 'suppression_function' :
    self.plot_suppression_function(argv)
@@ -95,97 +97,7 @@ class Plot(object):
    vw.add_variable(solver['bte_flux'],label = r'''BTE Thermal Flux [W/m/m]''')
    vw.write_vtk()
 
- def plot_map(self,argv):
 
-  if MPI.COMM_WORLD.Get_rank() == 0:
-
-   #init_plotting()
-   variable = argv['variable']
-   geo = dd.io.load('geometry.hdf5')
-   Nx = argv.setdefault('repeat_x',1)
-   Ny = argv.setdefault('repeat_y',1)
-
-   increment = [0,0]
-   #data = np.ones(len(geo['elems']))
-   if not variable == 'geometry':
-    solver = dd.io.load('solver.hdf5')
-
-   if not variable == 'geometry':
-    data = solver['fourier_flux']
-
-    if len(np.shape(data)) == 1: #It is temperature
-      increment = [1,0]
-      a = 1.0; b = (float(Nx)-1.0)/float(Nx)
-      data *= a-b
-      data += b
-    else: #it is temperature
-      increment = [0,0]
-
-
-    #In case we have flux
-    if variable == 'bte_flux' or variable == 'fourier_flux':
-     component = argv['direction']
-     if component == 'x':
-       data = data[0]
-     if component == 'y':
-       data = data[1]
-     if component == 'z':
-       data = data[2]
-     #if component == 'magnitude':
-     # print('ss')
-    tmp = []
-    for d in data :
-     tmp.append(np.linalg.norm(d))
-    data = tmp
-     #-------------------------
-    #print(np.shape(data))
-    #quit()
-    #normalization----
-    maxt = max(data)
-    mint = min(data)
-    data -= mint
-    data /= (maxt-mint)
-
-
-   mm =1e4
-   mm2 =-1e4
-   Lx = geo['size'][0]
-   Ly = geo['size'][1]
-
-   #init_plotting(presentation=True)
-   for nx in range(Nx):
-    for ny in range(Ny):
-     Px = nx* Lx
-     Py = ny * Ly
-     displ = [float(nx)/float(Nx),float(ny)/float(Ny)]
-     cmap = matplotlib.cm.get_cmap('Wistia')
-     for e,elem in enumerate(geo['elems']):
-      poly = []
-      for n in elem:
-       poly.append(geo['nodes'][n][0:2])
-      p = np.array(poly).copy()
-      for i in p:
-       i[0] += Px
-       i[1] += Py
-      path = create_path(p)
-      if variable == 'geometry':
-        color = 'gray'
-      else:
-        color = color=cmap(data[e]-np.dot(displ,increment))
-
-      patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=10,alpha=1.0,joinstyle='miter')
-      gca().add_patch(patch)
-      gca().add_patch(patch)
-
-   axis('off')
-   axis('equal')
-   xlim([-Lx/2,Lx/2])
-   ylim([-Ly/2,Ly/2])
-   if argv.setdefault('save_fig',False):
-    savefig(argv.setdefault('namefile','geometry.png'))
-    close()
-   else:
-    show()
 
  def plot_material(self,argv):
   if MPI.COMM_WORLD.Get_rank() == 0:
@@ -206,16 +118,6 @@ class Plot(object):
    ylim([0,max(dis_bulk)*1.3])
    show()
 
-
-
-
- def compute_area(self,points):
-
-   x = []; y= []
-   for p in points:
-    x.append(p[0])
-    y.append(p[1])
-   return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
 
 
  def plot_distribution(self,argv):
@@ -264,70 +166,89 @@ class Plot(object):
    show()
 
 
- def plot_node_map(self,argv):
-
+ def plot_over_line(self,argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
+   self.geo = Geometry(type='load')
+   (data,nodes,triangulation) = self.get_data(argv)
+   (Lx,Ly) = self.geo.get_repeated_size(argv)
 
-   geo = Geometry(type='load')
-   size = geo.state['size']
-   Nx = argv.setdefault('repeat_x',1)
-   Ny = argv.setdefault('repeat_y',1)
-   Nz = argv.setdefault('repeat_z',1)
-   Lx = size[0]*Nx
-   Ly = size[1]*Ny
-   variable = argv['variable'].split('/')[1]
-   #init_plotting(extra_bottom_padding = -0.0,extra_x_padding = -0.0)
-   #figure(num=None, figsize=(4, 4), dpi=80, facecolor='w', edgecolor='k')
-   close()
-   fig = figure(num=' ', figsize=(8*Lx/Ly, 4), dpi=80, facecolor='w', edgecolor='k')
-   axes([0,0,0.5,1.0])
+   p1 = [-Lx/2.0+1e-7,0.0]
+   p2 = [Lx/2.0*(1-1e-7),0.0]
+   line_data = self.compute_line_data(p1,p2)
 
-   #\fig = gcf()
-   #fig.figsize = (10,10)
-   #ax = gcf().gca()
-   #ax.clear()
+   axes([0.5,0.01,1.0,1.0])
+   gca().yaxis.tick_right()
 
-   #geo = dd.io.load('geometry.hdf5')
-   #gcf().clear()
-   #ax = axes([0,0,1.0,1.0])
 
-   solver = dd.io.load('solver.hdf5')
-   argv.update({'Geometry':geo})
+ #def compute_line_data(self,p1,p2):
 
-   vw = WriteVtk(argv)
+ # k = 0
+ # for elem in self.geo.elems:
+ #  poly = []
+ #  for n in elem:
+    #poly.append(self.geo.nodes[n][:2])
+  # p = Polygon(poly)
+  # if p.contains(p1):
+#    k +=1
+#  print(k)
 
 
 
+ def get_data(self,argv):
 
 
-   (triangulation,tmp,nodes) = vw.get_node_data(solver[variable])
+  size = self.geo.size
+  Nx = argv.setdefault('repeat_x',1)
+  Ny = argv.setdefault('repeat_y',1)
+  Nz = argv.setdefault('repeat_z',1)
+  Lx = size[0]*Nx
+  Ly = size[1]*Ny
+  variable = argv['variable'].split('/')[1]
+  solver = dd.io.load('solver.hdf5')
+  argv.update({'Geometry':self.geo})
 
-   #flip nodes-----This has to be checked
+  vw = WriteVtk(argv)
+  (triangulation,tmp,nodes) = vw.get_node_data(solver[variable])
 
-   #for node in nodes:
-#    node[0] -= node[0]
-    #node[1] -= node[1]
-   #---------------
-
-   if 'direction' in argv.keys():
-    if argv['direction'] == 'x':
+  if 'direction' in argv.keys():
+   if argv['direction'] == 'x':
      data = np.array(tmp).T[0]
-    if argv['direction'] == 'y':
+   if argv['direction'] == 'y':
      data = np.array(tmp).T[1]
-    if argv['direction'] == 'z':
+   if argv['direction'] == 'z':
      data = np.array(tmp).T[2]
-    if argv['direction'] == 'magnitude':
+   if argv['direction'] == 'magnitude':
       data = []
       for d in tmp:
        data.append(np.linalg.norm(d))
       data = np.array(data)
-   else:
+  else:
     data = np.array(tmp).T[0]
 
+  return data,nodes,triangulation
+
+
+ def plot_map(self,argv):
+
+
+  if MPI.COMM_WORLD.Get_rank() == 0:
+
+   self.geo = Geometry(type='load')
+   (Lx,Ly) = self.geo.get_repeated_size(argv)
+
+
+   close()
+   fig = figure(num=' ', figsize=(8*Lx/Ly, 4), dpi=80, facecolor='w', edgecolor='k')
+   axes([0,0,0.5,1.0])
+
+
+
    #data += 1.0
+   (data,nodes,triangulation) =  self.get_data(argv)
    vmin = argv.setdefault('vmin',min(data))
    vmax = argv.setdefault('vmax',max(data))
+
 
 
 
@@ -354,46 +275,21 @@ class Plot(object):
        Fx = griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
        z = np.array(tmp).T[1]
        Fy = griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
-       #sx = np.concatenate((-Lx*0.5*np.ones(n_lines),Lx*0.5*np.ones(n_lines)))
-       #sy = np.concatenate((np.linspace(-Ly*0.5*0.9,Ly*0.5*0.9,n_lines),np.linspace(-4.8,4.8,n_lines)))
+
 
        seed_points = np.array([-Lx*0.5*0.99*np.ones(n_lines),np.linspace(-Ly*0.5*0.98,Ly*0.5*0.98,n_lines)])
        ss = streamplot(xi, yi, Fx, Fy,maxlength = 1e8,start_points=seed_points.T,integration_direction='both',color='r',minlength=0.95,linewidth=1)
-       #a = np.shape(np.array(ss.lines.get_segments()))
-       #print(a)
 
-       #quit()
 
    if argv.setdefault('plot_interfaces',False):
-
-    for ll in geo.side_list['Interface']:
-      p1 = geo.state['nodes'][geo.state['sides'][ll][0]][:2]
-      p2 = geo.state['nodes'][geo.state['sides'][ll][1]][:2]
-      for nx in range(Nx):
-       for ny in range(Ny):
-        for nz in range(Nz):
-         P = np.array([size[0]*(nx-(Nx-1)*0.5),\
-              size[1]*(ny-(Ny-1)*0.5)])
-
-         pp1 = np.array(p1) + P
-         pp2 = np.array(p2) + P
-
-         plot([pp1[0],pp2[0]],[pp1[1],pp2[1]],color='w',ls='--',zorder=1)
-
-
-       #plot(seed_points[0], seed_points[1], 'bo')
-
+    pp = self.geo.get_interface_point_couples(argv)
 
 
    axis('equal')
    axis('off')
-   #tight_layout()
    gca().invert_yaxis()
    xlim([-Lx*0.5,Lx*0.5])
    ylim([-Ly*0.5,Ly*0.5])
-
-   show()
-   #gcf().canvas.draw()
 
 
 

@@ -62,39 +62,35 @@ def plot_data(variable):
 
  if not variable in ['Geometry',' '] :
   if variable == 'Flux (Magnitude)':
-      var = 'map/fourier_flux'
+      var = 'fourier_flux'
       direction = 'magnitude'
   elif variable == 'Flux (X)':
-      var = 'map/fourier_flux'
+      var = 'fourier_flux'
       direction = 'x'
   elif variable == 'Flux (Y)':
-      var = 'map/fourier_flux'
+      var = 'fourier_flux'
       direction = 'y'
 
-  #gcf().gca().clear()
-  Plot(variable=var,direction=direction,show=True,write=False,streamlines=False,repeat_x=1,repeat_y =1,plot_interfaces=True)
+  Plot(variable='map/' + var,direction=direction,show=True,write=False,streamlines=False,repeat_x=1,repeat_y =1,plot_interfaces=True)
+  #Plot(variable='line/'+ var,direction=direction,show=True,write=False,streamlines=False,repeat_x=1,repeat_y =1,plot_interfaces=True)
 
-  #show()
+
  if variable == 'Geometry':
-  #if not fignum_exists(1):
   Geometry(type='load',filename = 'geometry',plot=True)
-  #geo.plot_polygons()
-   #create_geometry(w.value,d.value,a.value,l.value)
-
 
 def run(b):
  sol = Solver(max_bte_iter = 0,verbose=False);
+
 
  kappa = sol.state['kappa_fourier']
  #if b.value==0:
  # display(t)
  t.value = 'Thermal Conductivity [W/m/K]: '.ljust(20) +  '{:8.2f}'.format(kappa)
  b.value +=1
- #plot_data('Flux (Magnitude)')
  sel.options=['Geometry','Flux (X)', 'Flux (Y)', 'Flux (Magnitude)']
 
  sel.value = 'Flux (Magnitude)'
- #display(sel)
+
 
 
 
@@ -175,24 +171,16 @@ interact(plot_data,variable=sel);
 
 button = widgets.Button(description="Run");
 button.value = 0
-
-#out = widgets.Output()
-
-#def on_button_clicked(b):
-    #button.description = 'Run'
-    #with out:
-    # kappa =  run()
-    # print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(3.333)+ ' W/m/K')
-
-
 v = button.on_click(run)
-#widgets.VBox([button, out])
 display(button);
 
+#button_line = widgets.Button(description="Plot over a line");
+#button_line.value = 0
+#v = button_line.on_click(plot_over_line)
+#display(button_line);
+
+
+
+
 display(t)
-#def f(kappa):#
-    #print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(3.333)+ ' W/m/K')
-
-#out = widgets.interactive_output(f, {'kappa': 0.0})
-
-#widgets.HBox([widgets.VBox([a, b, c]), out])
+#

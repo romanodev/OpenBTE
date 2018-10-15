@@ -152,6 +152,36 @@ class Geometry(object):
 
  # MPI.COMM_WORLD.Barrier()
 
+ def get_repeated_size(self,argv):
+    Nx = argv.setdefault('repeat_x',1)
+    Ny = argv.setdefault('repeat_y',1)
+    size = self.size
+    Lx = size[0]*Nx
+    Ly = size[1]*Ny
+    return Lx,Ly
+
+
+ def get_interface_point_couples(self,argv):
+
+   Nx = argv.setdefault('repeat_x',1)
+   Ny = argv.setdefault('repeat_y',1)
+
+
+   pp = []
+   for ll in self.side_list['Interface']:
+    p1 = self.nodes[self.sides[ll][0]][:2]
+    p2 = self.nodes[self.sides[ll][1]][:2]
+    for nx in range(Nx):
+      for ny in range(Ny):
+       P = np.array([self.size[0]*(nx-(Nx-1)*0.5),\
+                     self.size[1]*(ny-(Ny-1)*0.5)])
+       p1 = np.array(p1) + P
+       p2 = np.array(p2) + P
+       plot([p1[0],p2[0]],[p1[1],p2[1]],color='w',ls='--',zorder=1)
+
+
+
+
  def plot_polygons(self,**argv):
 
 
