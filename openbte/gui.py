@@ -72,7 +72,7 @@ def plot_data(variable):
       direction = 'y'
 
   Plot(variable='map/' + var,direction=direction,show=True,write=False,streamlines=False,repeat_x=1,repeat_y =1,plot_interfaces=True)
-  #Plot(variable='line/'+ var,direction=direction,show=True,write=False,streamlines=False,repeat_x=1,repeat_y =1,plot_interfaces=True)
+  Plot(variable='line/'+ var,direction=direction,show=True,write=False,streamlines=False,repeat_x=1,repeat_y =1,plot_interfaces=True)
 
 
  if variable == 'Geometry':

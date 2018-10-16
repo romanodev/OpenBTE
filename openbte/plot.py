@@ -181,17 +181,24 @@ class Plot(object):
    gca().yaxis.tick_right()
 
 
- #def compute_line_data(self,p1,p2):
+ def compute_line_data(self,p1,p2):
 
- # k = 0
- # for elem in self.geo.elems:
- #  poly = []
- #  for n in elem:
-    #poly.append(self.geo.nodes[n][:2])
-  # p = Polygon(poly)
-  # if p.contains(p1):
-#    k +=1
-#  print(k)
+  k = 0
+  for elem in self.geo.elems:
+   poly = []
+   for n in elem:
+    print(n)
+    t1 = self.geo.nodes[n][0]
+    t2 = self.geo.nodes[n][1]
+    poly.append([t1,t2])
+   p = Polygon(poly)
+   print(p.area)
+   if p.contains(Point(p1[0],p1[1])):
+    k +=1
+   else:
+       print('s')
+
+  print(k)
 
 
 
