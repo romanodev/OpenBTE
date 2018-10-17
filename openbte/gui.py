@@ -38,7 +38,7 @@ def create_geometry(porosity,shape,angle,lattice):
 
     geo = Geometry(type = type,shape=shape,
                                   lx = 1.0, ly = 1.0,\
-                                  step=step,\
+                                  step=step/4.0,\
                                   angle=angle,\
                                   porosity=porosity,
                                   inclusion = True,
@@ -49,8 +49,6 @@ def create_geometry(porosity,shape,angle,lattice):
     sel.value = ' '
     sel.value = 'Geometry'
     t.value = 'Thermal Conductivity [W/m/K]: '
-
-
     #geo.plot_polygons()
 
 
@@ -70,6 +68,9 @@ def plot_data(variable):
   elif variable == 'Flux (Y)':
       var = 'fourier_flux'
       direction = 'y'
+  elif variable == 'Temperature':
+      var = 'fourier_temperature'
+      direction = None
 
   Plot(variable='map/' + var,direction=direction,show=True,write=False,streamlines=False,repeat_x=1,repeat_y =1,plot_interfaces=True)
   Plot(variable='line/'+ var,direction=direction,show=True,write=False,streamlines=False,repeat_x=1,repeat_y =1,plot_interfaces=True)
@@ -87,7 +88,7 @@ def run(b):
  # display(t)
  t.value = 'Thermal Conductivity [W/m/K]: '.ljust(20) +  '{:8.2f}'.format(kappa)
  b.value +=1
- sel.options=['Geometry','Flux (X)', 'Flux (Y)', 'Flux (Magnitude)']
+ sel.options=['Geometry','Flux (X)', 'Flux (Y)', 'Flux (Magnitude)','Temperature']
 
  sel.value = 'Flux (Magnitude)'
 
@@ -178,9 +179,6 @@ display(button);
 #button_line.value = 0
 #v = button_line.on_click(plot_over_line)
 #display(button_line);
-
-
-
 
 display(t)
 #

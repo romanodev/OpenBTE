@@ -10,11 +10,12 @@ import matplotlib.patches as patches
 from matplotlib.path import Path
 from .fig_maker import *
 from shapely import geometry,wkt
-from shapely.geometry import MultiPoint,Point,Polygon,LineString
 from scipy.interpolate import BarycentricInterpolator
 from .WriteVTK import *
 from .geometry import *
 from scipy.interpolate import griddata
+from shapely.geometry import MultiPoint,Point,Polygon,LineString
+import shapely
 
 
 def get_suppression(mfps,sup,mfp):
@@ -173,33 +174,82 @@ class Plot(object):
    (data,nodes,triangulation) = self.get_data(argv)
    (Lx,Ly) = self.geo.get_repeated_size(argv)
 
-   p1 = [-Lx/2.0+1e-7,0.0]
-   p2 = [Lx/2.0*(1-1e-7),0.0]
-   line_data = self.compute_line_data(p1,p2)
+   #--------
+   p1 = np.array([-Lx/2.0+1e-7,0.0])
+   p2 = np.array([Lx/2.0*(1-1e-7),0.0])
+   (x,data,int_points) = self.compute_line_data(p1,p2,data)
+   #--------
+   axes([0.5,0.01,0.5,1.0])
+   plot(x,data,linewidth=2)
 
-   axes([0.5,0.01,1.0,1.0])
+   for p in int_points:
+    plot([p,p],[min(data),max(data)],ls='--',color='k')
+   plot([min(x),max(x)],[0,0],ls='--',color='k')
    gca().yaxis.tick_right()
 
 
- def compute_line_data(self,p1,p2):
+ def point_in_elem(self,elem,p):
+  poly = []
+  for n in self.geo.elems[elem]:
+   t1 = self.geo.nodes[n][0]
+   t2 = self.geo.nodes[n][1]
+   poly.append((t1,t2))
+  polygon = Polygon(poly)
+  if polygon.contains(Point(p[0],p[1])):
+   return True
+  else:
+   return False
 
-  k = 0
-  for elem in self.geo.elems:
-   poly = []
-   for n in elem:
-    print(n)
-    t1 = self.geo.nodes[n][0]
-    t2 = self.geo.nodes[n][1]
-    poly.append([t1,t2])
-   p = Polygon(poly)
-   print(p.area)
-   if p.contains(Point(p1[0],p1[1])):
-    k +=1
+ def compute_line_data(self,p1,p2,original):
+
+  N = 1000
+  tt = []
+  delta = np.linalg.norm(p2-p1)/N
+  neighbors = range(len(self.geo.elems))
+  h1 = 0
+  h2 = 0
+  gamma = 1e-4
+  data = []
+  x = []
+  int_points = []
+  for n in range(N+1):
+   r = p1 + n*delta*(p2-p1)
+   #Here we include extra points close to the interfaces-------
+   if n > 0:
+    tmp = self.geo.cross_interface(p1 + (n-1)*delta*(p2-p1),r)
+    versor = r - p1 + (n-1)*delta*(p2-p1)
+    versor /= np.linalg.norm(versor)
+    if len(tmp) > 0:
+     pp = [tmp-gamma*versor,tmp + gamma*versor,r]
+     x.append(n*delta-np.linalg.norm(r-tmp)-gamma)
+     x.append(n*delta-np.linalg.norm(r-tmp)+gamma)
+     x.append(n*delta)
+     int_points.append(n*delta-np.linalg.norm(r-tmp)-gamma)
+    else:
+     pp = [r]
+     x.append(n*delta)
    else:
-       print('s')
+    pp = [r]
+    x.append(n*delta)
+   #----------------------------------------------------------
+   for p in pp:
+    is_in = False
+    for elem in neighbors:
+     if self.point_in_elem(elem,p) :
+      is_in = True
+      value = self.geo.compute_2D_interpolation(original,p,elem)
+      data.append(value)
+      neighbors = self.geo.get_elem_extended_neighbors(elem)
+      break
+    if not is_in:
+     for elem in range(len(self.geo.elems)):
+      if self.point_in_elem(elem,p) :
+       neighbors = self.geo.get_elem_extended_neighbors(elem)
+       value = self.geo.compute_2D_interpolation(original,p,elem)
+       data.append(value)
+       break
 
-  print(k)
-
+  return x,data,int_points
 
 
  def get_data(self,argv):
@@ -218,14 +268,13 @@ class Plot(object):
   vw = WriteVtk(argv)
   (triangulation,tmp,nodes) = vw.get_node_data(solver[variable])
 
-  if 'direction' in argv.keys():
-   if argv['direction'] == 'x':
+  if argv['direction'] == 'x':
      data = np.array(tmp).T[0]
-   if argv['direction'] == 'y':
+  elif argv['direction'] == 'y':
      data = np.array(tmp).T[1]
-   if argv['direction'] == 'z':
+  elif argv['direction'] == 'z':
      data = np.array(tmp).T[2]
-   if argv['direction'] == 'magnitude':
+  elif argv['direction'] == 'magnitude':
       data = []
       for d in tmp:
        data.append(np.linalg.norm(d))
@@ -255,9 +304,6 @@ class Plot(object):
    (data,nodes,triangulation) =  self.get_data(argv)
    vmin = argv.setdefault('vmin',min(data))
    vmax = argv.setdefault('vmax',max(data))
-
-
-
 
    tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),zorder=1)
 

@@ -20,6 +20,8 @@ from .fig_maker import *
 from matplotlib.path import Path
 
 from IPython.display import display, HTML
+from shapely.geometry import LineString
+import shapely
 
 
 CSS = """
@@ -32,6 +34,8 @@ CSS = """
 import deepdish as dd
 from scipy.sparse import csc_matrix
 from matplotlib.pylab import *
+from shapely.geometry import MultiPoint,Point,Polygon,LineString
+
 
 def create_path(obj):
 
@@ -229,10 +233,30 @@ class Geometry(object):
     #HTML('<style>{}</style>'.format(CSS))
 
 
+ def compute_triangle_area(self,p1,p2,p):
+   p = Polygon([(p1[0],p1[1]),(p2[0],p2[1]),(p[0],p[1])])
+   return p.area
 
 
+ def compute_2D_interpolation(self,data,p,elem):
 
+   nodes = self.elems[elem]
+   p1 = self.nodes[nodes[0]]
+   p2 = self.nodes[nodes[1]]
+   p3 = self.nodes[nodes[2]]
 
+   v1 = data[nodes[0]]
+   v2 = data[nodes[1]]
+   v3 = data[nodes[2]]
+
+   area_1 = self.compute_triangle_area(p2,p3,p)
+   area_2 = self.compute_triangle_area(p1,p3,p)
+   area_3 = self.compute_triangle_area(p1,p2,p)
+   area = area_1 + area_2 + area_3
+   v = v1*area_1 + v2*area_2 + v3*area_3
+   v /= area
+   
+   return v
 
 
 
@@ -299,6 +323,7 @@ class Geometry(object):
 
     return data
 
+
  def compute_connecting_matrix(self):
 
    nc = len(self.elems)
@@ -308,10 +333,6 @@ class Geometry(object):
    data_tmp_b = []
 
    for ll in self.side_list['active'] :
-    #if not ll in self.side_list['Boundary'] and \
-    #   not ll in self.side_list['Hot'] and\
-    #   not ll in self.side_list['Cold']:
-
     if not ll in self.side_list['Hot'] and\
      not ll in self.side_list['Cold']:
 
@@ -1303,6 +1324,18 @@ class Geometry(object):
   centroid = centroid2 - self.side_periodicity[side][ind1] + self.side_periodicity[side][ind2]
   return centroid
 
+ def cross_interface(self,p1,p2):
+
+  line1 = LineString([p1,p2])
+  for ll in self.side_list['Interface']:
+   p3 = self.nodes[self.sides[ll][0]][:2]
+   p4 = self.nodes[self.sides[ll][1]][:2]
+   line2 = LineString([p3,p4])
+   tmp = line1.intersection(line2)
+   if isinstance(tmp,shapely.geometry.Point):
+     return np.array([tmp.x,tmp.y])
+  return []
+
 
  def compute_centroid(self,side):
 
@@ -1312,6 +1345,24 @@ class Geometry(object):
 
   return node/len(side)
 
+ def get_elem_extended_neighbors(self,elem):
+  #This also includes the element get_distance_between_centroids_of_two_elements_from_side
+  neighbors = []
+  for n in self.elems[elem]:
+   for elem2 in self.node_elem_map[n]:
+    if not elem2 in neighbors: neighbors.append(elem2)
+    #for m in self.elems[elem2]:
+    # for elem3 in self.node_elem_map[m]:
+    #    if not elem3 in neighbors: neighbors.append(elem3)
+
+  return neighbors
+
+ def get_elem_neighbors(self,elem):
+
+  neighbors = []
+  for ll in self.elem_side_map[elem]:
+   neighbors.append(self.get_neighbor_elem(elem,ll))
+  return neighbors
 
  def get_neighbor_elem(self,elem,ll) :
 
