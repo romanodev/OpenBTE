@@ -4,24 +4,34 @@ from openbte.geometry import *
 from openbte.solver import *
 from openbte.material import *
 from openbte.plot import *
-from ipywidgets import interact, interactive, fixed, interact_manual
+from ipywidgets import interact, interactive, fixed, interact_manual,HBox,VBox
 import ipywidgets as widgets
 from IPython.display import display
+from ipywidgets import Button, GridBox, Layout, ButtonStyle
 
-
+#
 
 t = widgets.Text(value = 'Thermal Conductivity [W/m/K]: ')
 
 sel = widgets.Select(
-    #options=['Geometry','Flux (X)', 'Flux (Y)', 'Flux (Magnitude)'],
-#        options=['Geometry','Flux (X)', 'Flux (Y)', 'Flux (Magnitude)'],
-    #options={'a':1,'b':2},
     options=['Geometry',' '],
     value='Geometry',
-    # rows=10,
     description='Variable',
     disabled=False
 )
+
+w = widgets.FloatSlider(
+    value=0.2,
+    min=0.01,
+    max=0.3,
+    step=0.01,
+    description='Porosity:',
+    disabled=False,
+    continuous_update=False,
+    orientation='horizontal',
+    readout=True,
+    readout_format='.3f')
+w.style.handle_color = 'lightblue'
 
 
 def create_geometry(porosity,shape,angle,lattice):
@@ -38,7 +48,7 @@ def create_geometry(porosity,shape,angle,lattice):
 
     geo = Geometry(type = type,shape=shape,
                                   lx = 1.0, ly = 1.0,\
-                                  step=step/4.0,\
+                                  step=step/1.0,\
                                   angle=angle,\
                                   porosity=porosity,
                                   inclusion = True,
@@ -49,12 +59,13 @@ def create_geometry(porosity,shape,angle,lattice):
     sel.value = ' '
     sel.value = 'Geometry'
     t.value = 'Thermal Conductivity [W/m/K]: '
-    #geo.plot_polygons()
 
 
 def create_material(kappa_matrix,kappa_inclusion):
     Material(region='Matrix',kappa = kappa_matrix,filename='material_a');
     Material(region='Inclusion',kappa = kappa_inclusion,filename='material_b');
+    w.value = w.value
+
 
 def plot_data(variable):
 
@@ -94,16 +105,6 @@ def run(b):
 
 
 
-
-r=widgets.ToggleButton(
-    value=False,
-    description='Click me',
-    disabled=False,
-    button_style='', # 'success', 'info', 'warning', 'danger' or ''
-    tooltip='Description',
-    icon='check'
-)
-
 w = widgets.FloatSlider(
     value=0.2,
     min=0.01,
@@ -115,6 +116,7 @@ w = widgets.FloatSlider(
     orientation='horizontal',
     readout=True,
     readout_format='.3f')
+w.style.handle_color = 'lightblue'
 
 
 d = widgets.RadioButtons(
@@ -142,6 +144,7 @@ a = widgets.FloatSlider(
     orientation='horizontal',
     readout=True,
     readout_format='.0f')
+a.style.handle_color = 'lightblue'
 
 
 km = widgets.BoundedFloatText(
@@ -155,7 +158,7 @@ km = widgets.BoundedFloatText(
     style = {'description_width': '150px'})
 
 ki = widgets.BoundedFloatText(
-    value=50.0,
+    value=0.0,
     min=0,
     max=1000,
     step=0.1,
@@ -166,19 +169,30 @@ ki = widgets.BoundedFloatText(
 
 
 
-interact(create_geometry, porosity=w, shape=d, angle=a,lattice=l);
-interact(create_material, kappa_matrix=km,kappa_inclusion=ki);
-interact(plot_data,variable=sel);
+#plot geometry-------
+test = interactive(create_geometry, porosity=w, shape=d, angle=a,lattice=l);
+v3 = interactive(create_material, kappa_matrix=km,kappa_inclusion=ki);
 
+v1 = VBox(test.children[0:2])
+v2 = VBox(test.children[2:4])
+display(HBox([v1,v2,v3]))
+#--------------------
+
+
+v = interactive(plot_data,variable=sel);
+
+display(v)
+
+
+#plot output-------
 button = widgets.Button(description="Run");
 button.value = 0
-v = button.on_click(run)
-display(button);
+button.on_click(run)
+display(HBox([button,t]))
+#-------------------
 
-#button_line = widgets.Button(description="Plot over a line");
-#button_line.value = 0
-#v = button_line.on_click(plot_over_line)
-#display(button_line);
 
-display(t)
+
+
+
 #
