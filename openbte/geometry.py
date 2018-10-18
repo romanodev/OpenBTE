@@ -188,6 +188,7 @@ class Geometry(object):
 
  def plot_polygons(self,**argv):
 
+   if MPI.COMM_WORLD.Get_rank() == 0:
 
     lx = abs(self.frame[0][0])*2
     ly = abs(self.frame[0][1])*2
@@ -255,7 +256,7 @@ class Geometry(object):
    area = area_1 + area_2 + area_3
    v = v1*area_1 + v2*area_2 + v3*area_3
    v /= area
-   
+
    return v
 
 
