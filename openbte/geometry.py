@@ -195,9 +195,9 @@ class Geometry(object):
 
     #init_plotting()
     close()
-    fig = figure(num=" ", figsize=(4*lx/ly, 4), dpi=80, facecolor='w', edgecolor='k')
+    fig = figure(num=" ", figsize=(8*lx/ly, 4), dpi=80, facecolor='w', edgecolor='k')
     #axes([0,0,1.0,1.0])
-    axes([0,0,1.0,1.0])
+    axes([0,0,0.5,1.0])
 
 
     xlim([-lx/2.0,lx/2.0])
@@ -226,8 +226,8 @@ class Geometry(object):
 
     #fig:wq
 
-    #if argv.setdefault('save_fig',False):
-    savefig(argv.setdefault('fig_file','geometry.png'))
+    if argv.setdefault('save_fig',False):
+     savefig(argv.setdefault('fig_file','geometry.png'))
 
     #return fig
 
