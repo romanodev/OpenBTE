@@ -24,6 +24,7 @@ class Solver(object):
 
   def __init__(self,**argv):
 
+
    self.mesh = Geometry(type='load',filename = argv.setdefault('geometry_filename','geometry'))
    self.ms_error = argv.setdefault('ms_error',0.1)
    self.verbose = argv.setdefault('verbose',True)
@@ -46,6 +47,10 @@ class Solver(object):
    for filename in files:
     mat = Material(model='load',filename=filename)
 
+    gamma = mat.state['kappa_bulk_tot']/mat.state['mfp_bulk'][0]/mat.state['mfp_bulk'][0]
+
+    mat.state.update({'gamma':gamma})
+
     self.materials.update({mat.state['region']:mat.state})
     self.B0 = mat.state['B0']
     self.B1 = mat.state['B1']
@@ -56,7 +61,7 @@ class Solver(object):
 
    self.lu = {}
 
-   self.mfp = np.array(mat.state['mfp_sampled'])/1e-9 #In nm
+   self.mfp = np.array(mat.state['mfp_sampled']) #In nm
    self.n_mfp = len(self.mfp)
 
    #INITIALIZATION-------------------------
@@ -206,6 +211,14 @@ class Solver(object):
     scipy.io.mmwrite(self.cache + '/RHS_DIFF_' + str(t) + '_' + str(p) + r'.mtx',RHS)
 
 
+  def get_material_properties(self,elem):
+    region = self.mesh.get_region_from_elem(elem)
+    gamma = self.materials[region]['gamma']*1e-18
+    mfp = self.materials[region]['mfp_bulk'][0]*1e9 # meter
+
+    return gamma,mfp
+
+
   def compute_directional_connections(self,index,options):
 
    #------------------------------BULK----------------------------------
@@ -216,13 +229,19 @@ class Solver(object):
    rk=[]; ck=[]; dk=[]
    P = np.zeros(self.n_elems)
    for i,j in zip(*self.mesh.A.nonzero()):
+
+    (gamma_i,mfp_i) = self.get_material_properties(i)
+    (gamma_j,mfp_j) = self.get_material_properties(j)
+
+
+
     (cm,cp,dummy,dummy) = self.mesh.get_angular_coeff(i,j,index)
-    r.append(i); c.append(i); d.append(cp)
+    r.append(i); c.append(i); d.append(cp*mfp_i)
     v = self.mesh.get_side_periodic_value(i,j)
     rk.append(i); ck.append(j);
-    dk.append(v*(cp+cm)*self.mesh.get_elem_volume(i))
-    r.append(i); c.append(j); d.append(cm)
-    P[i] += v*cm
+    dk.append(v*(cp*mfp_i+cm*mfp_j*gamma_j/gamma_i)*self.mesh.get_elem_volume(i))
+    r.append(i); c.append(j); d.append(cm*mfp_j*gamma_j/gamma_i)
+    P[i] += v*cm*mfp_j*gamma_j/gamma_i
 
    #------------------------------BOUNDARY-------------------------------
    HW_minus = np.zeros(self.n_elems)
@@ -302,12 +321,12 @@ class Solver(object):
 
       D = np.multiply(TB[m],HW_MINUS)
       global_index = m*self.dom['n_theta']*self.dom['n_phi'] +t*self.dom['n_phi']+p
-      F = scipy.sparse.eye(self.n_elems) + theta_factor * self.mfp[m] * A
+      F = scipy.sparse.eye(self.n_elems) + theta_factor  * A
       lu = splu(F.tocsc())
-      RHS = self.mfp[m]*theta_factor * (P + D) + TL[m]
+      RHS = theta_factor * P + TL[m]
       temp = lu.solve(RHS)
 
-      sup = pre_factor * K.dot(temp-TL[m]).sum()/self.mfp[m]*self.kappa_factor
+      sup = pre_factor * K.dot(temp-TL[m]).sum()*self.kappa_factor/self.materials['Matrix']['kappa_bulk_tot']
 
 
 
