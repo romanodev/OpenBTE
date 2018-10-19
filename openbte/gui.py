@@ -47,7 +47,7 @@ def create_geometry(porosity,shape,angle,lattice):
 
     geo = Geometry(type = type,shape=shape,
                                   lx = 1.0, ly = 1.0,\
-                                  step=step/10.0,\
+                                  step=step/1.0,\
                                   angle=angle,\
                                   porosity=porosity,
                                   inclusion = True,
