@@ -320,14 +320,13 @@ class Solver(object):
      if not fourier:
 
       D = np.multiply(TB[m],HW_MINUS)
-      global_index = m*self.dom['n_theta']*self.dom['n_phi'] +t*self.dom['n_phi']+p
+      #global_index = m*self.dom['n_theta']*self.dom['n_phi'] +t*self.dom['n_phi']+p
       F = scipy.sparse.eye(self.n_elems) + theta_factor  * A
       lu = splu(F.tocsc())
       RHS = theta_factor * P + TL[m]
       temp = lu.solve(RHS)
 
-      sup = pre_factor * K.dot(temp-TL[m]).sum()*self.kappa_factor/self.materials['Matrix']['kappa_bulk_tot']
-
+      sup = pre_factor * K.dot(temp-TL[m]).sum()*self.kappa_factor
 
 
       if self.multiscale:
@@ -533,7 +532,9 @@ class Solver(object):
      #lattice_temperature = np.dot(self.B2,temperature[m,:],axis=0)
 
     #--------------------------
+    #kappa = sum([self.B0[m]*suppression[m,:,:].sum() for m in range(self.n_mfp)])
     kappa = sum([self.B0[m]*suppression[m,:,:].sum() for m in range(self.n_mfp)])
+
     error = abs((kappa-previous_kappa))/abs(kappa)
 
     if MPI.COMM_WORLD.Get_rank() == 0:

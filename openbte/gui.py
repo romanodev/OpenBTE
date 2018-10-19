@@ -47,7 +47,7 @@ def create_geometry(porosity,shape,angle,lattice):
 
     geo = Geometry(type = type,shape=shape,
                                   lx = 1.0, ly = 1.0,\
-                                  step=step/1.0,\
+                                  step=step/10.0,\
                                   angle=angle,\
                                   porosity=porosity,
                                   inclusion = True,
@@ -197,7 +197,7 @@ ki = widgets.BoundedFloatText(
 
 mm = widgets.BoundedFloatText(
     value=1e-9,
-    min=1e-10,
+    min=1e-11,
     max=1e-3,
     step=0.1,
     description='MFP Matrix [m]',
@@ -207,7 +207,7 @@ mm = widgets.BoundedFloatText(
 
 mi = widgets.BoundedFloatText(
     value=1e-9,
-    min=1e-10,
+    min=1e-11,
     max=1e-3,
     step=0.1,
     description='MFP Inclusion [m]',

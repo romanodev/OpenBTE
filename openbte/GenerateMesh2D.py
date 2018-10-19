@@ -351,6 +351,8 @@ def mesh(polygons,frame,argv):
   polygons = regularize_polygons(polygons)
 
   mesh_ext = argv['step']
+  print(mesh_ext)
+  quit()
   Frame = Polygon(frame)
 
   #CREATE BULK SURFACE------------------------------------
