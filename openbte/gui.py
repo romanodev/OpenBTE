@@ -228,9 +228,9 @@ display(HBox([v1,v2,v3]))
 #--------------------
 
 
-v = interactive(plot_data,variable=sel);
+#v = interactive(plot_data,variable=sel);
 
-display(v)
+#display(v)
 
 
 #plot output-------
