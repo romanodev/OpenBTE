@@ -216,6 +216,30 @@ class Geometry(object):
      path = create_path(poly)
      patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=10,joinstyle='miter')
      gca().add_patch(patch);
+     
+     
+    #plot Boundary Conditions-----
+    for side in self.side_list['Boundary'] + self.side_list['Interface'] :
+     p1 = self.sides[side][0]
+     p2 = self.sides[side][1]
+     n1 = self.nodes[p1]
+     n2 = self.nodes[p2]
+     plot([n1[0],n2[0]],[n1[1],n2[1]],color='#f77f0e',lw=6)
+     
+     
+      #plot Periodic Conditions-----
+    for side in self.side_list['Periodic'] + self.side_list['Inactive']  :
+     p1 = self.sides[side][0]
+     p2 = self.sides[side][1]
+     n1 = self.nodes[p1]
+     n2 = self.nodes[p2]
+     plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=6)
+
+       
+    
+    #----------------------------
+     
+     
     axis('off')
 
     #if selfargv.setdefault('show',False):
@@ -303,6 +327,7 @@ class Geometry(object):
           'side_periodicity':self.side_periodicity,\
           'dim':self.dim,\
           'weigths':self.weigths,\
+          'region_elem_map':self.region_elem_map,\
           'size':self.size,\
           'c_areas':self.c_areas,\
           'interp_weigths':self.interp_weigths,\
@@ -332,7 +357,6 @@ class Geometry(object):
    row_tmp = []
    col_tmp = []
    data_tmp = []
-   data_tmp_b = []
 
    for ll in self.side_list['active'] :
     if not ll in self.side_list['Hot'] and\
@@ -489,9 +513,7 @@ class Geometry(object):
   else :
    t = int(index/self.dom['self.n_phi'])
    p = index%self.dom['n_phi']
-   angle = self.dom['S'][t][p]
    angle_factor = self.dom['S'][t][p]/self.dom['d_omega'][t][p]
-   control  = np.dot(self.dom['phonon_dir'][p],normal)
    coeff = np.dot(angle_factor,normal)*area/vol
 
 
@@ -643,7 +665,7 @@ class Geometry(object):
  def compute_gradient_on_side(self,x,ll,side_periodic_value):
 
    #Diff in the temp
-   normal = self.get_side_normal(0,ll)
+  
    elems = self.side_elem_map[ll]
    kc1 = elems[0]
    temp_1 = x[kc1]
@@ -687,7 +709,7 @@ class Geometry(object):
     grad = np.zeros(self.dim)
     for s in self.elem_side_map[kc1]:
      if s in self.side_list['Boundary']:
-      temp_2 = temp_2
+      temp_2 = temp_1
      else:
       kc2 = self.get_neighbor_elem(kc1,s)
       temp_2 = x[kc2] + self.get_side_periodic_value(s,kc2,side_periodic_value)
@@ -813,6 +835,7 @@ class Geometry(object):
     self.sides = self.state['sides']
     self.elems = self.state['elems']
     self.side_periodicity = self.state['side_periodicity']
+    self.region_elem_map = self.state['region_elem_map']
     self.size = self.state['size']
     self.dim = self.state['dim']
     self.weigths = self.state['weigths']
@@ -849,7 +872,7 @@ class Geometry(object):
  def import_mesh(self):
 
   #Create mesh---
-  a=subprocess.check_output(['gmsh','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
+  subprocess.check_output(['gmsh','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
 
   #-------------
 
@@ -869,6 +892,7 @@ class Geometry(object):
 
   #------------------------------------------
   self.elem_region_map = {}
+  self.region_elem_map = {}
 
 
   #import nodes------------------------
@@ -907,8 +931,7 @@ class Geometry(object):
   self.side_node_map = {}
   self.node_elem_map = {}
   self.side_list = {}
-  node_side_map = {}
-
+ 
 
   for n in range(n_tot):
    tmp = f.readline().split()
@@ -935,6 +958,7 @@ class Geometry(object):
              [n[0],n[2],n[3]]]
      self._update_map(perm_n,b_sides,nr,node_indexes)
      self.elem_region_map.update({len(self.elems)-1:self.blabels[int(tmp[3])]})
+     self.region_elem_map.setdefault(self.blabels[int(tmp[3])],[]).append(len(self.elems)-1)
 
 
    if self.dim == 2 and int(tmp[1]) == 2: #2D Elem (triangle)
@@ -946,6 +970,7 @@ class Geometry(object):
              [n[1],n[2]]]
 
      self.elem_region_map.update({len(self.elems)-1:self.blabels[int(tmp[3])]})
+     self.region_elem_map.setdefault(self.blabels[int(tmp[3])],[]).append(len(self.elems)-1)
 
      self._update_map(perm_n,b_sides,nr,node_indexes)
 
@@ -961,6 +986,8 @@ class Geometry(object):
      self._update_map(perm_n,b_sides,nr,n)
 
      self.elem_region_map.update({len(self.elems)-1:self.blabels[int(tmp[3])]})
+     self.region_elem_map.setdefault(self.blabels[int(tmp[3])],[]).append(len(self.elems)-1)
+
   #------------------------------------------------------------
   #Set default for hot and cold
   self.side_list.setdefault('Hot',[])

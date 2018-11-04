@@ -6,6 +6,7 @@ from ipywidgets import interact, interactive, fixed, interact_manual,HBox,VBox
 import ipywidgets as widgets
 from IPython.display import display
 from ipywidgets import Button, GridBox, Layout, ButtonStyle
+from IPython.display import Latex
 #from openbte.solver_new import *
 #from openbte.geometry import *
 
@@ -33,7 +34,30 @@ w = widgets.FloatSlider(
 w.style.handle_color = 'lightblue'
 
 
-def create_geometry(porosity,shape,angle,lattice):
+ki = widgets.BoundedFloatText(
+    value=100.0,
+    min=0,
+    max=1000,
+    step=0.1,
+    description='TC Inclusion [W/K/m]',
+    disabled=True,
+    layout = {'width': '300px'},\
+    style = {'description_width': '150px'})
+
+mi = widgets.BoundedFloatText(
+    value=1,
+    min=1e-3,
+    max=1e3,
+    step=0.001,
+    description='Kn Inclusion',
+    disabled=True,
+    layout = {'width': '300px'},\
+    style = {'description_width': '150px'})
+
+
+
+
+def create_geometry(porosity,shape,angle,lattice,dx,dy,inclusion,direction,xp,yp):
 
     if lattice == 'squared':
      type = 'porous/square_lattice'
@@ -45,12 +69,17 @@ def create_geometry(porosity,shape,angle,lattice):
       type = 'porous/hexagonal_lattice'
       step = 0.1 *np.sqrt(sqrt(3.0))
 
+    print(yp)
     geo = Geometry(type = type,shape=shape,
                                   lx = 1.0, ly = 1.0,\
                                   step=step/1.0,\
                                   angle=angle,\
+                                  dx = dx,\
+                                  dy = dy,\
                                   porosity=porosity,
-                                  inclusion = True,
+                                  direction=direction,
+                                  inclusion = inclusion,
+                                  Periodic=[xp,yp,False],
                                   mesh=True,plot=False);
 
 
@@ -59,10 +88,16 @@ def create_geometry(porosity,shape,angle,lattice):
     sel.value = 'Geometry'
     t.value = 'Thermal Conductivity [W/m/K]: '
 
+    
+    mi.disabled = not inclusion
+    ki.disabled = not inclusion
+    
+        
+
 
 def create_material(kappa_matrix,kappa_inclusion,mfp_matrix,mfp_inclusion):
-    Material(region='Matrix',kappa = kappa_matrix,filename='material_a',mfps=[mfp_matrix]);
-    Material(region='Inclusion',kappa = kappa_inclusion,filename='material_b',mfps=[mfp_inclusion]);
+    Material(region='Matrix',kappa = kappa_matrix,filename='material_a',mfps=[mfp_matrix*1e-9]);
+    Material(region='Inclusion',kappa = kappa_inclusion,filename='material_b',mfps=[mfp_inclusion*1e-9]);
     w.value = w.value
 
 
@@ -85,7 +120,7 @@ def plot_data(variable):
   if variable == 'Flux (Magnitude) [BTE]':
     var = 'bte_flux'
     direction = 'magnitude'
-  elif variable == 'Flux (X) [BTE]':
+  elif variable == 'Flux [BTE]':
     var = 'bte_flux'
     direction = 'x'
   elif variable == 'Flux (Y) [BTE]':
@@ -94,8 +129,6 @@ def plot_data(variable):
   elif variable == 'Temperature [BTE]':
     var = 'bte_temperature'
     direction = None
-
-
 
 
 
@@ -114,7 +147,7 @@ def run_fourier(b):
  # display(t)
  t.value = 'Thermal Conductivity [W/m/K]: '.ljust(20) +  '{:8.2f}'.format(kappa)
  b.value +=1
- sel.options=['Geometry','Flux (X) [Fourier]', 'Flux (Y) [Fourier]', 'Flux (Magnitude) [Fourier]','Temperature [Fourier]']
+ sel.options=['Geometry',display(Latex(r'''Flux (X) [Fourier]''')), 'Flux (Y) [Fourier]', 'Flux (Magnitude) [Fourier]','Temperature [Fourier]']
 
  sel.value = 'Flux (Magnitude) [Fourier]'
 
@@ -126,7 +159,7 @@ def run_bte(b):
   # display(t)
   t.value = 'Thermal Conductivity [W/m/K]: '.ljust(20) +  '{:8.2f}'.format(kappa)
   b.value +=1
-  sel.options=['Geometry','Flux (X) [BTE]', 'Flux (Y) [BTE]', 'Flux (Magnitude) [BTE]','Temperature [BTE]']
+  sel.options=['Geometry','Flux [X] [BTE]', 'Flux (Y) [BTE]', 'Flux (Magnitude) [BTE]','Temperature [BTE]']
 
   sel.value = 'Flux (Magnitude) [BTE]'
 
@@ -173,9 +206,62 @@ a = widgets.FloatSlider(
     readout_format='.0f')
 a.style.handle_color = 'lightblue'
 
+dx = widgets.FloatSlider(
+    value=0.0,
+    min=-0.5,
+    max=0.5,
+    step=0.1,
+    description='dx',
+    disabled=False,
+    continuous_update=False,
+    orientation='horizontal',
+    readout=True,
+    readout_format='.1f')
+dx.style.handle_color = 'red'
+
+dy = widgets.FloatSlider(
+    value=0.0,
+    min=-0.5,
+    max=0.5,
+    step=0.1,
+    description='dy',
+    disabled=False,
+    continuous_update=False,
+    orientation='horizontal',
+    readout=True,
+    readout_format='.1f')
+dy.style.handle_color = 'red'
+
+
+inc = widgets.Checkbox(
+    value=False,
+    description='Inclusion',
+    disabled=False
+)
+
+
+xp = widgets.Checkbox(
+    value=True,
+    description='Periodic along x',
+    disabled=False
+)
+
+yp = widgets.Checkbox(
+    value=True,
+    description='Periodic along y',
+    disabled=False
+)
+
+
+gra = widgets.RadioButtons(
+    options=['x', 'y'],
+    value='x',
+    description='Direction of the applied temperature',
+    disabled=False
+)
 
 km = widgets.BoundedFloatText(
-    value=100.0,
+    value=150.0,
     min=1,
     max=1000,
     step=0.1,
@@ -184,53 +270,36 @@ km = widgets.BoundedFloatText(
     layout = {'width': '300px'},\
     style = {'description_width': '150px'})
 
-ki = widgets.BoundedFloatText(
-    value=100.0,
-    min=0,
-    max=1000,
-    step=0.1,
-    description='TC Inclusion [W/K/m]',
-    disabled=False,
-    layout = {'width': '300px'},\
-    style = {'description_width': '150px'})
 
 
 mm = widgets.BoundedFloatText(
-    value=1e-9,
-    min=1e-11,
-    max=1e-3,
-    step=0.1,
-    description='MFP Matrix [m]',
+    value=1,
+    min=1e-3,
+    max=1e3,
+    step=0.001,
+    description='Kn Matrix',
     disabled=False,
     layout = {'width': '300px'},\
     style = {'description_width': '150px'})
-
-mi = widgets.BoundedFloatText(
-    value=1e-9,
-    min=1e-11,
-    max=1e-3,
-    step=0.1,
-    description='MFP Inclusion [m]',
-    disabled=False,
-    layout = {'width': '300px'},\
-    style = {'description_width': '150px'})
-
 
 
 
 #plot geometry-------
-test = interactive(create_geometry, porosity=w, shape=d, angle=a,lattice=l);
+test = interact(create_geometry, porosity=w, shape=d, angle=a,lattice=l,dx=dx,dy=dy,inclusion=inc,direction=gra,xp=xp,yp=yp);
 v3 = interactive(create_material, kappa_matrix=km,kappa_inclusion=ki,mfp_matrix = mm,mfp_inclusion=mi);
 
-v1 = VBox(test.children[0:2])
-v2 = VBox(test.children[2:4])
-display(HBox([v1,v2,v3]))
+
+
+#display(test.children[:])
+#v1 = VBox(test.children[0:2])
+#v2 = VBox(test.children[2:4])
+#display(HBox([v1,v2,v3]))
+display(v3)
 #--------------------
 
 
-#v = interactive(plot_data,variable=sel);
-
-#display(v)
+v = interactive(plot_data,variable=sel);
+display(v)
 
 
 #plot output-------

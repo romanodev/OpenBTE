@@ -1,5 +1,7 @@
 import numpy as np
 import math
+from shapely.geometry import Polygon
+
 
 def GenerateSquareLatticePores(argv):
 
@@ -24,16 +26,38 @@ def GenerateSquareLatticePores(argv):
   #Read Number of pores
   Nx = argv.setdefault('Nx',1)
   Ny = argv.setdefault('Ny',1)
-  #----------------------
+  dx = argv.setdefault('dx',0)
+  dy = argv.setdefault('dy',0)
+  
+  frame = []
+  frame.append([float(-Lx * Nx)/2,float(Ly * Ny)/2])
+  frame.append([float(Lx * Nx)/2,float(Ly * Ny)/2])
+  frame.append([float(Lx * Nx)/2,float(-Ly * Ny)/2])
+  frame.append([float(-Lx * Nx)/2,float(-Ly * Ny)/2])
+  frame_poly = Polygon(frame)
 
+    
+  
+  #----------------------
+  pbc = []
+  pbc.append([0,0])
+  pbc.append([Lx,0])
+  pbc.append([-Lx,0])
+  pbc.append([0,Ly])
+  pbc.append([0,-Ly])
+  pbc.append([Lx,Ly])
+  pbc.append([-Lx,-Ly])
+  pbc.append([-Lx,Ly])
+  pbc.append([Lx,-Ly])
 
   area = Lx * Ly * porosity
 
   polygons = []
-  for kx in range(int(Nx)):
-   for ky in range(int(Ny)):
-     cx = -Lx*Nx/2.0 + kx*Lx+0.5*Lx
-     cy = -Ly*Ny/2.0 + ky*Ly+0.5*Ly
+  for ppp in pbc:
+   for kx in range(int(Nx)):
+    for ky in range(int(Ny)):
+     cx = -Lx*Nx/2.0 + kx*Lx+(0.5+dx)*Lx + ppp[0]
+     cy = -Ly*Ny/2.0 + ky*Ly+(0.5+dy)*Ly + ppp[1]
      r = math.sqrt(2.0*area/Na/math.sin(2.0 * np.pi/Na))
 
      dphi = 2.0*math.pi/Na;
@@ -45,11 +69,11 @@ def GenerateSquareLatticePores(argv):
       p.append([px,py])
      polygons.append(p)
 
-  frame = []
-  frame.append([float(-Lx * Nx)/2,float(Ly * Ny)/2])
-  frame.append([float(Lx * Nx)/2,float(Ly * Ny)/2])
-  frame.append([float(Lx * Nx)/2,float(-Ly * Ny)/2])
-  frame.append([float(-Lx * Nx)/2,float(-Ly * Ny)/2])
+  
+  polys_cut = []
+  for p in polygons:
+   if Polygon(p).intersects(frame_poly):
+    polys_cut.append(p)
+    
 
-
-  return frame,polygons
+  return frame,polys_cut

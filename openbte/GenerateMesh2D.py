@@ -7,7 +7,7 @@ import math
 from matplotlib.pylab import *
 import subprocess
 from shapely.ops import cascaded_union
-from shapely.geometry import Point
+from shapely.geometry import Point,LineString
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
 import shapely
@@ -27,6 +27,7 @@ def line_exists_ordered(l,lines):
   if (line[0] == l[1] and line[1] == l[0]) :
    return -n
 
+
  return 0
 
 
@@ -39,7 +40,7 @@ def line_exists(l,lines):
 
 def point_exists(p,points):
 
- delta = 1e-2
+ delta = 1e-10
  for n,point in enumerate(points) :
    if abs(point[0] - p[0]) < delta and abs(point[1] - p[1])< delta :
      return n
@@ -102,27 +103,49 @@ def plot_region(region):
    xlim([-3,3])
    ylim([-3,3])
 
+
 def FindPeriodic(control,others,points,lines):
 
-
+ #line1 = LineString([points[lines[control][0]],points[lines[control][1]]])  
+    
 
  delta = 1e-3
- p1c = points[lines[control][0]]
- p2c = points[lines[control][1]]
+ p1c = np.array(points[lines[control][0]])
+ p2c = np.array(points[lines[control][1]])
+ pc = (p1c + p2c)/2.0
+ 
+     
  for n in range(len(others)):
-   p1 = points[lines[others[n]][0]]
-   p2 = points[lines[others[n]][1]]
+  p1o = np.array(points[lines[others[n]][0]])
+  p2o = np.array(points[lines[others[n]][1]])
+  po = (p1o + p2o)/2.0   
+  
+  
+  if np.linalg.norm(np.dot(p1c-p2c,pc-po)) < delta:     
+   #print(p1c,p2c)
+   #print(p1o,p2o)
+   line1 = LineString([p1c,p1o])
+   line2 = LineString([p2c,p2o])     
+   if line1.intersects(line2):
+    return -others[n]
+   else:
+    return others[n]
+       
+  #print(p1c,p2c)
+   #line1 = LineString([points[lines[others[n]][0]],points[lines[others[n]][1]]])  
+   #if line1.distance(line2)
+
    #Positive
-   pd1 = [p1c[0]-p1[0],p1c[1]-p1[1]]
-   pd2 = [p2c[0]-p2[0],p2c[1]-p2[1]]
-   if abs(pd1[0] - pd2[0]) < delta and abs(pd1[1] - pd2[1]) <delta :
-     return others[n]
+   #pd1 = [p1c[0]-p1[0],p1c[1]-p1[1]]
+   #pd2 = [p2c[0]-p2[0],p2c[1]-p2[1]]
+   #if abs(pd1[0] - pd2[0]) < delta and abs(pd1[1] - pd2[1]) <delta :
+   #  return others[n]
 
    #Negative
-   pd1 = [p1c[0]-p2[0],p1c[1]-p2[1]]
-   pd2 = [p2c[0]-p1[0],p2c[1]-p1[1]]
-   if abs(pd1[0] - pd2[0])<delta and abs(pd1[1] - pd2[1])<delta :
-     return -others[n]
+   #pd1 = [p1c[0]-p2[0],p1c[1]-p2[1]]
+   #pd2 = [p2c[0]-p1[0],p2c[1]-p1[1]]
+   #if abs(pd1[0] - pd2[0])<delta and abs(pd1[1] - pd2[1])<delta :
+   #  return -others[n]
 
 
  #If no periodic line has been found
@@ -174,7 +197,7 @@ def already_included(all_points,new_point):
 
  for n,p in enumerate(all_points):
   d = np.linalg.norm(np.array(p)-np.array(new_point))
-  if d < 1e-2:
+  if d < 1e-12:
    return n
 
  return -1
@@ -266,6 +289,9 @@ def prune(solution):
  return polygons
 
 
+def compute_line_point_distance(p1,p2,p3):
+   return np.linalg.norm(np.cross(p2-p1, p3-p1))/np.linalg.norm(p2-p1)
+
 def plot_region(dd,color='r'):
 
  dd.append(dd[0])
@@ -280,6 +306,7 @@ def plot_region(dd,color='r'):
 
 
 def create_line_list(pp,points,lines,store,mesh_ext):
+
 
    p_list = []
    for p in pp:
@@ -296,23 +323,18 @@ def create_line_list(pp,points,lines,store,mesh_ext):
    for l in range(len(p_list)):
     p1 = p_list[l]
     p2 = p_list[(l+1)%len(p_list)]
-    tmp = line_exists_ordered([p1,p2],lines)
+    if not p1 == p2:
+    #f 1 == 1:    
+     tmp = line_exists_ordered([p1,p2],lines)
 
-    if tmp == 0 : #craete line
-     lines.append([p1,p2])
-     store.write( 'Line('+str(len(lines)-1) +') = {' + str(p1) +','+ str(p2)+'};\n')
-     line_list.append(len(lines)-1)
-    else:
-     line_list.append(tmp)
+     if tmp == 0 : #craete line
+      lines.append([p1,p2])
+      store.write( 'Line('+str(len(lines)-1) +') = {' + str(p1) +','+ str(p2)+'};\n')
+      line_list.append(len(lines)-1)
+     else:
+      line_list.append(tmp)
 
-    #print(' ')
-    #print(p1)
-    #print(p2)
-    #print(tmp)
-    #print(line_list)
-    #print(lines[abs(line_list[-1])])
-
-   #quit()
+   
    return line_list
 
 
@@ -395,12 +417,10 @@ def mesh(polygons,frame,argv):
   inclusions = []
   for region in bulk:
 
-
-
    pp = list(region.exterior.coords)[:-1]
 
+   
    line_list = create_line_list(pp,points,lines,store,mesh_ext)
-
 
    loops +=1
    local_loops = [loops]
@@ -471,30 +491,55 @@ def mesh(polygons,frame,argv):
   upper = []
   lower = []
 
-  deltax = (Maxx-Minx)/1e5
-  deltay = (Maxy-Miny)/1e5
+  #deltax = (Maxx-Minx)/1e2
+  #deltay = (Maxy-Miny)/1e2
 
+  pul = np.array([-lx/2.0,ly/2.0])
+  pur = np.array([lx/2.0,ly/2.0])
+  pll = np.array([-lx/2.0,-ly/2.0])
+  plr = np.array([lx/2.0,-ly/2.0])
+
+
+  delta = 1e-8
   pore_wall = []
   for l,line in enumerate(lines):
    p1 = points[line[0]]
    p2 = points[line[1]]
-   is_on_boundary = False
-   if abs(p1[0] - Minx)<deltax and  abs(p2[0] - Minx)<deltax :
-    hot.append(l)
-    is_on_boundary = True
-   if abs(p1[0] - Maxx)<deltax and  abs(p2[0] - Maxx)<deltax :
-    cold.append(l)
-    is_on_boundary = True
-   if abs(p1[1] - Miny)<deltay and  abs(p2[1] - Miny)<deltay :
-    lower.append(l)
-    is_on_boundary = True
-   if abs(p1[1] - Maxy)<deltay and  abs(p2[1] - Maxy)<deltay :
-    upper.append(l)
-    is_on_boundary = True
+   pl = (np.array(points[line[0]])+np.array(points[line[1]]))/2.0
+   #print(compute_line_point_distance(pul,pur,pl)) 
+   if compute_line_point_distance(pul,pur,pl) < delta:     
+     upper.append(l)
+     is_on_boundary = False
+   if compute_line_point_distance(pll,plr,pl) < delta:
+     lower.append(l)
+     is_on_boundary = False 
+   if compute_line_point_distance(plr,pur,pl) < delta:
+     cold.append(l)
+     is_on_boundary = False 
+   if compute_line_point_distance(pll,pul,pl) < delta:
+     hot.append(l)
+     is_on_boundary = False   
+     
+     
+      
+   #if abs(p1[0] - Minx)<deltax and  abs(p2[0] - Minx)<deltax :
+   # hot.append(l)
+   # is_on_boundary = True
+   #if abs(p1[0] - Maxx)<deltax and  abs(p2[0] - Maxx)<deltax :
+   # cold.append(l)
+   # is_on_boundary = True
+   #if abs(p1[1] - Miny)<deltay and  abs(p2[1] - Miny)<deltay :
+   # lower.append(l)
+   # is_on_boundary = True
+   #if abs(p1[1] - Maxy)<deltay and  abs(p2[1] - Maxy)<deltay :
+   # upper.append(l)
+   # is_on_boundary = True
    if not is_on_boundary:
     pore_wall.append(l)
 
 
+  #print(len(lower))
+  #quit()
   additional_boundary = []
   if argv.setdefault('Periodic',[True,True,True])[0]:
    strc = r'''Physical Line('Periodic_1') = {'''
@@ -564,6 +609,7 @@ def mesh(polygons,frame,argv):
      strc += ','
 
 
+ 
   for n in range(len(hot)):
    periodic = FindPeriodic(hot[n],cold,points,lines)
    strc = 'Periodic Line{' + str(hot[n]) + '}={' + str(periodic) + '};\n'
