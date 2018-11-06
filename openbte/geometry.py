@@ -214,7 +214,7 @@ class Geometry(object):
 
     for poly in self.polygons:
      path = create_path(poly)
-     patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=10,joinstyle='miter')
+     patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=2,joinstyle='miter')
      gca().add_patch(patch);
      
      
@@ -229,11 +229,12 @@ class Geometry(object):
      
       #plot Periodic Conditions-----
     for side in self.side_list['Periodic'] + self.side_list['Inactive']  :
+        
      p1 = self.sides[side][0]
      p2 = self.sides[side][1]
      n1 = self.nodes[p1]
      n2 = self.nodes[p2]
-     plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=6)
+     plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=12,zorder=3)
 
        
     
@@ -1061,8 +1062,8 @@ class Geometry(object):
       for s in pairs:
        c1 = self.compute_side_centroid(s[0])
        c2 = self.compute_side_centroid(s[1])
-       plot([c1[0],c2[0]],[c1[1],c2[1]],color='r')
-      show()
+       #plot([c1[0],c2[0]],[c1[1],c2[1]],color='r')
+      #show()
      #Amend map
      for s in pairs:
       s1 = s[0]
@@ -1487,6 +1488,7 @@ class Geometry(object):
         side_value[ll] = -1.0
      if tmp > delta :
         side_value[ll] = +1.0
+        
 
     side_periodic_value = np.zeros((nsides,2))
 

@@ -25,6 +25,7 @@ class Solver(object):
   def __init__(self,**argv):
 
 
+   
    self.mesh = Geometry(type='load',filename = argv.setdefault('geometry_filename','geometry'))
    self.ms_error = argv.setdefault('ms_error',0.1)
    self.verbose = argv.setdefault('verbose',True)
@@ -233,13 +234,12 @@ class Solver(object):
     (gamma_i,mfp_i) = self.get_material_properties(i)
     (gamma_j,mfp_j) = self.get_material_properties(j)
 
-
-
     (cm,cp,dummy,dummy) = self.mesh.get_angular_coeff(i,j,index)
     r.append(i); c.append(i); d.append(cp*mfp_i)
     v = self.mesh.get_side_periodic_value(i,j)
     rk.append(i); ck.append(j);
-    dk.append(v*(cp*mfp_i+cm*mfp_j*gamma_j/gamma_i)*self.mesh.get_elem_volume(i))
+    dk.append(v*(cp*mfp_i*gamma_i+cm*mfp_j*gamma_j)*self.mesh.get_elem_volume(i))
+
     r.append(i); c.append(j); d.append(cm*mfp_j*gamma_j/gamma_i)
     P[i] += v*cm*mfp_j*gamma_j/gamma_i
 
@@ -248,8 +248,9 @@ class Solver(object):
    HW_plus = np.zeros(self.n_elems)
    for elem in self.mesh.boundary_elements:
     (dummy,dummy,cmb,cpb) = self.mesh.get_angular_coeff(elem,elem,index)
+    (gamma,mfp) = self.get_material_properties(elem)
     HW_plus[elem] =  cpb/np.pi
-    HW_minus[elem] = -cmb
+    HW_minus[elem] = -cmb*mfp
    #--------------------------------------------------------------
 
    #--------------------------WRITE FILES---------------------
@@ -323,7 +324,7 @@ class Solver(object):
       #global_index = m*self.dom['n_theta']*self.dom['n_phi'] +t*self.dom['n_phi']+p
       F = scipy.sparse.eye(self.n_elems) + theta_factor  * A
       lu = splu(F.tocsc())
-      RHS = theta_factor * P + TL[m]
+      RHS = theta_factor * (P + D) + TL[m]
       temp = lu.solve(RHS)
 
       sup = pre_factor * K.dot(temp-TL[m]).sum()*self.kappa_factor
@@ -410,8 +411,6 @@ class Solver(object):
        print(region.ljust(15) +  '{:8.2f}'.format(self.region_kappa_map[region])+ ' W/m/K')
 
 
-
-
    #Solve standard Fourier---------------------------------------------------------
 
    #Initalization-----------------------------------------------------------
@@ -471,12 +470,12 @@ class Solver(object):
    #-----------------------------------
    if MPI.COMM_WORLD.Get_rank() == 0:
     if max_iter > 0:
-     print('')
-     print(colored('Solving BTE... started', 'green'))
-     print('')
-     print('    Iter    Thermal Conductivity [W/m/K]      Error       Zeroth - Fourier - BTE')
-     print('   ------------------------------------------------------------------------------------')
+     if self.verbose:
 
+      print('')
+      print(colored('Solving BTE... started', 'green'))
+      print('')
+      print('    Iter    Thermal Conductivity [W/m/K]      Error       Zeroth - Fourier - BTE')
 
 
    flux = np.zeros((self.n_elems,3))
@@ -533,7 +532,10 @@ class Solver(object):
 
     #--------------------------
     #kappa = sum([self.B0[m]*suppression[m,:,:].sum() for m in range(self.n_mfp)])
-    kappa = sum([self.B0[m]*suppression[m,:,:].sum() for m in range(self.n_mfp)])
+    kappa = sum([suppression[m,:,:].sum() for m in range(self.n_mfp)])
+
+    #print(kappa)
+    #print(self.kappa_bulk)
 
     error = abs((kappa-previous_kappa))/abs(kappa)
 
@@ -542,7 +544,8 @@ class Solver(object):
      ms_0 = ms[0]/float(self.n_mfp)/float(self.n_theta)/float(self.n_phi)*self.symmetry
      ms_1 = ms[1]/float(self.n_mfp)/float(self.n_theta)/float(self.n_phi)*self.symmetry
      #if max_iter > 0:
-     print('{0:7d} {1:20.4E} {2:25.4E} {3:10.2E} {4:8.1E} {5:8.1E}'.format(self.current_iter,kappa*self.kappa_bulk, error,ms_0,ms_1,1.0-ms_0-ms_1))
+     if self.verbose:
+      print('{0:7d} {1:20.4E} {2:25.4E} {3:10.2E} {4:8.1E} {5:8.1E}'.format(self.current_iter,kappa, error,ms_0,ms_1,1.0-ms_0-ms_1))
 
     previous_kappa = kappa
     self.current_iter +=1
@@ -565,7 +568,7 @@ class Solver(object):
 
 
 
-   self.state = {'kappa_bte':kappa*self.kappa_bulk,\
+   self.state = {'kappa_bte':kappa,\
             'suppression':suppression,\
             'zero_suppression':suppression_zeroth,\
             'fourier_suppression':suppression_fourier,\
@@ -580,13 +583,15 @@ class Solver(object):
 
    if MPI.COMM_WORLD.Get_rank() == 0:
     if max_iter > 0 :
-     print('   ------------------------------------------------------------------------------------')
+     if self.verbose:
+      print('   ------------------------------------------------------------------------------------')
 
    if max_iter > 0:
     if MPI.COMM_WORLD.Get_rank() == 0:
-     print('')
-     print(colored('Solving BTE... done', 'green'))
-     print('')
+     if self.verbose:
+      print('')
+      print(colored('Solving BTE... done', 'green'))
+      print('')
 
 
   def assemble_fourier(self) :

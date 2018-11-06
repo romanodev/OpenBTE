@@ -427,7 +427,6 @@ def mesh(polygons,frame,argv):
    create_loop(loops,line_list,store)
 
    #Create internal loops-------------
-   internal_loops = []
    for interior in region.interiors:
     pp = list(interior.coords)[:-1]
     line_list = create_line_list(pp,points,lines,store,mesh_ext)
@@ -480,12 +479,6 @@ def mesh(polygons,frame,argv):
   store.write(strc)
 
 
-  Minx= frame[0][0]
-  Maxx= frame[2][0]
-  Miny= frame[3][1]
-  Maxy= frame[1][1]
-
-
   hot = []
   cold = []
   upper = []
@@ -503,10 +496,8 @@ def mesh(polygons,frame,argv):
   delta = 1e-8
   pore_wall = []
   for l,line in enumerate(lines):
-   p1 = points[line[0]]
-   p2 = points[line[1]]
+  
    pl = (np.array(points[line[0]])+np.array(points[line[1]]))/2.0
-   #print(compute_line_point_distance(pul,pur,pl)) 
    if compute_line_point_distance(pul,pur,pl) < delta:     
      upper.append(l)
      is_on_boundary = False
@@ -521,24 +512,10 @@ def mesh(polygons,frame,argv):
      is_on_boundary = False   
      
      
-      
-   #if abs(p1[0] - Minx)<deltax and  abs(p2[0] - Minx)<deltax :
-   # hot.append(l)
-   # is_on_boundary = True
-   #if abs(p1[0] - Maxx)<deltax and  abs(p2[0] - Maxx)<deltax :
-   # cold.append(l)
-   # is_on_boundary = True
-   #if abs(p1[1] - Miny)<deltay and  abs(p2[1] - Miny)<deltay :
-   # lower.append(l)
-   # is_on_boundary = True
-   #if abs(p1[1] - Maxy)<deltay and  abs(p2[1] - Maxy)<deltay :
-   # upper.append(l)
-   # is_on_boundary = True
    if not is_on_boundary:
     pore_wall.append(l)
 
 
-  #print(len(lower))
   #quit()
   additional_boundary = []
   if argv.setdefault('Periodic',[True,True,True])[0]:

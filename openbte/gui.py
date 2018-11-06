@@ -7,6 +7,7 @@ import ipywidgets as widgets
 from IPython.display import display
 from ipywidgets import Button, GridBox, Layout, ButtonStyle
 from IPython.display import Latex
+import numpy as np
 #from openbte.solver_new import *
 #from openbte.geometry import *
 
@@ -45,7 +46,7 @@ ki = widgets.BoundedFloatText(
     style = {'description_width': '150px'})
 
 mi = widgets.BoundedFloatText(
-    value=1,
+    value=0.1,
     min=1e-3,
     max=1e3,
     step=0.001,
@@ -69,7 +70,6 @@ def create_geometry(porosity,shape,angle,lattice,dx,dy,inclusion,direction,xp,yp
       type = 'porous/hexagonal_lattice'
       step = 0.1 *np.sqrt(sqrt(3.0))
 
-    print(yp)
     geo = Geometry(type = type,shape=shape,
                                   lx = 1.0, ly = 1.0,\
                                   step=step/1.0,\
@@ -133,7 +133,7 @@ def plot_data(variable):
 
 
   Plot(variable='map/' + var,direction=direction,show=True,write=False,streamlines=False,repeat_x=1,repeat_y =1,plot_interfaces=True)
-  Plot(variable='line/'+ var,direction=direction,show=True,write=False,streamlines=False,repeat_x=1,repeat_y =1,plot_interfaces=True)
+  #Plot(variable='line/'+ var,direction=direction,show=True,write=False,streamlines=False,repeat_x=1,repeat_y =1,plot_interfaces=True)
 
 
  if variable == 'Geometry':
@@ -181,7 +181,7 @@ w.style.handle_color = 'lightblue'
 
 d = widgets.RadioButtons(
     options=['circle', 'square', 'triangle'],
-    value='circle',
+    value='square',
     description='shape:',
     disabled=False
 )
@@ -234,7 +234,7 @@ dy.style.handle_color = 'red'
 
 
 inc = widgets.Checkbox(
-    value=False,
+    value=True,
     description='Inclusion',
     disabled=False
 )
@@ -273,7 +273,7 @@ km = widgets.BoundedFloatText(
 
 
 mm = widgets.BoundedFloatText(
-    value=1,
+    value=0.1,
     min=1e-3,
     max=1e3,
     step=0.001,
