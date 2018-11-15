@@ -20,6 +20,8 @@ from .geometry import *
 from .material import *
 
 
+
+
 class Solver(object):
 
   def __init__(self,**argv):
@@ -59,7 +61,7 @@ class Solver(object):
     self.kappa_bulk = mat.state['kappa_bulk_tot']
    #-----------------------------------------------------
 
-
+   
    self.lu = {}
 
    self.mfp = np.array(mat.state['mfp_sampled']) #In nm
@@ -96,14 +98,17 @@ class Solver(object):
    if MPI.COMM_WORLD.Get_rank() == 0:
     directory = self.cache
     if os.path.exists(directory):
-     shutil.rmtree(directory)
+     shutil.rmtree(directory,ignore_errors=True)
     os.makedirs(directory)
     #compute matrix--------
    argv.setdefault('max_bte_iter',10)
 
-   if argv['max_bte_iter'] > 0:
-    output = compute_sum(self.compute_directional_connections,self.n_index)
+   #if argv['max_bte_iter'] > 0:
+       
+   self.compute_directional_connections() 
+    #tput = compute_sum(self.compute_directional_connections,self.n_index)
 
+   
 
    #quit()
    self.compute_space_dependent_kappa_bulk()
@@ -220,190 +225,174 @@ class Solver(object):
     return gamma,mfp
 
 
-  def compute_directional_connections(self,index,options):
+  #def compute_directional_connections(self,index,options):
+      
+  def compute_directional_connections(self):
+      
+      
+   comm = MPI.COMM_WORLD   
+   size = comm.size
+   rank = comm.rank
+   n_index = self.n_index
+   block = n_index // size + 1
+   for kk in range(block):
+    index = rank*block + kk   
+    if index < n_index:
+     #if rank == 1:
+     #    print(index)
+     #------------------------------BULK----------------------------------
+     Diff = []
+     Fminus = []
+     Fplus = []
+     r=[];c=[];d=[]
+     rk=[]; ck=[]; dk=[]
+     P = np.zeros(self.n_elems)
+     for i,j in zip(*self.mesh.A.nonzero()):
 
-   #------------------------------BULK----------------------------------
-   Diff = []
-   Fminus = []
-   Fplus = []
-   r=[];c=[];d=[]
-   rk=[]; ck=[]; dk=[]
-   P = np.zeros(self.n_elems)
-   for i,j in zip(*self.mesh.A.nonzero()):
+      (gamma_i,mfp_i) = self.get_material_properties(i)
+      (gamma_j,mfp_j) = self.get_material_properties(j)
 
-    (gamma_i,mfp_i) = self.get_material_properties(i)
-    (gamma_j,mfp_j) = self.get_material_properties(j)
+      (cm,cp,dummy,dummy) = self.mesh.get_angular_coeff(i,j,index)
+      r.append(i); c.append(i); d.append(cp*mfp_i)
+      v = self.mesh.get_side_periodic_value(i,j)
+      rk.append(i); ck.append(j);
+      dk.append(v*(cp*mfp_i*gamma_i+cm*mfp_j*gamma_j)*self.mesh.get_elem_volume(i))
 
-    (cm,cp,dummy,dummy) = self.mesh.get_angular_coeff(i,j,index)
-    r.append(i); c.append(i); d.append(cp*mfp_i)
-    v = self.mesh.get_side_periodic_value(i,j)
-    rk.append(i); ck.append(j);
-    dk.append(v*(cp*mfp_i*gamma_i+cm*mfp_j*gamma_j)*self.mesh.get_elem_volume(i))
+      r.append(i); c.append(j); d.append(cm*mfp_j*gamma_j/gamma_i)
+      P[i] += v*cm*mfp_j*gamma_j/gamma_i
 
-    r.append(i); c.append(j); d.append(cm*mfp_j*gamma_j/gamma_i)
-    P[i] += v*cm*mfp_j*gamma_j/gamma_i
+     #------------------------------BOUNDARY-------------------------------
+     HW_minus = np.zeros(self.n_elems)
+     HW_plus = np.zeros(self.n_elems)
+     for elem in self.mesh.boundary_elements:
+      (dummy,dummy,cmb,cpb) = self.mesh.get_angular_coeff(elem,elem,index)
+      (gamma,mfp) = self.get_material_properties(elem)
+      HW_plus[elem] =  cpb/np.pi
+      HW_minus[elem] = -cmb*mfp
+     #--------------------------------------------------------------
 
-   #------------------------------BOUNDARY-------------------------------
-   HW_minus = np.zeros(self.n_elems)
-   HW_plus = np.zeros(self.n_elems)
-   for elem in self.mesh.boundary_elements:
-    (dummy,dummy,cmb,cpb) = self.mesh.get_angular_coeff(elem,elem,index)
-    (gamma,mfp) = self.get_material_properties(elem)
-    HW_plus[elem] =  cpb/np.pi
-    HW_minus[elem] = -cmb*mfp
+     #--------------------------WRITE FILES---------------------
+     A = csc_matrix( (d,(r,c)), shape=(self.n_elems,self.n_elems) )
+     K = csc_matrix( (dk,(rk,ck)), shape=(self.n_elems,self.n_elems) )
+     scipy.io.mmwrite(self.cache + '/A_' + str(index) + r'.mtx',A)
+     scipy.io.mmwrite(self.cache + '/K_' + str(index) + r'.mtx',K)
+     P.dump(open(self.cache + '/P_' + str(index) +r'.np','wb+'))
+     HW_minus.dump(open(self.cache +'/HW_MINUS_' + str(index) +r'.np','wb+'))
+     HW_plus.dump(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','wb+'))
+
+
+  def solve_bte(self,**argv):
+
+      
+   #Read options--------------------------------------------------
+   TB = argv['boundary_temperature']
+   TL = argv['temperature_lattice']
+   temp_fourier = argv['temperature_fourier']
+   temperature_gradient_fourier = argv['temperature_gradient_fourier']
+   kappa_fourier = argv['kappa_fourier']
    #--------------------------------------------------------------
+ 
+   ff_1 = 0
 
-   #--------------------------WRITE FILES---------------------
-   A = csc_matrix( (d,(r,c)), shape=(self.n_elems,self.n_elems) )
-   K = csc_matrix( (dk,(rk,ck)), shape=(self.n_elems,self.n_elems) )
-   scipy.io.mmwrite(self.cache + '/A_' + str(index) + r'.mtx',A)
-   scipy.io.mmwrite(self.cache + '/K_' + str(index) + r'.mtx',K)
-   P.dump(open(self.cache + '/P_' + str(index) +r'.np','wb+'))
-   HW_minus.dump(open(self.cache +'/HW_MINUS_' + str(index) +r'.np','wb+'))
-   HW_plus.dump(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','wb+'))
-
-
-  def solve_bte(self,index,options):
-
-   #if self.current_iter == 0:
-   A = scipy.io.mmread(self.cache + '/A_' + str(index) + '.mtx').tocsc()
-   P = np.load(open(self.cache + '/P_' + str(index) +r'.np','rb'))
-   HW_MINUS = np.load(open(self.cache + '/HW_MINUS_' + str(index) +r'.np','rb'))
-   HW_PLUS = np.load(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','rb'))
-   K = scipy.io.mmread(self.cache + '/K_' + str(index) + '.mtx').tocsc()
-   #Hot = np.load(open(self.cache + '/Hot_' + str(index) +r'.np','r'))
-   #Cold = np.load(open(self.cache + '/Cold_' + str(index) +r'.np','r'))
-
-
-   TB = options['boundary_temperature']
-   #D = np.multiply(TB,HW_MINUS)
-
-   suppression_fourier = options['suppression_fourier']
-   TL = options['lattice_temperature']
-   #TL = temp_mfp[0]
-   #print(max(TL))
-   temp_fourier = options['temperature_fourier']
-   temp_fourier_gradient = options['temperature_fourier_gradient']
-   #TL_new = np.zeros(self.n_el)
-   #TB_new = np.zeros(self.n_el)
-   TB_new = np.zeros((self.n_mfp,self.n_el))
-   #phi_factor = self.dom['phi_dir'][p]/self.dom['d_phi_vec'][p]
-
-   flux = np.zeros((self.n_el,3))
+   #Output variables---
    suppression = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
    temperature_mfp = np.zeros((self.n_mfp,self.n_elems))
-   ff_1 = 0
-   ff_0 = 0
+   TB_new = np.zeros((self.n_mfp,self.n_el))
+   flux = np.zeros((self.n_el,3))
+   #--------------------
+   comm = MPI.COMM_WORLD  
+   size = comm.size
+   rank = comm.rank
+   n_index = self.n_index
+   block = n_index // size + 1
+   for kk in range(block):
+    index = rank*block + kk   
+    if index < n_index:
+   
+     #Read directional information-------------------------------------------------- 
+     A = scipy.io.mmread(self.cache + '/A_' + str(index) + '.mtx').tocsc()
+     P = np.load(open(self.cache + '/P_' + str(index) +r'.np','rb'))
+     HW_MINUS = np.load(open(self.cache + '/HW_MINUS_' + str(index) +r'.np','rb'))
+     HW_PLUS = np.load(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','rb'))
+     K = scipy.io.mmread(self.cache + '/K_' + str(index) + '.mtx').tocsc()
+     #-----------------------------------------------------------------------------
+
+     for tt in range(self.n_theta_irr): #We take into account the symmetry
+      if self.dim == 2:
+       t = tt
+       p = index
+       theta_factor = self.dom['at'][t] / self.dom['d_theta_vec'][t]
+      else:
+       t = int(index/self.n_phi)
+       p = index%self.n_phi
+       theta_factor = 1.0
+      pre_factor = 3.0/4.0/np.pi*0.5*theta_factor * self.dom['d_omega'][t][p]
 
 
-   #for t in range(int(self.n_theta/2.0)): #We take into account the symmetry
+     fourier = False
+     
+     for m in range(self.n_mfp)[::-1]:
+      #----------------------------------------------------------------------------------
+      if not fourier:
 
-   for tt in range(self.n_theta_irr): #We take into account the symmetry
-    if self.dim == 2:
-     t = tt
-     p = index
-     theta_factor = self.dom['at'][t] / self.dom['d_theta_vec'][t]
-    else:
-     t = int(index/self.n_phi)
-     p = index%self.n_phi
-     theta_factor = 1.0
-    pre_factor = 3.0/4.0/np.pi*0.5*theta_factor * self.dom['d_omega'][t][p]#  self.dom['d_theta_vec'][t]*self.dom['d_phi_vec'][p]
+       D = np.multiply(TB[m],HW_MINUS)
+       F = scipy.sparse.eye(self.n_elems) + theta_factor  * A
+       lu = splu(F.tocsc())
+       RHS = theta_factor * (P + D) + TL[m]
+       temp = lu.solve(RHS)
+       sup = pre_factor * K.dot(temp-TL[m]).sum()*self.kappa_factor
 
-
-    #ss = self.dom['ss'][t][p]
-    fourier = False
-    zeroth_order = False
-    #RHS_DIFF = scipy.io.mmread('tmp/RHS_DIFF_' + str(t) + '_' + str(p) + '.mtx').tocsc()
-
-
-    for m in range(self.n_mfp)[::-1]:
-     #----------------------------------------------------------------------------------
-     if not fourier:
-
-      D = np.multiply(TB[m],HW_MINUS)
-      #global_index = m*self.dom['n_theta']*self.dom['n_phi'] +t*self.dom['n_phi']+p
-      F = scipy.sparse.eye(self.n_elems) + theta_factor  * A
-      lu = splu(F.tocsc())
-      RHS = theta_factor * (P + D) + TL[m]
-      temp = lu.solve(RHS)
-
-      sup = pre_factor * K.dot(temp-TL[m]).sum()*self.kappa_factor
-
-
-      if self.multiscale:
-       if not sup == 0.0:
-        sup_fourier = suppression_fourier[m][t][p]
-        error = abs(sup-sup_fourier)/abs(sup)
-
-        #f t==6 and p==15:
-         #print(sup,sup_fourier,error)
-        if m == 0:
-             print(m)
-
-        if error < self.ms_error:
-
+       if self.multiscale:
+        if not sup == 0.0:
+         sup_fourier = kappa_fourier[m]*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
+         error = abs(sup-sup_fourier)/abs(sup)
+         if error < self.ms_error:
           fourier = True
           ff_1 +=1
-        # sup = sup_fourier
-        # sup_old = 0.0
-      # else:
-    #     fourier = True
-#         sup_old = 0.0
-     else:
-      #if not zeroth_order:
-       temp = temp_fourier[m] - self.mfp[m]*np.dot(self.mfp[m]*self.dom['S'][t][p],temp_fourier_gradient[m].T)
-
-       #if not sup == 0.0 :
-       sup = suppression_fourier[m][t][p]
-
-       #sup_zeroth = options['suppression_zeroth']*ss[self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
-
-       #if abs(sup - sup_zeroth)/abs(sup) < 0.1 and abs(sup-sup_old)/abs(sup) < 0.01 :
-       # zeroth_order = True
-       # ff_0 +=1
-       #else:
-       ff_1 +=1
-       #sup_old = sup
-      #else:
-      # sup = sup_zeroth
-      # ff_0 +=1
-     #--------------------------
-     #TL_new += self.B2[m] * temp * self.dom['d_omega'][t][p]/4.0/np.pi * self.symmetry
-     if self.symmetry == 2.0:
-      flux += np.mean(self.B1[:,m])*np.outer(temp,np.multiply(self.dom['S'][t][p],[2.0,2.0,0.0]))
-      #flux += self.B1[m]*np.outer(temp,np.multiply(self.dom['S'][t][p],[2.0,2.0,0.0]))
-     else:
-      flux += np.mean(self.B1[:,m])*np.outer(temp,self.dom['S'][t][p])
-
-
+       else:
+        temp = temp_fourier[m] - self.mfp[m]*np.dot(self.mfp[m]*self.dom['S'][t][p],temperature_gradient_fourier[m].T)
+        sup =  kappa_fourier[m]*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
+        ff_1 +=1
+       
      suppression[m,t,p] += sup
      temperature_mfp[m] += temp*self.dom['d_omega'][t][p]*self.symmetry/4.0/np.pi
-
-     if self.dim == 2:
+     #--------------------------
+     if self.symmetry == 2.0:
+      flux += np.mean(self.B1[:,m])*np.outer(temp,np.multiply(self.dom['S'][t][p],[2.0,2.0,0.0]))
       suppression[m,self.n_theta -t -1,p] += suppression[m,t,p]
-      #TB_new += np.mean(self.B1[0,m])*self.dom['at'][t]*np.multiply(temp,HW_PLUS)*self.symmetry
-      #TB_new += self.B1[m]*self.dom['at'][t]*np.multiply(temp,HW_PLUS)*self.symmetry
       TB_new[m] += self.dom['at'][t]*np.multiply(temp,HW_PLUS)*self.symmetry
      else:
+      flux += np.mean(self.B1[:,m])*np.outer(temp,self.dom['S'][t][p])
       TB_new[m] += np.multiply(temp,HW_PLUS)*self.symmetry
+     
+        
+   #output = {'boundary_temperature':TB_new,\
+    #         'suppression':suppression,\
+    #         'flux':flux,\
+    #         'temperature_lattice':temperature_mfp,\
+    #         'ms':np.array(float(ff_1))}
 
-     #------------------------------------------------------------------------------------
-   output = {'boundary_temperature':TB_new,'suppression':suppression,'flux':flux,'temperature':temperature_mfp,'ms':np.array([float(ff_0),float(ff_1)])}
 
+   comm.Allreduce([suppression,MPI.DOUBLE],[argv['suppression'],MPI.DOUBLE],op=MPI.SUM)
+   comm.Allreduce([temperature_mfp,MPI.DOUBLE],[argv['temperature_lattice'],MPI.DOUBLE],op=MPI.SUM)
+   comm.Allreduce([TB_new,MPI.DOUBLE],[argv['boundary_temperature'],MPI.DOUBLE],op=MPI.SUM)
+   comm.Allreduce([flux,MPI.DOUBLE],[argv['flux'],MPI.DOUBLE],op=MPI.SUM)
+   comm.Allreduce([temperature_mfp,MPI.DOUBLE],[argv['temperature_mfp'],MPI.DOUBLE],op=MPI.SUM)
 
-   return output
 
 
 
   def compute_function(self,**argv):
 
+     
+   comm = MPI.COMM_WORLD   
+      
    max_iter = argv.setdefault('max_bte_iter',10)
    max_error = argv.setdefault('max_bte_error',1e-2)
    error = 2.0 * max_error
 
    previous_kappa = 0.0
    self.current_iter = 0
-
    if MPI.COMM_WORLD.Get_rank() == 0:
      if self.verbose:
       print('  ')
@@ -411,113 +400,77 @@ class Solver(object):
        print(region.ljust(15) +  '{:8.2f}'.format(self.region_kappa_map[region])+ ' W/m/K')
 
 
-   #Solve standard Fourier---------------------------------------------------------
+   #Compute first guess---------------------------------
+   if  comm.rank == 0:
+     output = self.solve_fourier()
+     if argv['verbose']:
+      print('  ')
+      print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(output['kappa'])+ ' W/m/K')
+      print('  ')
+   else: output = None
+   output = comm.bcast(output,root=0)
+   
+   #---------------------------------------------------------------------
+   kappa_fourier =         np.array(self.n_mfp * [output['kappa']])
+   temperature_fourier =   np.tile(output['temperature'],(self.n_mfp,1))
+   temperature_lattice = temperature_fourier.copy()
+   boundary_temperature = np.tile(np.multiply(self.boundary_mask,output['temperature']),(self.n_mfp,1))
+   temperature_gradient_fourier = np.tile(self.mesh.compute_grad(output['temperature']),(self.n_mfp,1,1))
 
-   #Initalization-----------------------------------------------------------
+
    suppression = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
-   #suppression_fourier = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
-   temperature = np.zeros((self.n_mfp,self.n_el))
-   temperature_fourier = np.zeros((self.n_mfp,self.n_el))
-   temperature_gradient = np.zeros((self.n_mfp,self.n_el,3))
-   flux_fourier = np.zeros((self.n_el,3))
-   #suppression_first = np.zeros(self.n_mfp)
-   ms = np.zeros(2)
-   #-----------------------------------------------------------------------
-   suppression_fourier = np.zeros((1,self.n_theta,self.n_phi))
-
-   temperature_fourier = np.zeros((1,self.n_el))
-   compute_sum(self.solve_fourier,1,output =  {'suppression':suppression_fourier,\
-                                                        'temperature':temperature_fourier,\
-                                                        'temperature_gradient':np.zeros((1,self.n_el,3)),\
-                                                        'flux':flux_fourier},\
-                                             options = {'kappa_bulk':[1.0],'mfe_factor':0.0})
-   #---------------------------------------------------------------------
-   #---------------------------------------------------------------------
-
-
-   kappa = suppression_fourier[0,:,:].sum()
-
-
-   #quit()
-
-   kappa_fourier = kappa
-   suppression = np.array(self.n_mfp * [suppression_fourier[0]])
-   fourier_temp = temperature_fourier[0]
-   lattice_temperature = np.tile(temperature_fourier,(self.n_mfp,1))
-
-
-   suppression_fourier = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
-   temperature_fourier = np.zeros((self.n_mfp,self.n_el))
-
-   suppression_fourier = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
-
-   if MPI.COMM_WORLD.Get_rank() == 0:
-      if argv['verbose']:
-       print('  ')
-       print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(kappa)+ ' W/m/K')
-       print('  ')
-
-
-   #lattice_temperature = fourier_temp.copy()
-
-
-   boundary_temperature = np.tile(np.multiply(self.boundary_mask,fourier_temp),(self.n_mfp,1))
-   b_temperature = boundary_temperature.copy()
-   #boundary_temperature = np.multiply(self.boundary_mask,fourier_temp)
-   #------------------------------------
-
-
    #-----------------------------------
    if MPI.COMM_WORLD.Get_rank() == 0:
     if max_iter > 0:
      if self.verbose:
-
       print('')
       print(colored('Solving BTE... started', 'green'))
       print('')
       print('    Iter    Thermal Conductivity [W/m/K]      Error       Zeroth - Fourier - BTE')
+   #--------------------------------------------------------
 
 
    flux = np.zeros((self.n_elems,3))
    kappa = 0.0
    suppression_zeroth = np.zeros(self.n_mfp)
    iso_suppression = np.zeros(self.n_mfp)
-   while error > max_error and self.current_iter < max_iter:
+   #while error > max_error and self.current_iter < max_iter:
 
-    #zeroth order---------------------------
-    suppression_zeroth = np.array([self.compute_diffusive_thermal_conductivity(lattice_temperature[0],mat = np.eye(3))])
-
-    if self.multiscale:
-     compute_sum(self.solve_fourier,self.n_mfp,output =  {'suppression':suppression_fourier,\
-                                                            'temperature':temperature_fourier,\
-                                                            'temperature_gradient':temperature_gradient,\
-                                                            'flux':flux},\
-                                                 options = {'boundary_temperature':boundary_temperature.copy(),\
-                                                            'lattice_temperature':lattice_temperature.copy(),\
-                                                            'interface_conductance': 3.0/2.0/self.mfp,\
-                                                            'kappa_bulk':np.square(self.mfp)/3.0,\
-                                                            'mfe_factor':1.0})
-
-
-    if not self.only_fourier:
+ 
+   #SOLVE BTE-------------------------------------------------------------------------------------------------
+   
+   options = {'temperature_lattice':temperature_lattice,\
+              'suppression':suppression,\
+              'kappa_fourier':kappa_fourier,\
+              'boundary_temperature':boundary_temperature,\
+              'temperature_fourier':temperature_fourier,\
+              'temperature_mfp':temperature_lattice,\
+              'flux':flux,\
+              'temperature_gradient_fourier':temperature_gradient_fourier}
+   
+   self.solve_bte(**options)
+   
+    
+   quit()
+   if not self.only_fourier:
      #BTE-------------------------------------------------------------------------------
-     compute_sum(self.solve_bte,self.n_index, \
-                          output = {'temperature':temperature,\
-                                    'flux':flux,\
-                                    'suppression':suppression,\
-                                    'ms':ms,\
-                                    'boundary_temperature':b_temperature},\
-                          options = {'lattice_temperature':lattice_temperature.copy(),\
-                                     'suppression_fourier':suppression_fourier.copy(),\
-                                     'boundary_temperature':boundary_temperature.copy(),\
-                                     'temperature_fourier':temperature_fourier.copy(),\
-                                     'temperature_fourier_gradient':temperature_gradient.copy(),\
-                                     'suppression_fourier':suppression_fourier.copy(),\
-                                     'suppression_zeroth':suppression_zeroth.copy()})
+     #compute_sum(self.solve_bte,self.n_index, \
+      #                    output = {'temperature':temperature,\
+       #                             'flux':flux,\
+        #                            'suppression':suppression,\
+         #                           'ms':ms,\
+          #                          'boundary_temperature':b_temperature},\
+           #               options = {'lattice_temperature':lattice_temperature.copy(),\
+            #                         'suppression_fourier':suppression_fourier.copy(),\
+             #                        'boundary_temperature':boundary_temperature.copy(),\
+              #                       'temperature_fourier':temperature_fourier.copy(),\
+               #                      'temperature_fourier_gradient':temperature_gradient.copy(),\
+                #                     'suppression_fourier':suppression_fourier.copy(),\
+                 #                    'suppression_zeroth':suppression_zeroth.copy()})
 
      #--------------------------------------------------------------------------------
      #lattice_temperature = np.sum([self.B2[m]*temperature[m,:] for m in range(self.n_mfp)],axis=0)
-     for n in range(self.n_mfp):
+    for n in range(self.n_mfp):
       lattice_temperature[n,:] = np.sum([self.B2[n,m]*temperature[m,:] for m in range(self.n_mfp)],axis=0)
       boundary_temperature[n,:] = np.sum([self.B1[n,m]*b_temperature[m,:] for m in range(self.n_mfp)],axis=0)
       if argv.setdefault('compute_iso',False):
@@ -553,7 +506,7 @@ class Solver(object):
 
 
    if not self.multiscale and max_iter > 0:
-    compute_sum(self.solve_fourier,self.n_mfp,output =  {'suppression':suppression_fourier,\
+    compute_sum(self.fourier,self.n_mfp,output =  {'suppression':suppression_fourier,\
                                                         'temperature':temperature_fourier,\
                                                         'temperature_gradient':temperature_gradient,\
                                                         'flux':flux},
@@ -655,14 +608,15 @@ class Solver(object):
    self.boundary_mask = data['boundary_mask']
 
 
-  def solve_fourier(self,n,options):
+  def solve_fourier(self,**argv):
 
-    #Update matrices-------
-    kappa_bulk = options['kappa_bulk'][n]
-    G = options.setdefault('interface_conductance',np.zeros(self.n_mfp))[n]
-    TL = options.setdefault('lattice_temperature',np.zeros((self.n_mfp,self.n_el)))
-    TB = options.setdefault('boundary_temperature',np.zeros((self.n_mfp,self.n_el)))
-    mfe_factor = options.setdefault('mfe_factor',0.0)
+    #Update matrices---------------------------------------------------
+    G = argv.setdefault('interface_conductance',0.0)
+    TL = argv.setdefault('lattice_temperature',np.zeros(self.n_el))
+    TB = argv.setdefault('boundary_temperature',np.zeros(self.n_el))
+    mfe_factor = argv.setdefault('mfe_factor',0.0)
+    #------------------------------------------------------------------
+
 
     #G = 0.0
     #mfe_factor = 0.0
@@ -689,9 +643,8 @@ class Solver(object):
     kappa_old = 0
 
 
-    n_kappa = len(options['kappa_bulk'])
-    temperature_mfp = np.zeros((n_kappa,self.n_elems))
-    gradient_temperature_mfp = np.zeros((len(options['kappa_bulk']),self.n_elems,3))
+#    temperature_mfp = np.zeros((n_kappa,self.n_elems))
+ #   gradient_temperature_mfp = np.zeros((len(options['kappa_bulk']),self.n_elems,3))
     #max_iter=1
     min_err = 1e-8
     while error > min_err and n_iter < max_iter :
@@ -706,8 +659,6 @@ class Solver(object):
 
      (C,flux) = self.compute_non_orth_contribution(temp)
 
-     #kappa = self.compute_diffusive_thermal_conductivity(temp)
-
      kappa = self.compute_inho_diffusive_thermal_conductivity(temp)
 
      error = abs((kappa - kappa_old)/kappa)
@@ -715,21 +666,21 @@ class Solver(object):
 
      kappa_old = kappa
      n_iter +=1
-    suppression = np.zeros(len(options['kappa_bulk']))
-    temperature_mfp[n] = temp
+    #temperature_mfp[n] = temp
 
-    gradient_temperature_mfp[n] = self.mesh.compute_grad(temp)
-    gradient_temperature = self.mesh.compute_grad(temp)
-    suppression = np.zeros((len(options['kappa_bulk']),self.n_theta,self.n_phi))
-    for t in range(self.n_theta):
-     for p in range(self.n_phi):
-      suppression[n,t,p] = kappa*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
+    #gradient_temperature_mfp[n] = self.mesh.compute_grad(temp)
+    #gradient_temperature = self.mesh.compute_grad(temp)
+    #suppression = np.zeros((self.n_theta,self.n_phi))
+    #for t in range(self.n_theta):
+    # for p in range(self.n_phi):
+    #  suppression[t,p] = kappa*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
 
 
-    fourier_flux = [-self.elem_kappa_map[k]*tmp for k,tmp in enumerate(flux)]
-    fourier_flux = np.array(fourier_flux)
+    fourier_flux = np.array([-self.elem_kappa_map[k]*tmp for k,tmp in enumerate(flux)])
+    
 
-    output = {'suppression':suppression,'temperature':temperature_mfp,'flux':fourier_flux,'temperature_gradient':gradient_temperature_mfp}
+    output = {'kappa':kappa,'temperature':temp, \
+             'flux':fourier_flux}#,'temperature_gradient':gradient_temperature_mfp}
 
     return output
 

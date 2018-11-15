@@ -22,9 +22,11 @@ def compute_parallel_sum(func,n_tot,output,options):
 
    comm.Barrier()
 
+   
    size = comm.Get_size()
    n_left = n_tot
    n_start = 0
+   #data = {}
    #VARIABLES------------------------------
    for key, value in output.items():
     strc = r'''output[' ''' + key + r''' '].fill(0)'''
@@ -61,9 +63,14 @@ def compute_parallel_sum(func,n_tot,output,options):
    for key, value in output.items():
     strc += r''' ' ''' + key + r''' ':  ''' + key +'_tot,'
    strc = list(strc)
-   strc[-1] = '}'
-   exec("".join(strc).replace(" ", ""))
 
+   strc[-1] = '}'
+   strc = "".join(strc).replace(" ", "")
+   
+   exec(strc)
+   #print(data)
+   #print(locals().keys())
+   #quit()
    tmp = comm.bcast(data,root=0)
    for key, value in tmp.items():
     if comm.Get_rank() > 0:
