@@ -51,7 +51,7 @@ To plot the mangnitude of heat flux, we type
 
 .. code-block:: shell
 
-   openbte -p map/bte_flux/magnitude
+   openbte -p -variable=map/bte_flux/magnitude
 
  
 .. image:: images/GettingStarted_3.png
@@ -62,7 +62,7 @@ To pseudotemperature is plotted with
 
 .. code-block:: shell
 
-   openbte -p map/temperature_bte
+   openbte -p -variable=map/temperature_bte
 
  
 .. image:: images/GettingStarted_7.png
@@ -84,7 +84,7 @@ The suppression function is plotted with
 
 .. code-block:: shell
 
-   openbte -p suppression_function
+   openbte -p -variable=suppression_function
 
 .. image:: images/GettingStarted_5.png
    :width: 60 %

@@ -12,7 +12,6 @@ Welcome to OpenBTE's documentation!
    download
    gettingstarted
    manual
-   theory
    citingopenbte
 
 

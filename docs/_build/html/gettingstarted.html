@@ -1,29 +1,20 @@
+
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
-
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    
-    <title>Getting Started &mdash; OpenBTE 0.9.0 documentation</title>
-    
+    <title>Getting Started &#8212; OpenBTE 0.9.0 documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    
-    <script type="text/javascript">
-      var DOCUMENTATION_OPTIONS = {
-        URL_ROOT:    './',
-        VERSION:     '0.9.0',
-        COLLAPSE_INDEX: false,
-        FILE_SUFFIX: '.html',
-        HAS_SOURCE:  true
-      };
-    </script>
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="OpenBTE 0.9.0 documentation" href="index.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Manual" href="manual.html" />
     <link rel="prev" title="Download" href="download.html" />
    
@@ -32,13 +23,14 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
 
-  </head>
-  <body>
+  </head><body>
   
 
     <div class="document">
       <div class="documentwrapper">
         <div class="bodywrapper">
+          
+
           <div class="body" role="main">
             
   <div class="section" id="getting-started">
@@ -46,70 +38,71 @@
 <div class="toctree-wrapper compound">
 </div>
 <p>The first step for setting up a OpenBTE simulation is creating a geometry. This can be done by the command</p>
-<div class="highlight-shell"><div class="highlight"><pre>openbte -g -type=porous/square_lattice -shape circle -porosity=0.25 -lx=10 -ly=10
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>openbte -g -type<span class="o">=</span>porous/square_lattice -shape circle -porosity<span class="o">=</span><span class="m">0</span>.25 -lx<span class="o">=</span><span class="m">10</span> -ly<span class="o">=</span><span class="m">10</span>
 </pre></div>
 </div>
-<p>where <tt class="docutils literal"><span class="pre">porous/square_lattice</span></tt> is the geometry model for a two-dimensional porous material. In this case, the shape of the pore is circular, the porosity is 0.25 and the periodicity is 10 nm in both Cartesian directions. Essentially, we simulate only one pore with periodic boundary conditions. The keywords and relative options for other geometry models are listed in the Reference. Once this command is run, the file <tt class="docutils literal"><span class="pre">geometry.hdf5</span></tt> is created in the current directory.</p>
+<p>where <code class="docutils literal notranslate"><span class="pre">porous/square_lattice</span></code> is the geometry model for a two-dimensional porous material. In this case, the shape of the pore is circular, the porosity is 0.25 and the periodicity is 10 nm in both Cartesian directions. Essentially, we simulate only one pore with periodic boundary conditions. The keywords and relative options for other geometry models are listed in the Reference. Once this command is run, the file <code class="docutils literal notranslate"><span class="pre">geometry.hdf5</span></code> is created in the current directory.</p>
 <p>To plot the geometry, type the command</p>
-<div class="highlight-shell"><div class="highlight"><pre>openbte -p -variable=map/geometry
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>openbte -p -variable<span class="o">=</span>map/geometry
 </pre></div>
 </div>
 <a class="reference internal image-reference" href="_images/GettingStarted_1.png"><img alt="_images/GettingStarted_1.png" class="align-center" src="_images/GettingStarted_1.png" style="width: 60%;" /></a>
 <p>To setup the bulk material, use the following command</p>
-<div class="highlight-shell"><div class="highlight"><pre>openbte -m -matfile=Si-300K.dat -n_mfp=10 -n_theta=15 -n_phi=32
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>openbte -m -matfile<span class="o">=</span>Si-300K.dat -n_mfp<span class="o">=</span><span class="m">10</span> -n_theta<span class="o">=</span><span class="m">15</span> -n_phi<span class="o">=</span><span class="m">32</span>
 </pre></div>
 </div>
-<p>where <tt class="docutils literal"><span class="pre">Si-300K.dat</span></tt> is the mean-free-path (MFP) distribution of Si at 300 K calculated with <a class="reference external" href="http://www.shengbte.com">ShengBTE</a>. The flag <tt class="docutils literal"><span class="pre">-n_mfp</span></tt> indicates the number of MFPs to consider in the solution of the BTE.</p>
+<p>where <code class="docutils literal notranslate"><span class="pre">Si-300K.dat</span></code> is the mean-free-path (MFP) distribution of Si at 300 K calculated with <a class="reference external" href="http://www.shengbte.com">ShengBTE</a>. The flag <code class="docutils literal notranslate"><span class="pre">-n_mfp</span></code> indicates the number of MFPs to consider in the solution of the BTE.</p>
 <p>At this point, we should be able to run the BTE with the command</p>
-<div class="highlight-shell"><div class="highlight"><pre>openbte -s
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>openbte -s
 </pre></div>
 </div>
 <p>The solver will first solve the diffusion equation to provide the first guess for the pseudotemperature, then it will solve the BTE. If you run it in serial on your laptop, it should take a few minutes.</p>
 <p>To plot the mangnitude of heat flux, we type</p>
-<div class="highlight-shell"><div class="highlight"><pre>openbte -p -variable=map/bte_flux/magnitude
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>openbte -p -variable<span class="o">=</span>map/bte_flux/magnitude
 </pre></div>
 </div>
 <a class="reference internal image-reference" href="_images/GettingStarted_3.png"><img alt="_images/GettingStarted_3.png" class="align-center" src="_images/GettingStarted_3.png" style="width: 60%;" /></a>
 <p>To pseudotemperature is plotted with</p>
-<div class="highlight-shell"><div class="highlight"><pre>openbte -p -variable=map/temperature_bte
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>openbte -p -variable<span class="o">=</span>map/temperature_bte
 </pre></div>
 </div>
 <a class="reference internal image-reference" href="_images/GettingStarted_7.png"><img alt="_images/GettingStarted_7.png" class="align-center" src="_images/GettingStarted_7.png" style="width: 60%;" /></a>
 <p>The MFP distribution in the porous material can be plotted with</p>
-<div class="highlight-shell"><div class="highlight"><pre>openbte -p -variable=distribution
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>openbte -p -variable<span class="o">=</span>distribution
 </pre></div>
 </div>
 <a class="reference internal image-reference" href="_images/GettingStarted_4.png"><img alt="_images/GettingStarted_4.png" class="align-center" src="_images/GettingStarted_4.png" style="width: 60%;" /></a>
 <p>The suppression function is plotted with</p>
-<div class="highlight-shell"><div class="highlight"><pre>openbte -p -variable=suppression_function
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>openbte -p -variable<span class="o">=</span>suppression_function
 </pre></div>
 </div>
 <a class="reference internal image-reference" href="_images/GettingStarted_5.png"><img alt="_images/GettingStarted_5.png" class="align-center" src="_images/GettingStarted_5.png" style="width: 60%;" /></a>
 <p>In case you are familiar with Python, you can setup a simulation with a script, i.e.</p>
-<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">openbte.material</span> <span class="kn">import</span> <span class="o">*</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">openbte.material</span> <span class="kn">import</span> <span class="o">*</span>
 <span class="kn">from</span> <span class="nn">openbte.geometry</span> <span class="kn">import</span> <span class="o">*</span>
 <span class="kn">from</span> <span class="nn">openbte.solver</span> <span class="kn">import</span> <span class="o">*</span>
 <span class="kn">from</span> <span class="nn">openbte.plot</span> <span class="kn">import</span> <span class="o">*</span>
 
-<span class="n">mat</span> <span class="o">=</span> <span class="n">Material</span><span class="p">(</span><span class="n">matfile</span><span class="o">=</span><span class="s">&#39;Si-300K&#39;</span><span class="p">,</span><span class="n">n_mfp</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span><span class="n">n_theta</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span><span class="n">n_phi</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+<span class="n">mat</span> <span class="o">=</span> <span class="n">Material</span><span class="p">(</span><span class="n">matfile</span><span class="o">=</span><span class="s1">&#39;Si-300K&#39;</span><span class="p">,</span><span class="n">n_mfp</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span><span class="n">n_theta</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span><span class="n">n_phi</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
 
-<span class="n">geo</span> <span class="o">=</span> <span class="n">Geometry</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s">&#39;porous/aligned&#39;</span><span class="p">,</span><span class="n">lx</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span><span class="n">ly</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+<span class="n">geo</span> <span class="o">=</span> <span class="n">Geometry</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;porous/aligned&#39;</span><span class="p">,</span><span class="n">lx</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span><span class="n">ly</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
               <span class="n">porosity</span> <span class="o">=</span> <span class="mf">0.25</span><span class="p">,</span>
               <span class="n">step</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
-              <span class="n">shape</span> <span class="o">=</span> <span class="s">&#39;square&#39;</span><span class="p">)</span>
+              <span class="n">shape</span> <span class="o">=</span> <span class="s1">&#39;square&#39;</span><span class="p">)</span>
 
 <span class="n">sol</span> <span class="o">=</span> <span class="n">Solver</span><span class="p">()</span>
 
-<span class="n">Plot</span><span class="p">(</span><span class="n">variable</span><span class="o">=</span><span class="s">&#39;map/flux_bte/magnitude&#39;</span><span class="p">)</span>
+<span class="n">Plot</span><span class="p">(</span><span class="n">variable</span><span class="o">=</span><span class="s1">&#39;map/flux_bte/magnitude&#39;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 
 
           </div>
+          
         </div>
       </div>
-      <div class="sphinxsidebar">
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
 <h1 class="logo"><a href="index.html">OpenBTE</a></h1>
 
@@ -123,11 +116,10 @@
 <h3>Navigation</h3>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="download.html">Download</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="">Getting Started</a><ul class="simple">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Getting Started</a><ul class="simple">
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="manual.html">Manual</a></li>
-<li class="toctree-l1"><a class="reference internal" href="theory.html">Theory</a></li>
 <li class="toctree-l1"><a class="reference internal" href="citingopenbte.html">Citing OpenBTE</a></li>
 </ul>
 
@@ -140,17 +132,16 @@
   </ul></li>
 </ul>
 </div>
-<div id="searchbox" style="display: none">
+<div id="searchbox" style="display: none" role="search">
   <h3>Quick search</h3>
+    <div class="searchformwrapper">
     <form class="search" action="search.html" method="get">
       <input type="text" name="q" />
       <input type="submit" value="Go" />
       <input type="hidden" name="check_keywords" value="yes" />
       <input type="hidden" name="area" value="default" />
     </form>
-    <p class="searchtip" style="font-size: 90%">
-    Enter search terms or a module, class or function name.
-    </p>
+    </div>
 </div>
 <script type="text/javascript">$('#searchbox').show(0);</script>
         </div>
@@ -161,11 +152,11 @@
       &copy;2017, Giuseppe Romano.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.2.2</a>
-      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.7.9</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.11</a>
       
       |
-      <a href="_sources/gettingstarted.txt"
+      <a href="_sources/gettingstarted.rst.txt"
           rel="nofollow">Page source</a>
     </div>
 

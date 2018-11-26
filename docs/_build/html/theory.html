@@ -1,49 +1,39 @@
+
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
-
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    
-    <title>Theory &mdash; OpenBTE 0.9.0 documentation</title>
-    
+    <title>Theory &#8212; OpenBTE 0.9.0 documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    
-    <script type="text/javascript">
-      var DOCUMENTATION_OPTIONS = {
-        URL_ROOT:    './',
-        VERSION:     '0.9.0',
-        COLLAPSE_INDEX: false,
-        FILE_SUFFIX: '.html',
-        HAS_SOURCE:  true
-      };
-    </script>
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="OpenBTE 0.9.0 documentation" href="index.html" />
-    <link rel="next" title="Citing OpenBTE" href="citingopenbte.html" />
-    <link rel="prev" title="Manual" href="manual.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
   
   <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
 
-  </head>
-  <body>
+  </head><body>
   
 
     <div class="document">
       <div class="documentwrapper">
         <div class="bodywrapper">
+          
+
           <div class="body" role="main">
             
   <div class="section" id="theory">
 <h1>Theory<a class="headerlink" href="#theory" title="Permalink to this headline">¶</a></h1>
-<p>Let us assume we want to calculate the thermal conductivity of a bar with length L and cross-sectional area A, subjected to a difference of temperatue . At the hot contact (HC), there will be outgoing thermal flux , which is related to the effective thermal conductivity  via Fourier&#8217;s law, i.e.</p>
+<p>Let us assume we want to calculate the thermal conductivity of a bar with length L and cross-sectional area A, subjected to a difference of temperatue . At the hot contact (HC), there will be outgoing thermal flux , which is related to the effective thermal conductivity  via Fourier’s law, i.e.</p>
 <p>Due to the presence of classical phonon size effects, heat transport is not diffusive, and  needs to be calculated by the Boltzmann transport equation (BTE). OpenBTE is based on the mean-free-path formulation of the BTE. The starting point of its derivation is the standard steady-state BTE in the relaxation time approximation</p>
 <p>where  collectively describes phonon wave vector  and polarization ,  is the group velocity,  is the non-equilibrium distribution function. The equilibrium function  is the Bose-Einstain distribution at the effective temperature , i.e.</p>
 <p>where  is the Boltzmann constant and  is the phonon energy. Energy conservation requires , where the total phonon flux  is defined by</p>
@@ -59,9 +49,10 @@
 
 
           </div>
+          
         </div>
       </div>
-      <div class="sphinxsidebar">
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
 <h1 class="logo"><a href="index.html">OpenBTE</a></h1>
 
@@ -73,11 +64,10 @@
 
 
 <h3>Navigation</h3>
-<ul class="current">
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="download.html">Download</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gettingstarted.html">Getting Started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="manual.html">Manual</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="">Theory</a></li>
 <li class="toctree-l1"><a class="reference internal" href="citingopenbte.html">Citing OpenBTE</a></li>
 </ul>
 
@@ -85,22 +75,19 @@
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="manual.html" title="previous chapter">Manual</a></li>
-      <li>Next: <a href="citingopenbte.html" title="next chapter">Citing OpenBTE</a></li>
   </ul></li>
 </ul>
 </div>
-<div id="searchbox" style="display: none">
+<div id="searchbox" style="display: none" role="search">
   <h3>Quick search</h3>
+    <div class="searchformwrapper">
     <form class="search" action="search.html" method="get">
       <input type="text" name="q" />
       <input type="submit" value="Go" />
       <input type="hidden" name="check_keywords" value="yes" />
       <input type="hidden" name="area" value="default" />
     </form>
-    <p class="searchtip" style="font-size: 90%">
-    Enter search terms or a module, class or function name.
-    </p>
+    </div>
 </div>
 <script type="text/javascript">$('#searchbox').show(0);</script>
         </div>
@@ -111,11 +98,11 @@
       &copy;2017, Giuseppe Romano.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.2.2</a>
-      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.7.9</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.11</a>
       
       |
-      <a href="_sources/theory.txt"
+      <a href="_sources/theory.rst.txt"
           rel="nofollow">Page source</a>
     </div>
 
