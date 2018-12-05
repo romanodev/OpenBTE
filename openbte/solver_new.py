@@ -8,6 +8,8 @@ import numpy as np
 from mpi4py import MPI
 import shutil
 from scipy.sparse.linalg import *
+from scipy.sparse.linalg import splu
+
 from scipy.sparse import diags
 from scipy.io import *
 import scipy.io
@@ -100,6 +102,7 @@ class Solver(object):
     if os.path.exists(directory):
      shutil.rmtree(directory,ignore_errors=True)
     os.makedirs(directory)
+   MPI.COMM_WORLD.Barrier()
     #compute matrix--------
    argv.setdefault('max_bte_iter',10)
 
@@ -107,10 +110,10 @@ class Solver(object):
        
    self.compute_directional_connections() 
     #tput = compute_sum(self.compute_directional_connections,self.n_index)
-
+   
    
 
-   #quit()
+   
    self.compute_space_dependent_kappa_bulk()
 
    self.assemble_fourier()
@@ -238,12 +241,7 @@ class Solver(object):
    for kk in range(block):
     index = rank*block + kk   
     if index < n_index:
-     #if rank == 1:
-     #    print(index)
-     #------------------------------BULK----------------------------------
-     Diff = []
-     Fminus = []
-     Fplus = []
+  
      r=[];c=[];d=[]
      rk=[]; ck=[]; dk=[]
      P = np.zeros(self.n_elems)
@@ -279,6 +277,7 @@ class Solver(object):
      P.dump(open(self.cache + '/P_' + str(index) +r'.np','wb+'))
      HW_minus.dump(open(self.cache +'/HW_MINUS_' + str(index) +r'.np','wb+'))
      HW_plus.dump(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','wb+'))
+  MPI.COMM_WORLD.Barrier()
 
 
   def solve_bte(self,**argv):
@@ -287,12 +286,12 @@ class Solver(object):
    #Read options--------------------------------------------------
    TB = argv['boundary_temperature']
    TL = argv['temperature_lattice']
-   temp_fourier = argv['temperature_fourier']
-   temperature_gradient_fourier = argv['temperature_gradient_fourier']
-   kappa_fourier = argv['kappa_fourier']
+   #temp_fourier = argv['temperature_fourier']
+   #temperature_gradient_fourier = argv['temperature_gradient_fourier']
+   #kappa_fourier = argv['kappa_fourier']
    #--------------------------------------------------------------
  
-   ff_1 = 0
+   #ff_1 = 0
 
    #Output variables---
    suppression = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
@@ -329,57 +328,54 @@ class Solver(object):
       pre_factor = 3.0/4.0/np.pi*0.5*theta_factor * self.dom['d_omega'][t][p]
 
 
-     fourier = False
+    # fourier = False
      
      for m in range(self.n_mfp)[::-1]:
       #----------------------------------------------------------------------------------
-      if not fourier:
-
+      #if not fourier:
        D = np.multiply(TB[m],HW_MINUS)
        F = scipy.sparse.eye(self.n_elems) + theta_factor  * A
        lu = splu(F.tocsc())
        RHS = theta_factor * (P + D) + TL[m]
-       temp = lu.solve(RHS)
+       temp = lu.solve(RHS) 
        sup = pre_factor * K.dot(temp-TL[m]).sum()*self.kappa_factor
-
-       if self.multiscale:
-        if not sup == 0.0:
-         sup_fourier = kappa_fourier[m]*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
-         error = abs(sup-sup_fourier)/abs(sup)
-         if error < self.ms_error:
-          fourier = True
-          ff_1 +=1
-       else:
-        temp = temp_fourier[m] - self.mfp[m]*np.dot(self.mfp[m]*self.dom['S'][t][p],temperature_gradient_fourier[m].T)
-        sup =  kappa_fourier[m]*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
-        ff_1 +=1
+       #if rank ==0:
+       #  print(sup) 
+       #if self.multiscale:
+       # if not sup == 0.0:
+       #  sup_fourier = kappa_fourier[m]*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
+       #  error = abs(sup-sup_fourier)/abs(sup)
+       #  if error < self.ms_error:
+       #   fourier = True
+       #   ff_1 +=1
+       #else:
+       # temp = temp_fourier[m] - self.mfp[m]*np.dot(self.mfp[m]*self.dom['S'][t][p],temperature_gradient_fourier[m].T)
+       # sup =  kappa_fourier[m]*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
+        
+        #ff_1 +=1
        
-     suppression[m,t,p] += sup
-     temperature_mfp[m] += temp*self.dom['d_omega'][t][p]*self.symmetry/4.0/np.pi
-     #--------------------------
-     if self.symmetry == 2.0:
-      flux += np.mean(self.B1[:,m])*np.outer(temp,np.multiply(self.dom['S'][t][p],[2.0,2.0,0.0]))
-      suppression[m,self.n_theta -t -1,p] += suppression[m,t,p]
-      TB_new[m] += self.dom['at'][t]*np.multiply(temp,HW_PLUS)*self.symmetry
-     else:
-      flux += np.mean(self.B1[:,m])*np.outer(temp,self.dom['S'][t][p])
-      TB_new[m] += np.multiply(temp,HW_PLUS)*self.symmetry
+     
+       suppression[m,t,p] += sup
+       temperature_mfp[m] += temp*self.dom['d_omega'][t][p]*self.symmetry/4.0/np.pi
+       #--------------------------
+       if self.symmetry == 2.0:
+        flux += np.mean(self.B1[:,m])*np.outer(temp,np.multiply(self.dom['S'][t][p],[2.0,2.0,0.0]))
+        suppression[m,self.n_theta -t -1,p] += suppression[m,t,p]
+        TB_new[m] += self.dom['at'][t]*np.multiply(temp,HW_PLUS)*self.symmetry
+       else:
+        flux += np.mean(self.B1[:,m])*np.outer(temp,self.dom['S'][t][p])
+        TB_new[m] += np.multiply(temp,HW_PLUS)*self.symmetry
      
         
-   #output = {'boundary_temperature':TB_new,\
-    #         'suppression':suppression,\
-    #         'flux':flux,\
-    #         'temperature_lattice':temperature_mfp,\
-    #         'ms':np.array(float(ff_1))}
-
-
+   comm.Barrier()
+   
    comm.Allreduce([suppression,MPI.DOUBLE],[argv['suppression'],MPI.DOUBLE],op=MPI.SUM)
    comm.Allreduce([temperature_mfp,MPI.DOUBLE],[argv['temperature_lattice'],MPI.DOUBLE],op=MPI.SUM)
    comm.Allreduce([TB_new,MPI.DOUBLE],[argv['boundary_temperature'],MPI.DOUBLE],op=MPI.SUM)
    comm.Allreduce([flux,MPI.DOUBLE],[argv['flux'],MPI.DOUBLE],op=MPI.SUM)
    comm.Allreduce([temperature_mfp,MPI.DOUBLE],[argv['temperature_mfp'],MPI.DOUBLE],op=MPI.SUM)
-
-
+ 
+   #return argv
 
 
   def compute_function(self,**argv):
@@ -448,9 +444,16 @@ class Solver(object):
               'flux':flux,\
               'temperature_gradient_fourier':temperature_gradient_fourier}
    
-   self.solve_bte(**options)
+   for n in range(5):
+    #print(np.shape(options['temperature_lattice'][0]))
+    #if MPI.COMM_WORLD.Get_rank() == 0:   
+     #print(np.max(options['temperature_lattice'][0]))   
+    o = self.solve_bte(**options)
    
-    
+    kappa = sum([self.B0[m]*o['suppression'][m,:,:].sum() for m in range(self.n_mfp)])
+    if MPI.COMM_WORLD.Get_rank() == 0:
+     print(kappa)
+
    quit()
    if not self.only_fourier:
      #BTE-------------------------------------------------------------------------------
