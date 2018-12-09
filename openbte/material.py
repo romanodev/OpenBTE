@@ -31,6 +31,7 @@ class Material(object):
 
 
    if argv['model'] == 'nongray':
+       
     self.import_data(argv)
 
    if argv['model'] == 'gray':
@@ -163,8 +164,11 @@ class Material(object):
     data.update({'kappa_bulk_tot':sum(kappa_bulk_new)})
     data.update({'mfp_bulk':mfp_bulk_new})
     data.update({'kappa_bulk':kappa_bulk_new})
+    
+    B1 = np.tile(B1,(n_mfp,1))
+  
     data.update({'B0':B0})
-    data.update({'B1':np.tile(B1,(n_mfp,1))})
+    data.update({'B1':B1})
     data.update({'B2':np.tile(B2,(n_mfp,1))})
     #data.update({'B1':B1})
     #data.update({'B2':B2})
