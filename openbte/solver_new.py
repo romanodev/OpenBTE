@@ -298,12 +298,6 @@ class Solver(object):
 
    N = 2
    for n in range(N):   
-    #Read options--------------------------------------------------
-    #temp_fourier = argv['temperature_fourier']
-    #temperature_gradient_fourier = argv['temperature_gradient_fourier']
-    #kappa_fourier = argv['kappa_fourier']
-    #--------------------------------------------------------------
-    #ff_1 = 0
 
     #Output variables---
     SUPp = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
@@ -343,8 +337,6 @@ class Solver(object):
         
        pre_factor = 3.0/4.0/np.pi*0.5*theta_factor * self.dom['d_omega'][t][p]  
           
-       
-    # fourier = False
      
        for m in range(self.n_mfp)[::-1]:
        #----------------------------------------------------------------------------------
@@ -356,29 +348,7 @@ class Solver(object):
         
         temp = lu.solve(RHS) 
         sup = pre_factor * K.dot(temp-TL[m]).sum()*self.kappa_factor
-        
-        
-       
-       #if rank ==0:
-       #  print(sup) 
-       #if self.multiscale:
-       # if not sup == 0.0:
-       #  sup_fourier = kappa_fourier[m]*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
-       #  error = abs(sup-sup_fourier)/abs(sup)
-       #  if error < self.ms_error:
-       #   fourier = True
-       #   ff_1 +=1
-       #else:
-       # temp = temp_fourier[m] - self.mfp[m]*np.dot(self.mfp[m]*self.dom['S'][t][p],temperature_gradient_fourier[m].T)
-       # sup =  kappa_fourier[m]*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
-        
-        #ff_1 +=1
-     
-        
-        #lattice_temperature[n,:] = np.sum([self.B2[n,m]*temperature[m,:] for m in range(self.n_mfp)],axis=0)
-      #boundary_temperature[n,:] = np.sum([self.B1[n,m]*b_temperature[m,:] for m in range(self.n_mfp)],axis=0)
-        #lattice_temperature[n,:] = np.sum([self.B2[n,m]*temperature[m,:] for m in range(self.n_mfp)],axis=0)
-        
+    
         TLp += np.outer(self.B2[:,m],temp)*self.dom['d_omega'][t][p]*self.symmetry/4.0/np.pi
         
         
