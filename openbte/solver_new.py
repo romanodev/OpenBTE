@@ -293,12 +293,17 @@ class Solver(object):
    self.state = {}      
    TB = argv['boundary_temperature']
    TL = argv['temperature_lattice']
+   
+   
    SUP = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
    FLUX = np.zeros((self.n_el,3))
-
-   N = 2
-   for n in range(N):   
-
+   ms_1 = 0
+   kappa_old = 0.0
+   n_iter = 0
+   error = 1.0
+   while n_iter < argv.setdefault('max_bte_iter',10) and \
+          error > argv.setdefault('max_bte_error',1e-2):
+   
     #Output variables---
     SUPp = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
     TLp  = np.zeros((self.n_mfp,self.n_elems))
@@ -334,10 +339,8 @@ class Solver(object):
         p = index%self.n_phi
         theta_factor = 1.0
         
-        
        pre_factor = 3.0/4.0/np.pi*0.5*theta_factor * self.dom['d_omega'][t][p]  
           
-     
        for m in range(self.n_mfp)[::-1]:
        #----------------------------------------------------------------------------------
        #if not fourier:
@@ -365,29 +368,39 @@ class Solver(object):
          TBp[m] += np.multiply(temp,HW_PLUS)*self.symmetry
    
     
-    
     comm.Allreduce([SUPp,MPI.DOUBLE],[SUP,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([TLp,MPI.DOUBLE],[TL,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([TBp,MPI.DOUBLE],[TB,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([FLUXp,MPI.DOUBLE],[FLUX,MPI.DOUBLE],op=MPI.SUM)
 
-    self.state.update({'suppression': SUP})
-    self.state.update({'suppression_mfp':[SUP[m,:,:].sum() for m in range(np.shape(SUP)[0])]})
-    self.state.update({'ThermalFlux_BTE': FLUX})
-    self.state.update({'Temperature_BTE': TL[0]}) #this has to be updated
-    self.state.update({'kappa_bte':sum([self.B0[m]*SUP[m,:,:].sum() for m in range(np.shape(SUPp)[0])])})
-    if rank==0:print(self.state['kappa_bte'])
+    kappa = sum([self.B0[m]*SUP[m,:,:].sum() for m in range(np.shape(SUPp)[0])])
+
+    output = {'suppression': SUP,\
+             'suppression_mfp':[SUP[m,:,:].sum() for m in range(np.shape(SUP)[0])],\
+             'ThermalFlux_BTE': FLUX,\
+             'Temperature_BTE': TL[0],\
+             'kappa_bte':kappa}
+    
+    n_iter +=1
+    error = abs(kappa-kappa_old)/abs(kappa)
+    kappa_old = kappa
+    if rank==0:
+     print('{0:7d} {1:20.4E} {2:25.4E} {4:8.1E} {5:8.1E}'.format(n_iter,self.state['kappa_bte'],error,ms_1,1.0-ms_1))
+
+    
+    return output
     
 
   def compute_function(self,**argv):
 
      
-   comm = MPI.COMM_WORLD   
+   #first guess
+   output = self.solve_fourier(**argv)   
       
-   max_iter = argv.setdefault('max_bte_iter',10)
-   max_error = argv.setdefault('max_bte_error',1e-2)
-   error = 2.0 * max_error
+   quit()
+   output = self.solve_bte(**argv)
 
+   quit()
    previous_kappa = 0.0
    self.current_iter = 0
    if MPI.COMM_WORLD.Get_rank() == 0:
@@ -397,15 +410,15 @@ class Solver(object):
        print(region.ljust(15) +  '{:8.2f}'.format(self.region_kappa_map[region])+ ' W/m/K')
 
 
-   #Compute first guess---------------------------------
-   if  comm.rank == 0:
-     output = self.solve_fourier()
-     if argv['verbose']:
-      print('  ')
-      print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(output['kappa'])+ ' W/m/K')
-      print('  ')
-   else: output = None
-   output = comm.bcast(output,root=0)
+   #Compute first guess--------------------------com-------
+   #if  comm.rank == 0:
+   #  output = self.solve_fourier()
+   #  if argv['verbose']:
+   #   print('  ')
+   #   print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(output['kappa'])+ ' W/m/K')
+   #   print('  ')
+   #else: output = None
+   #output = comm.bcast(output,root=0)
    
    #---------------------------------------------------------------------
    kappa_fourier =         np.array(self.n_mfp * [output['kappa']])
@@ -423,7 +436,7 @@ class Solver(object):
       print('')
       print(colored('Solving BTE... started', 'green'))
       print('')
-      print('    Iter    Thermal Conductivity [W/m/K]      Error       Zeroth - Fourier - BTE')
+      print('    Iter    Thermal Conductivity [W/m/K]      Error       Fourier - BTE')
    #--------------------------------------------------------
 
 
@@ -449,7 +462,9 @@ class Solver(object):
     #print(np.shape(options['temperature_lattice'][0]))
     #if MPI.COMM_WORLD.Get_rank() == 0:   
      #print(np.max(options['temperature_lattice'][0]))   
-   self.solve_bte(**options)
+   #self.solve_bte(**options)
+   
+   
    
     #kappa = sum([self.B0[m]*o['suppression'][m,:,:].sum() for m in range(self.n_mfp)])
     #if MPI.COMM_WORLD.Get_rank() == 0:
@@ -571,7 +586,7 @@ class Solver(object):
 
      (v_orth,dummy) = self.mesh.get_decomposed_directions(kc1,kc2)
      vol1 = self.mesh.get_elem_volume(kc1)
-     vol2 = self.mesh.get_elem_volume(kc2)
+     #vol2 = self.mesh.get_elem_volume(kc2)
      row_tmp.append(kc1)
      col_tmp.append(kc2)
      data_tmp.append(-v_orth/vol1*kappa)
@@ -614,62 +629,88 @@ class Solver(object):
 
   def solve_fourier(self,**argv):
 
+        
     #Update matrices---------------------------------------------------
-    G = argv.setdefault('interface_conductance',0.0)
+    G = argv.setdefault('interface_conductance',0.0)*self.dom['correction']
     TL = argv.setdefault('lattice_temperature',np.zeros(self.n_el))
     TB = argv.setdefault('boundary_temperature',np.zeros(self.n_el))
     mfe_factor = argv.setdefault('mfe_factor',0.0)
-    #------------------------------------------------------------------
+    kappa_bulk = argv.setdefault('kappa',[1.0])
+    n_index = len(kappa_bulk)
+    #-------------------------------
+    KAPPAp = np.zeros(n_index)
+    KAPPA = np.zeros(n_index)
+    #TLp = np.zeros((n_index,self.n_elems))
+    FLUXp = np.zeros((3,self.n_elems))
+    FLUX = np.zeros((3,self.n_elems))
+    TL = np.zeros(self.n_elems)
 
+    
+    #set up MPI------------------
+    comm = MPI.COMM_WORLD  
+    size = comm.size
+    rank = comm.rank
+    
+    block = n_index // size + 1
+    for kk in range(block):
+     index = rank*block + kk   
+     if index < n_index:
 
-    #G = 0.0
-    #mfe_factor = 0.0
-    #print(G)
-    #G = 0.0
-    #G *= self.dom['correction']/2.0
-    diag_1 = diags([self.FF],[0]).tocsc()
-    #A = (self.F + diag_1*G)   + mfe_factor * csc_matrix(scipy.sparse.eye(self.n_elems))/kappa_bulk
-    #B = (self.B + np.multiply(self.FF,TB[n])*G)  + mfe_factor * TL[n]/kappa_bulk
-    A = self.F
-    B = self.B
-    if mfe_factor == 0.0:
-     A[10,10] = 1.0
-    #----------------------------------------------------
+      #Aseemble matrix-------------       
+      A = (self.F + mfe_factor*diags([self.FF],[0]).tocsc()*G[index])  + \
+            mfe_factor * csc_matrix(scipy.sparse.eye(self.n_elems))/kappa_bulk[index]
+      B = (self.B + np.multiply(self.FF,TB[index])*G)  + mfe_factor * TL[index]/kappa_bulk[index]
+      if mfe_factor == 0.0: A[10,10] = 1.0
+      SU = splu(A)
+      C = np.zeros(self.n_el)
+      #--------------------------------------
 
-    #------------------------
-    SU = splu(A)
-    C = np.zeros(self.n_el)
-    #--------------------------------------
-    min_err = 1e-3
-    error = 2*min_err
-    max_iter = 10
-    n_iter = 0
-    kappa_old = 0
+      n_iter = 0
+      kappa_old = 0
+      error = 1
+      while error > argv.setdefault('max_fourier_error',1e-11) and \
+                    n_iter < argv.setdefault('max_fourier_iter',10) :
 
+        RHS = B + C#*kappa_bulk
+        if mfe_factor == 0.0: RHS[10] = 0.0      
+        temp = SU.solve(RHS)
+        temp = temp - (max(temp)+min(temp))/2.0
+        (C,flux) = self.compute_non_orth_contribution(temp)
+        kappa = self.compute_inho_diffusive_thermal_conductivity(temp)
+        error = abs((kappa - kappa_old)/kappa)
+        kappa_old = kappa
+        n_iter +=1
+        
+     FLUXp = np.array([-self.elem_kappa_map[k]*tmp for k,tmp in enumerate(flux)])
+     
+    comm.Allreduce([KAPPAp,MPI.DOUBLE],[KAPPA,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([temp/n_index,MPI.DOUBLE],[TL,MPI.DOUBLE],op=MPI.SUM) #to be changed
+    comm.Allreduce([FLUXp/n_index,MPI.DOUBLE],[FLUX,MPI.DOUBLE],op=MPI.SUM) #to be changed
 
+    if rank== 0:
+     print('  ')
+     print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(KAPPA[0])+ ' W/m/K')
+     print('  ')
+
+   
+   #-------------------------------------------
+    
+
+    return {'kappa':KAPPA,'foutier_flux':FLUX,'temperature_fourier':TL}
+
+      
+
+ #output = {'kappa':kappa,'temperature':temp, \
+    #         'flux':fourier_flux}#,'temperature_gradient':gradient_temperature_mfp}  
 #    temperature_mfp = np.zeros((n_kappa,self.n_elems))
  #   gradient_temperature_mfp = np.zeros((len(options['kappa_bulk']),self.n_elems,3))
     #max_iter=1
-    min_err = 1e-8
-    while error > min_err and n_iter < max_iter :
 
 
-     RHS = B + C#*kappa_bulk
-     if mfe_factor == 0.0:
-       RHS[10] = 0.0
-
-     temp = SU.solve(RHS)
-     temp = temp - (max(temp)+min(temp))/2.0
-
-     (C,flux) = self.compute_non_orth_contribution(temp)
-
-     kappa = self.compute_inho_diffusive_thermal_conductivity(temp)
-
-     error = abs((kappa - kappa_old)/kappa)
 
 
-     kappa_old = kappa
-     n_iter +=1
+
+   
     #temperature_mfp[n] = temp
 
     #gradient_temperature_mfp[n] = self.mesh.compute_grad(temp)
@@ -680,14 +721,13 @@ class Solver(object):
     #  suppression[t,p] = kappa*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi
 
 
-    fourier_flux = np.array([-self.elem_kappa_map[k]*tmp for k,tmp in enumerate(flux)])
+    
     
 
-    output = {'kappa':kappa,'temperature':temp, \
-             'flux':fourier_flux}#,'temperature_gradient':gradient_temperature_mfp}
+    #output = {'kappa':kappa,'temperature':temp, \
+    #         'flux':fourier_flux}#,'temperature_gradient':gradient_temperature_mfp}
 
-    return output
-
+  
   def compute_non_orth_contribution(self,temp) :
 
     self.gradT = self.mesh.compute_grad(temp)
