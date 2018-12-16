@@ -10,8 +10,7 @@ from openbte.plot import *
 #geo = Geometry(type='bulk',lx=10,ly=10,lz=2,\
 #                    porosity=0.25,step=1.0,shape='square')
 
-#geo = Geometry(type='porous/square_lattice',lx=10,ly=10,lz=2,\
-#                    porosity=0.25,step=1.0,shape='square')
-sol = Solver(max_bte_iter = 1,max_bte_error=1e-6)
+#geo = Geometry(type='porous/square_lattice',lx=10,ly=10,lz=2,porosity=0.25,step=1.0,shape='square')
+sol = Solver(max_bte_iter = 10,max_bte_error=1e-6,max_fourier_iter=1)
 
 

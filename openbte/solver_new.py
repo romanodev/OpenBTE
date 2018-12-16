@@ -287,6 +287,8 @@ class Solver(object):
    ms = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
    TB = temperature_fourier.copy()
    TL = temperature_fourier.copy()
+   TLtot,TBtot  = np.zeros((2,self.n_mfp,self.n_elems))
+
    kappa_fourier =  np.tile(output['kappa_fourier'],(self.n_mfp,1))
    
    
@@ -344,9 +346,11 @@ class Solver(object):
          RHS = self.mfp[m]*theta_factor * (P + D) + TL[m]
          temp = lu.solve(RHS) 
          sup = pre_factor * K.dot(temp-TL[m]).sum()*self.kappa_factor/self.mfp[m]
-         TLp += np.outer(self.B2[:,m],temp)*self.dom['d_omega'][t][p]*self.symmetry/4.0/np.pi        
-         sup_fourier = kappa_fourier[m]*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi/self.kappa_bulk
-         if abs((sup_fourier - sup)/sup) < argv.setdefault('ms_error',1e-2): fourier=True
+         TLp += np.outer(self.B2[:,m],temp)*self.dom['d_omega'][t][p]*self.symmetry/4.0/np.pi    
+         #TLp[m] += self.B2[0,m]*temp*self.dom['d_omega'][t][p]*self.symmetry/4.0/np.pi    
+         #TLp[m] += temp*self.dom['d_omega'][t][p]*self.symmetry/4.0/np.pi 
+         #sup_fourier = kappa_fourier[m]*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi/self.kappa_bulk
+         #if abs((sup_fourier - sup)/sup) < argv.setdefault('ms_error',1e-2): fourier=True
         else:
          ms[m,t,p] = 1   
          sup = kappa_fourier[m]*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi/self.kappa_bulk
@@ -364,37 +368,40 @@ class Solver(object):
    
     comm.Barrier()
     comm.Allreduce([SUPp,MPI.DOUBLE],[SUP,MPI.DOUBLE],op=MPI.SUM)
-    comm.Allreduce([TLp,MPI.DOUBLE],[TL,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([TLp,MPI.DOUBLE],[TLtot,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([TBp,MPI.DOUBLE],[TB,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([FLUXp,MPI.DOUBLE],[FLUX,MPI.DOUBLE],op=MPI.SUM)
     kappa = sum([self.B0[m]*SUP[m,:,:].sum() for m in range(np.shape(SUP)[0])])*self.kappa_bulk
-    
+    TL = TLtot.copy()
+    #if rank == 0:
+    # [print(max(TLtot[u])) for u in range(self.n_mfp)]
+    #quit() 
     #Solve fourier---------------------------------------------------
-    argv.update({'mfe_factor':1.0,\
-                 'verbose':False,\
-                 'lattice_temperature':TL,\
-                 'boundary_temperature':TB,\
-                 'kappa':np.square(self.mfp)/2.0,\
-                 'interface_conductance': 3.0/2.0/self.mfp})    
-    output = self.solve_fourier(**argv) 
-    kappa_fourier = output['kappa_fourier']
-    temperature_fourier = output['temperature_fourier']
-    temperature_fourier_gradient = output['temperature_fourier_gradient']
+    #argv.update({'mfe_factor':1.0,\
+     #            'verbose':False,\
+     #            'lattice_temperature':TL,\
+     #            'boundary_temperature':TB,\
+     #            'kappa':np.square(self.mfp)/2.0,\
+     #            'interface_conductance': 3.0/2.0/self.mfp})    
+    #output = self.solve_fourier(**argv) 
+    #kappa_fourier = output['kappa_fourier']
+    #temperature_fourier = output['temperature_fourier']
+    #temperature_fourier_gradient = output['temperature_fourier_gradient']
     #----------------------------------------------------------------
     
     n_iter +=1
     error = abs(kappa-kappa_old)/abs(kappa)
     kappa_old = kappa
-    if rank==0:
-      print(kappa)  
-      print(sum(sum(sum(ms))),self.n_mfp*self.n_theta*self.n_phi)
+    #if rank==0:
+    #  print(kappa)  
+    #  print(sum(sum(sum(ms))),self.n_mfp*self.n_theta*self.n_phi)
       #print(error)
      #print(ms_1) 
      #print('{0:7d} {1:20.4E} {2:25.4E} {4:8.1E} {5:8.1E}'.format(n_iter,kappa,error,ms_1,1.0-ms_1))
    if rank==0:
     sup_m = [SUP[m,:,:].sum() for m in range(np.shape(SUP)[0])]
     plt.plot(self.mfp,sup_m,'g')
-    plt.plot(self.mfp,kappa_fourier/self.kappa_bulk,'r')
+    #plt.plot(self.mfp,kappa_fourier/self.kappa_bulk,'r')
     plt.xscale('log')
     plt.show()
     
@@ -446,7 +453,7 @@ class Solver(object):
     data_tmp_b2 = []
     B = np.zeros(self.n_elems)
     for kc1,kc2 in zip(*self.mesh.A.nonzero()):
-     ll = self.mesh.get_side_between_two_elements(kc1,kc2)
+     #ll = self.mesh.get_side_between_two_elements(kc1,kc2)
 
      #kappa = self.side_kappa_map[ll]
      kappa = 1.0
@@ -506,13 +513,15 @@ class Solver(object):
     TB = argv.setdefault('boundary_temperature',np.zeros((1,self.n_el)))
     mfe_factor = argv.setdefault('mfe_factor',0.0)
     kappa_bulk = argv.setdefault('kappa',[1.0])
+   
+    
     
     n_index = len(kappa_bulk)
     G = np.zeros(n_index)
     #-------------------------------
     KAPPAp,KAPPA = np.zeros((2,n_index))
     FLUX,FLUXp = np.zeros((2,n_index,3,self.n_elems))
-    TL,TLp = np.zeros((2,n_index,self.n_elems))
+    TLp,TLtot = np.zeros((2,n_index,self.n_elems))
 
     
     #set up MPI------------------
@@ -525,10 +534,11 @@ class Solver(object):
      index = rank*block + kk   
      if index < n_index:
       #Aseemble matrix-------------       
-     
-      A = self.F + mfe_factor*diags([self.FF],[0]).tocsc()*G[index])  + \
-            mfe_factor * csc_matrix(scipy.sparse.eye(self.n_elems))/kappa_bulk[index]
-      B = self.B + np.multiply(self.FF,TB[index])*G[index])  + mfe_factor * TL[index]/kappa_bulk[index]
+    
+        
+      #print(max(TL[index]))
+      A = kappa_bulk[index] * self.F + mfe_factor * csc_matrix(scipy.sparse.eye(self.n_elems)) #+ mfe_factor * diags([self.FF],[0]).tocsc() *   G[index]  
+      B = kappa_bulk[index] * self.B + mfe_factor * TL[index] #+ mfe_factor * np.multiply(self.FF,TB[index]) * G[index] 
       if mfe_factor == 0.0: A[10,10] = 1.0
       SU = splu(A)
       C = np.zeros(self.n_el)
@@ -541,7 +551,7 @@ class Solver(object):
       while error > argv.setdefault('max_fourier_error',1e-11) and \
                     n_iter < argv.setdefault('max_fourier_iter',10) :
 
-        RHS = B + C#*kappa_bulk
+        RHS = B + C
         if mfe_factor == 0.0: RHS[10] = 0.0      
         temp = SU.solve(RHS)
         temp = temp - (max(temp)+min(temp))/2.0
@@ -556,7 +566,7 @@ class Solver(object):
       TLp[index] = temp
       
     comm.Allreduce([KAPPAp,MPI.DOUBLE],[KAPPA,MPI.DOUBLE],op=MPI.SUM)
-    comm.Allreduce([TLp,MPI.DOUBLE],[TL,MPI.DOUBLE],op=MPI.SUM) #to be changed
+    comm.Allreduce([TLp,MPI.DOUBLE],[TLtot,MPI.DOUBLE],op=MPI.SUM) #to be changed
     comm.Allreduce([FLUXp,MPI.DOUBLE],[FLUX,MPI.DOUBLE],op=MPI.SUM) #
  
     if rank== 0 and argv.setdefault('verbose',True):
@@ -609,7 +619,7 @@ class Solver(object):
 
      if not i==j:
       ll = self.mesh.get_side_between_two_elements(i,j)
-      kappa = self.side_kappa_map[ll]
+      #kappa = self.side_kappa_map[ll]
       #Get agerage gradient----
       side = self.mesh.get_side_between_two_elements(i,j)
 
@@ -619,8 +629,9 @@ class Solver(object):
       #------------------------
       (dumm,v_non_orth) = self.mesh.get_decomposed_directions(i,j)
 
-      C[i] += np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(i)*kappa
-      C[j] -= np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(j)*kappa
+      
+      C[i] += np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(i)#*kappa
+      C[j] -= np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(j)#*kappa
 
 
     return C, self.gradT# [-self.elem_kappa_map[n]*tmp for n,tmp in enumerate(self.gradT)]
