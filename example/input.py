@@ -4,7 +4,7 @@ from openbte.solver import *
 from openbte.plot import *
 
 
-mat = Material(model='nongray',matfile='Si-300K.dat',n_theta=12,n_phi=48,n_mfp=100)
+#mat = Material(model='nongray',matfile='Si-300K.dat',n_theta=12,n_phi=48,n_mfp=30)
  
 #quit()
 #geo = Geometry(type='bulk',lx=10,ly=10,lz=2,\
@@ -12,6 +12,6 @@ mat = Material(model='nongray',matfile='Si-300K.dat',n_theta=12,n_phi=48,n_mfp=1
 
 #geo = Geometry(type='porous/square_lattice',lx=10,ly=10,lz=2,\
 #                    porosity=0.25,step=1.0,shape='square')
-sol = Solver(max_bte_iter = 10,max_bte_error=1e-6)
+sol = Solver(max_bte_iter = 1,max_bte_error=1e-6)
 
 
