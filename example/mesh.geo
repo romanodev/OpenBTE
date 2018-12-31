@@ -22,6 +22,6 @@ Physical Line('Periodic_1') = {3};
 Physical Line('Periodic_2') = {1};
 Physical Line('Periodic_3') = {0};
 Physical Line('Periodic_4') = {2};
-Physical Line('Boundary') = {0,1,2,3,4,5,6,7};
+Physical Line('Boundary') = {4,5,6,7};
 Periodic Line{3}={-1};
 Periodic Line{2}={0};

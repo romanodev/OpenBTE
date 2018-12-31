@@ -1,21 +1,22 @@
 from __future__ import print_function
-import xml.etree.ElementTree as ET
-import os,sys
+#import xml.etree.ElementTree as ET
+#import os
+#import sys
 import numpy as np
-import random
-import math
-from matplotlib.pylab import *
-import subprocess
+#import random
+#import math
+import matplotlib.pylab as plt
+#import subprocess
 from shapely.ops import cascaded_union
 from shapely.geometry import Point,LineString
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
 import shapely
 
-def get_loop(points,lines):
+#def get_loop(points,lines):
 
 
- return loop
+# return loop
 
 
 
@@ -70,27 +71,27 @@ def get_line_from_points(p1,p2,all_lines,points):
  return line
 
 
-def rev_rotate(l,n):
-    return l[-n:] + l[:-n]
+#def rev_rotate(l,n):
+#    return l[-n:] + l[:-n]
 
 
-def rotate(l,n):
-    return l[n:] + l[:n]
+#def rotate(l,n):
+#    return l[n:] + l[:n]
 
 
-def GetSampleList(output_dir) :
-   tmp =  glob.glob(output_dir + '/*.json')
-   index = 0
-   if len(tmp) > 0:
-    for n in range(len(tmp)) :
-     tmp2 = tmp[n].split('/')
-     tmp3 = tmp2[-1].split('.')
-     tmp4 = tmp3[0].split('_')
-     index = max([int(tmp4[1]),index])
-    index +=1
+#def GetSampleList(output_dir) :
+#   tmp =  glob.glob(output_dir + '/*.json')
+#   index = 0
+#   if len(tmp) > 0:
+#    for n in range(len(tmp)) :
+#     tmp2 = tmp[n].split('/')
+#     tmp3 = tmp2[-1].split('.')
+#     tmp4 = tmp3[0].split('_')
+#     index = max([int(tmp4[1]),index])
+#    index +=1
 
 
-   return index
+#   return index
 
 
 
@@ -99,9 +100,9 @@ def plot_region(region):
    for n in range(len(region)) :
     n1 = n
     n2 = (n+1)%len(region)
-    plot([region[n1][0],region[n2][0]],[region[n1][1],region[n2][1]],color='black')
-   xlim([-3,3])
-   ylim([-3,3])
+    plt.plot([region[n1][0],region[n2][0]],[region[n1][1],region[n2][1]],color='black')
+   plt.xlim([-3,3])
+   plt.ylim([-3,3])
 
 
 def FindPeriodic(control,others,points,lines):
@@ -498,21 +499,28 @@ def mesh(polygons,frame,argv):
   for l,line in enumerate(lines):
   
    pl = (np.array(points[line[0]])+np.array(points[line[1]]))/2.0
+   
+   is_on_boundary = True
    if compute_line_point_distance(pul,pur,pl) < delta:     
      upper.append(l)
+    
      is_on_boundary = False
+     
    if compute_line_point_distance(pll,plr,pl) < delta:
      lower.append(l)
      is_on_boundary = False 
+     
    if compute_line_point_distance(plr,pur,pl) < delta:
      cold.append(l)
      is_on_boundary = False 
+     
    if compute_line_point_distance(pll,pul,pl) < delta:
      hot.append(l)
      is_on_boundary = False   
      
-     
-   if not is_on_boundary:
+   
+   if is_on_boundary:
+    
     pore_wall.append(l)
 
 

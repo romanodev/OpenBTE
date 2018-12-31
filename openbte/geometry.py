@@ -421,7 +421,7 @@ class Geometry(object):
     c1 = self.get_elem_centroid(elem_1)
     c2 = self.get_next_elem_centroid(elem_1,side)
     dist = c2-c1
-    v_orth = np.dot(Af,np.dot(rot,Af))/np.dot(Af,dist)
+    v_orth = area*np.dot(normal,np.dot(rot,normal))/np.dot(normal,dist)
     v_non_orth = np.dot(rot,Af) - dist*v_orth
     return v_orth,v_non_orth
 
@@ -494,6 +494,34 @@ class Geometry(object):
   phi_dir_adj = [np.cos(phi_1) - np.cos(phi_2),np.sin(phi_2) - np.sin(phi_1),0.0]
   return np.array(phi_dir_adj),case
 
+
+ def get_angular_coeff_old(self,elem_1,elem_2,index):
+  vol = self.get_elem_volume(elem_1)
+  side = self.get_side_between_two_elements(elem_1,elem_2)
+  normal = self.compute_side_normal(elem_1,side)
+  
+  polar_int = self.dom['polar_dir'][index]*self.dom['fphi']
+  area = self.compute_side_area(side)
+  tmp = np.dot(polar_int,normal)
+  cm = 0
+  cp = 0
+  cmb = 0
+  cpb = 0
+
+  if tmp < 0:
+   if elem_1 == elem_2:  
+    cmb = tmp*area/vol
+   else:
+    cm = tmp*area/vol
+  else:
+   cp = tmp*area/vol
+   if elem_1 == elem_2:  
+    cpb = tmp
+  
+
+  return cm,cp,cmb,cpb
+
+
  def get_angular_coeff(self,elem_1,elem_2,index):
 
   side = self.get_side_between_two_elements(elem_1,elem_2)
@@ -505,10 +533,12 @@ class Geometry(object):
 
 
   if self.dim == 2:
+      
    p = index
+   
    polar_int = self.dom['polar_dir'][p]*self.dom['polar_factor']
-   coeff  = np.dot(polar_int,normal)*area/vol
-
+   tmp = np.dot(polar_int,normal)
+   coeff  = tmp*area/vol
    #coeff = np.dot(angle_factor,normal)*area/vol
    #control  = np.dot(self.dom['polar_dir'][p],normal)
   else :
@@ -517,7 +547,6 @@ class Geometry(object):
    angle_factor = self.dom['S'][t][p]/self.dom['d_omega'][t][p]
    coeff = np.dot(angle_factor,normal)*area/vol
 
-
   #coeff = round(coeff,8)
   #anti aliasing---
   extra_coeff = 0.0
@@ -525,55 +554,21 @@ class Geometry(object):
   case = 0
   if self.dim == 2:
    (phi_dir_adj,case) = self.compute_2D_adjusment(normal,round(self.dom['phi_vec'][p],8),self.dom['d_phi'])
-   extra_coeff = np.dot(phi_dir_adj,normal)*area/vol/self.dom['d_phi_vec'][p]
-   extra_angle = np.dot(phi_dir_adj,normal)*self.dom['d_phi']
-
-
-
+   #extra_coeff = np.dot(phi_dir_adj,normal)*area/vol/self.dom['d_phi_vec'][p]
+   #extra_angle = np.dot(phi_dir_adj,normal)*self.dom['d_phi']
 
   cm = 0.0
   cp = 0.0
   cmb = 0.0
   cpb = 0.0
   if coeff >= 0:
-   #extra coeff always negative
-   #if not case in [0,1,4]:
-#     print(case)#
-#     print("error")
-     #quit()
-#   if coeff < 0:
-
-    # print(self.dom['polar_dir'][p])
-    # print(self.dom['phi_dir'][p])
-    # print(coeff)
-    # print(angle_factor)
-    # quit()
-
    cp = coeff - extra_coeff
    if not elem_1 == elem_2:
     cm = extra_coeff
    else:
-    #if case == 4:
-    # print(self.dom['polar_dir'][p])
-    # print(extra_coeff)
-    cpb = np.dot(polar_int,normal)*self.dom['d_phi'] - extra_angle
-
+    cpb = tmp*self.dom['d_phi'] - extra_angle
     cmb = extra_coeff
-    #if extra_coeff < 0.0 :
-    # print(normal)
-    # print(case)
-    #print(extra_coeff)
-
-
   else :
-   #if not case in [0,2,3]:
-#    print(control)
-    #print(case)
-    #print("error")
-    #quit()
-   #if not case == 0:
-#       print(extra_coeff)
-
    cp = extra_coeff
    if not elem_1 == elem_2: #In this case the incoming part is from the boundary
     cm = coeff  - extra_coeff

@@ -1,6 +1,46 @@
 import numpy as np
 from math import *
+import matplotlib.pylab as plt
 #from sympy import *
+
+
+def compute_dom_2d(argv):
+    
+   #Polar Angle-----
+   n_phi = int(argv.setdefault('n_phi',48)); Dphi = 2.0*np.pi/n_phi
+   phi = np.linspace(0.0,2.0*np.pi,n_phi,endpoint=False)
+   phi += argv.setdefault('polar_offset',0.0)*np.pi/180.0
+   phi = phi %(2.0*np.pi)
+   fphi= np.sinc(Dphi/2.0/np.pi)
+   dphi_ave = 1/n_phi*np.ones(n_phi)
+   #--------------------
+
+   
+   #Azimuthal Angle------------------------------
+   n_theta = 24; Dtheta = np.pi/n_theta/2.0
+   theta = np.linspace(Dtheta/2.0,np.pi/2.0 - Dtheta/2.0,n_theta)
+   ftheta = np.sin(theta)*(1-np.cos(2*theta)*np.sinc(Dtheta/np.pi))/(np.sinc(Dtheta/2/np.pi)*(1-np.cos(2*theta)))
+   dtheta_ave = np.sin(Dtheta/2.0)*np.sin(theta) #2 is for symmetry
+   dtheta = 2.0*np.sin(Dtheta/2.0)*np.sin(theta)
+   #---------------------------------------------
+   
+   #phonon directions-------
+   polar_dir = np.array([np.sin(phi),np.cos(phi),np.zeros(n_phi)]).T
+   
+   
+   output = {'n_phi':n_phi,\
+             'dtheta':dtheta,\
+             'n_theta':n_theta,\
+             'dphi_ave':dphi_ave,\
+             'dphi':Dphi,\
+             'dtheta_ave':dtheta_ave,\
+             'polar_dir':polar_dir,\
+             'fphi':fphi,\
+             'ftheta':ftheta}
+   
+   return output
+   
+
 
 
 def compute_dom_3d(argv) :
@@ -27,15 +67,16 @@ def compute_dom_3d(argv) :
    Dphi = 2.0*np.pi/n_phi
    d_phi_plain = Dphi*np.ones(n_phi)
    d_phi_int = Dphi*np.ones(n_phi)
-   output.update({'d_phi':Dphi})
-   output.update({'polar_factor':2.0*np.sin(Dphi/2.0)/Dphi})
+   output.update({'dphi':Dphi})
+   
+   output.update({'fphi':2.0*np.sin(Dphi/2.0)/Dphi})   #
+   
+
    #phi_vec = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True) #this is the correct one
 
    phi_vec = np.linspace(0.0,2.0*np.pi,n_phi,endpoint=False)
-
    phi_vec += argv.setdefault('polar_offset',0.0)*np.pi/180.0
    phi_vec = phi_vec %(2.0*np.pi)
-   #print(phi_vec * 180.0/np.pi)
 
 
    output.update({'phi_vec':phi_vec})
@@ -47,13 +88,14 @@ def compute_dom_3d(argv) :
 
    d_theta_int = np.zeros(n_theta)
    ss = np.zeros((n_theta,n_phi,3,3))
-   d_theta_vec = np.zeros(n_theta)
+#   d_theta_vec = np.zeros(n_theta)
    phonon_dir = np.zeros((n_theta,n_phi,3))
    integrated_dir = np.zeros((n_theta,n_phi,3))
    phi_dir = np.zeros((n_phi,3))
    polar_dir = np.zeros((n_phi,3))
 
    at = np.zeros(n_theta)
+   tt = np.zeros(n_theta)
    for t in range(n_theta):
     theta = theta_vec[t]
 
@@ -68,6 +110,10 @@ def compute_dom_3d(argv) :
 
     d_theta_int[t] = int_sin_theta
     at[t] = int_sin_theta_2
+    
+    
+    tt[t]=np.sin(theta)*(1-np.cos(2*theta)*np.sinc(d_theta_plain[t]/np.pi))/(np.sinc(d_theta_plain[t]/2/np.pi)*(1-np.cos(2*theta)))
+
 
 
     for p in range(n_phi):
@@ -81,6 +127,7 @@ def compute_dom_3d(argv) :
      int_cos_phi_sin_phi = np.sin(phi)*np.cos(phi)*np.sin(d_phi_plain[p])
      #-------------------------------------------
 
+     
      x = sin(theta) * sin(phi)
      y = sin(theta) * cos(phi)
      z = cos(theta)
@@ -126,9 +173,6 @@ def compute_dom_3d(argv) :
    #for t in range(n_theta):
 #    for p in range(n_phi):#
       #print(np.cross(integrated_dir[t][p][0:2],phonon_dir[t][p][0:2]))
-
-
-
 
 
    output.update({'d_omega':d_omega})

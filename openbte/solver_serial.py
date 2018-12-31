@@ -3,10 +3,12 @@ from __future__ import absolute_import
 
 import os
 import numpy as np
+import time
 from scipy.sparse import csc_matrix
 from mpi4py import MPI
 import shutil
 from scipy.sparse.linalg import splu
+from scipy.sparse.linalg import lgmres
 import matplotlib.pylab as plt
 from scipy.sparse import diags
 import scipy.io
@@ -87,19 +89,15 @@ class Solver(object):
    #---------------------
 
    #if self.compute_matrix:
-   if MPI.COMM_WORLD.Get_rank() == 0:
-    directory = self.cache
-    if os.path.exists(directory):
+   directory = self.cache
+   if os.path.exists(directory):
      shutil.rmtree(directory,ignore_errors=True)
-    os.makedirs(directory)
-   MPI.COMM_WORLD.Barrier()
-    #compute matrix--------
+   os.makedirs(directory)
    argv.setdefault('max_bte_iter',10)
 
    #if argv['max_bte_iter'] > 0:
        
-   self.compute_directional_connections() 
-    #tput = compute_sum(self.compute_directional_connections,self.n_index)
+   self.compute_directional_connections()
    
    
 
@@ -115,6 +113,7 @@ class Solver(object):
 
    #solve the BTE
    self.compute_function(**argv)
+   quit()
 
 
    if MPI.COMM_WORLD.Get_rank() == 0:
@@ -217,50 +216,29 @@ class Solver(object):
     return gamma,mfp
 
 
-  #def compute_directional_connections(self,index,options):
-      
   def compute_directional_connections(self):
-      
-      
-   comm = MPI.COMM_WORLD   
-   size = comm.size
-   rank = comm.rank
-   n_index = self.n_index
-   block = n_index // size + 1
-   for kk in range(block):
-    index = rank*block + kk   
-    if index < n_index:
-  
+
+    for index in range(self.n_index):
+
      r=[];c=[];d=[]
      rk=[]; ck=[]; dk=[]
      P = np.zeros(self.n_elems)
+     HW_minus = np.zeros(self.n_elems)
+     HW_plus = np.zeros(self.n_elems)
      for i,j in zip(*self.mesh.A.nonzero()):
-
-      #(gamma_i,mfp_i) = self.get_material_properties(i)
-      #(gamma_j,mfp_j) = self.get_material_properties(j)
-
-      (cm,cp,dummy,dummy) = self.mesh.get_angular_coeff(i,j,index)
-      r.append(i); c.append(i); d.append(cp) #d.append(cp*mfp_i)
+      (cm,cp,cmb,cpb) = self.mesh.get_angular_coeff_old(i,j,index)
+      r.append(i); c.append(i); d.append(cp) 
       v = self.mesh.get_side_periodic_value(i,j)
       rk.append(i); ck.append(j);
       dk.append(v*(cp+cm)*self.mesh.get_elem_volume(i))
-
-      #dk.append(v*(cp*mfp_i*gamma_i+cm*mfp_j*gamma_j)*self.mesh.get_elem_volume(i))
-
-      r.append(i); c.append(j);  d.append(cm)#d.append(cm*mfp_j*gamma_j/gamma_i)
+      r.append(i); c.append(j);  d.append(cm)
       
-      P[i] += v*cm#*mfp_j*gamma_j/gamma_i
-
-     #------------------------------BOUNDARY-------------------------------
-     HW_minus = np.zeros(self.n_elems)
-     HW_plus = np.zeros(self.n_elems)
-     for elem in self.mesh.boundary_elements:
-      (dummy,dummy,cmb,cpb) = self.mesh.get_angular_coeff(elem,elem,index)
-      (gamma,mfp) = self.get_material_properties(elem)
-      HW_plus[elem] =  cpb/np.pi
-      HW_minus[elem] = -cmb#*mfp
+      P[i] += v*cm
+      HW_plus[i]  += cpb/np.pi
+      HW_minus[i] -= cmb
      #--------------------------------------------------------------
 
+     
      #--------------------------WRITE FILES---------------------
      A = csc_matrix( (d,(r,c)), shape=(self.n_elems,self.n_elems) )
      K = csc_matrix( (dk,(rk,ck)), shape=(self.n_elems,self.n_elems) )
@@ -269,266 +247,156 @@ class Solver(object):
      P.dump(open(self.cache + '/P_' + str(index) +r'.np','wb+'))
      HW_minus.dump(open(self.cache +'/HW_MINUS_' + str(index) +r'.np','wb+'))
      HW_plus.dump(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','wb+'))
-  MPI.COMM_WORLD.Barrier()
 
 
+      
   def solve_bte(self,**argv):
 
          
-   #First Guess---------------------------   
+   #First Guess---------------------------  
+   argv.update({'kappa':[self.kappa_bulk]})
+   
    output = self.solve_fourier(**argv) #simple fourier----   
    temperature_fourier = np.tile(output['temperature_fourier'],(self.n_mfp,1))
    temperature_fourier_gradient = np.tile(output['temperature_fourier_gradient'],(self.n_mfp,1,1))
    ms = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
    TB = temperature_fourier.copy()
    TL = temperature_fourier.copy()
-   
-   TLtot,TBtot  = np.zeros((2,self.n_mfp,self.n_elems))
-
    kappa_fourier =  np.tile(output['kappa_fourier'],(self.n_mfp))
-      
+  
+
+   TLtot,TBtot  = np.zeros((2,self.n_mfp,self.n_elems))
    
    SUP = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
    FLUX = np.zeros((self.n_el,3))
-   #ms_1 = 0
    kappa_old = 0.0
    n_iter = 0
    error = 1.0
-   comm = MPI.COMM_WORLD  
+   kappa_mfe = np.square(self.mfp)/3.0
 
-   block = self.n_index // comm.size + 1
-   while n_iter < argv.setdefault('max_bte_iter',10) and \
-          error > argv.setdefault('max_bte_error',1e-2):
-    
-    #print('g')          
-    #if comm.rank == 0:
-    #   for n in range(self.n_mfp): 
-    #    print('ff',min(TL[n]),max(TL[n])) 
-    # tmp = self.compute_inho_diffusive_thermal_conductivity(TL[0].copy())
-    # print('fff',tmp)
-    #if comm.rank == 0:    
-    #   fff = TL.copy() 
-    #   print(max(fff[0]),max(TL[0]))
-      
-    
-    #Solve fof Fourier-----         
-    if n_iter ==  argv.setdefault('max_bte_iter',10)-1:
-      #if comm.rank == 0:  
-      # for n in range(self.n_mfp):
-      #  tmp = self.compute_inho_diffusive_thermal_conductivity(TL[n])  
-      #  print(n,tmp)
-      
-      
-      
-      #argv.update({'mfe_factor':1.0,\
-      #             'verbose':False,\
-      #             'lattice_temperature':TL,\
-      #             'boundary_temperature':TB.copy(),\
-      #             'kappa':np.square(self.mfp),\
-      #             'interface_conductance': self.mfp/3.0})    
-      #output = self.solve_fourier(**argv) 
-      #kappa_fourier = output['kappa_fourier']
-      #temperature_fourier = output['temperature_fourier']
-      #temperature_fourier_gradient = output['temperature_fourier_gradient']
-     #--------------------------------------
-      sup_zero = [self.compute_diffusive_thermal_conductivity(TL[n].copy(),mat = np.eye(3)) for n in range(self.n_mfp)]        
-      
-    comm.Barrier()
-    #Output variables---
-    SUPp = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
+   start = time.time()
+   while n_iter < argv.setdefault('max_bte_iter',10): # and \
+#          error > argv.setdefault('max_bte_error',1e-2):
+
+
+    #solve_fourier
+    #if n_iter ==  argv.setdefault('max_bte_iter',10)-1:
+    # argv.update({'mfe_factor':1.0,\
+    #               'verbose':False,\
+    #               'lattice_temperature':TL.copy(),\
+    #               'boundary_temperature':TB.copy(),\
+    #               'kappa':kappa_mfe,\
+    #               'interface_conductance': self.mfp/2.0})    
+    # output = self.solve_fourier(**argv) 
+    # kappa_fourier = output['kappa_fourier']
+    # sup_zero = [self.compute_diffusive_thermal_conductivity(TL[n].copy(),mat = np.eye(3)) for n in range(self.n_mfp)]        
+    #-
+
+
+    SUP = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
+    #SUPms = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
+    SUPd = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
+    #SUPb = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
     TLp,TBp  = np.zeros((2,self.n_mfp,self.n_elems))
     FLUXp = np.zeros((self.n_el,3))
+
     
-    rank = comm.rank
-    for kk in range(block):
-     index = rank*block + kk   
-     if index < self.n_index:
-      #Read directional information-------------------------------------------------- 
-      A = scipy.io.mmread(self.cache + '/A_' + str(index) + '.mtx').tocsc()
-      P = np.load(open(self.cache + '/P_' + str(index) +r'.np','rb'))
-      HW_MINUS = np.load(open(self.cache + '/HW_MINUS_' + str(index) +r'.np','rb'))
-      HW_PLUS = np.load(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','rb'))
-      K = scipy.io.mmread(self.cache + '/K_' + str(index) + '.mtx').tocsc()
+    
+    #solve_BTE
+    for index in range(self.n_index):
+     #Read directional information-------------------------------------------------- 
+     A = scipy.io.mmread(self.cache + '/A_' + str(index) + '.mtx').tocsc()
+     P = np.load(open(self.cache + '/P_' + str(index) +r'.np','rb'))
+     HW_MINUS = np.load(open(self.cache + '/HW_MINUS_' + str(index) +r'.np','rb'))
+     HW_PLUS = np.load(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','rb'))
+     K = scipy.io.mmread(self.cache + '/K_' + str(index) + '.mtx').tocsc()
       #-----------------------------------------------------------------------------
 
-      for tt in range(self.n_theta_irr): #We take into account the symmetry
+     #old_temp = TL[0].copy()
+     for tt in range(self.n_theta_irr): #We take into account the symmetry
           
-       if self.dim == 2:
-        t = tt
-        p = index
-        theta_factor = self.dom['at'][t] / self.dom['d_theta_vec'][t]
-       else:
-        t = int(index/self.n_phi)
-        p = index%self.n_phi
-        theta_factor = 1.0
+      if self.dim == 2:
+       t = tt
+       p = index
+       theta_factor = self.dom['at'][t] / self.dom['d_theta_vec'][t] 
+      else:
+       t = int(index/self.n_phi)
+       p = index%self.n_phi
+       theta_factor = 1.0
         
-       pre_factor = 3.0/4.0/np.pi*0.5*theta_factor * self.dom['d_omega'][t][p]  
+      pre_factor = 3.0/4.0/np.pi*0.5*theta_factor * self.dom['d_omega'][t][p]  
+         
+      #dif = False   
+      for m in range(self.n_mfp)[::-1]:
+        
+       D = np.multiply(TB[m],HW_MINUS)
+       F = scipy.sparse.eye(self.n_elems) + theta_factor  * A * self.mfp[m]
+       RHS = self.mfp[m]*theta_factor * (P + D) + TL[m]
+       
+       
+
+       lu = splu(F.tocsc())   
+       temp = lu.solve(RHS) 
+ 
+       sup = pre_factor * K.dot(temp-TL[m]).sum()*self.kappa_factor/self.mfp[m]
+       
+       #if n_iter ==  argv.setdefault('max_bte_iter',10)-1:
+       # sup_dif = self.compute_diffusive_thermal_conductivity(temp.copy(),mat = self.dom['ss2'][t][p])*3.0/4.0/np.pi 
+       # SUPd[m,t,p] += sup_dif
+       # SUPd[m,self.n_theta -t -1,p] += SUPd[m,t,p]
+       #if not sup == 0:
+       # if dif:
+       #  sup = self.compute_diffusive_thermal_conductivity(temp.copy(),mat = self.dom['ss2'][t][p])*3.0/4.0/np.pi 
+       # else:    
+       #  er = abs((sup-sup_dif)/sup)   
+       #  if abs((sup-sup_dif)/sup)< 5e-1:
+       #   sup = sup_dif
+       #   dif = True
+
+
+
+       SUP[m,t,p] += sup
+
+       TLp += np.outer(self.B2[:,m],temp)*self.dom['d_omega'][t][p]*self.symmetry/4.0/np.pi    
+        
           
-       fourier=False
-       for m in range(self.n_mfp)[::-1]:
-       #----------------------------------------------------------------------------------
-        if not fourier:
-        
-         D = np.multiply(TB[m],HW_MINUS)
-         F = scipy.sparse.eye(self.n_elems) + theta_factor  * A * self.mfp[m]
-         lu = splu(F.tocsc())
-         
-         
-         RHS = self.mfp[m]*theta_factor * (P + D) + TL[m]
-
-         temp = lu.solve(RHS) 
-    
-         #gg = self.mesh.compute_grad(temp)
-        
-         
-         #temp =  -np.dot(self.dom['S'][t][p],self.mesh.compute_grad(TL[0]).T)/self.dom['d_omega'][t][p]
-         #sup = pre_factor * K.dot(temp).sum()*self.kappa_factor
-        
-         #sup = self.compute_inho_diffusive_thermal_conductivity(temp,mat=self.dom['ss2'][t][p])*3.0/4.0/np.pi
-         #sup = 0.0
-         #for i,j in zip(*self.mesh.A.nonzero()):
-         #  v = self.mesh.get_side_periodic_value(i,j)            
-         #  if v == -1:
-         #   ll = self.mesh.get_side_between_two_elements(i,j)
-         #   area = self.mesh.get_side_area(ll)   
-         #   grad = (gg[i] + gg[j])/2.0
-         #   sup -= np.dot(self.dom['ss2'][t][p][0],grad)*self.kappa_factor*3.0/4.0/np.pi*area
-         
-         sup = pre_factor * K.dot(temp-TL[m]).sum()*self.kappa_factor/self.mfp[m]
-         #sup = self.compute_diffusive_thermal_conductivity(temp,mat = np.eye(3))     
-
-         
-        
-             
-         if sup == 0: 
-            ms[m,t,p] = 1
-         else:
-          sup_fourier = kappa_fourier[m]*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi/self.kappa_bulk
-         
-          if abs((sup_fourier - sup)/sup) < argv.setdefault('ms_error',1e-2): 
-             ms[m,t,p] = 1
-             if argv.setdefault('multiscale',False):
-              fourier = True
-              
-        else:
-         ms[m,t,p] = 1   
-         sup = kappa_fourier[m]*self.dom['ss2'][t][p][self.mesh.direction][self.mesh.direction]*3.0/4.0/np.pi/self.kappa_bulk
-         temp = temperature_fourier[m]-self.mfp[m]*np.dot(self.dom['S'][t][p],temperature_fourier_gradient[m])/self.dom['d_omega'][t][p]
-         
-        SUPp[m,t,p] += sup
-        
-        TLp += np.outer(self.B2[:,m],temp)*self.dom['d_omega'][t][p]*self.symmetry/4.0/np.pi    
-        
-        #for n in range(self.n_mfp):
-        # TLp[n] += temp*self.dom['d_omega'][t][p]*self.symmetry/4.0/np.pi * self.B2[m,0]   
-        
-        
        #--------------------------
-        if self.symmetry == 2.0:
+       if self.symmetry == 2.0:
          FLUXp += np.mean(self.B1[:,m])*np.outer(temp,np.multiply(self.dom['S'][t][p],[2.0,2.0,0.0]))
-         SUPp[m,self.n_theta -t -1,p] += SUPp[m,t,p]
-         
-         #TBp += self.dom['at'][t]*self.symmetry*np.outer(self.B1[:,m],np.multiply(temp,HW_PLUS))
+         SUP[m,self.n_theta -t -1,p] += SUP[m,t,p]
          TBp += self.dom['at'][t]*self.symmetry*np.outer(self.B1[:,m],np.multiply(temp,HW_PLUS))
-        else:
+       else:
          FLUXp += np.mean(self.B1[:,m])*np.outer(temp,self.dom['S'][t][p])
          TBp[m] += np.multiply(temp,HW_PLUS)*self.symmetry
-
-
-   
-    comm.Barrier()
-    comm.Allreduce([SUPp,MPI.DOUBLE],[SUP,MPI.DOUBLE],op=MPI.SUM)
-    comm.Allreduce([TLp,MPI.DOUBLE],[TL,MPI.DOUBLE],op=MPI.SUM)
-    comm.Allreduce([TBp,MPI.DOUBLE],[TB,MPI.DOUBLE],op=MPI.SUM)
-    comm.Allreduce([FLUXp,MPI.DOUBLE],[FLUX,MPI.DOUBLE],op=MPI.SUM)
-    #TL = TLtot.copy()
-    #TB = TBtot.copy()
-    #TL = TLtot.copy()
-    #TB = TLtot.copy()    
-    #  print('gg')  
-    #  for n in range(self.n_mfp):  
-          
-    #   print(max(TL[n]))  
-    #print('gg')
+ 
+     
         
     kappa = sum([self.B0[m]*SUP[m,:,:].sum() for m in range(np.shape(SUP)[0])])*self.kappa_bulk
-    sup_m = [SUP[m,:,:].sum() for m in range(np.shape(SUP)[0])]
+    #sup_m =  [SUP[m,:,:].sum() for m in range(np.shape(SUP)[0])]
     n_iter +=1
     error = abs(kappa-kappa_old)/abs(kappa)
     kappa_old = kappa
-    if rank==0:
-        
-     print(kappa)
-    #print(rank,np.linalg.norm(TL_old[0]-TL[0]))
+    TL = TLp.copy()
+    TB = TBp.copy()
+    print(min(TB[0]),max(TB[0]))
     
+    print(kappa)
     #check---
-    
-    
-    
-    #if rank == 0:
-    # [print(max(TLtot[u])) for u in range(self.n_mfp)]
-    #quit() 
-    #Solve fourier---------------------------------------------------
-    #print(max(TL[0]))
-    #if n_iter < argv.setdefault('max_bte_iter',10) and \
-    #      error > argv.setdefault('max_bte_error',1e-2) and \
-    #      argv.setdefault('multiscale',False):
-          
-    # argv.update({'mfe_factor':1.0,\
-    #              'verbose':False,\
-    #              'lattice_temperature':TL,\
-    #              'boundary_temperature':TB,\
-    #              'kappa':1.0/3.0*np.square(self.mfp),\
-    #              'interface_conductance': 1.0/2.0/self.mfp})    
-    # output = self.solve_fourier(**argv) 
-    # kappa_fourier = output['kappa_fourier']
-    # temperature_fourier = output['temperature_fourier']
-    # temperature_fourier_gradient = output['temperature_fourier_gradient']
-    #----------------------------------------------------------------
-    
-    #if rank==0:
-    #  print(kappa)  
-    #  print(sum(sum(sum(ms)))/float(self.n_mfp*self.n_theta*self.n_phi))
-      #print(error)
-     #print(ms_1) 
-     #print('{0:7d} {1:20.4E} {2:25.4E} {4:8.1E} {5:8.1E}'.format(n_iter,kappa,error,ms_1,1.0-ms_1))
-  
-   #argv.update({'mfe_factor':1.0,\
-   #               'verbose':False,\
-   #               'lattice_temperature':TL_old,\
-   #               'boundary_temperature':TB_old,\
-   #               'kappa':np.square(self.mfp)/3.0,\
-   #               'interface_conductance': self.mfp/4.0})    
-   #output = self.solve_fourier(**argv) 
-   #kappa_fourier = output['kappa_fourier']
-   #if rank==0:  
-    #print(max(TL_old[0])) 
-    #print(max(TL_old[-1])) 
-
-    
-   # for n in range(self.n_mfp):
-   #  tmp = self.compute_inho_diffusive_thermal_conductivity(TL_old[n])
-    # print(tmp)
-  
-    #print(tmp)
-   if rank == 0:
-     plt.plot(self.mfp,sup_m,'g')  
-     plt.plot(self.mfp,sup_zero,'k')  
-
-     #plt.plot(self.mfp,kappa_fourier/self.kappa_bulk,'r')
-     plt.xscale('log')
-     plt.ylim([0,1])
-     plt.show()
+   #sup_d =  [SUPd[m,:,:].sum() for m in range(np.shape(SUPd)[0])]
+   #print(time.time()-start)
+   #plt.plot(self.mfp,sup_m,'g')  
+   #plt.plot(self.mfp,sup_mb,'r')  
+   #plt.plot(self.mfp,sup_d,'r')  
+   #plt.plot(self.mfp,sup_md,'b')  
+   #plt.plot(self.mfp,sup_ms,'r')  
+   #plt.legend(['bal','dif'])
+   #plt.plot(self.mfp,sup_zero,'k')  
+   #plt.plot(self.mfp,kappa_fourier/kappa_mfe)
+   #plt.xscale('log')
+   #plt.ylim([0,1])
+   #plt.show()
      
     
-    #sup_m = [SUP[m,:,:].sum() for m in range(np.shape(SUP)[0])]
-    #output = {'suppression': SUP,\
-    #        'suppression_mfp':sup_m,\
-    #        'ThermalFlux_BTE': FLUX,\
-    #        'Temperature_BTE': TL[0],\
-    #        'kappa_bte':kappa}
-  
-    #return output
     
 
   def print_bulk_kappa(self):
@@ -565,6 +433,7 @@ class Solver(object):
     data_tmp_b = []
     data_tmp_b2 = []
     B = np.zeros(self.n_elems)
+    self.kappa_mask = []
     for kc1,kc2 in zip(*self.mesh.A.nonzero()):
      #ll = self.mesh.get_side_between_two_elements(kc1,kc2)
 
@@ -586,8 +455,12 @@ class Solver(object):
      #----------------------
      row_tmp_b.append(kc1)
      col_tmp_b.append(kc2)
-     data_tmp_b.append(self.mesh.get_side_periodic_value(kc2,kc1)*v_orth*kappa)
-     data_tmp_b2.append(self.mesh.get_side_periodic_value(kc2,kc1))
+     tt = self.mesh.get_side_periodic_value(kc2,kc1)
+     data_tmp_b.append(tt*v_orth*kappa)
+     data_tmp_b2.append(tt)
+     if tt == 1.0:
+      self.kappa_mask.append([kc1,kc2])
+     
      #---------------------
      B[kc1] += self.mesh.get_side_periodic_value(kc2,kc1)*v_orth/vol1*kappa
 
@@ -626,11 +499,12 @@ class Solver(object):
     TB = argv.setdefault('boundary_temperature',np.zeros((1,self.n_el)))
     mfe_factor = argv.setdefault('mfe_factor',0.0)
     kappa_bulk = argv.setdefault('kappa',[1.0])
-   
+    #print(kappa_bulk)
+
     #print(kappa_bulk)
     #G *=5.0
     n_index = len(kappa_bulk)
-    G = np.zeros(n_index)
+    #G = np.zeros(n_index)
     #-------------------------------
     KAPPAp,KAPPA = np.zeros((2,n_index))
     FLUX,FLUXp = np.zeros((2,n_index,3,self.n_elems))
@@ -638,20 +512,9 @@ class Solver(object):
 
     
     #set up MPI------------------
-    comm = MPI.COMM_WORLD  
-    size = comm.size
-    rank = comm.rank
-    
-    
-    block = n_index // size + 1
-    for kk in range(block):
-     index = rank*block + kk   
-     if index < n_index:
+    for index in range(n_index):
       #Aseemble matrix-------------       
      
-      #diag_1 = diags([self.FF],[0]).tocsc()
-      #A = (self.F + diag_1*G[index])   + mfe_factor * csc_matrix(scipy.sparse.eye(self.n_elems))/kappa_bulk[index]
-      #B = (self.B + np.multiply(self.FF,TB[index])*G[index])  + mfe_factor * TL[index]/kappa_bulk[index] 
       A  = kappa_bulk[index] * self.F + mfe_factor * csc_matrix(scipy.sparse.eye(self.n_elems)) 
       A += mfe_factor * diags([self.FF],[0]).tocsc() * G[index]  
       
@@ -667,15 +530,18 @@ class Solver(object):
       kappa_old = 0
       error = 1        
 
+      
       while error > argv.setdefault('max_fourier_error',1e-11) and \
                     n_iter < argv.setdefault('max_fourier_iter',10) :
-
         RHS = B + C*kappa_bulk[index]
         if mfe_factor == 0.0: RHS[10] = 0.0      
         temp = SU.solve(RHS)
         temp = temp - (max(temp)+min(temp))/2.0
         (C,flux) = self.compute_non_orth_contribution(temp)
-        KAPPAp[index] = self.compute_inho_diffusive_thermal_conductivity(temp)
+        #KAPPAp[index] = self.compute_inho_diffusive_thermal_conductivity(temp)*kappa_bulk[index]
+        #start = time.time()
+        KAPPAp[index] = self.compute_diffusive_thermal_conductivity(temp)*kappa_bulk[index]
+        #print(time.time()-start)
         error = abs((KAPPAp[index] - kappa_old)/KAPPAp[index])
         kappa_old = KAPPAp[index]
         n_iter +=1
@@ -684,18 +550,14 @@ class Solver(object):
       FLUXp[index] = flux.T
       TLp[index] = temp
       
-    comm.Allreduce([KAPPAp,MPI.DOUBLE],[KAPPA,MPI.DOUBLE],op=MPI.SUM)
-    comm.Allreduce([TLp,MPI.DOUBLE],[TLtot,MPI.DOUBLE],op=MPI.SUM) #to be changed
-    comm.Allreduce([FLUXp,MPI.DOUBLE],[FLUX,MPI.DOUBLE],op=MPI.SUM) #
- 
-    if rank== 0 and argv.setdefault('verbose',True):
+    if argv.setdefault('verbose',True):
      print('  ')
-     print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(KAPPA[0])+ ' W/m/K')
+     print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(KAPPAp.sum())+ ' W/m/K')
      print('  ')
     
 
 
-    return {'kappa_fourier':KAPPA,'temperature_fourier_gradient':FLUX,'temperature_fourier':TLtot}
+    return {'kappa_fourier':KAPPAp,'temperature_fourier_gradient':FLUX,'temperature_fourier':TLp}
 
       
   def compute_non_orth_contribution(self,temp) :
@@ -732,18 +594,25 @@ class Solver(object):
     ll = self.mesh.get_side_between_two_elements(i,j)
     kappa_b = self.side_kappa_map[ll]
     (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=mat)
+   
     
-    kappa += 0.5*v_orth *self.PER[i,j]*(temp[j]+self.PER[i,j]-temp[i])*kappa_b
+    kappa += 0.5*v_orth *self.PER[i,j]*(temp[j]+self.PER[i,j]-temp[i])#*kappa_b
 
    return kappa*self.kappa_factor
 
 
   def compute_diffusive_thermal_conductivity(self,temp,mat=np.eye(3)):
 
+   
    kappa = 0
-   for i,j in zip(*self.PER.nonzero()):
+   for (i,j) in self.kappa_mask:
     (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=mat)
-    kappa += 0.5*v_orth *self.PER[i,j]*(temp[j]+self.PER[i,j]-temp[i])
+    kappa += v_orth  *(temp[j]+1.0-temp[i])
+
+   #kappa = 0
+   #for i,j in zip(*self.PER.nonzero()):
+   # (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=mat)
+   # kappa += 0.5*v_orth *self.PER[i,j]*(temp[j]+self.PER[i,j]-temp[i])
 
    return kappa*self.kappa_factor
 
