@@ -17,7 +17,7 @@ def compute_dom_2d(argv):
 
    
    #Azimuthal Angle------------------------------
-   n_theta = 24; Dtheta = np.pi/n_theta/2.0
+   n_theta = 96; Dtheta = np.pi/n_theta/2.0
    theta = np.linspace(Dtheta/2.0,np.pi/2.0 - Dtheta/2.0,n_theta)
    ftheta = np.sin(theta)*(1-np.cos(2*theta)*np.sinc(Dtheta/np.pi))/(np.sinc(Dtheta/2/np.pi)*(1-np.cos(2*theta)))
    dtheta_ave = np.sin(Dtheta/2.0)*np.sin(theta) #2 is for symmetry

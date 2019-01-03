@@ -15,6 +15,14 @@ import deepdish as dd
 #from termcolor import colored
 from .geometry import Geometry
 from .material import Material
+from scipy import interpolate
+
+def log_interp1d(xx, yy, kind='linear'):
+    logx = np.log10(xx)
+    logy = np.log10(yy)
+    lin_interp = interpolate.interp1d(logx, logy, kind=kind)
+    log_interp = lambda zz: np.power(10.0, lin_interp(np.log10(zz)))
+    return log_interp
 
 
 class Solver(object):
@@ -50,6 +58,8 @@ class Solver(object):
     self.B2 = mat.state['B2']
     self.factor = mat.state['factor']
     self.kappa_bulk = mat.state['kappa_bulk']
+    self.kappa_bulk_tot = mat.state['kappa_bulk_tot']
+    self.mfp_bulk = mat.state['mfp_bulk']*1e9
    #-----------------------------------------------------
 
    
@@ -144,9 +154,15 @@ class Solver(object):
       
   def solve_bte(self,**argv):
 
-         
-   #First Guess---------------------------  
-   argv.update({'kappa':[self.kappa_bulk]})
+   
+      
+   #Variable declaration-----   
+   ftheta = self.dom['ftheta']
+   dtheta = self.dom['dtheta']
+   kk = np.outer(1/self.mfp_bulk,ftheta*dtheta)    
+   trials = np.outer(self.mfp_bulk,ftheta)  
+   
+   argv.update({'kappa':[self.kappa_bulk_tot]})
    output = self.solve_fourier(**argv) #simple fourier----   
   
    temperature_fourier = np.tile(output['temperature_fourier'],(self.n_rmfp,1))
@@ -190,9 +206,12 @@ class Solver(object):
 
     
     #solve_BTE
-    kappa = 0
+    #kappa = 0
     #tt= 0
     #temp_test= np.zeros(self.n_elems)
+    #sup = np.zeros((self.n_rmfp,self.n_index))
+    kernel = np.zeros((self.n_index,self.n_rmfp))
+    
     for index in range(self.n_index):
      #Read directional information-------------------------------------------------- 
      A = scipy.io.mmread(self.cache + '/A_' + str(index) + '.mtx').tocsc()
@@ -204,7 +223,7 @@ class Solver(object):
      #pre_factor = 3.0/2.0# * self.dom['d_phi'] 
      #if self.dom['polar_dir'][index][0] > 0:
      # tt += self.dom['dphi']*self.dom['fphi']*self.dom['polar_dir'][index][0]/2
-      
+       
      for n in range(self.n_rmfp)[::-1]:
       D = np.multiply(TB[n],HW_MINUS)
       F = scipy.sparse.eye(self.n_elems) +  A * self.rmfp[n]
@@ -215,10 +234,18 @@ class Solver(object):
       #sup = pre_factor * K.dot(temp-TL[n]).sum()*self.kappa_factor/self.mfp[n]
       #SUP[n,p] += sup
       
-      kappa+= 2.0*self.kappa_factor*self.B1[0,n]*K.dot(temp-TL[n]).sum()/4.0/np.pi*3*self.factor*1e-9*self.dom['fphi']*self.dom['dphi']
+      #sup[n,index] = 2.0*self.kappa_factor/4.0/np.pi*3*self.factor*1e-9 *self.B1[0,n]*K.dot(temp-TL[n]).sum()*self.dom['fphi']*self.dom['dphi']
+      #test[index,n] = 3*2/4/np.pi*self.kappa_factor*K.dot(temp-TL[n]).sum()*self.dom['fphi']*self.dom['dphi']
+      kernel[index,n] = 3*2/4/np.pi*self.kappa_factor*K.dot(temp-TL[n]).sum()*self.dom['fphi']*self.dom['dphi'] 
       
+    
+    
       TLp += np.outer(self.B2[:,n],temp)*self.dom['dphi']/2.0/np.pi  
       TBp += 2.0*np.outer(self.B1[:,n],np.multiply(temp,HW_PLUS))*self.dom['fphi']*self.dom['dphi']/np.pi
+      
+    
+      
+      
       #temp_test += 2.0*self.B1[0,n]*np.multiply(temp,HW_PLUS)*self.dom['fphi']*self.dom['dphi']
       
       #if self.dom['polar_dir'][index][0] > 0:
@@ -240,24 +267,33 @@ class Solver(object):
     #kappa_old = kappa
     TL = TLp.copy()
     TB = TBp.copy()
+  
     
-    print(min(TL[0]),max(TL[0]))
-    print(kappa)
-    #check---
-   #sup_d =  [SUPd[m,:,:].sum() for m in range(np.shape(SUPd)[0])]
-   #print(time.time()-start)
-   #plt.plot(self.mfp,sup_m,'g')  
-   #plt.plot(self.mfp,sup_mb,'r')  
-   #plt.plot(self.mfp,sup_d,'r')  
-   #plt.plot(self.mfp,sup_md,'b')  
-   #plt.plot(self.mfp,sup_ms,'r')  
-   #plt.legend(['bal','dif'])
-   #plt.plot(self.mfp,sup_zero,'k')  
-   #plt.plot(self.mfp,kappa_fourier/kappa_mfe)
-   #plt.xscale('log')
-   #plt.ylim([0,1])
-   #plt.show()
+    sup = np.zeros(len(self.mfp_bulk))
+    for index in  range(self.n_index):
+     f  = log_interp1d(self.rmfp,kernel[index].clip(min=1e-12))
+     sup += np.sum(np.multiply(kk,f(trials)),axis=1)    
      
+    print(np.dot(self.kappa_bulk,sup))
+   
+    
+    
+   plt.plot(self.mfp_bulk,sup) 
+   plt.xscale('log')
+   plt.show()
+    
+   #mfp = np.logpspace(np.log10(min(self.mfp_bulk)),np.log10(max(self.mfp_bulk)),200)
+   #trials = np.outer(mfp,ftheta)   
+   #for m in range(len(mfp)):
+       
+   
+   
+   
+   #--------------------------------
+    
+    
+    
+    
     
     
 
@@ -267,7 +303,7 @@ class Solver(object):
      if self.verbose:
       #print('  ')
       #for region in self.region_kappa_map.keys():
-       print('{:8.2f}'.format(self.kappa_bulk)+ ' W/m/K')    
+       print('{:8.2f}'.format(self.kappa_bulk_tot)+ ' W/m/K')    
        #print(region.ljust(15) +  '{:8.2f}'.format(self.region_kappa_map[region])+ ' W/m/K')    
 
   def compute_function(self,**argv):      
@@ -454,8 +490,8 @@ class Solver(object):
    kappa = 0
    for i,j in zip(*self.PER.nonzero()):
 
-    ll = self.mesh.get_side_between_two_elements(i,j)
-    kappa_b = self.side_kappa_map[ll]
+    #ll = self.mesh.get_side_between_two_elements(i,j)
+    #kappa_b = self.side_kappa_map[ll]
     (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=mat)
    
     

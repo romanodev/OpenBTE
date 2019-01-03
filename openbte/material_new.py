@@ -160,7 +160,8 @@ class Material(object):
     #---------------------------------------------
     #Compute DOM
     #----------------
-    data.update({'kappa_bulk':sum(kappa_bulk)})
+    data.update({'kappa_bulk_tot':sum(kappa_bulk)})
+    data.update({'kappa_bulk':kappa_bulk})
     data.update({'mfp_bulk':mfp_bulk})
     data.update({'rmfp':rmfp})
     data.update({'factor':factor})

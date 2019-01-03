@@ -14,7 +14,7 @@ from openbte.material_new import *
 #mfps = np.logspace(-12,-4,30)
 #mat = Material(model='gray',n_theta = 48, n_phi = 96,mfps=mfps,special_point=-1,polar_offset = 0)
 ##mat = Material(model='gray',n_theta = 48, n_phi = 48,mfps=mfps,polar_offset = 0)
-mat = Material(model='nongray',matfile='Si-300K.dat',n_phi=24,n_rmfp=50,polar_offset=7.5)
+mat = Material(model='nongray',matfile='Si-300K.dat',n_phi=24,n_rmfp=100,polar_offset=7.5)
 #mat = Material(model='nongray',matfile='Si-300K.dat',n_theta=24,n_phi=24,n_mfp=50,polar_offset=7.5)
 
  
