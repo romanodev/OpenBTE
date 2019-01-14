@@ -96,7 +96,7 @@ class Geometry(object):
      if geo_type == 'porous/random':
       frame,polygons = GenerateRandomPoresOverlap(argv)
 
-    self.Lz = float(argv.setdefault('z',0.0))
+    self.Lz = float(argv.setdefault('lz',0.0))
     if geo_type == 'bulk':
       Lx = float(argv['lx'])
       Ly = float(argv['ly'])
@@ -120,11 +120,13 @@ class Geometry(object):
 
  def mesh(self,**argv):
 
+     
     if self.Lz > 0.0:
      self.dim = 3
     else:
      self.dim = 2
 
+    
     argv.update({'lz':self.Lz})
     if len(self.polygons) > 0 and self.dim == 3:
      GenerateMesh3D.mesh(self.polygons,self.frame,argv)
@@ -495,14 +497,14 @@ class Geometry(object):
   return np.array(phi_dir_adj),case
 
 
- def get_angular_coeff_old(self,elem_1,elem_2,index):
+ def get_angular_coeff_old(self,elem_1,elem_2,angle):
   vol = self.get_elem_volume(elem_1)
   side = self.get_side_between_two_elements(elem_1,elem_2)
   normal = self.compute_side_normal(elem_1,side)
   
-  polar_int = self.dom['polar_dir'][index]*self.dom['fphi']
+  
   area = self.compute_side_area(side)
-  tmp = np.dot(polar_int,normal)
+  tmp = np.dot(angle,normal)
   cm = 0
   cp = 0
   cmb = 0
@@ -515,6 +517,7 @@ class Geometry(object):
     cm = tmp*area/vol
   else:
    cp = tmp*area/vol
+   
    if elem_1 == elem_2:  
     cpb = tmp
   
@@ -773,9 +776,6 @@ class Geometry(object):
     temp += area_loc * x[ne]
 
    return temp
-
-
-
 
 
  def compute_contact_areas(self):

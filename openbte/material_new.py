@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 import numpy as np
-import math
-from .compute_dom import *
+
+from .compute_dom import compute_dom_2d
 from mpi4py import MPI
 import os
 import os.path
@@ -18,8 +18,7 @@ class Material(object):
   #MFP discretization-----------------------------
   self.state = {}
  
-
-  argv.setdefault('model','gray')
+  argv.setdefault('model','nongray')
   if argv['model'] == 'load':
    #MPI.COMM_WORLD.Barrier()
    if MPI.COMM_WORLD.Get_rank() == 0:
@@ -29,12 +28,12 @@ class Material(object):
    #print(self.state['region'])
   else:
 
-   if MPI.COMM_WORLD.Get_rank() == 0:
-    dom = compute_dom_2d(argv)
+   #if MPI.COMM_WORLD.Get_rank() == 0:
+   dom = compute_dom_2d(argv)
 
    if argv['model'] == 'nongray':
      argv.update({'dom':dom})   
-     self.import_data(argv)
+     self.import_data_new(argv)
 
    
    if argv['model'] == 'gray':
@@ -50,7 +49,7 @@ class Material(object):
    self.state.update(MPI.COMM_WORLD.bcast(data,root=0))
 
    #-----------------------------------------------
-   #SAVE FILE--------------------
+     #SAVE FILE--------------------
    if argv.setdefault('save',True):
     if MPI.COMM_WORLD.Get_rank() == 0:
      dd.io.save(argv.setdefault('filename','material') + '.hdf5', self.state)
@@ -83,11 +82,59 @@ class Material(object):
      data.update({'B1':np.eye(n_mfp)})
      data.update({'B2':np.eye(n_mfp)})
 
-
     data.update({'mfp_sampled':mfp})
   else: data=None
   self.state = MPI.COMM_WORLD.bcast(data,root=0)
 
+
+
+ def import_data_new(self,argv):
+
+  if MPI.COMM_WORLD.Get_rank() == 0:
+
+    
+    dom = argv['dom']  
+    if '/' in argv['matfile']:
+     filename = argv['matfile']
+    else:
+     filename = os.path.dirname(__file__) + '/materials/'+ argv['matfile']
+  
+    tmp = np.loadtxt(filename)
+    mfp_bulk = tmp[:,0]*1e9
+    kappa_bulk = tmp[:,1]
+    ftheta = dom['ftheta']
+    dtheta = dom['dtheta']
+    min_rmfp = 0.99*min(mfp_bulk)*min(ftheta)
+    max_rmfp = 1.01*max(mfp_bulk)*max(ftheta)
+    rmfp_log = np.linspace(np.log10(min_rmfp*0.99),np.log10(max_rmfp*1.01),argv['n_rmfp'])
+    #---DISCRETIZE MFPS in LOG SPACE---------------------
+    rmfp = []
+    for m in rmfp_log:
+     rmfp.append(pow(10,m))
+    rmfp = np.array(rmfp)
+    
+    trials = np.outer(mfp_bulk,ftheta)    
+    coeff1 = kappa_bulk/mfp_bulk
+    J0=np.outer(np.ones(len(mfp_bulk)),dtheta)
+    J1 = np.outer(coeff1/sum(coeff1),ftheta*dtheta)   
+    coeff2 = kappa_bulk/mfp_bulk/mfp_bulk
+    J2 = np.outer(coeff2/sum(coeff2),dtheta) #Here we should multiply by 2 for the symmetry and divide by 2 for the average
+    J3 = np.outer(1/mfp_bulk,ftheta*dtheta)   
+    
+    data = {}
+    data.update({'kappa_bulk_tot':sum(kappa_bulk)})
+    data.update({'kappa_bulk':kappa_bulk})
+    data.update({'mfp_bulk':mfp_bulk})
+    data.update({'trials':trials})
+    data.update({'rmfp':rmfp})
+    data.update({'J0':J0})
+    data.update({'J1':J1})
+    data.update({'J2':J2})
+    data.update({'J3':J3})  
+    
+  else: data=None
+  self.state = MPI.COMM_WORLD.bcast(data,root=0)
+  
 
 
 
@@ -112,19 +159,14 @@ class Material(object):
     
     #experimental----------
     ftheta = argv['dom']['ftheta']
-    dtheta_ave = argv['dom']['dtheta_ave']
-   
-    dtheta = argv['dom']['dtheta']
-    n_theta = len(dtheta_ave)
+    #dtheta_ave = argv['dom']['dtheta_ave']
+    #dtheta = argv['dom']['dtheta']
+    #n_theta = len(dtheta_ave)
     #---------------------------------
     
     min_rmfp = 0.99*min(mfp_bulk)*min(ftheta)
     max_rmfp = 1.01*max(mfp_bulk)*max(ftheta)
-     
-    
-    #----------------------
     rmfp_log = np.linspace(np.log10(min_rmfp*0.99),np.log10(max_rmfp*1.01),n_rmfp)
-
     #---DISCRETIZE MFPS in LOG SPACE---------------------
     rmfp = []
     for m in rmfp_log:
@@ -133,29 +175,32 @@ class Material(object):
     #--------------------------------------------------------
     #MFP interpolation---------------------------
    # B0 = np.zeros(n_rmfp)
-    B1 = np.zeros(n_rmfp)
-    B2 = np.zeros(n_rmfp)
-    factor = 0
+    #B1 = np.zeros(n_rmfp)
+    #J = np.zeros(n_mfp_bulk)
+    
+    #B2 = np.zeros(n_rmfp)
+    #factor = 0
     #kappa_tot = 0
-    for m in range(n_mfp_bulk):
-     kappa = kappa_bulk[m]
-     mfp = mfp_bulk[m]
-     a = kappa/mfp
-     factor += a
-     for t in range(n_theta) :   
-      [n1,n2,f1,f2] = self.get_mfp_interpolation(rmfp_log,np.log10(mfp*ftheta[t]))
+    #for m in range(n_mfp_bulk):
+    # kappa = kappa_bulk[m]
+    # mfp = mfp_bulk[m]
+    # a = kappa/mfp
+    # J[m] = a
+    # factor += a
+    # for t in range(n_theta) :   
+    #  [n1,n2,f1,f2] = self.get_mfp_interpolation(rmfp_log,np.log10(mfp*ftheta[t]))
      #n1,n2,f1,f2] = self.get_mfp_interpolation(rmfp_log,np.log10(mfp))
       #b0 = kappa * dtheta_ave[t]
-      b1 = a*  ftheta[t]*dtheta[t]
-      b2 = kappa/mfp/mfp*dtheta_ave[t]
-      #B0[n1] += f1*b0; B0[n2] += f2*b0
-      B1[n1] += f1*b1; B1[n2] += f2*b1
-      B2[n1] += f1*b2; B2[n2] += f2*b2
+    #  b1 = a*ftheta[t]*dtheta[t]
+    #  b2 = kappa/mfp/mfp*dtheta_ave[t]
+     
+      #B1[n1] += f1*b1; B1[n2] += f2*b1
+      #B2[n1] += f1*b2; B2[n2] += f2*b2
     #B0 /=np.sum(B0)
     
     
-    B1 /=factor
-    B2 /=np.sum(B2)
+    #B1 /=factor
+    #B2 /=np.sum(B2)
     
     #---------------------------------------------
     #Compute DOM
@@ -164,9 +209,13 @@ class Material(object):
     data.update({'kappa_bulk':kappa_bulk})
     data.update({'mfp_bulk':mfp_bulk})
     data.update({'rmfp':rmfp})
+    data.update({'J':J/sum(J)})
+    
     data.update({'factor':factor})
     
-    data.update({'B1':np.tile(B1,(n_rmfp,1))})
+    #data#.update({'B1':np.tile(B1,(n_rmfp,1))})
+    data.update({'B1':B1})
+
     data.update({'B2':np.tile(B2,(n_rmfp,1))})
     data.update({'rmfp':np.array(rmfp)})
 

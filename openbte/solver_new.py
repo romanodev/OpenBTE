@@ -275,7 +275,6 @@ class Solver(object):
   def solve_bte(self,**argv):
 
          
-   #First Guess---------------------------   
    output = self.solve_fourier(**argv) #simple fourier----   
    temperature_fourier = np.tile(output['temperature_fourier'],(self.n_mfp,1))
    temperature_fourier_gradient = np.tile(output['temperature_fourier_gradient'],(self.n_mfp,1,1))
