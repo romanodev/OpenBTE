@@ -34,7 +34,7 @@ class Solver(object):
    self.ms_error = argv.setdefault('ms_error',0.1)
    self.verbose = argv.setdefault('verbose',True)
    self.n_elems = len(self.mesh.elems)
-   self.cache = '.cache'
+   self.cache = '/home/romanog/OpenBTE/example/.cache'
    self.multiscale = argv.setdefault('multiscale',False)
    tmp = dd.io.load('material.hdf5')
    
@@ -54,7 +54,9 @@ class Solver(object):
     self.n_index = self.mat['n_phi'] * self.mat['n_theta']
    else:   
     self.n_index = self.mat['n_phi']
-   #self.compute_directional_connections()  
+   self.compute_directional_connections()  
+    
+    
    
    #quit()
    #------------------------- 
@@ -127,23 +129,31 @@ class Solver(object):
       
   def solve_bte(self,**argv):
 
- 
-   argv.update({'kappa':[self.mat['kappa_bulk_tot']]})
-   output = self.solve_fourier(**argv) #simple fourier----   
-  
+   if not argv.setdefault('load_state',False):
+    argv.update({'kappa':[self.mat['kappa_bulk_tot']]})
+    output = self.solve_fourier(**argv) #simple fourier----   
+    temperature_fourier = np.tile(output['temperature_fourier'],(self.mat['n_mfp'],1))
+    #temperature_fourier_gradient = np.tile(output['temperature_fourier_gradient'],(self.n_rmfp,1,1))
+    #ms = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
+    TB = temperature_fourier.copy()
+    TL = temperature_fourier.copy()     
+    error = 1.0
+    kappa_old = 0
+    n_iter = 0
+    #SUP = output['kappa_fourier'][0]*np.ones(len(self.mat['J3']))
+   #kappa_fourier =  np.tile(output['kappa_fourier'],(self.mat['n_mfp']))
+   else:
+    data = dd.io.load('state.hdf5')
+    TL = data['TL']
+    TB = data['TB']
+    SUP = data['SUP']
+    n_iter = data['n_iter']
+    kappa_old = data['kappa']
+    kappa = data['kappa']
     
-   temperature_fourier = np.tile(output['temperature_fourier'],(self.mat['n_mfp'],1))
-   #temperature_fourier_gradient = np.tile(output['temperature_fourier_gradient'],(self.n_rmfp,1,1))
-   #ms = np.zeros((self.n_mfp,self.n_theta,self.n_phi))
-   TB = temperature_fourier.copy()
-   TL = temperature_fourier.copy()     
-   kappa_fourier =  np.tile(output['kappa_fourier'],(self.mat['n_mfp']))
    
     
    #FLUX = np.zeros((self.n_el,3))
-   kappa_old = 0.0
-   n_iter = 0
-   error = 1.0
    
    comm = MPI.COMM_WORLD  
    block = self.n_index // comm.size + 1
@@ -152,23 +162,23 @@ class Solver(object):
    rank = comm.rank 
 
   
-   while n_iter < argv.setdefault('max_bte_iter',10) and \
-          error > argv.setdefault('max_bte_error',1e-2):
+   while n_iter < argv.setdefault('max_bte_iter',10): #and \
+#          error > argv.setdefault('max_bte_error',1e-2):
 
       
               
     #solve_fourier
     #if n_iter ==  argv.setdefault('max_bte_iter',10)-1:
      #Solve Fourier-----------------------------------------------
-    if n_iter > 0:
-     argv.update({'mfe_factor':1.0,\
-                  'verbose':False,\
-                  'lattice_temperature':TL.copy(),\
-                  'boundary_temperature':TB.copy(),\
-                  'kappa':self.mat['kappa_mfe'],\
-                  'interface_conductance': self.mat['G']})    
-     output = self.solve_fourier(**argv) 
-     kappa_fourier = output['kappa_fourier'] 
+    #if n_iter == argv.setdefault('max_bte_iter',10)-1:
+     #argv.update({'mfe_factor':1.0,\
+     #             'verbose':False,\
+     #             'lattice_temperature':TL.copy(),\
+     #             'boundary_temperature':TB.copy(),\
+     #             'kappa':self.mat['kappa_mfe'],\
+     #             'interface_conductance': self.mat['G']})    
+     #output = self.solve_fourier(**argv) 
+     #kappa_fourier = output['kappa_fourier'] 
     
     
     
@@ -190,10 +200,12 @@ class Solver(object):
        local_index = index*self.mat['n_mfp'] + n   
        #Solve the system--------    
        RHS = self.mat['mfp'][n]  * (P + np.multiply(TB[n],HW_MINUS)) + TL[n]      
-       if not local_index in lu.keys():   
-        F = scipy.sparse.eye(self.n_elems) +  A * self.mat['mfp'][n] 
-        lu.update({local_index:splu(F.tocsc())})   
-       temp = lu[local_index].solve(RHS)        
+       #if not local_index in lu.keys():   
+       F = scipy.sparse.eye(self.n_elems) +  A * self.mat['mfp'][n] 
+       lu = splu(F.tocsc())
+       temp = lu.solve(RHS)
+       #lu.update({local_index:splu(F.tocsc())})   
+       #temp = lu[local_index].solve(RHS)        
        
        Tp[n] += temp*self.mat['domega'][index]
        kernelp[n] += 3*self.kappa_factor*K.dot(temp-TL[n]).sum()*self.mat['domega'][index]
@@ -205,42 +217,59 @@ class Solver(object):
     comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
     
     n_iter +=1
-    
    
     #----------------------------------------------------------- 
-    
-    #Boundary temperature
-    TB = 4.0*np.tile([np.sum(np.multiply(self.mat['J1'],log_interp1d(self.mat['mfp'],J.T[e])(self.mat['trials']))) \
-         for e in range(self.n_elems)],(self.mat['n_mfp'],1))
-    
-    
-    #Lattice temperature   
-    TL = np.tile([np.sum(np.multiply(self.mat['J2'],log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials']))) \
-        for e in range(self.n_elems)],(self.mat['n_mfp'],1))
-    
+
     #Suppression function   
     SUP = np.sum(np.multiply(self.mat['J3'],log_interp1d(self.mat['mfp'],kernel.clip(min=1e-13))(self.mat['trials'])),axis=1)
     kappa = np.dot(self.mat['kappa_bulk'],SUP)
     error = abs(kappa-kappa_old)/abs(kappa)
     kappa_old = kappa
-     
+    
+    if argv.setdefault('save_state',False) and rank == 0:
+     dd.io.save('state.hdf5',{'TL':TL,'TB':TB,'SUP':SUP,'n_iter':n_iter,'error':error,'kappa':kappa})
+
+    #Boundary temperature
+    TB = 4.0*np.tile([np.sum(np.multiply(self.mat['J1'],log_interp1d(self.mat['mfp'],J.T[e])(self.mat['trials']))) \
+         for e in range(self.n_elems)],(self.mat['n_mfp'],1))
+    
+    #Lattice temperature   
+    TL = np.tile([np.sum(np.multiply(self.mat['J2'],log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials']))) \
+        for e in range(self.n_elems)],(self.mat['n_mfp'],1))
+    
+    
     
        
     #Thermal conductivity   
     if rank==0:
      print(kappa)       
      
-   if rank==0:
-    
-    #if self.multiscale:
-    SUP_DIF = np.sum(np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],kappa_fourier/self.mat['kappa_mfe'])(self.mat['trials'])),axis=1)   
-    #SUP_DIF = np.sum(np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],kappa_fourier)(self.mat['trials'])),axis=1)   
 
-    plt.plot(self.mat['mfp_bulk'],SUP_DIF,'r') 
-    plt.plot(self.mat['mfp_bulk'],SUP) 
+    #if n_iter ==  argv.setdefault('max_bte_iter',10)-1:
+     #Solve Fourier-----------------------------------------------
+     #if n_iter == argv.setdefault('max_bte_iter',10)-1:
+   argv.update({'mfe_factor':1.0,\
+                  'verbose':False,\
+                  'lattice_temperature':TL.copy(),\
+                  'boundary_temperature':TB.copy(),\
+                  'kappa':self.mat['kappa_mfe'],\
+                  'interface_conductance': self.mat['G']})    
+   output = self.solve_fourier(**argv) 
+   kappa_fourier = output['kappa_fourier'] 
+    
+
+   if rank==0:
+     print(' ')  
+     print(kappa)       
+
+    #if self.multiscale:
+     SUP_DIF = np.sum(np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],kappa_fourier/self.mat['kappa_mfe'])(self.mat['trials'])),axis=1)   
+
+     plt.plot(self.mat['mfp_bulk'],SUP_DIF,'r') 
+     plt.plot(self.mat['mfp_bulk'],SUP) 
     #
-    plt.xscale('log')
-    plt.show()
+     plt.xscale('log')
+     plt.show()
     
    
     

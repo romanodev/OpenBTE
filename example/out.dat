@@ -1,0 +1,2 @@
+qt.qpa.screen: QXcbConnection: Could not connect to display localhost:10.0
+Could not connect to any X display.

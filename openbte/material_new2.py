@@ -131,8 +131,8 @@ class Material(object):
     J3 = np.array([J3]).T
     trials = np.array([trials]).T
     
-    G = mfp*3/2
-    kappa_mfe = np.square(mfp)/3
+    G = mfp*0
+    kappa_mfe = np.square(mfp)
 
    
     domega = []
