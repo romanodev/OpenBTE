@@ -7,11 +7,17 @@ from mpi4py import MPI
 #import shutil
 from scipy.sparse.linalg import splu
 import matplotlib.pylab as plt
-from scipy.sparse import diags
+from scipy.sparse import spdiags
 import scipy.io
 import deepdish as dd
 from .geometry import Geometry
 from scipy import interpolate
+import sparse
+from scipy.sparse import coo_matrix
+import time
+from numpy.testing import assert_array_equal
+import pickle
+import os
 
 def log_interp1d(xx, y, kind='linear'):
      yy = y.copy()
@@ -34,7 +40,7 @@ class Solver(object):
    self.ms_error = argv.setdefault('ms_error',0.1)
    self.verbose = argv.setdefault('verbose',True)
    self.n_elems = len(self.mesh.elems)
-   self.cache = '/home/romanog/OpenBTE/example/.cache'
+   self.cache = os.getcwd() + '/.cache'
    self.multiscale = argv.setdefault('multiscale',False)
    tmp = dd.io.load('material.hdf5')
    
@@ -54,8 +60,12 @@ class Solver(object):
     self.n_index = self.mat['n_phi'] * self.mat['n_theta']
    else:   
     self.n_index = self.mat['n_phi']
-   self.compute_directional_connections()  
-    
+
+   start = time.time() 
+   self.compute_directional_connections_new()  
+   print(time.time()-start)
+
+   quit() 
     
    
    #quit()
@@ -81,10 +91,47 @@ class Solver(object):
    #  dd.io.save('solver.hdf5', self.state)
 
 
+  def compute_directional_connections_new(self):
+
+   #Perform some precompuations----
+   TT = 0.5*self.mesh.B * np.array([self.mesh.elem_volumes]).T    
+   #-------------------------------
+       
+   nc = self.n_elems    
+   start = time.time() 
+   comm = MPI.COMM_WORLD
+   block = self.n_index // comm.size + 1
+   for kk in range(block):
+    index = comm.rank*block + kk   
+    if index < self.n_index:   
+ 
+     if self.mesh.dim == 3:   
+      t = int(index/self.mat['n_phi'])
+      p = index%self.mat['n_phi']   
+      angle = self.mat['direction_ave'][t][p]
+     else: 
+      angle = self.mat['polar_ave'][index]
+    
+     #Get scipy AP------------------------
+     aa = sparse.COO([0,1,2],angle,shape=(3))
+     HW_minus = -sparse.tensordot(self.mesh.CM,aa,axes=1).clip(max=0)
+     HW_plus = sparse.tensordot(self.mesh.CP,aa,axes=1).clip(min=0)
+     test2  = sparse.tensordot(self.mesh.N,aa,axes=1)
+     K = test2 * TT #broadcasting (B_ij * V_i)
+     AM = test2.clip(max=0)
+     P = (AM*self.mesh.B).sum(axis=1).todense()
+     AP = spdiags(test2.clip(min=0).sum(axis=1).todense(),0,nc,nc,format='csc')
+     CPB = spdiags(sparse.tensordot(self.mesh.CPB,aa,axes=1).clip(min=0),0,nc,nc,format='csc')
+     A =  AP + AM + CPB
+     splu(A.tocsc())
+     data = {'A':A,'P':P,'K':K,'HW_minus':HW_minus,'HW_plus':HW_plus}
+     pickle.dump(data,open(self.cache + '/save_' + str(index) + '.p','wb'))
+
+
   def compute_directional_connections(self):
 
   
-        
+   start = time.time() 
    comm = MPI.COMM_WORLD
    block = self.n_index // comm.size + 1
    for kk in range(block):
@@ -97,31 +144,38 @@ class Solver(object):
       angle = self.mat['direction_ave'][t][p]
      else: 
       angle = self.mat['polar_ave'][index]   
-     
+    
      r=[];c=[];d=[]
      rk=[]; ck=[]; dk=[]
+     dk2=[]
      P = np.zeros(self.n_elems)
      HW_minus = np.zeros(self.n_elems)
      HW_plus = np.zeros(self.n_elems)
      for i,j in zip(*self.mesh.A.nonzero()):
+
       (cm,cp,cmb,cpb) = self.mesh.get_angular_coeff_old(i,j,angle)
+
       r.append(i); c.append(i); d.append(cp) 
+      r.append(i); c.append(j); d.append(cm)
       v = self.mesh.get_side_periodic_value(i,j)
       rk.append(i); ck.append(j);
       dk.append(v*(cp+cm)*self.mesh.get_elem_volume(i)*0.5)
-      r.append(i); c.append(j);  d.append(cm)
       P[i] += v*cm
       HW_plus[i]  += cpb
       HW_minus[i] -= cmb
-     #--------------------------------------------------------------
-     #--------------------------WRITE FILES---------------------
-     A = csc_matrix( (d,(r,c)), shape=(self.n_elems,self.n_elems) )
-     K = csc_matrix( (dk,(rk,ck)), shape=(self.n_elems,self.n_elems) )
-     scipy.io.mmwrite(self.cache + '/A_' + str(index) + r'.mtx',A)
-     scipy.io.mmwrite(self.cache + '/K_' + str(index) + r'.mtx',K)
-     P.dump(open(self.cache + '/P_' + str(index) +r'.np','wb+'))
-     HW_minus.dump(open(self.cache +'/HW_MINUS_' + str(index) +r'.np','wb+'))
-     HW_plus.dump(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','wb+'))
+
+    A = csc_matrix( (d,(r,c)), shape=(self.n_elems,self.n_elems))    
+    K = csc_matrix( (dk,(rk,ck)), shape=(self.n_elems,self.n_elems) )
+
+    #--------------------------------------------------------------
+    #--------------------------WRITE FILES---------------------
+    A = csc_matrix( (d,(r,c)), shape=(self.n_elems,self.n_elems) )
+    K = csc_matrix( (dk,(rk,ck)), shape=(self.n_elems,self.n_elems) )
+    scipy.io.mmwrite(self.cache + '/A_' + str(index) + r'.mtx',A)
+    scipy.io.mmwrite(self.cache + '/K_' + str(index) + r'.mtx',K)
+    P.dump(open(self.cache + '/P_' + str(index) +r'.np','wb+'))
+    HW_minus.dump(open(self.cache +'/HW_MINUS_' + str(index) +r'.np','wb+'))
+    HW_plus.dump(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','wb+'))
 
 
   

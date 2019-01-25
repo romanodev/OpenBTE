@@ -18,11 +18,11 @@ from . import GenerateBulk3D
 import matplotlib.patches as patches
 from .fig_maker import *
 from matplotlib.path import Path
-
 from IPython.display import display, HTML
 from shapely.geometry import LineString
 import shapely
-
+import pickle
+import sparse
 
 CSS = """
    .output {
@@ -66,7 +66,8 @@ class Geometry(object):
 
   if geo_type == 'load':
   # if MPI.COMM_WORLD.Get_rank() == 0:
-    self.state = dd.io.load(argv.setdefault('filename','geometry')+ '.hdf5')
+    self.state = pickle.load(open('geometry.p','rb'))
+    
     self._update_data()
 
   else:
@@ -110,8 +111,6 @@ class Geometry(object):
     self.frame = frame
     self.polygons = polygons
 
-
-
     if argv.setdefault('mesh',True):
      self.mesh(**argv)
 
@@ -154,8 +153,12 @@ class Geometry(object):
     #  self.dim = 2
      #-----------------------------------
     data = self.compute_mesh_data()
-    dd.io.save('geometry.hdf5', data)
-
+    
+        
+    #dd.io.save('geometry.hdf5', data)
+    
+    pickle.dump(data,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
+    
  # MPI.COMM_WORLD.Barrier()
 
  def get_repeated_size(self,argv):
@@ -309,6 +312,7 @@ class Geometry(object):
     self.compute_side_centroids()
     self.compute_least_square_weigths()
     self.compute_connecting_matrix()
+    self.compute_connecting_matrix_new()
     self.compute_interpolation_weigths()
     self.compute_contact_areas()
     self.compute_boundary_condition_data()
@@ -324,6 +328,7 @@ class Geometry(object):
           'node_elem_map':self.node_elem_map,\
           'elem_map':self.elem_map,\
           'nodes':self.nodes,\
+          'N':self.N,\
           'sides':self.sides,\
           'elems':self.elems,\
           'A':self.A,\
@@ -340,6 +345,10 @@ class Geometry(object):
           'periodic_nodes':self.periodic_nodes,\
           'side_areas':self.side_areas,\
           'pairs':self.pairs,\
+          'B':self.B,\
+          'CM':self.CM,\
+          'CP':self.CP,\
+          'CPB':self.CPB,\
           'boundary_elements':self.boundary_elements,\
           'interface_elements':self.interface_elements,\
           'side_normals':self.side_normals,\
@@ -365,6 +374,7 @@ class Geometry(object):
     if not ll in self.side_list['Hot'] and\
      not ll in self.side_list['Cold']:
 
+         
      elems = self.get_elems_from_side(ll)
      kc1 = elems[0]
      kc2 = elems[1]
@@ -374,9 +384,38 @@ class Geometry(object):
      row_tmp.append(kc2)
      col_tmp.append(kc1)
      data_tmp.append(1)
-
-
+   
    self.A = csc_matrix( (np.array(data_tmp),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) ).todense()
+
+ def compute_connecting_matrix_new(self):
+
+   nc = len(self.elems)
+   N = sparse.DOK((nc,nc,3), dtype=float32)
+   self.CM = np.zeros((nc,3))
+   self.CP = np.zeros((nc,3))
+   self.CPB = np.zeros((nc,3))
+   i = [];j = [];k = []
+   data = []
+   for ll in self.side_list['active'] :
+     elems = self.get_elems_from_side(ll)
+     kc1 = elems[0]
+     kc2 = elems[1]
+     vol1 = self.get_elem_volume(kc1)
+     vol2 = self.get_elem_volume(kc2)
+     area = self.compute_side_area(ll)
+     normal = self.compute_side_normal(kc1,ll)
+     if not kc1 == kc2:
+       N[kc1,kc2] = normal*area/vol1
+       N[kc2,kc1] = -normal*area/vol2
+     else:  
+       self.CM[kc1]  = normal*area/vol1
+       self.CPB[kc1] = normal*area/vol1
+       self.CP[kc1]  = normal
+
+
+   self.N = N.to_coo()
+
+
 
 
  def compute_elem_map(self):
@@ -498,11 +537,10 @@ class Geometry(object):
 
 
  def get_angular_coeff_old(self,elem_1,elem_2,angle):
+
   vol = self.get_elem_volume(elem_1)
   side = self.get_side_between_two_elements(elem_1,elem_2)
   normal = self.compute_side_normal(elem_1,side)
-  
-  
   area = self.compute_side_area(side)
   tmp = np.dot(angle,normal)
   cm = 0
@@ -510,6 +548,7 @@ class Geometry(object):
   cmb = 0
   cpb = 0
 
+   
   if tmp < 0:
    if elem_1 == elem_2:  
     cmb = tmp*area/vol
@@ -517,7 +556,6 @@ class Geometry(object):
     cm = tmp*area/vol
   else:
    cp = tmp*area/vol
-   
    if elem_1 == elem_2:  
     cpb = tmp
   
@@ -642,6 +680,7 @@ class Geometry(object):
  def get_side_between_two_elements(self,elem_1,elem_2):
 
    if elem_1 == elem_2: #Boundary side
+    
 
     for side in self.elem_side_map[elem_1]:
      if side in self.side_list['Boundary']:
@@ -860,6 +899,11 @@ class Geometry(object):
     self.frame = self.state['frame']
     self.argv = self.state['argv']
     self.polygons = self.state['polygons']
+    self.N = self.state['N']
+    self.CM = self.state['CM']
+    self.CP = self.state['CP']
+    self.CPB = self.state['CPB']
+    self.B = self.state['B']
     self.side_periodic_value = self.state['side_periodic_value']
     self.kappa_factor = self.size[self.direction]/self.area_flux
 
@@ -1331,10 +1375,7 @@ class Geometry(object):
 
  def get_side_periodic_value(self,elem,elem_p) :
 
-
     ll = self.get_side_between_two_elements(elem,elem_p)
-    #print(ll,tmp)
-
     ind = self.side_elem_map[ll].index(elem)
     return self.side_periodic_value[ll][ind]
 
@@ -1484,19 +1525,32 @@ class Geometry(object):
      if tmp > delta :
         side_value[ll] = +1.0
         
-
     side_periodic_value = np.zeros((nsides,2))
 
+   
+    n_el = len(self.elems)
+    B = sparse.DOK((n_el,n_el),dtype=float32)
+    
+    #ll = self.get_side_between_two_elements(elem,elem_p)
+    #ind = self.side_elem_map[ll].index(elem)
+    #return self.side_periodic_value[ll][ind]
 
+     
     if len(self.side_list.setdefault('Periodic',[])) > 0:
-     for t,side in enumerate(self.pairs) :
-      side_periodic_value[side[0]][0]= side_value[side[0]]
-      side_periodic_value[side[0]][1]= side_value[side[1]]
+     for side in self.pairs:
+      side_periodic_value[side[0]][0] = side_value[side[0]]
+      side_periodic_value[side[0]][1] = side_value[side[1]]
+
+
+      elem1,elem2 = self.side_elem_map[side[0]]
+      B[elem1,elem2] = side_value[side[0]]#*self.get_elem_volume(elem1)
+      B[elem2,elem1] = side_value[side[1]]#*self.get_elem_volume(elem2)
+
 
     self.area_flux = abs(np.dot(flux_dir,self.c_areas))
     self.flux_sides = flux_sides
     self.side_periodic_value = side_periodic_value
-
+    self.B = B.to_coo()
 
 
 
