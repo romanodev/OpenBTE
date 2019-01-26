@@ -6,15 +6,20 @@ from scipy.sparse import csc_matrix
 from mpi4py import MPI
 #import shutil
 from scipy.sparse.linalg import splu
+
+
+
+from scipy.sparse.linalg import spilu
 import matplotlib.pylab as plt
 from scipy.sparse import spdiags
-from scipy.sparse import diags
 import scipy.io
 import deepdish as dd
 from .geometry import Geometry
 from scipy import interpolate
 import sparse
+import scipy
 from scipy.sparse import coo_matrix
+from scipy.sparse.linalg import spsolve_triangular
 import time
 from numpy.testing import assert_array_equal
 import pickle
@@ -38,13 +43,16 @@ class Solver(object):
   def __init__(self,**argv):
    
    self.mesh = Geometry(type='load',filename = argv.setdefault('geometry_filename','geometry'))
+   self.TT = 0.5*self.mesh.B * np.array([self.mesh.elem_volumes]).T    
    self.ms_error = argv.setdefault('ms_error',0.1)
    self.verbose = argv.setdefault('verbose',True)
    self.n_elems = len(self.mesh.elems)
    self.cache = os.getcwd() + '/.cache'
    self.multiscale = argv.setdefault('multiscale',False)
    tmp = dd.io.load('material.hdf5')
-   
+   self.lu = {}
+   self.last_index = -1
+
    if self.mesh.dim == 3:
      self.mat = tmp['data_3D']
    else:   
@@ -62,11 +70,8 @@ class Solver(object):
    else:   
     self.n_index = self.mat['n_phi']
 
-   start = time.time() 
-   self.compute_directional_connections()  
-   #print(time.time()-start)
-
-   #quit() 
+   #start = time.time() 
+   #self.compute_directional_connections()  
     
    
    #quit()
@@ -93,58 +98,61 @@ class Solver(object):
 
 
 
+  def get_solving_data2(self,index,n,TB,TL,Jp,kernelp,Tp):
 
-  def compute_directional_connections(self):
+       
 
-  
-   start = time.time() 
-   comm = MPI.COMM_WORLD
-   block = self.n_index // comm.size + 1
-   for kk in range(block):
-    index = comm.rank*block + kk   
-    if index < self.n_index:   
- 
+   nc = self.n_elems       
+   if  index != self.last_index:
+
+    #if os.path.exists(self.cache + '/P_' + str(index) + '.p') :
+    # self.A = scipy.sparse.load_npz(self.cache + '/A_' + str(index) + '.npz')
+    # self.K = scipy.sparse.load_npz(self.cache + '/K_' + str(index) + '.npz')
+    # self.HW_MINUS = np.load(open(self.cache +'/HW_MINUS_' + str(index) + '.p','rb'))
+    # self.HW_PLUS = np.load(open(self.cache +'/HW_PLUS_' + str(index) + '.p','rb'))
+    # self.P = np.load(open(self.cache +'/P_' + str(index) +'.p','rb'))
+    #else:
      if self.mesh.dim == 3:   
-      t = int(index/self.mat['n_phi'])
-      p = index%self.mat['n_phi']   
-      angle = self.mat['direction_ave'][t][p]
+       t = int(index/self.mat['n_phi'])
+       p = index%self.mat['n_phi']   
+       angle = self.mat['direction_ave'][t][p]
      else: 
-      angle = self.mat['polar_ave'][index]   
+       angle = self.mat['polar_ave'][index]
+     aa = sparse.COO([0,1,2],angle,shape=(3))
+     self.HW_MINUS = -sparse.tensordot(self.mesh.CM,aa,axes=1).clip(max=0)
+     self.HW_PLUS = sparse.tensordot(self.mesh.CP,aa,axes=1).clip(min=0)
+     test2  = sparse.tensordot(self.mesh.N,aa,axes=1)
+     self.K = test2 * self.TT #broadcasting (B_ij * V_i)
+     AM = test2.clip(max=0)
+     self.P = (AM*self.mesh.B).sum(axis=1).todense()
+     AP = spdiags(test2.clip(min=0).sum(axis=1).todense(),0,nc,nc,format='csc')
+     CPB = spdiags(sparse.tensordot(self.mesh.CPB,aa,axes=1).clip(min=0),0,nc,nc,format='csc')
+     self.A =  AP + AM + CPB
+     #scipy.sparse.save_npz(self.cache + '/A_' + str(index) + '.npz',self.A.tocsc())
+     #scipy.sparse.save_npz(self.cache + '/K_' + str(index) + '.npz',self.K.tocsc())
+     #self.P.dump(open(self.cache + '/P_' + str(index) + '.p','wb'))
+     #self.HW_MINUS.dump(open(self.cache + '/HW_MINUS_' + str(index) + '.p','wb'))
+     #self.HW_PLUS.dump(open(self.cache + '/HW_PLUS_' + str(index) + '.p','wb'))
     
-     r=[];c=[];d=[]
-     rk=[]; ck=[]; dk=[]
-     dk2=[]
-     P = np.zeros(self.n_elems)
-     HW_minus = np.zeros(self.n_elems)
-     HW_plus = np.zeros(self.n_elems)
-     for i,j in zip(*self.mesh.A.nonzero()):
+     self.last_index = index
 
-      (cm,cp,cmb,cpb) = self.mesh.get_angular_coeff_old(i,j,angle)
-
-      r.append(i); c.append(i); d.append(cp) 
-      r.append(i); c.append(j); d.append(cm)
-      v = self.mesh.get_side_periodic_value(i,j)
-      rk.append(i); ck.append(j);
-      dk.append(v*(cp+cm)*self.mesh.get_elem_volume(i)*0.5)
-      P[i] += v*cm
-      HW_plus[i]  += cpb
-      HW_minus[i] -= cmb
-
-    A = csc_matrix( (d,(r,c)), shape=(self.n_elems,self.n_elems))    
-    K = csc_matrix( (dk,(rk,ck)), shape=(self.n_elems,self.n_elems) )
-
-    #--------------------------------------------------------------
-    #--------------------------WRITE FILES---------------------
-    A = csc_matrix( (d,(r,c)), shape=(self.n_elems,self.n_elems) )
-    K = csc_matrix( (dk,(rk,ck)), shape=(self.n_elems,self.n_elems) )
-    scipy.io.mmwrite(self.cache + '/A_' + str(index) + r'.mtx',A)
-    scipy.io.mmwrite(self.cache + '/K_' + str(index) + r'.mtx',K)
-    P.dump(open(self.cache + '/P_' + str(index) +r'.np','wb+'))
-    HW_minus.dump(open(self.cache +'/HW_MINUS_' + str(index) +r'.np','wb+'))
-    HW_plus.dump(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','wb+'))
+    #----------------------------------------------
 
 
-  
+   global_index = index * self.mat['n_mfp'] +n
+   if global_index in self.lu.keys():
+    lu = self.lu[global_index]
+   else:
+    F = scipy.sparse.eye(self.n_elems,format='csc') +  self.A * self.mat['mfp'][n] 
+    lu = splu(F.tocsc())
+    self.lu.update({global_index:lu})
+
+   RHS = self.mat['mfp'][n]  * (self.P + np.multiply(TB[n],self.HW_MINUS)) + TL[n]      
+   temp = lu.solve(RHS)
+   Tp[n] += temp*self.mat['domega'][index]
+   kernelp[n] += 3*self.kappa_factor*self.K.dot(temp-TL[n]).sum()*self.mat['domega'][index]
+   Jp[n] += np.multiply(temp,self.HW_PLUS)*self.mat['domega'][index]
+
 
       
   def solve_bte(self,**argv):
@@ -177,7 +185,7 @@ class Solver(object):
    
    comm = MPI.COMM_WORLD  
    block = self.n_index // comm.size + 1
-   lu = {}
+   #lu = {}
 
    rank = comm.rank 
 
@@ -186,8 +194,7 @@ class Solver(object):
 #          error > argv.setdefault('max_bte_error',1e-2):
 
       
-              
-    #solve_fourier
+              #solve_fourier
     #if n_iter ==  argv.setdefault('max_bte_iter',10)-1:
      #Solve Fourier-----------------------------------------------
     #if n_iter == argv.setdefault('max_bte_iter',10)-1:
@@ -208,30 +215,9 @@ class Solver(object):
     for kk in range(block):
      index = rank*block + kk   
      if index < self.n_index  :
-      #Read directional information-------------------------------------------------- 
-      A = scipy.io.mmread(self.cache + '/A_' + str(index) + '.mtx').tocsc()
-      P = np.load(open(self.cache + '/P_' + str(index) +r'.np','rb'))
-      HW_MINUS = np.load(open(self.cache + '/HW_MINUS_' + str(index) +r'.np','rb'))
-      HW_PLUS = np.load(open(self.cache + '/HW_PLUS_' + str(index) +r'.np','rb'))
-      K = scipy.io.mmread(self.cache + '/K_' + str(index) + '.mtx').tocsc()
-       
       for n in range(self.mat['n_mfp'])[::-1]:
-          
-       local_index = index*self.mat['n_mfp'] + n   
-       #Solve the system--------    
-       RHS = self.mat['mfp'][n]  * (P + np.multiply(TB[n],HW_MINUS)) + TL[n]      
-       #if not local_index in lu.keys():   
-       F = scipy.sparse.eye(self.n_elems) +  A * self.mat['mfp'][n] 
-       lu = splu(F.tocsc())
-       temp = lu.solve(RHS)
-       #lu.update({local_index:splu(F.tocsc())})   
-       #temp = lu[local_index].solve(RHS)        
-       
-       Tp[n] += temp*self.mat['domega'][index]
-       kernelp[n] += 3*self.kappa_factor*K.dot(temp-TL[n]).sum()*self.mat['domega'][index]
-       Jp[n] += np.multiply(temp,HW_PLUS)*self.mat['domega'][index]
-    
-    
+       self.get_solving_data2(index,n,TB,TL,Jp,kernelp,Tp)
+
     comm.Allreduce([Tp,MPI.DOUBLE],[T,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([kernelp,MPI.DOUBLE],[kernel,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
@@ -257,8 +243,6 @@ class Solver(object):
     TL = np.tile([np.sum(np.multiply(self.mat['J2'],log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials']))) \
         for e in range(self.n_elems)],(self.mat['n_mfp'],1))
     
-    
-    
        
     #Thermal conductivity   
     if rank==0:
@@ -268,28 +252,30 @@ class Solver(object):
     #if n_iter ==  argv.setdefault('max_bte_iter',10)-1:
      #Solve Fourier-----------------------------------------------
      #if n_iter == argv.setdefault('max_bte_iter',10)-1:
-   #argv.update({'mfe_factor':1.0,\
-   #               'verbose':False,\
-   #               'lattice_temperature':TL.copy(),\
-   #               'boundary_temperature':TB.copy(),\
-   #               'kappa':self.mat['kappa_mfe'],\
-   #               'interface_conductance': self.mat['G']})    
-   #output = self.solve_fourier(**argv) 
-   #kappa_fourier = output['kappa_fourier'] 
-    
+   argv.update({'mfe_factor':1.0,\
+                  'verbose':False,\
+                  'lattice_temperature':TL.copy(),\
+                  'boundary_temperature':TB.copy(),\
+                  'kappa':self.mat['kappa_mfe'],\
+                  'interface_conductance': self.mat['G']})    
+   output = self.solve_fourier(**argv) 
+   kappa_fourier = output['kappa_fourier'] 
+   
+
+
 
    if rank==0:
      print(' ')  
      print(kappa)       
 
     #if self.multiscale:
-    # SUP_DIF = np.sum(np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],kappa_fourier/self.mat['kappa_mfe'])(self.mat['trials'])),axis=1)   
+     SUP_DIF = np.sum(np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],kappa_fourier/self.mat['kappa_mfe'])(self.mat['trials'])),axis=1)   
 
-    # plt.plot(self.mat['mfp_bulk'],SUP_DIF,'r') 
-    # plt.plot(self.mat['mfp_bulk'],SUP) 
+     plt.plot(self.mat['mfp_bulk'],SUP_DIF,'r') 
+     plt.plot(self.mat['mfp_bulk'],SUP) 
     #
-    # plt.xscale('log')
-    # plt.show()
+     plt.xscale('log')
+     plt.show()
     
    
     
@@ -545,3 +531,38 @@ class Solver(object):
      print('Polar angles:      ' + str(self.mat['n_phi']))
      print('Mean-free-paths:   ' + str(self.mat['n_mfp']))
      
+    #Build data and perform superlu factorization---
+    #lu_data = {'L':lu.L,'U':lu.U,'perm_c':lu.perm_c,'perm_r':lu.perm_r}
+    #pickle.dump(lu_data,open(self.cache + '/lu_' + str(index*self.mat['n_mfp']+n) + '.p','wb'))
+   #a = time.time()
+   #b = time.time() 
+   #start = time.time()
+  # temp = self.spsolve_lu(lu_data,RHS)
+   #c = time.time() 
+   #print((c-b)/(b-a))
+   #quit()
+    #return Tp, kernelp, Jp
+   #return Tp, np.zeros(self.n_elems), Jp
+
+   #global_index = index*self.mat['n_mfp']+n
+   #if  os.path.exists(self.cache + '/lu_' + str(global_index) + '.p') :
+   # lu_data = pickle.load(open(self.cache + '/lu_' + str(index*self.mat['n_mfp']+n) + '.p','rb'))
+   # self.data = pickle.load(open(self.cache + '/save_' + str(index) + '.p','rb'))
+    
+   #else:
+  """
+  def spsolve_lu(self,lu_data,b):
+   perm_r = lu_data['perm_r']
+   perm_c = lu_data['perm_c']
+   L = lu_data['L'].tocsr()
+   U = lu_data['U'].tocsr()
+   if perm_r is not None:
+      b_old = b.copy()
+      for old_ndx, new_ndx in enumerate(perm_r):
+        b[new_ndx] = b_old[old_ndx]
+   c = spsolve_triangular(L, b, lower=True)
+   px = spsolve_triangular(U, c, lower=False)
+   return px[perm_c]
+   """
+
+
