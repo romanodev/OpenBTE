@@ -27,7 +27,6 @@ class Material(object):
    self.state.update(MPI.COMM_WORLD.bcast(data,root=0))
    #print(self.state['region'])
   else:
-
    #if MPI.COMM_WORLD.Get_rank() == 0:
    dom = compute_dom_2d(argv)
 

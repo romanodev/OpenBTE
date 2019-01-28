@@ -29,9 +29,7 @@ class Material(object):
    #print(self.state['region'])
   else:
 
-
    if argv['model'] == 'nongray':
-       
     self.import_data(argv)
 
    if argv['model'] == 'gray':
