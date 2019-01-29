@@ -81,6 +81,7 @@ class Material(object):
                 'polar':polar,\
                 'azimuthal':azimuthal,\
                 'polar_ave':polar,\
+                'control_angle':polar,\
                 'azimuthal_ave':azimuthal}
    
    return data
@@ -109,7 +110,8 @@ class Material(object):
     azimuthal_ave = np.array([ftheta,ftheta,np.cos(Dtheta/2)*np.ones(n_theta)]).T   
     direction_ave = np.multiply(np.einsum('ij,kj->ikj',azimuthal_ave,polar_ave),direction)
     #---------------------------------------------------------------
-   
+    dire_ave_index = direction_ave.reshape((n_phi*n_theta,3))
+
     #Import material
     tmp = np.loadtxt(os.path.dirname(__file__) + '/materials/'+ argv['matfile'])
     mfp_bulk = tmp[:,0]*1e9; n_mfp_bulk = len(mfp_bulk)
@@ -140,7 +142,10 @@ class Material(object):
      for p in range(n_phi):
       domega.append(dtheta[t]*Dphi/4.0/np.pi)
     domega = np.array(domega)
-    
+   
+
+
+
     data = {'kappa_bulk_tot':sum(kappa_bulk),'kappa_bulk':kappa_bulk,\
                 'mfp_bulk':mfp_bulk,\
                 'fphi':fphi,\
@@ -154,7 +159,8 @@ class Material(object):
                 'J0':J0,'J1':J1,'J2':J2,'J3':J3,\
                 'n_phi':n_phi,'n_theta':n_theta,\
                 'direction':direction,\
-                'direction_ave':direction_ave,\
+                'control_angle':dire_ave_index,\
+                'dire_ave_index':dire_ave_index,\
                 'polar':polar,\
                 'azimuthal':azimuthal,\
                 'polar_ave':polar,\

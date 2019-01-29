@@ -201,7 +201,6 @@ class Solver(object):
      #kappa_fourier = output['kappa_fourier'] 
     
     
-    
     Jp,J = np.zeros((2,self.mat['n_mfp'],self.n_elems))
     kernelp,kernel = np.zeros((2,self.mat['n_mfp']))
     Tp,T = np.zeros((2,self.mat['n_mfp'],self.n_elems))
