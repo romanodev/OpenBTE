@@ -96,7 +96,7 @@ class Solver(object):
 
    #SAVE FILE--------------------
    #if argv.setdefault('save',True):
-   # if MPI.COMM_WORLD.Get_rank() == 0:
+   #if MPI.COMM_WORLD.Get_rank() == 0:
    #  dd.io.save('solver.hdf5', self.state)
 
 
@@ -104,51 +104,60 @@ class Solver(object):
   def get_solving_data2(self,index,n,TB,TL):
 
 
-    nc = self.n_elems       
+     nc = self.n_elems       
 #   if  index != self.last_index:
 
-    if os.path.exists(self.cache + '/P_' + str(index) + '.p') :
-     self.A = scipy.sparse.load_npz(self.cache + '/A_' + str(index) + '.npz')
-     self.K = scipy.sparse.load_npz(self.cache + '/K_' + str(index) + '.npz')
-     self.HW_MINUS = np.load(open(self.cache +'/HW_MINUS_' + str(index) + '.p','rb'))
-     self.HW_PLUS = np.load(open(self.cache +'/HW_PLUS_' + str(index) + '.p','rb'))
-     self.P = np.load(open(self.cache +'/P_' + str(index) +'.p','rb'))
-    else:
+    #if os.path.exists(self.cache + '/P_' + str(index) + '.p') :
+    # self.A = scipy.sparse.load_npz(self.cache + '/A_' + str(index) + '.npz')
+    # self.K = scipy.sparse.load_npz(self.cache + '/K_' + str(index) + '.npz')
+    # self.HW_MINUS = np.load(open(self.cache +'/HW_MINUS_' + str(index) + '.p','rb'))
+    # self.HW_PLUS = np.load(open(self.cache +'/HW_PLUS_' + str(index) + '.p','rb'))
+    # self.P = np.load(open(self.cache +'/P_' + str(index) +'.p','rb'))
+    #else:
      angle = self.mat['control_angle'][index]
      aa = sparse.COO([0,1,2],angle,shape=(3))
-     self.HW_MINUS = -sparse.tensordot(self.mesh.CM,aa,axes=1).clip(max=0)
-     self.HW_PLUS = sparse.tensordot(self.mesh.CP,aa,axes=1).clip(min=0)
+     HW_MINUS = -sparse.tensordot(self.mesh.CM,aa,axes=1).clip(max=0)
+     HW_PLUS = sparse.tensordot(self.mesh.CP,aa,axes=1).clip(min=0)
      test2  = sparse.tensordot(self.mesh.N,aa,axes=1)
-     self.K = test2 * self.TT #broadcasting (B_ij * V_i)
+     K = test2 * self.TT #broadcasting (B_ij * V_i)
      AM = test2.clip(max=0)
-     self.P = (AM*self.mesh.B).sum(axis=1).todense()
+     P = (AM*self.mesh.B).sum(axis=1).todense()
      AP = spdiags(test2.clip(min=0).sum(axis=1).todense(),0,nc,nc,format='csc')
      CPB = spdiags(sparse.tensordot(self.mesh.CPB,aa,axes=1).clip(min=0),0,nc,nc,format='csc')
-     self.A =  AP + AM + CPB
-     scipy.sparse.save_npz(self.cache + '/A_' + str(index) + '.npz',self.A.tocsc())
-     scipy.sparse.save_npz(self.cache + '/K_' + str(index) + '.npz',self.K.tocsc())
-     self.P.dump(open(self.cache + '/P_' + str(index) + '.p','wb'))
-     self.HW_MINUS.dump(open(self.cache + '/HW_MINUS_' + str(index) + '.p','wb'))
-     self.HW_PLUS.dump(open(self.cache + '/HW_PLUS_' + str(index) + '.p','wb'))
+     A =  AP + AM + CPB
+     #scipy.sparse.save_npz(self.cache + '/A_' + str(index) + '.npz',self.A.tocsc())
+     #scipy.sparse.save_npz(self.cache + '/K_' + str(index) + '.npz',self.K.tocsc())
+     #P.dump(open(self.cache + '/P_' + str(index) + '.p','wb'))
+     #HW_MINUS.dump(open(self.cache + '/HW_MINUS_' + str(index) + '.p','wb'))
+     #HW_PLUS.dump(open(self.cache + '/HW_PLUS_' + str(index) + '.p','wb'))
  #    self.last_index = index
 
     #----------------------------------------------
 
 
-    #global_index = index * self.mat['n_mfp'] +n
-    #if global_index in self.lu.keys():
-    # lu = self.lu[global_index]
-    #else:
-    F = scipy.sparse.eye(self.n_elems,format='csc') +  self.A * self.mat['mfp'][n] 
-    lu = splu(F.tocsc())
-    # self.lu.update({global_index:lu})
+     #global_index = index * self.mat['n_mfp'] +n
+     #if global_index in self.lu.keys():
+     # lu = self.lu[global_index]
+     #else:
+     F = scipy.sparse.eye(self.n_elems,format='csc') +  A.tocsc() * self.mat['mfp'][n] 
 
-    RHS = self.mat['mfp'][n] * (self.P + np.multiply(TB[n],self.HW_MINUS)) + TL[n]      
-    temp = lu.solve(RHS)
 
-    s = self.K.dot(temp-TL[n]).sum() * self.mat['domega'][index] * 3 * self.kappa_factor
+     lu = splu(F.tocsc())
+     # self.lu.update({global_index:lu})
 
-    return temp,s
+     RHS = self.mat['mfp'][n] * (P + np.multiply(TB[n],HW_MINUS)) + TL[n]      
+     temp = lu.solve(RHS)
+     #temp = temp - (max(temp)+min(temp))/2.0
+     #print(max(temp)-min(temp))
+   
+     t = temp*self.mat['domega'][index]
+
+     s = K.dot(temp-TL[n]).sum() * self.mat['domega'][index] * 3 * self.kappa_factor
+
+     j = np.multiply(temp,HW_PLUS)*self.mat['domega'][index]
+
+
+     return t,s,j
 
       
   def solve_bte(self,**argv):
@@ -169,17 +178,17 @@ class Solver(object):
     if n_iter == 0:          
       n_mfp = 1
       kappa = [self.mat['kappa_bulk_tot']]
-      G = [0]
-      TL = [[]]
-      TB = [[]]
+      G = [0];TL = [[]];TB = [[]]
     else: 
       n_mfp = self.mat['n_mfp']
       kappa = self.mat['kappa_mfe']
       G = self.mat['G']
+      #print(max(TL[0]))
+      #quit()
       TL = TL.copy()
       TB = TB.copy()
 
-    SDIFF,SDIFFp = np.zeros((2,n_mfp))          
+    SDIFF_ave,SDIFF_avep = np.zeros((2,n_mfp))          
     TDIFF,TDIFFp = np.zeros((2,n_mfp,self.n_elems))          
     TDIFFGrad,TDIFFGradp = np.zeros((2,n_mfp,self.n_elems,3))          
 
@@ -187,9 +196,9 @@ class Solver(object):
     for kk in range(block):
      n = rank*block + kk   
      if n < n_mfp :
-      SDIFFp[n],TDIFFp[n],TDIFFGradp[n] = self.get_diffusive_suppression_function(kappa[n],G[n],TB[n],TL[n])
+      SDIFF_avep[n],TDIFFp[n],TDIFFGradp[n] = self.get_diffusive_suppression_function(kappa[n],G[n],TB[n],TL[n])
        
-    comm.Allreduce([SDIFFp,MPI.DOUBLE],[SDIFF,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([SDIFF_avep,MPI.DOUBLE],[SDIFF_ave,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([TDIFFp,MPI.DOUBLE],[TDIFF,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([TDIFFGradp,MPI.DOUBLE],[TDIFFGrad,MPI.DOUBLE],op=MPI.SUM)
 
@@ -198,17 +207,19 @@ class Solver(object):
      TDIFF=np.repeat(TDIFF,self.mat['n_mfp'],axis = 0)
      TB = TDIFF.copy()
      TL = TDIFF.copy()
-     SDIFF=SDIFF[0]*np.ones(self.mat['n_mfp'])
+     SDIFF_ave=SDIFF_ave[0]*np.ones(self.mat['n_mfp'])
     #---------------------------------------------------------------------------------------------------------
 
 
     #Print diffusive Kappa---------
     if rank == 0:
-     SUP_DIF = np.sum(np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],SDIFF)(self.mat['trials'])),axis=1)   
+     SUP_DIF = np.sum(np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],SDIFF_ave)(self.mat['trials'])),axis=1)   
     
-     print(np.dot(SUP_DIF,self.mat['kappa_bulk']))
+     print('Fourier:' + str(np.dot(SUP_DIF,self.mat['kappa_bulk'])))
 
 
+
+    block = self.n_index // comm.size + 1
     Jp,J = np.zeros((2,self.mat['n_mfp'],self.n_elems))
     kernelp,kernel = np.zeros((2,self.mat['n_mfp']))
     Tp,T = np.zeros((2,self.mat['n_mfp'],self.n_elems))
@@ -217,45 +228,59 @@ class Solver(object):
      if index < self.n_index  :
 
       #Get ballistic suppression function
-      temp_bal,a_bal = self.get_solving_data2(index,self.mat['n_mfp']-1,TB,TL)
-      SBAL = a_bal/self.mat['mfp']
-      SDIFF = SDIFF*pow(self.mat['control_angle'][index][self.mesh.direction],2)*3*self.mat['domega'][index]
+      #temp_bal,a_bal = self.get_solving_data2(index,self.mat['n_mfp']-1,TB,TL)
+      #if a_bal < 0:
+          
+      # S = np.zeros(self.mat['n_mfp'])
+      # for n in range(self.mat['n_mfp']):
+      #   dummy,s = self.get_solving_data2(index,n,TB,TL)
+      #   S[n] = s/self.mat['mfp'][n] 
+      # plt.plot(self.mat['mfp'],S,'b')
+      # plt.xscale('log')
+      # print(index)
+      # plt.show()
 
 
-      #if index == 16:
-       #print(self.mat['direction_ave'][t][p])   
-      # plt.plot(self.mat['mfp'],SBAL)
-      # plt.plot(self.mat['mfp'],SDIFF)
-       #plt.xscale('log')
-       #plt.ylim([0,.1])
-       #plt.show()
-      #quit()  
-
+      #SBAL = a_bal/self.mat['mfp']
+      #TSDIFF = SDIFF_ave*pow(self.mat['control_angle'][index][self.mesh.direction],2)*3*self.mat['domega'][index]
       #idx   = np.argwhere(np.diff(np.sign(SDIFF - SBAL))).flatten()
+       
+     
+      #if len(idx) == 0:
+      # print(a_bal)   
+      # plt.plot(self.mat['mfp'],SBAL,'b')
+      # plt.plot(self.mat['mfp'],SDIFF,'r')
+      # plt.xscale('log')
+      # plt.ylim([2*min(SDIFF),2*max(SDIFF)])
+      # plt.show()
+
       #idx  = [100]
 
       #S = np.zeros(self.mat['n_mfp'])
-      #fourier = False
+      
+      fourier = False
       #for n in range(self.mat['n_mfp'])[idx[0]::-1]:
-      for n in range(self.mat['n_mfp']):
-
-        #if  fourier :
-        # s = SDIFF[n] * self.mat['mfp'][n]
-        # if self.mesh.dim == 2:
-        #  temp = TDIFF[n] - self.mat['mfp'][n]*np.dot(self.mat['polar_ave'][index],TDIFFGrad[n].T)
-        # else: 
-        #  t = int(index/self.mat['n_phi'])
-        #  p = index%self.mat['n_phi']   
-        #  temp = TDIFF[n] - self.mat['mfp'][n]*np.dot(self.mat['direction_ave'][t][p],TDIFFGrad[n].T)
-        #else:  
-        temp,s = self.get_solving_data2(index,n,TB,TL)
-        # sup = s/self.mat['mfp'][n]
-        # if abs((SDIFF[n] - sup)/sup) < 5e-2 and self.multiscale: fourier = True
-        if n == 4:
-         print(max(temp))
-        Tp[n]      += temp*self.mat['domega'][index]
-        Jp[n]      += np.multiply(temp,self.HW_PLUS)*self.mat['domega'][index]
+      for n in range(self.mat['n_mfp'])[::-1]:
+       # if  fourier :
+       #  s = SDIFF[n] * self.mat['mfp'][n]
+       #  temp = TDIFF[n] - self.mat['mfp'][n]*np.dot(self.mat['control_angle'][index],TDIFFGrad[n].T)
+       # else:  
+        t,s,j = self.get_solving_data2(index,n,TB,TL)
+        Tp[n]      += t
+        Jp[n]      += j
         kernelp[n] += s
+
+        #if  max(temp) > 100 or min(temp) < -100:
+        # t = int(index/self.mat['n_phi'])
+        # p = index%self.mat['n_phi']   
+         #print(min(temp),max(temp),self.mat['mfp'][n],t,p)
+        # print(n,t,p,max(temp),self.mat['control_angle'][index])
+       #  sup = s/self.mat['mfp'][n]
+       #  if abs((SDIFF[n] - sup)/sup) < 5e-2 and self.multiscale:
+       #      n_diff = n
+       #      fourier = True
+        #Tp[n]      += temp*self.mat['domega'][index]
+        #Jp[n]      += np.multiply(temp,self.HW_PLUS)*self.mat['domega'][index]
     
         #S[n] = s/self.mat['mfp'][n]
 
@@ -266,13 +291,16 @@ class Solver(object):
       #   s = SBAL[n]*self.mat['mfp'][n]
       #   temp = temp_bal
       # else:  
-      #  temp,s = self.get_solving_data2(index,n,TB,TL)
-      #  sup = s/self.mat['mfp'][n]
-       #if abs((SBAL[n] - sup)/sup) < 5e-2 and self.multiscale: ballistic = True
-       #Tp[n]      += temp*self.mat['domega'][index]
-       #Jp[n]      += np.multiply(temp,self.HW_PLUS)*self.mat['domega'][index]
-       #kernelp[n] += s
+      #   temp,s = self.get_solving_data2(index,n,TB,TL)
+      #   sup = s/self.mat['mfp'][n]
+      #   if abs((SBAL[n] - sup)/sup) < 5e-2 and self.multiscale: 
+      #      n_bal = n
+      #      ballistic = True
 
+      # Tp[n]      += temp*self.mat['domega'][index]
+      # Jp[n]      += np.multiply(temp,self.HW_PLUS)*self.mat['domega'][index]
+      # kernelp[n] += s
+      #print(n_diff,idx[0],n_bal)
 
       #if index == 20 :
       # plt.plot(self.mat['mfp'],S)
@@ -287,8 +315,10 @@ class Solver(object):
     comm.Allreduce([Tp,MPI.DOUBLE],[T,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([kernelp,MPI.DOUBLE],[kernel,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
-    for n in range(self.mat['n_mfp']):
-     print(min(T[n]),max(T[n]))
+    #if rank == 0:
+    # for m in range(self.mat['n_mfp']):
+    #  print(min(T[m]),max(T[m]))
+    #quit() 
 
     n_iter +=1
    
@@ -301,21 +331,35 @@ class Solver(object):
     kappa_old = kappa
 
 
-    if argv.setdefault('save_state',False) and rank == 0:
-     dd.io.save('state.hdf5',{'TL':TL,'TB':TB,'SUP':SUP,'n_iter':n_iter,'error':error,'kappa':kappa})
 
     #Boundary temperature
     TB = 4.0*np.tile([np.sum(np.multiply(self.mat['J1'],log_interp1d(self.mat['mfp'],J.T[e])(self.mat['trials']))) \
          for e in range(self.n_elems)],(self.mat['n_mfp'],1))
-    
+   
+    #for n in range(self.mat['n_mfp']):
+    #    print(min(T[0]))
+
     #Lattice temperature   
     TL = np.tile([np.sum(np.multiply(self.mat['J2'],log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials']))) \
-        for e in range(self.n_elems)],(self.mat['n_mfp'],1))
-    
-         
+         for e in range(self.n_elems)],(self.mat['n_mfp'],1))
+
+
+    if argv.setdefault('save_state',False) and rank == 0:
+     #dd.io.save('state.hdf5',{'TL':TL,'TB':TB,'SUP':SUP,'n_iter':n_iter,'error':error,'kappa':kappa})
+     print('ggg')
+     dd.io.save('/home/romanog/OpenBTE/state.hdf5',{'temperature_bte':TL[0]})
+   
+    #TL = np.zeros(self.n_elems)
+    #for m in range(len(self.mat['J2'])):
+    # for e in range(self.n_elems):
+    #  TL[e] += log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials'][m])*self.mat['J2'][m]
+    #print(min(TL),max(TL))
+    #quit()     
+
     #Thermal conductivity   
     if rank==0:
-     print(kappa)       
+      print('BTE: ' + str(kappa))
+      #self.state.update({'bte_temperature':TL[0]})
      
 
     #if n_iter ==  argv.setdefault('max_bte_iter',10)-1:

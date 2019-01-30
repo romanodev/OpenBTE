@@ -2,6 +2,7 @@ import numpy as np
 import os
 import deepdish as dd
 from mpi4py import MPI
+from numpy.testing import assert_array_equal
 
 
 class Material(object):
@@ -110,7 +111,28 @@ class Material(object):
     azimuthal_ave = np.array([ftheta,ftheta,np.cos(Dtheta/2)*np.ones(n_theta)]).T   
     direction_ave = np.multiply(np.einsum('ij,kj->ikj',azimuthal_ave,polar_ave),direction)
     #---------------------------------------------------------------
-    dire_ave_index = direction_ave.reshape((n_phi*n_theta,3))
+    control_angle = direction_ave.reshape((n_phi*n_theta,3))
+
+    #dire_ave_index_2 = []
+    #n = 0
+    #for t in range(n_theta):
+    # for p in range(n_phi):
+    #    dire_ave_index_2.append(direction_ave[t][p])
+    #    print(dire_ave_index[n])
+    #    print(direction_ave[t][p])
+    #    print(" ")
+    #    n +=1
+
+    
+    #quit()
+    #dire_ave_index = np.array(dire_ave_index_2)
+    # print(np.shape(dire_ave_index))
+
+
+    #assert_array_equal(dire_ave_index_2,dire_ave_index)
+
+    
+    #quit()     
 
     #Import material
     tmp = np.loadtxt(os.path.dirname(__file__) + '/materials/'+ argv['matfile'])
@@ -124,7 +146,6 @@ class Material(object):
     J1 = kappa_bulk/mfp_bulk/sum(kappa_bulk/mfp_bulk)   
     J2 = kappa_bulk/pow(mfp_bulk,2)/sum(kappa_bulk/pow(mfp_bulk,2))   
     J3 = 1/mfp_bulk
-
 
     
     J0 = np.array([J0]).T
@@ -145,7 +166,6 @@ class Material(object):
    
 
 
-
     data = {'kappa_bulk_tot':sum(kappa_bulk),'kappa_bulk':kappa_bulk,\
                 'mfp_bulk':mfp_bulk,\
                 'fphi':fphi,\
@@ -159,8 +179,8 @@ class Material(object):
                 'J0':J0,'J1':J1,'J2':J2,'J3':J3,\
                 'n_phi':n_phi,'n_theta':n_theta,\
                 'direction':direction,\
-                'control_angle':dire_ave_index,\
-                'dire_ave_index':dire_ave_index,\
+                'control_angle':control_angle,\
+                'direction_ave':direction_ave,\
                 'polar':polar,\
                 'azimuthal':azimuthal,\
                 'polar_ave':polar,\

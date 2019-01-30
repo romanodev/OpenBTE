@@ -1540,7 +1540,7 @@ class Geometry(object):
      for side in self.pairs:
       side_periodic_value[side[0]][0] = side_value[side[0]]
       side_periodic_value[side[0]][1] = side_value[side[1]]
-
+      
 
       elem1,elem2 = self.side_elem_map[side[0]]
       B[elem1,elem2] = side_value[side[0]]#*self.get_elem_volume(elem1)
