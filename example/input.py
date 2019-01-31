@@ -11,7 +11,8 @@ import time
 #quit()
 #geometry.Geometry(type='porous/square_lattice',porosity=0.25,shape='square',lx=10,ly=10,lz=0,step=1)
 #geometry.Geometry(type='bulk',porosity=0.25,shape='square',lx=10,ly=10,lz=0,step=1)
-#geometry.Geometry(type='porous/square_lattice',porosity=0.25,shape='square',lx=10,ly=10,lz=5,step=2)
+#geometry.Geometry(type='porous/square_lattice',porosity=0.25,shape='square',lx=10,ly=10,lz=5,step=2.0)
+
 #quit()
 #geometry.Geometry(type='bulk',porosity=0.25,shape='square',lx=10,ly=10,lz=5,step=2)
 

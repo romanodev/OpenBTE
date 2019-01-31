@@ -154,7 +154,7 @@ class Solver(object):
 
      j = np.multiply(temp,HW_PLUS)*self.mat['domega'][index]
 
-     s = max([0,s])
+     #s = max([0,s])
      return t,s,j
 
       
@@ -225,12 +225,17 @@ class Solver(object):
       #Get ballistic suppression function
 
       #compute ballistic---
-      a_bal = -1
-      k = 1
-      err_bal = 1
-      a_bal_old = 0
+      #a_bal = -1
+      #k = 1
+      #err_bal = 1
+      #a_bal_old = 0
       #while err_bal > 1e-2 and k < self.mat['n_mfp']:
-      temp_bal,a_bal,dummy = self.get_solving_data2(index,self.mat['n_mfp']-k,TB,TL)
+      temp_bal,a_bal,dummy = self.get_solving_data2(index,self.mat['n_mfp']-1,TB,TL)
+      #dummy,a_bal_2,dummy = self.get_solving_data2(index,self.mat['n_mfp']-2,TB,TL)
+      #gamma = (a_bal_2 - a_bal_1)/(self.mat['mfp'][-2] - self.mat['mfp'][-1]) 
+      #alpha = a_bal_1 - self.mat['mfp'][-1]*gamma
+      #SBAL = -alpha/self.mat['mfp'] + gamma
+
       # err_bal = 1
       # if a_bal > 0:
       #  err_ban = abs((a_bal - a_bal_old)/a_bal)
@@ -239,7 +244,6 @@ class Solver(object):
       # if k == self.mat['n_mfp']:
       #  print('Ballistic suppression cannot be identified')  
       #  quit()  
-      SBAL = a_bal/self.mat['mfp']
       #print(a_bal)
       #if a_bal < 0:
           
@@ -254,26 +258,28 @@ class Solver(object):
 
 
       TSDIFF = SDIFF_ave*pow(self.mat['control_angle'][index][self.mesh.direction],2)*3*self.mat['domega'][index]
-      idx   = np.argwhere(np.diff(np.sign(TSDIFF - SBAL))).flatten()
-      
+      idx   = np.argwhere(np.diff(np.sign(TSDIFF*self.mat['mfp'] - a_bal*np.ones(self.mat['n_mfp'])))).flatten()
+
 
       do_plot = False
-      if len(idx) == 0: idx = [self.mat['mfp']]
+      if len(idx) == 0:
+         print('fff') 
           #if len(idx) == 0:
-         # print(a_bal)  
+         print(a_bal)  
          # print(index)
-
-         # plt.plot(self.mat['mfp'],SBAL,'b')
-         # plt.plot(self.mat['mfp'],TSDIFF,'r')
-         # plt.xscale('log')
-         # plt.ylim([2*min(TSDIFF),2*max(TSDIFF)])
-         # plt.show()
+          
+         print() 
+         plt.plot(self.mat['mfp'],TSDIFF*self.mat['mfp'],'b')
+         plt.plot(self.mat['mfp'],a_bal*np.ones(self.mat['n_mfp']),'r')
+         plt.xscale('log')
+         plt.ylim([-2*a_bal,2*abal])
+         plt.show()
 
       #idx  = [100]
 
-      S = np.zeros(self.mat['n_mfp'])
+      #S = np.zeros(self.mat['n_mfp'])
       
-      fourier = False
+      #fourier = False
       #for n in range(self.mat['n_mfp'])[idx[0]::-1]:
       for n in range(self.mat['n_mfp'])[::-1]:
        # if  fourier :
@@ -297,13 +303,16 @@ class Solver(object):
         #Tp[n]      += temp*self.mat['domega'][index]
         #Jp[n]      += np.multiply(temp,self.HW_PLUS)*self.mat['domega'][index]
     
-      #  S[n] = s/self.mat['mfp'][n]
-      #if do_plot:
+       # S[n] = s
+      #if a_bal_1 < 0:
       #  a_bal
-      #  plt.plot(self.mat['mfp'],S,'b')
-      #  plt.plot(self.mat['mfp'],TSDIFF,'r')
+        #plt.plot(self.mat['mfp'],SBAL,'b')
+        #plt.plot(self.mat['mfp'],S/self.mat['mfp'],'k')
+      #  plt.plot(self.mat['mfp'],S,'k')
+        #plt.plot(self.mat['mfp'],TSDIFF,'r')
       #  plt.xscale('log')
       #  plt.show()
+
 
       #ballistic = False
       #for n in range(self.mat['n_mfp'])[idx[0]+1:-1]:
