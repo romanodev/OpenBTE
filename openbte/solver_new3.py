@@ -131,7 +131,6 @@ class Solver(object):
      #HW_MINUS.dump(open(self.cache + '/HW_MINUS_' + str(index) + '.p','wb'))
      #HW_PLUS.dump(open(self.cache + '/HW_PLUS_' + str(index) + '.p','wb'))
  #    self.last_index = index
-
     #----------------------------------------------
 
 
@@ -148,7 +147,6 @@ class Solver(object):
      RHS = self.mat['mfp'][n] * (P + np.multiply(TB[n],HW_MINUS)) + TL[n]      
      temp = lu.solve(RHS)
      #temp = temp - (max(temp)+min(temp))/2.0
-     #print(max(temp)-min(temp))
    
      t = temp*self.mat['domega'][index]
 
@@ -156,7 +154,7 @@ class Solver(object):
 
      j = np.multiply(temp,HW_PLUS)*self.mat['domega'][index]
 
-
+     s = max([0,s])
      return t,s,j
 
       
@@ -183,8 +181,6 @@ class Solver(object):
       n_mfp = self.mat['n_mfp']
       kappa = self.mat['kappa_mfe']
       G = self.mat['G']
-      #print(max(TL[0]))
-      #quit()
       TL = TL.copy()
       TB = TB.copy()
 
@@ -218,7 +214,6 @@ class Solver(object):
      print('Fourier:' + str(np.dot(SUP_DIF,self.mat['kappa_bulk'])))
 
 
-
     block = self.n_index // comm.size + 1
     Jp,J = np.zeros((2,self.mat['n_mfp'],self.n_elems))
     kernelp,kernel = np.zeros((2,self.mat['n_mfp']))
@@ -228,7 +223,24 @@ class Solver(object):
      if index < self.n_index  :
 
       #Get ballistic suppression function
-      #temp_bal,a_bal = self.get_solving_data2(index,self.mat['n_mfp']-1,TB,TL)
+
+      #compute ballistic---
+      a_bal = -1
+      k = 1
+      err_bal = 1
+      a_bal_old = 0
+      #while err_bal > 1e-2 and k < self.mat['n_mfp']:
+      temp_bal,a_bal,dummy = self.get_solving_data2(index,self.mat['n_mfp']-k,TB,TL)
+      # err_bal = 1
+      # if a_bal > 0:
+      #  err_ban = abs((a_bal - a_bal_old)/a_bal)
+      # a_bal_old = a_bal 
+      # k =+1
+      # if k == self.mat['n_mfp']:
+      #  print('Ballistic suppression cannot be identified')  
+      #  quit()  
+      SBAL = a_bal/self.mat['mfp']
+      #print(a_bal)
       #if a_bal < 0:
           
       # S = np.zeros(self.mat['n_mfp'])
@@ -241,22 +253,25 @@ class Solver(object):
       # plt.show()
 
 
-      #SBAL = a_bal/self.mat['mfp']
-      #TSDIFF = SDIFF_ave*pow(self.mat['control_angle'][index][self.mesh.direction],2)*3*self.mat['domega'][index]
-      #idx   = np.argwhere(np.diff(np.sign(SDIFF - SBAL))).flatten()
-       
-     
-      #if len(idx) == 0:
-      # print(a_bal)   
-      # plt.plot(self.mat['mfp'],SBAL,'b')
-      # plt.plot(self.mat['mfp'],SDIFF,'r')
-      # plt.xscale('log')
-      # plt.ylim([2*min(SDIFF),2*max(SDIFF)])
-      # plt.show()
+      TSDIFF = SDIFF_ave*pow(self.mat['control_angle'][index][self.mesh.direction],2)*3*self.mat['domega'][index]
+      idx   = np.argwhere(np.diff(np.sign(TSDIFF - SBAL))).flatten()
+      
+
+      do_plot = False
+      if len(idx) == 0: idx = [self.mat['mfp']]
+          #if len(idx) == 0:
+         # print(a_bal)  
+         # print(index)
+
+         # plt.plot(self.mat['mfp'],SBAL,'b')
+         # plt.plot(self.mat['mfp'],TSDIFF,'r')
+         # plt.xscale('log')
+         # plt.ylim([2*min(TSDIFF),2*max(TSDIFF)])
+         # plt.show()
 
       #idx  = [100]
 
-      #S = np.zeros(self.mat['n_mfp'])
+      S = np.zeros(self.mat['n_mfp'])
       
       fourier = False
       #for n in range(self.mat['n_mfp'])[idx[0]::-1]:
@@ -282,7 +297,13 @@ class Solver(object):
         #Tp[n]      += temp*self.mat['domega'][index]
         #Jp[n]      += np.multiply(temp,self.HW_PLUS)*self.mat['domega'][index]
     
-        #S[n] = s/self.mat['mfp'][n]
+      #  S[n] = s/self.mat['mfp'][n]
+      #if do_plot:
+      #  a_bal
+      #  plt.plot(self.mat['mfp'],S,'b')
+      #  plt.plot(self.mat['mfp'],TSDIFF,'r')
+      #  plt.xscale('log')
+      #  plt.show()
 
       #ballistic = False
       #for n in range(self.mat['n_mfp'])[idx[0]+1:-1]:
@@ -343,10 +364,8 @@ class Solver(object):
     TL = np.tile([np.sum(np.multiply(self.mat['J2'],log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials']))) \
          for e in range(self.n_elems)],(self.mat['n_mfp'],1))
 
-
     if argv.setdefault('save_state',False) and rank == 0:
      #dd.io.save('state.hdf5',{'TL':TL,'TB':TB,'SUP':SUP,'n_iter':n_iter,'error':error,'kappa':kappa})
-     print('ggg')
      dd.io.save('/home/romanog/OpenBTE/state.hdf5',{'temperature_bte':TL[0]})
    
     #TL = np.zeros(self.n_elems)

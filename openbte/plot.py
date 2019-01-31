@@ -94,6 +94,11 @@ class Plot(object):
    #vw.add_variable(solver['fourier_temperature'],label = 'Fourier Temperature [K]')
    #vw.add_variable(solver['fourier_flux'],label = r'''Thermal Flux [W/m/m]''')
 
+   TL = solver['temperature_bte']
+   for t in TL:
+       if abs(t) > 0.6:
+           print(t)
+   quit()
    vw.add_variable(solver['temperature_bte'],label = r'''BTE Temperature [K]''')
    #vw.add_variable(solver['bte_flux'],label = r'''BTE Thermal Flux [W/m/m]''')
    vw.write_vtk()

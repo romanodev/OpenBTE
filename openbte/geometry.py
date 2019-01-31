@@ -408,9 +408,9 @@ class Geometry(object):
        N[kc1,kc2] = normal*area/vol1
        N[kc2,kc1] = -normal*area/vol2
      else:  
-       self.CM[kc1]  = normal*area/vol1
-       self.CPB[kc1] = normal*area/vol1
-       self.CP[kc1]  = normal
+       self.CM[kc1]  += normal*area/vol1
+       self.CPB[kc1] += normal*area/vol1
+       self.CP[kc1]  += normal
 
 
    self.N = N.to_coo()

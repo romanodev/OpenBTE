@@ -10,7 +10,6 @@ class WriteVtk(object):
   self.mesh = argv['Geometry']
 
 
-
   self.Nx = argv.setdefault('repeat_x',1)
   self.Ny = argv.setdefault('repeat_y',1)
   self.Nz = argv.setdefault('repeat_z',1)
@@ -156,7 +155,7 @@ class WriteVtk(object):
 
 
 
-   strc = 'data = PointData('
+   strc = 'd=PointData('
    for n,variable in enumerate(self.data) :
 
     is_scalar = len(list(np.shape(variable))) == 1
@@ -170,12 +169,12 @@ class WriteVtk(object):
     if is_scalar:
      increment = tmp[self.mesh.direction]
     #---------------------------------------
-    ss = r'''nodes,cells,output_''' + str(n)+r'''=self.repeat_nodes_and_data(node_data,increment)'''
-
-    quit()
+    #ss = r'''nodes,cells,output_''' + str(n)+r'''=self.repeat_nodes_and_data(node_data,increment)'''
+    nodes,cells,output = self.repeat_nodes_and_data(node_data,increment)
     #nodes,cells,output = self.repeat_nodes_and_data(self.Nx,self.Ny,self.Nz,node_data,increment)
     if is_scalar:
-      strc += r'''Scalars(output_''' + str(n) + r''',name =' ''' + self.label[n] +  r''' ')'''
+      #strc += r'''Scalars(output_''' + str(n) + r''',name =' ''' + self.label[n] +  r''' ')'''
+      strc += r'''Scalars(output,name=' ''' + self.label[n] +  r''' ')'''
     else:
       strc += r'''Vectors(output_''' + str(n) + r''',name =' ''' + self.label[n] +  r''' ')'''
 
@@ -184,10 +183,9 @@ class WriteVtk(object):
     else:
      strc += ','
 
-   exec(strc)
 
-   print(node_data)
-   quit()
+   data=PointData(Scalars(output,name=' BTE Temperature [K] '))
+
    if self.mesh.dim == 3:
     vtk = VtkData(UnstructuredGrid(nodes,tetra=cells),data)
    else :
