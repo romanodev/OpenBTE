@@ -170,7 +170,6 @@ class Solver(object):
    while n_iter < argv.setdefault('max_bte_iter',10) and \
           error > argv.setdefault('max_bte_error',1e-2):
 
-
     #Solve Fourier of First Guess
     #--------------------------------------------------------------------------------------------------          
     if n_iter == 0:          
@@ -222,132 +221,49 @@ class Solver(object):
      index = rank*block + kk   
      if index < self.n_index  :
 
-      #Get ballistic suppression function
-
-      #compute ballistic---
-      #a_bal = -1
-      #k = 1
-      #err_bal = 1
-      #a_bal_old = 0
-      #while err_bal > 1e-2 and k < self.mat['n_mfp']:
-      temp_bal,a_bal,dummy = self.get_solving_data2(index,self.mat['n_mfp']-1,TB,TL)
-      #dummy,a_bal_2,dummy = self.get_solving_data2(index,self.mat['n_mfp']-2,TB,TL)
-      #gamma = (a_bal_2 - a_bal_1)/(self.mat['mfp'][-2] - self.mat['mfp'][-1]) 
-      #alpha = a_bal_1 - self.mat['mfp'][-1]*gamma
-      #SBAL = -alpha/self.mat['mfp'] + gamma
-
-      # err_bal = 1
-      # if a_bal > 0:
-      #  err_ban = abs((a_bal - a_bal_old)/a_bal)
-      # a_bal_old = a_bal 
-      # k =+1
-      # if k == self.mat['n_mfp']:
-      #  print('Ballistic suppression cannot be identified')  
-      #  quit()  
-      #print(a_bal)
-      #if a_bal < 0:
-          
-      # S = np.zeros(self.mat['n_mfp'])
-      # for n in range(self.mat['n_mfp']):
-      #   dummy,s = self.get_solving_data2(index,n,TB,TL)
-      #   S[n] = s/self.mat['mfp'][n] 
-      # plt.plot(self.mat['mfp'],S,'b')
-      # plt.xscale('log')
-      # print(index)
-      # plt.show()
-
-
+      tbal,sbal,jbal = self.get_solving_data2(index,self.mat['n_mfp']-1,TB,TL)
       TSDIFF = SDIFF_ave*pow(self.mat['control_angle'][index][self.mesh.direction],2)*3*self.mat['domega'][index]
-      idx   = np.argwhere(np.diff(np.sign(TSDIFF*self.mat['mfp'] - a_bal*np.ones(self.mat['n_mfp'])))).flatten()
+      if sbal > 0:
+       idx   = np.argwhere(np.diff(np.sign(TSDIFF*self.mat['mfp'] - sbal*np.ones(self.mat['n_mfp'])))).flatten()
+      else: 
+       idx = [self.mat['mfp']-1]   
 
-
-      do_plot = False
       if len(idx) == 0:
          print('fff') 
-          #if len(idx) == 0:
-         print(a_bal)  
-         # print(index)
-          
-         print() 
-         plt.plot(self.mat['mfp'],TSDIFF*self.mat['mfp'],'b')
-         plt.plot(self.mat['mfp'],a_bal*np.ones(self.mat['n_mfp']),'r')
-         plt.xscale('log')
-         plt.ylim([-2*a_bal,2*abal])
-         plt.show()
 
-      #idx  = [100]
-
-      #S = np.zeros(self.mat['n_mfp'])
+      #print(idx[0])
       
-      #fourier = False
-      #for n in range(self.mat['n_mfp'])[idx[0]::-1]:
-      for n in range(self.mat['n_mfp'])[::-1]:
-       # if  fourier :
-       #  s = SDIFF[n] * self.mat['mfp'][n]
-       #  temp = TDIFF[n] - self.mat['mfp'][n]*np.dot(self.mat['control_angle'][index],TDIFFGrad[n].T)
-       # else:  
-        t,s,j = self.get_solving_data2(index,n,TB,TL)
-        Tp[n]      += t
-        Jp[n]      += j
-        kernelp[n] += s
+      fourier = False
+      print([range(self.mat['n_mfp'])[idx[0]::-1:]])
+      for n in range(self.mat['n_mfp'])[idx[0]::-1]:
+        #if index == 12:
+        # print('D:' + str(n))  
+        if  fourier :
+          s = SDIFF[n] * self.mat['mfp'][n]
+          temp = TDIFF[n] - self.mat['mfp'][n]*np.dot(self.mat['control_angle'][index],TDIFFGrad[n].T)
+        else:  
+         t,s,j = self.get_solving_data2(index,n,TB,TL)
+         Tp[n]+= t; Jp[n] += j;  kernelp[n] += s
 
-        #if  max(temp) > 100 or min(temp) < -100:
-        # t = int(index/self.mat['n_phi'])
-        # p = index%self.mat['n_phi']   
-         #print(min(temp),max(temp),self.mat['mfp'][n],t,p)
-        # print(n,t,p,max(temp),self.mat['control_angle'][index])
-       #  sup = s/self.mat['mfp'][n]
-       #  if abs((SDIFF[n] - sup)/sup) < 5e-2 and self.multiscale:
-       #      n_diff = n
-       #      fourier = True
-        #Tp[n]      += temp*self.mat['domega'][index]
-        #Jp[n]      += np.multiply(temp,self.HW_PLUS)*self.mat['domega'][index]
-    
-       # S[n] = s
-      #if a_bal_1 < 0:
-      #  a_bal
-        #plt.plot(self.mat['mfp'],SBAL,'b')
-        #plt.plot(self.mat['mfp'],S/self.mat['mfp'],'k')
-      #  plt.plot(self.mat['mfp'],S,'k')
-        #plt.plot(self.mat['mfp'],TSDIFF,'r')
-      #  plt.xscale('log')
-      #  plt.show()
+      ballistic = False
+      for n in range(self.mat['n_mfp'])[idx[0]+1:]:
+       #if index == 12:
+       # print('B:' + str(n))  
+       if  ballistic :
+         s = sbal;t = tbal; j = jbal
+       else:  
+         t,s,j = self.get_solving_data2(index,n,TB,TL)
+         if abs(s-sbal)/sbal < 5e-2 and self.multiscale: 
+          ballistic = True
+       Tp[n] += t; Jp[n] += j; kernelp[n] += s
 
-
-      #ballistic = False
-      #for n in range(self.mat['n_mfp'])[idx[0]+1:-1]:
-
-      # if  ballistic :
-      #   s = SBAL[n]*self.mat['mfp'][n]
-      #   temp = temp_bal
-      # else:  
-      #   temp,s = self.get_solving_data2(index,n,TB,TL)
-      #   sup = s/self.mat['mfp'][n]
-      #   if abs((SBAL[n] - sup)/sup) < 5e-2 and self.multiscale: 
-      #      n_bal = n
-      #      ballistic = True
-
-      # Tp[n]      += temp*self.mat['domega'][index]
-      # Jp[n]      += np.multiply(temp,self.HW_PLUS)*self.mat['domega'][index]
-      # kernelp[n] += s
-      #print(n_diff,idx[0],n_bal)
-
-      #if index == 20 :
-      # plt.plot(self.mat['mfp'],S)
-       #plt.plot(self.mat['mfp'],SBAL)
-       #plt.plot(self.mat['mfp'],SDIFF)
-       #plt.plot(self.mat['mfp'][0:len(SUP_DIF)],SUP_DIF)
-      # plt.xscale('log')
-      # plt.ylim([0,.1])
-      # plt.show()
-       
 
     comm.Allreduce([Tp,MPI.DOUBLE],[T,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([kernelp,MPI.DOUBLE],[kernel,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
-    #if rank == 0:
-    # for m in range(self.mat['n_mfp']):
-    #  print(min(T[m]),max(T[m]))
+    if rank == 0:
+     for m in range(self.mat['n_mfp']):
+      print(min(TB[m]),max(TB[m]))
     #quit() 
 
     n_iter +=1
