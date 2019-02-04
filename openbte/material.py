@@ -1,196 +1,192 @@
-from __future__ import absolute_import
 import numpy as np
-import math
-from .compute_dom import *
-from mpi4py import MPI
 import os
-import os.path
 import deepdish as dd
+from mpi4py import MPI
+from numpy.testing import assert_array_equal
 
 
 class Material(object):
 
  def __init__(self,**argv):
 
-  #defaults--
-  #argv.setdefault('grid',[50,12,24])
-
-  #MFP discretization-----------------------------
-  self.state = {}
-
-
-  argv.setdefault('model','gray')
-  if argv['model'] == 'load':
-   #MPI.COMM_WORLD.Barrier()
-   if MPI.COMM_WORLD.Get_rank() == 0:
-    data = dd.io.load(argv.setdefault('filename','material.hdf5'))
-   else: data=None
-   self.state.update(MPI.COMM_WORLD.bcast(data,root=0))
-   #print(self.state['region'])
-  else:
-
-   if argv['model'] == 'nongray':
-    self.import_data(argv)
-
-   if argv['model'] == 'gray':
-    self.create_gray_model(argv)
-   #-----------------------------------------------
-
-   #Angular discretization-------------------------
-   if MPI.COMM_WORLD.Get_rank() == 0:
-    region = argv.setdefault('region','Matrix')
-
-    dom = compute_dom_3d(argv)
-    data = {'dom':dom,'region':region}
-
-
-   else: data=None
-   self.state.update(MPI.COMM_WORLD.bcast(data,root=0))
-
-   #-----------------------------------------------
-   #SAVE FILE--------------------
-   if argv.setdefault('save',True):
-    if MPI.COMM_WORLD.Get_rank() == 0:
-     dd.io.save(argv.setdefault('filename','material') + '.hdf5', self.state)
-
-
- #def get_region(self):
-     #return self.region
-
- def create_gray_model(self,argv):
-
   if MPI.COMM_WORLD.Get_rank() == 0:
-    data = {}
-    mfp = argv.setdefault('mfps',[100e-9])
-    n_mfp = len(mfp)
-    kappa = argv.setdefault('kappa',1.0)
-
-    data.update({'kappa_bulk_tot':kappa})
-    data.update({'mfp_bulk':mfp})
-    data.update({'kappa_bulk':[kappa]})
-    data.update({'B0':np.array(n_mfp*[1.0/n_mfp])})
-
-    if 'special_point' in argv.keys():
-     sp = argv['special_point']
-     tmp = np.zeros(n_mfp)
-     tmp[sp] = 1.0
-     tmp = np.tile(tmp,[n_mfp,1])
-     data.update({'B1':tmp})
-     data.update({'B2':tmp})
-    else:
-     data.update({'B1':np.eye(n_mfp)})
-     data.update({'B2':np.eye(n_mfp)})
-
-
-    data.update({'mfp_sampled':mfp})
-  else: data=None
-  self.state = MPI.COMM_WORLD.bcast(data,root=0)
-
-
-
-
- def import_data(self,argv):
-
-  if MPI.COMM_WORLD.Get_rank() == 0:
-
-    if '/' in argv['matfile']:
-     filename = argv['matfile']
-    else:
-     filename = os.path.dirname(__file__) + '/materials/'+ argv['matfile']
-
-    data = {}
-    #[n_mfp,n_theta,n_phi] = argv['grid']
-
-    n_mfp = int(argv['n_mfp'])
-    #READ DATA-------------------------------------------
-    tmp = np.loadtxt(filename)
-    kappa_bulk_tot = np.sum(tmp[:,1])
-    mfp_bulk = tmp[:,0]
-    kappa_bulk = tmp[:,1]
-    n_mfp_bulk = len(mfp_bulk)
-    #-----------------------------------------------------
-    delta = argv.setdefault('delta',0.0)
-    acc = 0
-    mfp_bulk_new = []
-    kappa_bulk_new = []
-    for m in range(n_mfp_bulk):
-     if acc > kappa_bulk_tot*delta and acc < kappa_bulk_tot*(1.0-delta):
-      mfp_bulk_new.append(mfp_bulk[m])
-      kappa_bulk_new.append(kappa_bulk[m])
-     acc += kappa_bulk[m]
-
-
-    min_mfp = min(mfp_bulk_new)
-    min_mfp = min(min_mfp,argv.setdefault('min_mfp',min_mfp))
-    max_mfp = max(mfp_bulk_new)
-    max_mfp = max(max_mfp,argv.setdefault('max_mfp',max_mfp))
-
-    mfp_sampled_log = np.linspace(np.log10(min_mfp*0.99),np.log10(max_mfp*1.01),n_mfp)
-
-    #---DISCRETIZE MFPS in LOG SPACE---------------------
-    mfp_sampled = []
-    for m in mfp_sampled_log:
-     mfp_sampled.append(pow(10,m))
-    #--------------------------------------------------------
-
-
-
-    #MFP interpolation---------------------------
-    B0 = np.zeros(n_mfp)
-    B1 = np.zeros(n_mfp)
-    B2 = np.zeros(n_mfp)
-    kappa_tot = 0
-    for m in range(len(mfp_bulk_new)):
-     kappa = kappa_bulk_new[m]
-     mfp = mfp_bulk_new[m]
-     [m1,m2,f1,f2] = self.get_mfp_interpolation(mfp_sampled_log,np.log10(mfp))
-     b0 = kappa
-     b1 = kappa/mfp
-     b2 = kappa/mfp/mfp
-     B0[m1] += f1*b0; B0[m2] += f2*b0
-     B1[m1] += f1*b1; B1[m2] += f2*b1
-     B2[m1] += f1*b2; B2[m2] += f2*b2
-    B0 /=np.sum(B0)
-    B1 /=np.sum(B1)
-    B2 /=np.sum(B2)
-    #---------------------------------------------
-    #Compute DOM
-    #----------------
-    data.update({'kappa_bulk_tot':sum(kappa_bulk_new)})
-    data.update({'mfp_bulk':mfp_bulk_new})
-    data.update({'kappa_bulk':kappa_bulk_new})
-    
-    B1 = np.tile(B1,(n_mfp,1))
   
-    data.update({'B0':B0})
-    data.update({'B1':B1})
-    data.update({'B2':np.tile(B2,(n_mfp,1))})
-    #data.update({'B1':B1})
-    #data.update({'B2':B2})
-    data.update({'mfp_sampled':np.array(mfp_sampled)})
+   output = {}   
+   data = self.compute_mat_2D(argv)   
+   output.update({'data_2D':data})
+   
+   data = self.compute_mat_3D(argv)   
+   output.update({'data_3D':data})
+   
+   dd.io.save('material.hdf5',output)   
+   
+ def compute_mat_2D(self,argv):  
+   
+   #Polar Angle-----
+   n_phi = int(argv.setdefault('n_phi',46)); Dphi = 2*np.pi/n_phi
+   phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+   #--------------------
+   
+   #Azimuthal Angle------------------------------
+   n_theta = int(argv.setdefault('n_theta',48)); Dtheta = np.pi/n_theta/2.0
+   theta = np.linspace(Dtheta/2.0,np.pi/2.0 - Dtheta/2.0,n_theta)
+   dtheta = 2.0*np.sin(Dtheta/2.0)*np.sin(theta)   
+   
+   #Compute directions---
+   polar = np.array([np.sin(phi),np.cos(phi),np.ones(n_phi)]).T
+   azimuthal = np.array([np.sin(theta),np.sin(theta),np.cos(theta)]).T
+   direction = np.einsum('ij,kj->ikj',azimuthal,polar)
+   
+   #Compute average---
+   ftheta = (1-np.cos(2*theta)*np.sinc(Dtheta/np.pi))/(np.sinc(Dtheta/2/np.pi)*(1-np.cos(2*theta)))
+   fphi= np.sinc(Dphi/2.0/np.pi)
+   polar_ave = np.array([fphi*np.ones(n_phi),fphi*np.ones(n_phi),np.ones(n_phi)]).T
+   azimuthal_ave = np.array([ftheta,ftheta,np.cos(Dtheta/2)*np.ones(n_theta)]).T   
+   direction_ave = np.multiply(np.einsum('ij,kj->ikj',azimuthal_ave,polar_ave),direction)
+   #---------------------------------------------------------------
+   
+   #Import material
+   tmp = np.loadtxt(os.path.dirname(__file__) + '/materials/'+ argv['matfile'])
+   mfp_bulk = tmp[:,0]*1e9; n_mfp_bulk = len(mfp_bulk)
+   trials = np.outer(mfp_bulk,ftheta*np.sin(theta))
+   kappa_bulk = tmp[:,1]
+   mfp = np.logspace(-3,np.log10(max(mfp_bulk)),argv['n_mfp'])
+   
+   
+   J0 = np.outer(np.ones(n_mfp_bulk),dtheta)
+   J1 = np.outer(kappa_bulk/mfp_bulk,ftheta*dtheta*np.sin(theta))/sum(kappa_bulk/mfp_bulk)   
+   J2 = np.outer(kappa_bulk/pow(mfp_bulk,2),dtheta)/sum(kappa_bulk/pow(mfp_bulk,2))   #x2 (symmetry) and /2 (average)
+   J3 = np.outer(1/mfp_bulk,ftheta*dtheta*np.sin(theta))
 
-  else: data=None
-  self.state = MPI.COMM_WORLD.bcast(data,root=0)
+   G = mfp/2
+   kappa_mfe = np.square(mfp)/2
+
+   domega = np.ones(n_phi)*Dphi/2.0/np.pi
+ 
+
+   
+   data = {'kappa_bulk_tot':sum(kappa_bulk),'kappa_bulk':kappa_bulk,\
+                'mfp_bulk':mfp_bulk,\
+                'fphi':fphi,\
+                'G':G,\
+                'kappa_mfe':kappa_mfe,\
+                'dphi':Dphi,\
+                'n_mfp':len(mfp),\
+                'trials':trials,\
+                'domega':domega,\
+                'mfp':mfp,\
+                'J0':J0,'J1':J1,'J2':J2,'J3':J3,\
+                'n_phi':n_phi,'n_theta':n_theta,\
+                'direction':direction,\
+                'direction_ave':direction_ave,\
+                'polar':polar,\
+                'azimuthal':azimuthal,\
+                'polar_ave':polar,\
+                'control_angle':polar,\
+                'azimuthal_ave':azimuthal}
+   
+   return data
+
+ def compute_mat_3D(self,argv):  
+   
+    #Polar Angle-----
+    n_phi = int(argv.setdefault('n_phi',46)); Dphi = 2.0*np.pi/n_phi
+    phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+   #--------------------
+   
+    #Azimuthal Angle------------------------------
+    n_theta = int(argv.setdefault('n_theta',48)); Dtheta = np.pi/n_theta
+    theta = np.linspace(Dtheta/2.0,np.pi - Dtheta/2.0,n_theta)
+    dtheta = 2.0*np.sin(Dtheta/2.0)*np.sin(theta)   
+   
+    #Compute directions---
+    polar = np.array([np.sin(phi),np.cos(phi),np.ones(n_phi)]).T
+    azimuthal = np.array([np.sin(theta),np.sin(theta),np.cos(theta)]).T
+    direction = np.einsum('ij,kj->ikj',azimuthal,polar)
+   
+    #Compute average---
+    ftheta = (1-np.cos(2*theta)*np.sinc(Dtheta/np.pi))/(np.sinc(Dtheta/2/np.pi)*(1-np.cos(2*theta)))
+    fphi= np.sinc(Dphi/2.0/np.pi)
+    polar_ave = np.array([fphi*np.ones(n_phi),fphi*np.ones(n_phi),np.ones(n_phi)]).T
+    azimuthal_ave = np.array([ftheta,ftheta,np.cos(Dtheta/2)*np.ones(n_theta)]).T   
+    direction_ave = np.multiply(np.einsum('ij,kj->ikj',azimuthal_ave,polar_ave),direction)
+    #---------------------------------------------------------------
+    control_angle = direction_ave.reshape((n_phi*n_theta,3))
+
+    #dire_ave_index_2 = []
+    #n = 0
+    #for t in range(n_theta):
+    # for p in range(n_phi):
+    #    dire_ave_index_2.append(direction_ave[t][p])
+    #    print(dire_ave_index[n])
+    #    print(direction_ave[t][p])
+    #    print(" ")
+    #    n +=1
+
+    
+    #quit()
+    #dire_ave_index = np.array(dire_ave_index_2)
+    # print(np.shape(dire_ave_index))
 
 
- def get_mfp_interpolation(self,mfp_sampled,mfp_bulk) :
+    #assert_array_equal(dire_ave_index_2,dire_ave_index)
 
-   n_mfp = len(mfp_sampled)
-   findm = 0
-   for m in range(n_mfp-1) :
-    if (mfp_bulk >= mfp_sampled[m]) and (mfp_bulk <= mfp_sampled[m+1]) :
+    
+    #quit()     
 
-     #get data for mfp interpolation
-     m1 = m
-     m2 = m+1
-     mfp1 = mfp_sampled[m1]
-     mfp2 = mfp_sampled[m2]
-     fm = (mfp_bulk-mfp1)/(mfp2 - mfp1) #for interpolation
-     findm = 1
-     m_par = [m1,m2,1-fm,fm]
-     assert mfp_bulk <= mfp2
-     assert mfp_bulk >= mfp1
-     assert abs(fm) <= 1
-     return m_par
+    #Import material
+    tmp = np.loadtxt(os.path.dirname(__file__) + '/materials/'+ argv['matfile'])
+    mfp_bulk = tmp[:,0]*1e9; n_mfp_bulk = len(mfp_bulk)
+    trials = mfp_bulk
 
-   assert findm == 1
+    kappa_bulk = tmp[:,1]
+    mfp = np.logspace(-3,np.log10(max(mfp_bulk)),argv['n_mfp'])
+   
+    J0 = np.ones(n_mfp_bulk)
+    J1 = kappa_bulk/mfp_bulk/sum(kappa_bulk/mfp_bulk)   
+    J2 = kappa_bulk/pow(mfp_bulk,2)/sum(kappa_bulk/pow(mfp_bulk,2))   
+    J3 = 1/mfp_bulk
+
+    
+    J0 = np.array([J0]).T
+    J1 = np.array([J1]).T
+    J2 = np.array([J2]).T
+    J3 = np.array([J3]).T
+    trials = np.array([trials]).T
+    
+    G = mfp/2
+    kappa_mfe = np.square(mfp)/3
+
+   
+    domega = []
+    for t in range(n_theta):
+     for p in range(n_phi):
+      domega.append(dtheta[t]*Dphi/4.0/np.pi)
+    domega = np.array(domega)
+   
+
+
+    data = {'kappa_bulk_tot':sum(kappa_bulk),'kappa_bulk':kappa_bulk,\
+                'mfp_bulk':mfp_bulk,\
+                'fphi':fphi,\
+                'dphi':Dphi,\
+                'n_mfp':len(mfp),\
+                'G':G,\
+                'kappa_mfe':kappa_mfe,\
+                'trials':trials,\
+                'domega':domega,\
+                'mfp':mfp,\
+                'J0':J0,'J1':J1,'J2':J2,'J3':J3,\
+                'n_phi':n_phi,'n_theta':n_theta,\
+                'direction':direction,\
+                'control_angle':control_angle,\
+                'direction_ave':direction_ave,\
+                'polar':polar,\
+                'azimuthal':azimuthal,\
+                'polar_ave':polar,\
+                'azimuthal_ave':azimuthal}
+   
+    return data
+   
+
+   
