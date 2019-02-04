@@ -226,29 +226,32 @@ class Solver(object):
       if sbal > 0:
        idx   = np.argwhere(np.diff(np.sign(TSDIFF*self.mat['mfp'] - sbal*np.ones(self.mat['n_mfp'])))).flatten()
       else: 
-       idx = [self.mat['mfp']-1]   
+       idx = [self.mat['n_mfp']-1]   
 
-      if len(idx) == 0:
-         print('fff') 
+     
+         
 
       #print(idx[0])
       
       fourier = False
-      print([range(self.mat['n_mfp'])[idx[0]::-1:]])
+     
       for n in range(self.mat['n_mfp'])[idx[0]::-1]:
-        #if index == 12:
-        # print('D:' + str(n))  
         if  fourier :
-          s = SDIFF[n] * self.mat['mfp'][n]
-          temp = TDIFF[n] - self.mat['mfp'][n]*np.dot(self.mat['control_angle'][index],TDIFFGrad[n].T)
+          s = TSDIFF[n] * self.mat['mfp'][n]
+          temp = TDIFF[n] - self.mat['mfp'][n]*np.dot(self.mat['control_angle'][index],TDIFFGrad[n].T)      
+          t = temp*self.mat['domega'][index]
+          j = np.multiply(temp,HW_PLUS)*self.mat['domega'][index]
+            
         else:  
          t,s,j = self.get_solving_data2(index,n,TB,TL)
-         Tp[n]+= t; Jp[n] += j;  kernelp[n] += s
+         if abs((TSDIFF-s*self.mat['mfp'][n])/TSDIFF)<5e-2 and self.multiscale:
+           fourier = True
+           
+        Tp[n]+= t; Jp[n] += j;  kernelp[n] += s
+
 
       ballistic = False
       for n in range(self.mat['n_mfp'])[idx[0]+1:]:
-       #if index == 12:
-       # print('B:' + str(n))  
        if  ballistic :
          s = sbal;t = tbal; j = jbal
        else:  
@@ -263,7 +266,7 @@ class Solver(object):
     comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
     if rank == 0:
      for m in range(self.mat['n_mfp']):
-      print(min(TB[m]),max(TB[m]))
+       print(min(TB[m]),max(TB[m]))
     #quit() 
 
     n_iter +=1
