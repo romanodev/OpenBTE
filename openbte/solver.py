@@ -175,7 +175,6 @@ class Solver(object):
    comm = MPI.COMM_WORLD  
    rank = comm.rank 
 
-
    error = 1.0
    kappa_old = 0
    n_iter = 0
@@ -331,6 +330,7 @@ class Solver(object):
     #Thermal conductivity   
     if rank==0:
       print('BTE: ' + str(kappa))
+      np.array([kappa]).dump(open('kappa.dat','rw'))
       #self.state.update({'bte_temperature':TL[0]})
      
 
