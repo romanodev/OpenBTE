@@ -914,7 +914,6 @@ class Geometry(object):
 
   #Create mesh---
   subprocess.check_output(['gmsh','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
-  print('dd')
 
   #-------------
 
