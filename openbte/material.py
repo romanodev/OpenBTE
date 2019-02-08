@@ -19,9 +19,11 @@ class Material(object):
    output.update({'data_3D':data})
    
    dd.io.save('material.hdf5',output)   
-   
+  MPI.COMM_WORLD.Barrier()
+
  def compute_mat_2D(self,argv):  
    
+  if MPI.COMM_WORLD.Get_rank() == 0:
    #Polar Angle-----
    n_phi = int(argv.setdefault('n_phi',46)); Dphi = 2*np.pi/n_phi
    phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
@@ -89,6 +91,7 @@ class Material(object):
 
  def compute_mat_3D(self,argv):  
    
+  if MPI.COMM_WORLD.Get_rank() == 0:
     #Polar Angle-----
     n_phi = int(argv.setdefault('n_phi',46)); Dphi = 2.0*np.pi/n_phi
     phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
@@ -122,16 +125,11 @@ class Material(object):
     #    print(direction_ave[t][p])
     #    print(" ")
     #    n +=1
-
     
     #quit()
     #dire_ave_index = np.array(dire_ave_index_2)
     # print(np.shape(dire_ave_index))
 
-
-    #assert_array_equal(dire_ave_index_2,dire_ave_index)
-
-    
     #quit()     
 
     #Import material

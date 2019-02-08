@@ -1,7 +1,7 @@
+def test(a):
 
-import deepdish as dd
-import numpy as np
+   return a 
 
+b = eval('test(1)')   
 
-tmp = dd.io.save('rr',{'d':np.arange(5),'f':np.arange(6)})
-tmp = dd.io.load('rr')
+print(b)

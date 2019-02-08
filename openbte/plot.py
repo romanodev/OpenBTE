@@ -17,7 +17,6 @@ from scipy.interpolate import griddata
 from shapely.geometry import MultiPoint,Point,Polygon,LineString
 import shapely
 
-
 def get_suppression(mfps,sup,mfp):
 
 
@@ -88,19 +87,14 @@ class Plot(object):
    #Write data-------
    #geo = dd.io.load('geometry.hdf5')
    geo = Geometry(type='load')
-   solver = dd.io.load('state.hdf5')
+   solver = dd.io.load('solver.hdf5')
    argv.update({'Geometry':geo})
    vw = WriteVtk(argv)
    #vw.add_variable(solver['fourier_temperature'],label = 'Fourier Temperature [K]')
    #vw.add_variable(solver['fourier_flux'],label = r'''Thermal Flux [W/m/m]''')
 
-   TL = solver['temperature_bte']
-   for t in TL:
-       if abs(t) > 0.6:
-           print(t)
-   quit()
-   vw.add_variable(solver['temperature_bte'],label = r'''BTE Temperature [K]''')
-   #vw.add_variable(solver['bte_flux'],label = r'''BTE Thermal Flux [W/m/m]''')
+   vw.add_variable(solver['temperature'],label = r'''BTE Temperature [K]''')
+   vw.add_variable(solver['flux'],label = r'''BTE Thermal Flux [W/m/m]''')
    vw.write_vtk()
 
 
@@ -348,7 +342,6 @@ class Plot(object):
    gca().invert_yaxis()
    xlim([-Lx*0.5,Lx*0.5])
    ylim([-Ly*0.5,Ly*0.5])
-
 
 
  def plot_suppression_function(self,argv):

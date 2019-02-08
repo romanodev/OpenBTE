@@ -7,8 +7,7 @@ from mpi4py import MPI
 #import shutil
 from scipy.sparse.linalg import splu
 
-
-
+#import colored
 from scipy.sparse.linalg import spilu
 import matplotlib.pylab as plt
 from scipy.sparse import spdiags
@@ -26,8 +25,9 @@ import pickle
 import os
 
 def log_interp1d(xx, y, kind='linear'):
+
+
      yy = y.copy()
-     
      scale = min(yy)
      yy -= min(yy)
      yy+= 1e-12
@@ -175,6 +175,16 @@ class Solver(object):
    comm = MPI.COMM_WORLD  
    rank = comm.rank 
 
+
+   if rank == 0:
+     print('')
+     print('Solving BTE... started', 'green')
+     print('')
+     print('    Iter    Thermal Conductivity [W/m/K]      Error         Diffusive - BTE - Ballistic')
+     print('   ------------------------------------------------------------------------------------')
+
+  
+
    error = 1.0
    kappa_old = 0
    n_iter = 0
@@ -221,15 +231,14 @@ class Solver(object):
     if rank == 0:
      SUP_DIF = np.sum(np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],SDIFF_ave)(self.mat['trials'])),axis=1)   
     
-     print('Fourier:' + str(np.dot(SUP_DIF,self.mat['kappa_bulk'])))
+     #print('Fourier:' + str(np.dot(SUP_DIF,self.mat['kappa_bulk'])))
 
 
     block = self.n_index // comm.size + 1
     Jp,J = np.zeros((2,self.mat['n_mfp'],self.n_elems))
-    Fluxp,Flux = np.zeros((2,self.mat['n_mfp'],3,self.n_elems))
+    Fluxp,Flux = np.zeros((2,self.mat['n_mfp'],self.n_elems,3))
     kernelp,kernel = np.zeros((2,self.mat['n_mfp']))
     Tp,T = np.zeros((2,self.mat['n_mfp'],self.n_elems))
-
 
     for kk in range(block):
      index = rank*block + kk   
@@ -241,7 +250,10 @@ class Solver(object):
        idx   = np.argwhere(np.diff(np.sign(SDIFF*self.mat['mfp'] - sbal*np.ones(self.mat['n_mfp'])))).flatten()
       else: 
        idx = [self.mat['n_mfp']-1]   
-     
+    
+      
+      if len(idx) == 0:
+       idx = [self.mat['n_mfp']-1]   
       nd = 0
       nn = idx[0]
       nb = self.mat['n_mfp']
@@ -258,12 +270,12 @@ class Solver(object):
 
          if error<5e-2 and self.multiscale:
            fourier = True
-           nd = n
+          # nd = n
         Tp[n]+= t; Jp[n] += j;  kernelp[n] += s
 
-        #Fluxp[n] += np.outer(self.mat['control_angle'],t)
+        Fluxp[n] += np.outer(t,self.mat['control_angle'][index])
 
-    #    S[n] = s/self.mat['mfp'][n]
+    #S[n] = s/self.mat['mfp'][n]
 
       ballistic = False
       for n in range(self.mat['n_mfp'])[idx[0]+1:]:
@@ -273,13 +285,13 @@ class Solver(object):
          t,s,j = self.get_solving_data(index,n,TB,TL)
          if abs(s-sbal)/sbal < 1e-2 and self.multiscale: 
           ballistic = True
-          nb = n
+         # nb = n
        Tp[n] += t; Jp[n] += j; kernelp[n] += s
     #   S[n] = s/self.mat['mfp'][n]
 
     #   print(nd,nn,nb)
 
-    #comm.Allreduce([Fluxp,MPI.DOUBLE],[Flux,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([Fluxp,MPI.DOUBLE],[Flux,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([Tp,MPI.DOUBLE],[T,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([kernelp,MPI.DOUBLE],[kernel,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
@@ -304,34 +316,15 @@ class Solver(object):
          for e in range(self.n_elems)],(self.mat['n_mfp'],1))
 
 
-    #FLUX = np.zeros((self.n_elems,3))
-    #for e in range(self.n_elems):
-    #  FLUX[e] = np.sum(np.multiply(log_interp1d(self.mat['mfp'],Flux.T[e](self.mat['trials']))))
-
+    FLUX  = np.array([[np.sum(np.multiply(self.mat['J1'],log_interp1d(self.mat['mfp'],Flux.T[d,e])\
+           (self.mat['trials'])))*self.mat['kappa_bulk_tot'] for d in range(3) ] for e in range(self.n_elems)])
 
    
-    #if rank == 0:
-    # plt.plot(self.mat['mfp_bulk'],SUP,'r')
-    # plt.xscale('log')
-    # plt.show()
-      #print(nd,nn,nb)
-
-    #if argv.setdefault('save_state',False) and rank == 0:
-     #dd.io.save('state.hdf5',{'TL':TL,'TB':TB,'SUP':SUP,'n_iter':n_iter,'error':error,'kappa':kappa})
-    # dd.io.save(os.getcwd() + '/state.hdf5',{'bte_temperature':TL[0],'suppression':SUP})
-   
-    #TL = np.zeros(self.n_elems)
-    #for m in range(len(self.mat['J2'])):
-    # for e in range(self.n_elems):
-    #  TL[e] += log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials'][m])*self.mat['J2'][m]
-    #print(min(TL),max(TL))
-    #quit()     
 
     #Thermal conductivity   
     if rank==0:
-      print('BTE: ' + str(kappa))
-      np.array([kappa]).dump(open('kappa.dat','rw'))
-      #self.state.update({'bte_temperature':TL[0]})
+      print('     ' + str(n_iter) + '     ' +  str(round(kappa,4)) + '     ' + str(error))
+      dd.io.save('solver.hdf5',{'temperature':TL[0],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk']})
      
 
     #if n_iter ==  argv.setdefault('max_bte_iter',10)-1:

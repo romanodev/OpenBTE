@@ -117,6 +117,8 @@ class Geometry(object):
   if argv.setdefault('plot',False):
    self.plot_polygons()
 
+  MPI.COMM_WORLD.Barrier()
+
  def mesh(self,**argv):
 
      
