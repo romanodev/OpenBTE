@@ -344,7 +344,48 @@ class Solver(object):
     #Thermal conductivity   
     if rank==0:
       print('\033[0;37;40m {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,error,diffusive,1-diffusive-ballistic,ballistic))
-      dd.io.save('solver.hdf5',{'temperature':TL[0],'flux':FLUX,'error':error,'SUP':SUP,'MFP':self.mat['mfp_bulk']})
+      dd.io.save('solver.hdf5',{'temperature':TL[0],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],\
+                                 'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa})
+     
+
+    #if n_iter ==  argv.setdefault('max_bte_iter',10)-1:
+     #Solve Fourier-----------------------------------------------
+     #if n_iter == argv.setdefault('max_bte_iter',10)-1:
+   #argv.update({  'mfe_factor':1.0,\
+   #               'verbose':False,\
+   #               'lattice_temperature':TL.copy(),\
+   #               'boundary_temperature':TB.copy(),\
+   #               'kappa':self.mat['kappa_mfe'],\
+   #               'interface_conductance':self.mat['G']})    
+   #output = self.solve_fourier(**argv) 
+   #kappa_fourier = output['kappa_fourier'] 
+   
+
+
+
+   #if rank==0:
+   #  print(' ')  
+   #  print(kappa)       
+
+    #if self.multiscale:
+     #SUP_DIF = np.sum(np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],kappa_fourier/self.mat['kappa_mfe'])(self.mat['trials'])),axis=1)   
+     #SUP_BAL = self.mat['mfp_bulk'][-1]*SUP[-1]/self.mat['mfp_bulk']
+     #model
+
+     #idx = np.argwhere(np.diff(np.sign(SUP_DIF - SUP_BAL))).flatten()
+     #plt.scatter([self.mat['mfp_bulk'][idx[0]]],SUP[idx[0]])
+     #plt.scatter([self.mat['mfp_bulk'][idx[0]]],SUP_BAL[idx[0]])
+     #plt.scatter([self.mat['mfp_bulk'][idx[0]]],SUP_DIF[idx[0]])
+
+     #plt.plot(self.mat['mfp_bulk'],SUP_DIF,'r')#,marker='o') 
+   #  plt.plot(self.mat['mfp_bulk'],SUP) 
+     #plt.plot(self.mat['mfp_bulk'],SUP_BAL,'b') 
+   #  plt.xscale('log')
+   #  plt.ylim([0,1])
+   #  plt.show()
+    
+   
+>>>>>>> f3f0cddb2b57e1e0bbc7732fde1641ed92148491
     
     
    if rank==0:
