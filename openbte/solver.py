@@ -346,7 +346,7 @@ class Solver(object):
     if rank==0:
       print('\033[0;37;40m {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,error,diffusive,1-diffusive-ballistic,ballistic))
       dd.io.save('solver.hdf5',{'temperature':TL[0],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],\
-                                 'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'MS',MS})
+              'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'MS':MS})
      
    if rank==0:
      print('\033[1;32;40m   ---------------------------------------------------------------------------------------')
