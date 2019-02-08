@@ -79,7 +79,7 @@ class Solver(object):
    
    #quit()
    #------------------------- 
-   if self.verbose: self.print_bulk_kappa()
+   #if self.verbose: self.print_bulk_kappa()
    
    self.assemble_fourier()
    
@@ -116,46 +116,56 @@ class Solver(object):
 
   def get_solving_data(self,index,n,TB,TL):
 
-
+     global_index = index * self.mat['n_mfp'] +n
      nc = self.n_elems       
-#   if  index != self.last_index:
 
-    #if os.path.exists(self.cache + '/P_' + str(index) + '.p') :
-    # self.A = scipy.sparse.load_npz(self.cache + '/A_' + str(index) + '.npz')
-    # self.K = scipy.sparse.load_npz(self.cache + '/K_' + str(index) + '.npz')
-    # self.HW_MINUS = np.load(open(self.cache +'/HW_MINUS_' + str(index) + '.p','rb'))
-    # self.HW_PLUS = np.load(open(self.cache +'/HW_PLUS_' + str(index) + '.p','rb'))
-    # self.P = np.load(open(self.cache +'/P_' + str(index) +'.p','rb'))
-    #else:
-     angle = self.mat['control_angle'][index]
-     aa = sparse.COO([0,1,2],angle,shape=(3))
-     HW_MINUS = -sparse.tensordot(self.mesh.CM,aa,axes=1).clip(max=0)
-     HW_PLUS = sparse.tensordot(self.mesh.CP,aa,axes=1).clip(min=0)
-     test2  = sparse.tensordot(self.mesh.N,aa,axes=1)
-     K = test2 * self.TT #broadcasting (B_ij * V_i)
-     AM = test2.clip(max=0)
-     P = (AM*self.mesh.B).sum(axis=1).todense()
-     AP = spdiags(test2.clip(min=0).sum(axis=1).todense(),0,nc,nc,format='csc')
-     CPB = spdiags(sparse.tensordot(self.mesh.CPB,aa,axes=1).clip(min=0),0,nc,nc,format='csc')
-     A =  AP + AM + CPB
-     #scipy.sparse.save_npz(self.cache + '/A_' + str(index) + '.npz',self.A.tocsc())
-     #scipy.sparse.save_npz(self.cache + '/K_' + str(index) + '.npz',self.K.tocsc())
-     #P.dump(open(self.cache + '/P_' + str(index) + '.p','wb'))
-     #HW_MINUS.dump(open(self.cache + '/HW_MINUS_' + str(index) + '.p','wb'))
-     #HW_PLUS.dump(open(self.cache + '/HW_PLUS_' + str(index) + '.p','wb'))
- #    self.last_index = index
+     if  index == self.last_index:
+       A = self.A
+       HW_PLUS = self.HW_MINUS
+       HW_PLUS = self.HW_PLUS
+       K = self.K
+       P = self.P
+     elif os.path.exists(self.cache + '/P_' + str(index) + '.p') :
+      A = scipy.sparse.load_npz(self.cache + '/A_' + str(index) + '.npz')
+      K = scipy.sparse.load_npz(self.cache + '/K_' + str(index) + '.npz')
+      HW_MINUS = np.load(open(self.cache +'/HW_MINUS_' + str(index) + '.p','rb'))
+      HW_PLUS = np.load(open(self.cache +'/HW_PLUS_' + str(index) + '.p','rb'))
+      P = np.load(open(self.cache +'/P_' + str(index) +'.p','rb'))
+     else:
+      angle = self.mat['control_angle'][index]
+      aa = sparse.COO([0,1,2],angle,shape=(3))
+      HW_MINUS = -sparse.tensordot(self.mesh.CM,aa,axes=1).clip(max=0)
+      HW_PLUS = sparse.tensordot(self.mesh.CP,aa,axes=1).clip(min=0)
+      test2  = sparse.tensordot(self.mesh.N,aa,axes=1)
+      K = test2 * self.TT #broadcasting (B_ij * V_i)
+      AM = test2.clip(max=0)
+      P = (AM*self.mesh.B).sum(axis=1).todense()
+      AP = spdiags(test2.clip(min=0).sum(axis=1).todense(),0,nc,nc,format='csc')
+      CPB = spdiags(sparse.tensordot(self.mesh.CPB,aa,axes=1).clip(min=0),0,nc,nc,format='csc')
+      A =  AP + AM + CPB
+      if self.argv.setdefault('save_data',True):
+       scipy.sparse.save_npz(self.cache + '/A_' + str(index) + '.npz',A.tocsc())
+       scipy.sparse.save_npz(self.cache + '/K_' + str(index) + '.npz',K.tocsc())
+       P.dump(open(self.cache + '/P_' + str(index) + '.p','wb'))
+       HW_MINUS.dump(open(self.cache + '/HW_MINUS_' + str(index) + '.p','wb'))
+       HW_PLUS.dump(open(self.cache + '/HW_PLUS_' + str(index) + '.p','wb'))
+
+      self.A = A
+      self.K = K
+      self.HW_MINUS= HW_MINUS
+      self.HW_PLUS= HW_PLUS
+      self.P = P
+      self.last_index = index
     #----------------------------------------------
 
 
-     #global_index = index * self.mat['n_mfp'] +n
-     #if global_index in self.lu.keys():
-     # lu = self.lu[global_index]
-     #else:
-     F = scipy.sparse.eye(self.n_elems,format='csc') +  A.tocsc() * self.mat['mfp'][n] 
-
-
-     lu = splu(F.tocsc())
-     # self.lu.update({global_index:lu})
+     if global_index in self.lu.keys():
+      lu = self.lu[global_index]
+     else:
+      F = scipy.sparse.eye(self.n_elems,format='csc') +  A.tocsc() * self.mat['mfp'][n] 
+      lu = splu(F.tocsc())
+      if self.argv.setdefault('keep_lu',False):
+       self.lu.update({global_index:lu})
 
      RHS = self.mat['mfp'][n] * (P + np.multiply(TB[n],HW_MINUS)) + TL[n]      
      temp = lu.solve(RHS)
@@ -177,11 +187,11 @@ class Solver(object):
 
 
    if rank == 0:
-     print('')
-     print('Solving BTE... started', 'green')
-     print('')
-     print('    Iter    Thermal Conductivity [W/m/K]      Error         Diffusive - BTE - Ballistic')
-     print('   ------------------------------------------------------------------------------------')
+     #print('')
+     #print('Solving BTE... started')
+     #print('')
+     print('    Iter    Thermal Conductivity [W/m/K]      Error        Diffusive  -  BTE  -  Ballistic')
+     print('\033[1;32;40m   ---------------------------------------------------------------------------------------')
 
   
 
@@ -230,6 +240,9 @@ class Solver(object):
     #Print diffusive Kappa---------
     if rank == 0:
      SUP_DIF = np.sum(np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],SDIFF_ave)(self.mat['trials'])),axis=1)   
+     if n_iter==0:
+       kappa = np.dot(SUP_DIF,self.mat['kappa_bulk'])
+       print('\033[0;37;40m {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,1,1,0,0))
     
      #print('Fourier:' + str(np.dot(SUP_DIF,self.mat['kappa_bulk'])))
 
@@ -239,6 +252,8 @@ class Solver(object):
     Fluxp,Flux = np.zeros((2,self.mat['n_mfp'],self.n_elems,3))
     kernelp,kernel = np.zeros((2,self.mat['n_mfp']))
     Tp,T = np.zeros((2,self.mat['n_mfp'],self.n_elems))
+    MSp,MS = np.zeros((2,2))
+
 
     for kk in range(block):
      index = rank*block + kk   
@@ -250,10 +265,11 @@ class Solver(object):
        idx   = np.argwhere(np.diff(np.sign(SDIFF*self.mat['mfp'] - sbal*np.ones(self.mat['n_mfp'])))).flatten()
       else: 
        idx = [self.mat['n_mfp']-1]   
-    
       
       if len(idx) == 0:
-       idx = [self.mat['n_mfp']-1]   
+       idx = [self.mat['n_mfp']-1]  
+
+
       nd = 0
       nn = idx[0]
       nb = self.mat['n_mfp']
@@ -270,7 +286,7 @@ class Solver(object):
 
          if error<5e-2 and self.multiscale:
            fourier = True
-          # nd = n
+           nd = n
         Tp[n]+= t; Jp[n] += j;  kernelp[n] += s
 
         Fluxp[n] += np.outer(t,self.mat['control_angle'][index])
@@ -285,16 +301,20 @@ class Solver(object):
          t,s,j = self.get_solving_data(index,n,TB,TL)
          if abs(s-sbal)/sbal < 1e-2 and self.multiscale: 
           ballistic = True
-         # nb = n
+          nb = n
        Tp[n] += t; Jp[n] += j; kernelp[n] += s
     #   S[n] = s/self.mat['mfp'][n]
 
-    #   print(nd,nn,nb)
 
+      MSp += np.array([float(nd),float(nb)])
+    comm.Allreduce([MSp,MPI.DOUBLE],[MS,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([Fluxp,MPI.DOUBLE],[Flux,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([Tp,MPI.DOUBLE],[T,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([kernelp,MPI.DOUBLE],[kernel,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
+    diffusive = MS[0]/self.n_index/self.mat['n_mfp']
+    ballistic = (self.n_index*self.mat['n_mfp'] - MS[1])/self.n_index/self.mat['n_mfp']
+
     #quit() 
 
     n_iter +=1
@@ -323,49 +343,13 @@ class Solver(object):
 
     #Thermal conductivity   
     if rank==0:
-      print('     ' + str(n_iter) + '     ' +  str(round(kappa,4)) + '     ' + str(error))
-      dd.io.save('solver.hdf5',{'temperature':TL[0],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk']})
-     
-
-    #if n_iter ==  argv.setdefault('max_bte_iter',10)-1:
-     #Solve Fourier-----------------------------------------------
-     #if n_iter == argv.setdefault('max_bte_iter',10)-1:
-   #argv.update({  'mfe_factor':1.0,\
-   #               'verbose':False,\
-   #               'lattice_temperature':TL.copy(),\
-   #               'boundary_temperature':TB.copy(),\
-   #               'kappa':self.mat['kappa_mfe'],\
-   #               'interface_conductance':self.mat['G']})    
-   #output = self.solve_fourier(**argv) 
-   #kappa_fourier = output['kappa_fourier'] 
-   
-
-
-
-   #if rank==0:
-   #  print(' ')  
-   #  print(kappa)       
-
-    #if self.multiscale:
-     #SUP_DIF = np.sum(np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],kappa_fourier/self.mat['kappa_mfe'])(self.mat['trials'])),axis=1)   
-     #SUP_BAL = self.mat['mfp_bulk'][-1]*SUP[-1]/self.mat['mfp_bulk']
-     #model
-
-     #idx = np.argwhere(np.diff(np.sign(SUP_DIF - SUP_BAL))).flatten()
-     #plt.scatter([self.mat['mfp_bulk'][idx[0]]],SUP[idx[0]])
-     #plt.scatter([self.mat['mfp_bulk'][idx[0]]],SUP_BAL[idx[0]])
-     #plt.scatter([self.mat['mfp_bulk'][idx[0]]],SUP_DIF[idx[0]])
-
-     #plt.plot(self.mat['mfp_bulk'],SUP_DIF,'r')#,marker='o') 
-   #  plt.plot(self.mat['mfp_bulk'],SUP) 
-     #plt.plot(self.mat['mfp_bulk'],SUP_BAL,'b') 
-   #  plt.xscale('log')
-   #  plt.ylim([0,1])
-   #  plt.show()
-    
-   
+      print('\033[0;37;40m {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,error,diffusive,1-diffusive-ballistic,ballistic))
+      dd.io.save('solver.hdf5',{'temperature':TL[0],'flux':FLUX,'error':error,'SUP':SUP,'MFP':self.mat['mfp_bulk']})
     
     
+   if rank==0:
+     print('\033[1;32;40m   ---------------------------------------------------------------------------------------')
+     print('\033[0;37;40m ')
     
 
   def print_bulk_kappa(self):
@@ -568,11 +552,11 @@ class Solver(object):
     comm.Allreduce([FLUXp,MPI.DOUBLE],[FLUX,MPI.DOUBLE],op=MPI.SUM)  
     
     
-    if argv.setdefault('verbose',True) and rank==0:
+    #if argv.setdefault('verbose',True) and rank==0:
 
-     print('  ')
-     print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(KAPPAp.sum())+ ' W/m/K')
-     print('  ')
+     #print('  ')
+     #print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(KAPPAp.sum())+ ' W/m/K')
+     #print('  ')
     
 
 
@@ -656,6 +640,8 @@ class Solver(object):
      print('Azimuthal angles:  ' + str(self.mat['n_theta']))
      print('Polar angles:      ' + str(self.mat['n_phi']))
      print('Mean-free-paths:   ' + str(self.mat['n_mfp']))
+     print('Bulk Thermal Conductivity:   ' + str(round(self.mat['kappa_bulk_tot'],4)) +' W/m/K')
+     print(' ')
      
     #Build data and perform superlu factorization---
     #lu_data = {'L':lu.L,'U':lu.U,'perm_c':lu.perm_c,'perm_r':lu.perm_r}

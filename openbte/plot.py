@@ -293,7 +293,6 @@ class Plot(object):
    (Lx,Ly) = self.geo.get_repeated_size(argv)
 
 
-   close()
    fig = figure(num=' ', figsize=(8*Lx/Ly, 4), dpi=80, facecolor='w', edgecolor='k')
    axes([0,0,0.5,1.0])
 
