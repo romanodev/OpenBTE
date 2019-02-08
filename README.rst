@@ -13,23 +13,17 @@ Community
 Installation $ Usage
 ====================
 
-
 Install `gmsh <http://gmsh.info/>`_
+
 .. code-block:: shell
 
-  pip install --upgrade openbte
+sudo wget http://geuz.org/gmsh/bin/Linux/gmsh-3.0.0-Linux64.tgz && \
+     tar -xzf gmsh-3.0.0-Linux64.tgz && \
+     cp gmsh-3.0.0-Linux/bin/gmsh /usr/bin/ && \
+     rm -rf gmsh-3.0.0-Linux && \
+     rm gmsh-3.0.0-Linux64.tgz
 
-  mkdir -p example_openbte && cd example_openbte
-
-  download_openbte_example
-
-  python example.py
-
-Quick Try
-=========
-
-.. image:: https://mybinder.org/badge.svg
-   :target: https://mybinder.org/v2/gh/romanodev/OpenBTE/master?filepath=notebooks%2FAlignedPores.ipynb
+pip install --upgrade openbte     
 
 Example
 =======
@@ -41,7 +35,7 @@ Example
  from openbte.solver import *
  from openbte.plot import *
 
- mat = Material(matfile='Si-300K.dat',n_mfp=10,n_theta=6,n_phi=32)
+ mat = Material(matfile='Si-300K.dat',n_mfp=100,n_theta=24,n_phi=32)
 
  geo = Geometry(type='porous/square_lattice',lx=10,ly=10,
                porosity = 0.25,
@@ -50,12 +44,8 @@ Example
 
  sol = Solver()
 
- Plot(variable='map/bte_flux/magnitude')
+ Plot(variable='map/flux',direction='x')
 
-Author
-======
-
-Giuseppe Romano (romanog@mit.edu)
 
 
 
