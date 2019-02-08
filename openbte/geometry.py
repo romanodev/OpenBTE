@@ -158,7 +158,6 @@ class Geometry(object):
     
         
     #dd.io.save('geometry.hdf5', data)
-    
     pickle.dump(data,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
     
  # MPI.COMM_WORLD.Barrier()
@@ -915,6 +914,7 @@ class Geometry(object):
 
   #Create mesh---
   subprocess.check_output(['gmsh','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
+  print('dd')
 
   #-------------
 

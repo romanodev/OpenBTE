@@ -324,7 +324,8 @@ class Solver(object):
     #Thermal conductivity   
     if rank==0:
       print('     ' + str(n_iter) + '     ' +  str(round(kappa,4)) + '     ' + str(error))
-      dd.io.save('solver.hdf5',{'temperature':TL[0],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk']})
+      dd.io.save('solver.hdf5',{'temperature':TL[0],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],\
+                                 'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa})
      
 
     #if n_iter ==  argv.setdefault('max_bte_iter',10)-1:

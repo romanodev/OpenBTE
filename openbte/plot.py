@@ -6,6 +6,7 @@ import numpy as np
 import deepdish as dd
 import os
 import matplotlib
+import matplotlib.pylab as plt
 import matplotlib.patches as patches
 from matplotlib.path import Path
 from .fig_maker import *
@@ -57,6 +58,9 @@ class Plot(object):
 
  def __init__(self,**argv):
 
+
+  self.solver = dd.io.load('solver.hdf5')
+
   if '/' in argv['variable']:
    model= argv['variable'].split('/')[0]
    if model == 'map':
@@ -64,8 +68,12 @@ class Plot(object):
    if model == 'line':
     self.plot_over_line(argv)
 
-  if argv['variable'] == 'suppression_function' :
-   self.plot_suppression_function(argv)
+  #if argv['variable'] == 'suppression_function' :
+  # self.plot_suppression_function(argv)
+
+  if argv['variable'] == 'SUP' :
+   self.SUP()
+
 
   if argv['variable'] == 'distribution' :
    self.plot_distribution(argv)
@@ -97,6 +105,17 @@ class Plot(object):
    vw.add_variable(solver['flux'],label = r'''BTE Thermal Flux [W/m/m]''')
    vw.write_vtk()
 
+
+ def SUP(self):
+
+    SUP = self.solver['SUP'] 
+    MFP = self.solver['MFP']
+
+    plt.plot(MFP,SUP)
+
+    plt.xscale('log')
+
+    plt.show()
 
 
  def plot_material(self,argv):

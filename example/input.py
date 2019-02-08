@@ -2,6 +2,7 @@ import openbte.material as material
 import openbte.solver as solver
 import openbte.geometry as geometry
 import openbte.plot as plot
+
 material.Material(matfile='Si-300K.dat',n_mfp=40,n_phi=24,n_theta=12)
 
 geometry.Geometry(type='porous/square_lattice',porosity=0.25,shape='square',lx=10,ly=10,lz=0,step=0.5)
