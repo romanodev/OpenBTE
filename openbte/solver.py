@@ -23,6 +23,7 @@ import time
 from numpy.testing import assert_array_equal
 import pickle
 import os
+import shutil
 
 def log_interp1d(xx, y, kind='linear'):
 
@@ -48,7 +49,15 @@ class Solver(object):
    self.verbose = argv.setdefault('verbose',True)
    self.n_elems = len(self.mesh.elems)
    self.cache = os.getcwd() + '/.cache'
-  
+ 
+   if MPI.COMM_WORLD.rank == 0:
+    if os.path.exists(self.cache):
+        shutil.rmtree(self.cache)
+    os.mkdir('.cache')
+
+   MPI.COMM_WORLD.Barrier() 
+    
+
    self.argv = argv
    self.multiscale = argv.setdefault('multiscale',False)
    tmp = dd.io.load('material.hdf5')
@@ -121,7 +130,7 @@ class Solver(object):
 
      if  index == self.last_index:
        A = self.A
-       HW_PLUS = self.HW_MINUS
+       HW_MINUS = self.HW_MINUS
        HW_PLUS = self.HW_PLUS
        K = self.K
        P = self.P

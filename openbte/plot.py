@@ -60,6 +60,8 @@ class Plot(object):
 
 
   self.solver = dd.io.load('solver.hdf5')
+  self.Nx = argv.setdefault('repeat_x',1)
+  self.Ny = argv.setdefault('repeat_y',1)
 
   if '/' in argv['variable']:
    model= argv['variable'].split('/')[0]
@@ -283,8 +285,11 @@ class Plot(object):
   solver = dd.io.load('solver.hdf5')
   argv.update({'Geometry':self.geo})
 
+
   vw = WriteVtk(argv)
   (triangulation,tmp,nodes) = vw.get_node_data(solver[variable])
+
+
 
   if argv['direction'] == 'x':
      data = np.array(tmp).T[0]
@@ -305,16 +310,14 @@ class Plot(object):
 
  def plot_map(self,argv):
 
-
   if MPI.COMM_WORLD.Get_rank() == 0:
 
    self.geo = Geometry(type='load')
    (Lx,Ly) = self.geo.get_repeated_size(argv)
 
-
-   fig = figure(num=' ', figsize=(8*Lx/Ly, 4), dpi=80, facecolor='w', edgecolor='k')
-   axes([0,0,0.5,1.0])
-
+   fig = figure(num=' ', figsize=(8*Lx/Ly, 8), dpi=80, facecolor='w', edgecolor='k')
+   #axes([0,0,0.5,1.0])
+   axes([0,0,1.0,1.0])
 
 
    #data += 1.0
@@ -328,22 +331,22 @@ class Plot(object):
    #colorbar(norm=mpl.colors.Normalize(vmin=min(data),vmax=max(data)))
 
     #Contour-----
-   if argv.setdefault('iso_values',False):
+   if argv.setdefault('iso_values',True):
     t = tricontour(triangulation,data,levels=np.linspace(vmin,vmax,10),colors='black',linewidths=1.5)
 
 
 
-   if argv.setdefault('streamlines',False) and (variable == 'fourier_flux' or variable == 'bte_flux' ):
+   if argv.setdefault('streamlines',False):# and (variable == 'fourier_flux' or variable == 'flux' ):
 
 
-       n_lines = argv.setdefault('n_lines',10)*Ny #assuming transport across x
-       xi = np.linspace(-Lx*0.5,Lx*0.5,300*Nx)
-       yi = np.linspace(-Ly*0.5,Ly*0.5,300*Ny)
+       n_lines = argv.setdefault('n_lines',10)*self.Ny #assuming transport across x
+       xi = np.linspace(-Lx*0.5,Lx*0.5,300*self.Nx)
+       yi = np.linspace(-Ly*0.5,Ly*0.5,300*self.Ny)
        x = np.array(nodes)[:,0]
        y = np.array(nodes)[:,1]
-       z = np.array(tmp).T[0]
+       z = np.array(data).T[0]
        Fx = griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
-       z = np.array(tmp).T[1]
+       z = np.array(data).T[1]
        Fy = griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
 
 
@@ -355,11 +358,12 @@ class Plot(object):
     pp = self.geo.get_interface_point_couples(argv)
 
 
-   axis('equal')
    axis('off')
    gca().invert_yaxis()
    xlim([-Lx*0.5,Lx*0.5])
    ylim([-Ly*0.5,Ly*0.5])
+   axis('equal')
+   show()
 
 
  def plot_suppression_function(self,argv):

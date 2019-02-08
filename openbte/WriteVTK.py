@@ -24,6 +24,7 @@ class WriteVtk(object):
 
  def cell_to_node(self,data):
 
+
    #n_nodes = len(self.mesh.nodes)
 
    #print(len(self.mesh.node_list['Interface']))
@@ -49,7 +50,6 @@ class WriteVtk(object):
 
      self.mesh.node_elem_map[node] = node_elem_map_1
      self.mesh.node_elem_map.update({len(self.mesh.nodes)-1:node_elem_map_2})
-
 
    #for node  in self.mesh.node_list['Interface']:
 #     print(len(self.mesh.node_elem_map[node]))
