@@ -203,10 +203,27 @@ class Solver(object):
      print('\033[1;32;40m   ---------------------------------------------------------------------------------------')
 
   
-   kappa_eff = []
-   error = 1.0
-   kappa_old = 0
-   n_iter = 0
+
+
+   if argv.setdefault('load_state',False):
+    if rank == 0:
+      print('Loading previous state')  
+    data  = dd.io.load('solver.hdf5')
+    TB = data['TB']
+    TL = data['TL']
+    kappa_eff = data['kappa']
+    n_iter = data['n_iter']
+    error = data['error']
+    kappa_old = kappa_eff[-1]
+   else:   
+    kappa_eff = []
+    kappa_old = 0
+    n_iter = 0
+    error = 1.0
+
+     
+
+
    while n_iter < argv.setdefault('max_bte_iter',10) and \
           error > argv.setdefault('max_bte_error',1e-2):
 
@@ -223,19 +240,19 @@ class Solver(object):
       TL = TL.copy()
       TB = TB.copy()
 
-    SDIFF_ave,SDIFF_avep = np.zeros((2,n_mfp))          
-    TDIFF,TDIFFp = np.zeros((2,n_mfp,self.n_elems))          
-    TDIFFGrad,TDIFFGradp = np.zeros((2,n_mfp,self.n_elems,3))          
-
-    block = self.mat['n_mfp'] // comm.size + 1
-    for kk in range(block):
-     n = rank*block + kk   
-     if n < n_mfp :
-      SDIFF_avep[n],TDIFFp[n],TDIFFGradp[n] = self.get_diffusive_suppression_function(kappa[n],G[n],TB[n],TL[n])
+    if n_iter == 0 or self.multiscale:
+     SDIFF_ave,SDIFF_avep = np.zeros((2,n_mfp))          
+     TDIFF,TDIFFp = np.zeros((2,n_mfp,self.n_elems))          
+     TDIFFGrad,TDIFFGradp = np.zeros((2,n_mfp,self.n_elems,3))          
+     block = self.mat['n_mfp'] // comm.size + 1
+     for kk in range(block):
+      n = rank*block + kk   
+      if n < n_mfp :
+       SDIFF_avep[n],TDIFFp[n],TDIFFGradp[n] = self.get_diffusive_suppression_function(kappa[n],G[n],TB[n],TL[n])
        
-    comm.Allreduce([SDIFF_avep,MPI.DOUBLE],[SDIFF_ave,MPI.DOUBLE],op=MPI.SUM)
-    comm.Allreduce([TDIFFp,MPI.DOUBLE],[TDIFF,MPI.DOUBLE],op=MPI.SUM)
-    comm.Allreduce([TDIFFGradp,MPI.DOUBLE],[TDIFFGrad,MPI.DOUBLE],op=MPI.SUM)
+     comm.Allreduce([SDIFF_avep,MPI.DOUBLE],[SDIFF_ave,MPI.DOUBLE],op=MPI.SUM)
+     comm.Allreduce([TDIFFp,MPI.DOUBLE],[TDIFF,MPI.DOUBLE],op=MPI.SUM)
+     comm.Allreduce([TDIFFGradp,MPI.DOUBLE],[TDIFFGrad,MPI.DOUBLE],op=MPI.SUM)
 
     if n_iter == 0: 
      TDIFFGrad=np.repeat(TDIFFGrad,self.mat['n_mfp'],axis = 0)
@@ -247,7 +264,7 @@ class Solver(object):
 
 
     #Print diffusive Kappa---------
-    if rank == 0:
+    if rank == 0 and self.multiscale :
      SUP_DIF = np.sum(np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],SDIFF_ave)(self.mat['trials'])),axis=1)   
      if n_iter==0:
        kappa = np.dot(SUP_DIF,self.mat['kappa_bulk'])
@@ -268,15 +285,18 @@ class Solver(object):
      index = rank*block + kk   
      if index < self.n_index  :
 
-      tbal,sbal,jbal= self.get_solving_data(index,self.mat['n_mfp']-1,TB,TL)
-      SDIFF = SDIFF_ave*pow(self.mat['control_angle'][index][self.mesh.direction],2)*3*self.mat['domega'][index]
-      if sbal > 0:
-       idx   = np.argwhere(np.diff(np.sign(SDIFF*self.mat['mfp'] - sbal*np.ones(self.mat['n_mfp'])))).flatten()
-      else: 
-       idx = [self.mat['n_mfp']-1]   
+      if self.multiscale:     
+       tbal,sbal,jbal= self.get_solving_data(index,self.mat['n_mfp']-1,TB,TL)
+       SDIFF = SDIFF_ave*pow(self.mat['control_angle'][index][self.mesh.direction],2)*3*self.mat['domega'][index]
+       if sbal > 0:
+        idx   = np.argwhere(np.diff(np.sign(SDIFF*self.mat['mfp'] - sbal*np.ones(self.mat['n_mfp'])))).flatten()
+       else: 
+        idx = [self.mat['n_mfp']-1]   
       
-      if len(idx) == 0:
-       idx = [self.mat['n_mfp']-1]  
+       if len(idx) == 0:
+        idx = [self.mat['n_mfp']-1]  
+      else:  
+        idx = [self.mat['n_mfp']-1]  
 
 
       nd = 0
@@ -291,9 +311,9 @@ class Solver(object):
         else: 
          t,s,j = self.get_solving_data(index,n,TB,TL)
 
-         error = abs((SDIFF[n]-s/self.mat['mfp'][n])/SDIFF[n])
-
-         if error<5e-2 and self.multiscale:
+         if self.multiscale:
+          error = abs((SDIFF[n]-s/self.mat['mfp'][n])/SDIFF[n])
+          if error<5e-2:
            fourier = True
            nd = n
         Tp[n]+= t; Jp[n] += j;  kernelp[n] += s
@@ -308,9 +328,10 @@ class Solver(object):
          s = sbal;t = tbal; j = jbal
        else:  
          t,s,j = self.get_solving_data(index,n,TB,TL)
-         if abs(s-sbal)/sbal < 1e-2 and self.multiscale: 
-          ballistic = True
-          nb = n
+         if self.multiscale:
+          if abs(s-sbal)/sbal < 1e-2: 
+           ballistic = True
+           nb = n
        Tp[n] += t; Jp[n] += j; kernelp[n] += s
     #   S[n] = s/self.mat['mfp'][n]
 
@@ -354,8 +375,8 @@ class Solver(object):
     #Thermal conductivity   
     if rank==0:
       print('\033[0;37;40m {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,error,diffusive,1-diffusive-ballistic,ballistic))
-      dd.io.save('solver.hdf5',{'temperature':TL[0],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],\
-              'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'MS':MS})
+      dd.io.save('solver.hdf5',{'TL':TL,'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error':error,\
+              'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'MS':MS,'TB':TB})
      
    if rank==0:
      print('\033[1;32;40m   ---------------------------------------------------------------------------------------')

@@ -1,0 +1,20 @@
+package:
+    name: openbte
+    version: 0.9.26 
+
+source:
+    fn: nlopt-2.4.2.tar.gz
+    url: http://ab-initio.mit.edu/nlopt/nlopt-2.4.2.tar.gz
+    md5: d0b8f139a4acf29b76dbae69ade8ac54
+
+requirements:
+    build:
+        - python
+        - numpy
+    run:
+        - python
+        - numpy
+
+test:
+    imports:
+        - openbte

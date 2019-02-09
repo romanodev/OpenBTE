@@ -3,7 +3,6 @@ Description
 
 Space-dependent Boltzmann transport equation solver for phonons
 
-
 Community
 =========
 
