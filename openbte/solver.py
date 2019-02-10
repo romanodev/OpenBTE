@@ -196,9 +196,6 @@ class Solver(object):
 
 
    if rank == 0:
-     #print('')
-     #print('Solving BTE... started')
-     #print('')
      print('    Iter    Thermal Conductivity [W/m/K]      Error        Diffusive  -  BTE  -  Ballistic')
      print('\033[1;32;40m   ---------------------------------------------------------------------------------------')
 
@@ -206,20 +203,27 @@ class Solver(object):
 
 
    if argv.setdefault('load_state',False):
-    if rank == 0:
-      print('Loading previous state')  
     data  = dd.io.load('solver.hdf5')
     TB = data['TB']
     TL = data['TL']
     kappa_eff = data['kappa']
     n_iter = data['n_iter']
-    error = data['error']
+    error_vec = data['error_vec']
+    error = error_vec[-1]
     kappa_old = kappa_eff[-1]
+    ms_vec = data['ms_vec']
+    if rank == 0:
+      for n in range(len(kappa_eff)):
+       print('\033[0;37;40m {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n,kappa_eff[n],error_vec[n],ms_vec[n][0],ms_vec[n][1],ms_vec[n][2]))
+      print('\033[1;31;40m   ---------------------------------------------------------------------------------------')
+
    else:   
     kappa_eff = []
     kappa_old = 0
     n_iter = 0
     error = 1.0
+    error_vec = [error]
+    ms_vec = [[1,0,0]]
 
      
 
@@ -355,6 +359,7 @@ class Solver(object):
     kappa = np.dot(self.mat['kappa_bulk'],SUP)
     kappa_eff.append(kappa)
     error = abs(kappa-kappa_old)/abs(kappa)
+    error_vec.append(error)
     kappa_old = kappa
 
     #Boundary temperature
@@ -370,13 +375,13 @@ class Solver(object):
     FLUX  = np.array([[np.sum(np.multiply(self.mat['J1'],log_interp1d(self.mat['mfp'],Flux.T[d,e])\
            (self.mat['trials'])))*self.mat['kappa_bulk_tot'] for d in range(3) ] for e in range(self.n_elems)])
 
-   
-
+    
+    ms_vec.append([diffusive,1-diffusive-ballistic,ballistic]) 
     #Thermal conductivity   
     if rank==0:
       print('\033[0;37;40m {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,error,diffusive,1-diffusive-ballistic,ballistic))
-      dd.io.save('solver.hdf5',{'TL':TL,'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error':error,\
-              'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'MS':MS,'TB':TB})
+      dd.io.save('solver.hdf5',{'TL':TL,'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error_vec':error_vec,'ms_vec':ms_vec,\
+              'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'TB':TB})
      
    if rank==0:
      print('\033[1;32;40m   ---------------------------------------------------------------------------------------')
