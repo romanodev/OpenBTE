@@ -169,7 +169,7 @@ class Porous(object):
   if not (isinstance(bulk, shapely.geometry.multipolygon.MultiPolygon)):
    bulk = [bulk]
 
-  #bulk_surface = []
+  
   for region in bulk:
    pp = list(region.exterior.coords)[:-1]
    self.create_lines_and_loop_from_points(pp,z)
