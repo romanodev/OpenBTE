@@ -21,14 +21,11 @@ import shapely
 
 
 def line_exists_ordered(l,lines):
-
  for n,line in enumerate(lines) :
   if (line[0] == l[0] and line[1] == l[1]) :
    return n
   if (line[0] == l[1] and line[1] == l[0]) :
    return -n
-
-
  return 0
 
 
@@ -192,15 +189,12 @@ def PolygonArea(corners):
     return area
 
 
-
-
 def already_included(all_points,new_point):
 
  for n,p in enumerate(all_points):
   d = np.linalg.norm(np.array(p)-np.array(new_point))
   if d < 1e-12:
    return n
-
  return -1
 
 
@@ -406,11 +400,9 @@ def mesh(polygons,frame,argv):
 
   #-------------------------
 
-  MP = MultiPolygon(polypores)
-
   #Create bulk surfacep
+  MP = MultiPolygon(polypores)
   bulk = Frame.difference(cascaded_union(MP))
-
   if not (isinstance(bulk, shapely.geometry.multipolygon.MultiPolygon)):
    bulk = [bulk]
 
@@ -419,8 +411,6 @@ def mesh(polygons,frame,argv):
   for region in bulk:
 
    pp = list(region.exterior.coords)[:-1]
-
-   
    line_list = create_line_list(pp,points,lines,store,mesh_ext)
 
    loops +=1

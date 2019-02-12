@@ -61,6 +61,50 @@ def rotate(l,n):
     return l[n:] + l[:n]
 
 
+def line_exists_ordered(l,lines):
+ for n,line in enumerate(lines) :
+  if (line[0] == l[0] and line[1] == l[1]) :
+   return n
+  if (line[0] == l[1] and line[1] == l[0]) :
+   return -n
+ return 0
+
+#def create_line_and_loop(pp,points):
+ 
+   
+
+
+def create_line_list(pp,points,lines,store,mesh_ext):
+
+   p_list = []
+   for p in pp:
+    tmp = already_included(points,p)
+    if tmp == -1:
+     points.append(p)
+     store.write( 'Point('+str(len(points)-1) +') = {' + str(p[0]) +','+ str(p[1])+',0,'+ str(mesh_ext) +'};\n')
+     p_list.append(len(points)-1)
+    else:
+     p_list.append(tmp)
+
+
+   line_list = []
+   for l in range(len(p_list)):
+    p1 = p_list[l]
+    p2 = p_list[(l+1)%len(p_list)]
+    if not p1 == p2:
+    #f 1 == 1:    
+     tmp = line_exists_ordered([p1,p2],lines)
+
+     if tmp == 0 : #craete line
+      lines.append([p1,p2])
+      store.write( 'Line('+str(len(lines)-1) +') = {' + str(p1) +','+ str(p2)+'};\n')
+      line_list.append(len(lines)-1)
+     else:
+      line_list.append(tmp)
+
+   
+   return line_list
+
 def GetSampleList(output_dir) :
    tmp =  glob.glob(output_dir + '/*.json')
    index = 0
@@ -148,6 +192,55 @@ def PolygonArea(corners):
     area = abs(area) / 2.0
     return area
 
+
+def already_included(all_points,new_point):
+
+ for n,p in enumerate(all_points):
+  d = np.linalg.norm(np.array(p)-np.array(new_point))
+  if d < 1e-12:
+   return n
+ return -1 
+
+
+def create_loop(loops,line_list,store):
+
+   #create external loop
+   strc = 'Line Loop(' + str(loops)+ ') = {'
+   for n in range(len(line_list)):
+    strc +=str(line_list[n])
+    if n == len(line_list)-1:
+     strc += '};\n'
+    else:
+     strc += ','
+   store.write(strc)
+
+   return strc
+
+def create_surface(ss,bulk_surface,store):
+
+
+  strc = '''Plane Surface(''' + str(bulk_surface) + ')= {'
+  for n,s in enumerate(ss):
+   strc += str(s)
+   if n == len(ss)-1:
+     strc += '};\n'
+   else:
+     strc += ','
+  store.write(strc)
+
+
+def create_phsycal_surface(name,bulk_surface,store):
+
+  strc = r'''Physical Surface(''' + name + ''') = {'''
+  for n,s in enumerate(bulk_surface):
+   strc += str(s)
+   if n == len(bulk_surface)-1:
+     strc += '};\n'
+   else:
+     strc += ','
+  store.write(strc)
+
+
 def mesh(polygons,frame,argv):
 
   mesh_ext = argv['step']
@@ -160,26 +253,58 @@ def mesh(polygons,frame,argv):
   Frame = Polygon(frame)
 
   store = open('mesh.geo', 'w+')
-  #CREATE BULK SURFACE------------------------------------
-  c = pyclipper.Pyclipper()
-  c.AddPath(scale_to_clipper(frame), pyclipper.PT_SUBJECT,True) 
-  c.AddPaths(scale_to_clipper(polygons),pyclipper.PT_CLIP,True) 
-  solution = scale_from_clipper(c.Execute(pyclipper.CT_DIFFERENCE,pyclipper.PFT_EVENODD,pyclipper.PFT_EVENODD))
 
-  #polypores = []
-  #for poly in polygons:
-  # thin = Polygon(poly).intersection(Frame)
-  # if isinstance(thin, shapely.geometry.multipolygon.MultiPolygon):
-  #   tmp = list(thin)
-  #   for t in tmp:
-  #    polypores.append(t)
-  # else:
-  #  polypores.append(thin)
+  points = []
+  lines = []
+  loops = 0
+  ss = 0
+  polypores = []
+  for poly in polygons:
+   thin = Polygon(poly).intersection(Frame)
+   if isinstance(thin, shapely.geometry.multipolygon.MultiPolygon):
+     tmp = list(thin)
+     for t in tmp:
+      polypores.append(t)
+   else:
+    polypores.append(thin)
+  MP = MultiPolygon(polypores)
+  bulk = Frame.difference(cascaded_union(MP))
+  if not (isinstance(bulk, shapely.geometry.multipolygon.MultiPolygon)):
+   bulk = [bulk]
 
-  #MP = MultiPolygon(polypores)
-  #bulk = Frame.difference(cascaded_union(MP))
-  #if not (isinstance(bulk, shapely.geometry.multipolygon.MultiPolygon)):
-  # bulk = [bulk]
+  bulk_surface = []
+  inclusions = []
+  for region in bulk:
+   pp = list(region.exterior.coords)[:-1]
+   line_list,loop = create_line_and_loop(pp)
+
+
+
+   line_list = create_line_list(pp,points,lines,store,mesh_ext)
+   loops +=1
+   local_loops = [loops]
+   create_loop(loops,line_list,store)
+   #Create internal loops-------------
+   for interior in region.interiors:
+    pp = list(interior.coords)[:-1]
+    line_list = create_line_list(pp,points,lines,store,mesh_ext)
+    loops +=1
+    local_loops.append(loops)
+    create_loop(loops,line_list,store)
+   #---------------------------------
+   ss +=1
+   bulk_surface.append(ss)
+   create_surface(local_loops,ss,store)
+
+  create_phsycal_surface('Matrix',bulk_surface,store)
+
+  store.close()
+
+  quit()
+
+
+
+
 
 
   ng = len(solution)

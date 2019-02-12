@@ -1,0 +1,74 @@
+{% set name = "openbte" %}
+{% set version = "0.9.28" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
+  sha256: 123dddb8efd8ef3e243a710f04b48a77ae7c22de715237a304334284a8f2e2fa
+
+build:
+  number: 0
+  entry_points:
+    - openbte=openbte.__main__:main
+    - shengbte2openbte=openbte.shengbte2openbte:main
+  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vvv "
+
+requirements:
+  host:
+    - alabaster
+    - deepdish
+    - future
+    - grin
+    - matplotlib
+    - mpi4py
+    - networkx
+    - numpy
+    - pip
+    - python
+    - pyvtk
+    - scipy
+    - shapely
+    - sparse
+    - termcolor
+    - twisted
+    - unittest2
+  run:
+    - alabaster
+    - deepdish
+    - future
+    - grin
+    - matplotlib
+    - mpi4py
+    - networkx
+    - numpy
+    - python
+    - pyvtk
+    - scipy
+    - shapely
+    - sparse
+    - termcolor
+    - twisted
+    - unittest2
+
+test:
+  imports:
+    - openbte
+  commands:
+    - openbte --help
+    - shengbte2openbte --help
+
+about:
+  home: The package home page
+  license: GPLv2
+  license_family: GPL2
+  license_file: 
+  summary: Boltzmann Transport Equation for Phonons
+  doc_url: 
+  dev_url: 
+
+extra:
+  recipe-maintainers:
+    - your-github-id-here

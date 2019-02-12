@@ -15,6 +15,7 @@ from . import GenerateMesh2D
 from . import GenerateMesh3D
 from . import GenerateBulk2D
 from . import GenerateBulk3D
+from . import porous
 import matplotlib.patches as patches
 from .fig_maker import *
 from matplotlib.path import Path
@@ -130,7 +131,12 @@ class Geometry(object):
     
     argv.update({'lz':self.Lz})
     if len(self.polygons) > 0 and self.dim == 3:
-     GenerateMesh3D.mesh(self.polygons,self.frame,argv)
+     #GenerateMesh3D.mesh(self.polygons,self.frame,argv)
+     #GenerateMesh3DNew.mesh(self.polygons,self.frame,argv)
+     argv['polygons'] = self.polygons
+     argv['frame'] = self.frame
+     porous.Porous(**argv)
+
     if len(self.polygons) > 0 and self.dim == 2:
      GenerateMesh2D.mesh(self.polygons,self.frame,argv)
     if len(self.polygons) == 0 and self.dim == 2:

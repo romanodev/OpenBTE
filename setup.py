@@ -1,9 +1,8 @@
 from setuptools import setup,find_packages
 import os
 
-
 setup(name='openbte',
-      version='0.9.26',
+      version='0.9.28',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',
@@ -21,7 +20,6 @@ setup(name='openbte',
                         'termcolor',
                         'future',
                         'alabaster',
-                        'pyclipper',
                         'deepdish',
                         'mpi4py',
                         'networkx',
@@ -33,7 +31,6 @@ setup(name='openbte',
       #packages = find_packages(exclude=['openbte_new']),
       entry_points = {
      'console_scripts': [
-      'openbte=openbte.__main__:main','shengbte2openbte=openbte.shengbte2openbte:main',
-      'download_openbte_example=openbte.download_openbte_example:main'],
+      'openbte=openbte.__main__:main','shengbte2openbte=openbte.shengbte2openbte:main'],
       },
       zip_safe=False)
