@@ -1,5 +1,5 @@
 {% set name = "openbte" %}
-{% set version = "0.9.28" %}
+{% set version = "0.9.30" %}
 
 package:
   name: "{{ name|lower }}"
@@ -7,7 +7,7 @@ package:
 
 source:
   url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
-  sha256: 123dddb8efd8ef3e243a710f04b48a77ae7c22de715237a304334284a8f2e2fa
+  sha256: c4c4324d88d076d4d841f402fa270f8770b25c82b84218463dce3f71e222a9d5
 
 build:
   number: 0
@@ -22,6 +22,7 @@ requirements:
     - deepdish
     - future
     - grin
+    - ipython
     - matplotlib
     - mpi4py
     - networkx
@@ -40,6 +41,7 @@ requirements:
     - deepdish
     - future
     - grin
+    - ipython
     - matplotlib
     - mpi4py
     - networkx
@@ -71,4 +73,4 @@ about:
 
 extra:
   recipe-maintainers:
-    - your-github-id-here
+    - romanodev
