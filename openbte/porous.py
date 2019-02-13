@@ -29,7 +29,6 @@ class Porous(object):
   
   self.write_geo()
 
-  quit()
 
 
  #def get_surface_normal(self,ss):
@@ -113,7 +112,7 @@ class Porous(object):
      
      
  def apply_periodic_mesh(self):
-     
+     self.argv.setdefault('Periodic',[True,True,False])
      #Find periodic surfaces----
      self.periodic = {}
      for s1 in range(len(self.surfaces)):
@@ -129,21 +128,21 @@ class Porous(object):
             for n2,p2 in zip(ind2,pts2):
              if np.linalg.norm(p1-p2-per) < 1e-3:
                 corr[n1] = n2
-                break
-            
+                break            
            #-----------------------------------------
            loop_1 = self.loops[self.surfaces[s1][0]] 
            loop_2 = []
            for ll in loop_1 :
              pts = self.lines[abs(ll)-1]
              if ll > 0:
-               p1 = pts[0]; p2 = pts[1] 
+              p1 = pts[0]; p2 = pts[1] 
              else:
-               p2 = pts[1]; p1 = pts[0]   
-               
-             loop_2.append(self.line_exists_ordered(corr[p1],corr[p2]))
-             
-           self.periodic[s1] = [s2,loop_1,loop_2]  
+              p1 = pts[1]; p2 = pts[0]   
+             loop_2.append(self.line_exists_ordered(corr[p1],corr[p2]))             
+           self.periodic[s1] = [s2,loop_1,loop_2,np.array(per/np.linalg.norm(per))]  
+           
+          
+           
            break  
      
       
@@ -222,15 +221,22 @@ class Porous(object):
     store.write(strc)
     
 
+   boundary = list(range(len(self.surfaces)))
    #Apply periodicity
+   vec = {}
    for key, value in self.periodic.items():
-     store.write('Periodic Surface ' + str(key) + ' {') 
+      
+     boundary.remove(key)  
+     boundary.remove(value[0])  
+
+     
+     store.write('Periodic Surface ' + str(key+nl+nll) + ' {') 
      
      for n,k in enumerate(value[1]):
       store.write(str(k))
       if n < len(value[1])-1:
        store.write(',')
-     store.write('} = ' + str(value[0]) + ' {')
+     store.write('} = ' + str(value[0]+nl+nll) + ' {')
      
      for n,k in enumerate(value[2]):
       store.write(str(k))
@@ -238,6 +244,52 @@ class Porous(object):
        store.write(',')
      store.write('};\n')
     
+
+     value[0] += nl+nll
+     tt = key +  nl + nll
+     if np.array_equal(np.array([1,0,0]),value[3]) : 
+        vec.setdefault(1,[]).append(value[0]) 
+        vec.setdefault(2,[]).append(tt) 
+     
+     if np.array_equal(np.array([-1,0,0]),value[3]): 
+        vec.setdefault(1,[]).append(tt) 
+        vec.setdefault(2,[]).append(value) 
+        
+     if np.array_equal(np.array([0,1,0]),value[3]) : 
+        vec.setdefault(3,[]).append(value[0]) 
+        vec.setdefault(4,[]).append(tt)
+        
+     if np.array_equal(np.array([0,-1,0]),value[3]) : 
+        vec.setdefault(4,[]).append(value[0]) 
+        vec.setdefault(3,[]).append(tt)
+        
+     if np.array_equal(np.array([0,0,1]),value[3]) : 
+        vec.setdefault(5,[]).append(value[0]) 
+        vec.setdefault(6,[]).append(tt)   
+        
+     if np.array_equal(np.array([0,0,-1]),value[3]) : 
+        vec.setdefault(6,[]).append(value[0]) 
+        vec.setdefault(5,[]).append(tt) 
+        
+   for key, value in vec.items():
+    
+     strc = r'''Physical Surface("Periodic_''' + str(key) + '''") = {'''
+     for n,p in enumerate(value) :
+      strc +=str(p)
+      if n == len(value)-1:
+       strc += '};\n'
+      else :
+       strc += ','
+     store.write(strc)
+         
+   strc = r'''Physical Surface("Boundary") = {'''
+   for n,p in enumerate(boundary) :
+      strc +=str(p+nl+nll)
+      if n == len(boundary)-1:
+       strc += '};\n'
+      else :
+       strc += ','
+   store.write(strc)
     
     
    if len(self.surfaces) > 0:

@@ -12,7 +12,6 @@ from .GenerateCustomPores import *
 #from GenerateRandomPores import *
 from .GenerateRandomPoresOverlap import *
 from . import GenerateMesh2D
-from . import GenerateMesh3D
 from . import GenerateBulk2D
 from . import GenerateBulk3D
 from . import porous
@@ -132,7 +131,6 @@ class Geometry(object):
     argv.update({'lz':self.Lz})
     if len(self.polygons) > 0 and self.dim == 3:
      #GenerateMesh3D.mesh(self.polygons,self.frame,argv)
-     #GenerateMesh3DNew.mesh(self.polygons,self.frame,argv)
      argv['polygons'] = self.polygons
      argv['frame'] = self.frame
      porous.Porous(**argv)
@@ -183,7 +181,6 @@ class Geometry(object):
    Ny = argv.setdefault('repeat_y',1)
 
 
-   pp = []
    for ll in self.side_list['Interface']:
     p1 = self.nodes[self.sides[ll][0]][:2]
     p2 = self.nodes[self.sides[ll][1]][:2]
