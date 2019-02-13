@@ -17,14 +17,140 @@ class Porous(object):
   self.argv = argv
  
     
-  self.common(z=-1)
-  self.common(z=1)
+  self.common(z=-self.argv['lz']/2)
+  self.common(z=self.argv['lz']/2)
   self.merge() 
+  self.points = np.array(self.points)
+  self.lines = np.array(self.lines)
+  self.loops = np.array(self.loops)
+
+  
+  self.apply_periodic_mesh()
   
   self.write_geo()
 
   quit()
 
+
+ #def get_surface_normal(self,ss):
+     
+  # s = self.surfaces[ss][0]  
+   #p1 = self.points[self.lines[self.loops[s,0]]]
+  # p1 = self.points[self.lines[abs(self.loops[s,0])-1]]
+  # p2 = self.points[self.lines[abs(self.loops[s,1])-1]]
+  # normal = np.cross(p1[1]-p1[0],p2[1]-p2[0])
+  # normal /= np.linalg.norm(normal)
+   #if ss==2:
+   #    print(normal)
+   #    print(p1)
+  # return normal
+     
+ def get_surface_centroid(self,ss):
+     
+  
+   s = self.surfaces[ss][0]  
+    
+   pts = []
+   for n in self.loops[s]:
+    if n > 0:
+        i = 0
+    else:
+        i = 1
+    pts.append(self.points[self.lines[abs(n)-1][i]])
+   pts = np.array(pts) 
+    
+   
+   
+   return np.mean(pts,axis=0)
+   
+     
+
+ def isperiodic(self,s1,s2):
+
+   #n = self.get_surface_normal(s1)
+   #n2 = self.get_surface_normal(s2)
+   c1 = self.get_surface_centroid(s1)
+   c2 = self.get_surface_centroid(s2)
+   
+   
+   
+   if abs(np.linalg.norm(c1-c2) - self.argv['lx'])<1e-4 and \
+      np.linalg.norm(np.cross(c1-c2,[1,0,0])) < 1e-4: 
+      return 0,c1-c2
+   
+
+   if abs(np.linalg.norm(c1-c2) - self.argv['ly'])<1e-4 and \
+      np.linalg.norm(np.cross(c1-c2,[0,1,0])) < 1e-4: 
+      return 1,c1-c2
+   
+   if abs(np.linalg.norm(c1-c2) - self.argv['lz'])<1e-4 and \
+      np.linalg.norm(np.cross(c1-c2,[0,0,1])) < 1e-4: 
+      return 2,c1-c2
+   
+  
+    
+   return None,None
+   
+ 
+   
+    
+ def get_points_from_surface(self,s1):
+      
+   ll = self.surfaces[s1][0]
+   pts = []
+   ind = []
+   for n in self.loops[ll]:
+    if n > 0:
+        i = 0
+    else:
+        i = 1
+    pts.append(self.points[self.lines[abs(n)-1][i]])
+    
+    ind.append(self.lines[abs(n)-1][i])
+
+
+   return np.array(pts),ind
+     
+     
+ def apply_periodic_mesh(self):
+     
+     #Find periodic surfaces----
+     self.periodic = {}
+     for s1 in range(len(self.surfaces)):
+      for s2 in range(s1+1,len(self.surfaces)):
+         (a,per) = self.isperiodic(s1,s2)
+         if not a == None and self.argv['Periodic'][a]:
+          
+           corr = {}
+           pts1,ind1 = self.get_points_from_surface(s1)
+           pts2,ind2 = self.get_points_from_surface(s2)
+          
+           for n1,p1 in zip(ind1,pts1):
+            for n2,p2 in zip(ind2,pts2):
+             if np.linalg.norm(p1-p2-per) < 1e-3:
+                corr[n1] = n2
+                break
+            
+           #-----------------------------------------
+           loop_1 = self.loops[self.surfaces[s1][0]] 
+           loop_2 = []
+           for ll in loop_1 :
+             pts = self.lines[abs(ll)-1]
+             if ll > 0:
+               p1 = pts[0]; p2 = pts[1] 
+             else:
+               p2 = pts[1]; p1 = pts[0]   
+               
+             loop_2.append(self.line_exists_ordered(corr[p1],corr[p2]))
+             
+           self.periodic[s1] = [s2,loop_1,loop_2]  
+           break  
+     
+      
+        
+        
+
+       
 
  def merge(self):
 
@@ -47,16 +173,20 @@ class Porous(object):
      tmp.append(self.line_exists_ordered(i2,j2))   
      tmp.append(self.line_exists_ordered(j2,j1))
      tmp.append(self.line_exists_ordered(j1,i1))
-     
+  
+         
      self.loops.append(tmp)
+     self.surfaces.append([len(self.loops)-1])
      
  
  
-
+ #def apply_periodic_mesh(self):
 
  def write_geo(self):
-     
+
+   
    store = open('mesh.geo', 'w+')
+
    
    #Write points-----
    for p,point in enumerate(self.points):
@@ -67,7 +197,7 @@ class Porous(object):
      store.write( 'Line('+str(l+1) +') = {' + str(line[0]) +','+ str(line[1])+'};\n')
       
    #Write loops------
-   nl = len(self.lines)
+   nl = len(self.lines)+1
    for ll,loop in enumerate(self.loops):  
     strc = 'Line Loop(' + str(ll+nl)+ ') = {'
     for n,l in enumerate(loop):
@@ -78,37 +208,65 @@ class Porous(object):
       strc += ','
     store.write(strc)
    
-    #Write surface------
-    #strc = '''Plane Surface(''' +str(nl) + ''')= {'''
+   
+   #Write surface------
+   nll = len(self.loops)
+   for s,surface in enumerate(self.surfaces):
+    strc = '''Plane Surface(''' +str(s+nll+nl) + ''')= {''' 
+    for n,ll in enumerate(surface):
+      strc += str(ll+nl)  
+      if n == len(surface)-1:
+       strc += '};\n'
+      else:
+       strc += ','    
+    store.write(strc)
     
-    #if s == len(self.loops)-1:
-    # strc += '};\n'
-    #else:
-    # strc += ','
-   #store.write(strc)
-   
-   #------------------
-  strc = r'''Surface Loop(''' + str(ss) + ') = {'
-  for n,p in enumerate(surfaces) :
-   strc +=str(p)
-   if n == len(surfaces)-1:
-    strc += '};\n'
-   else :
-    strc += ','
-  store.write(strc)
-   
-   
-   
-  store.close()
+
+   #Apply periodicity
+   for key, value in self.periodic.items():
+     store.write('Periodic Surface ' + str(key) + ' {') 
+     
+     for n,k in enumerate(value[1]):
+      store.write(str(k))
+      if n < len(value[1])-1:
+       store.write(',')
+     store.write('} = ' + str(value[0]) + ' {')
+     
+     for n,k in enumerate(value[2]):
+      store.write(str(k))
+      if n < len(value[2])-1:
+       store.write(',')
+     store.write('};\n')
+    
+    
+    
+   if len(self.surfaces) > 0:
+    #------------------
+    ss  = len(self.surfaces)
+    strc = r'''Surface Loop(''' + str(ss+nll+nl) + ') = {'
+    for s in range(len(self.surfaces)) :
+     strc +=str(s+nl+nll)
+     if s == len(self.surfaces)-1:
+      strc += '};\n'
+     else :
+      strc += ','
+    store.write(strc)
+    
+    strc = r'''Volume(0) = {''' + str(ss+nll+nl) + '};\n'
+    store.write(strc)
+    strc = r'''Physical Volume('Bulk') = {0};'''
+    store.write(strc) 
+
+   store.close()
 
  def line_exists_ordered(self,p1,p2):
      
   l = [p1,p2]   
   for n,line in enumerate(self.lines) :
    if (line[0] == l[0] and line[1] == l[1]) :
-    return n
+    return n+1
    if (line[0] == l[1] and line[1] == l[0]) :
-    return -n
+    return -(n+1)
   return 0
 
  def already_included(self,p):
@@ -170,15 +328,20 @@ class Porous(object):
    bulk = [bulk]
 
   
+  loop_start = len(self.loops)  
   for region in bulk:
    pp = list(region.exterior.coords)[:-1]
    self.create_lines_and_loop_from_points(pp,z)
-  
+   
+    
    #From pores 
    for interior in region.interiors:
     pp = list(interior.coords)[:-1]
     self.create_lines_and_loop_from_points(pp,z)
-    
+  loop_end = len(self.loops)  
+  
+  self.surfaces.append(range(loop_start,loop_end))
+
     
 
 

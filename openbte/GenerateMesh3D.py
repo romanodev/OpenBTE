@@ -5,8 +5,8 @@ import numpy as np
 import random
 import math
 from matplotlib.pylab import *
-#import pyclipper
-#from pyclipper import *
+import pyclipper
+from pyclipper import *
 import subprocess
 from shapely.ops import cascaded_union
 from shapely.geometry import Point,LineString
