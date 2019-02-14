@@ -27,15 +27,18 @@ import shutil
 
 def log_interp1d(xx, y, kind='linear'):
 
-
-     yy = y.copy()
-     scale = min(yy)
-     yy -= min(yy)
-     yy+= 1e-12
-     logx = np.log10(xx)
-     logy = np.log10(yy)
-     lin_interp = interpolate.interp1d(logx,logy,kind=kind,fill_value='extrapolate')
-     log_interp = lambda zz: np.power(10.0, lin_interp(np.log10(zz)))  +scale -1e-12
+     if len(y) > 1:
+      yy = y.copy()
+      scale = min(yy)
+      yy -= min(yy)
+      yy+= 1e-12
+      logx = np.log10(xx)
+      logy = np.log10(yy)
+      lin_interp = interpolate.interp1d(logx,logy,kind=kind,fill_value='extrapolate')
+      log_interp = lambda zz: np.power(10.0, lin_interp(np.log10(zz)))  +scale -1e-12
+     else:
+      log_interp = lambda zz: y[0]
+     
      return log_interp
 
 
@@ -356,6 +359,8 @@ class Solver(object):
 
     #Suppression function   
     SUP = np.sum(np.multiply(self.mat['J3'],log_interp1d(self.mat['mfp'],kernel.clip(min=1e-13))(self.mat['trials'])),axis=1)
+    print(SUP)
+    quit()
     kappa = np.dot(self.mat['kappa_bulk'],SUP)
     kappa_eff.append(kappa)
     error = abs(kappa-kappa_old)/abs(kappa)
@@ -380,7 +385,7 @@ class Solver(object):
     #Thermal conductivity   
     if rank==0:
       print('\033[0;37;40m {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,error,diffusive,1-diffusive-ballistic,ballistic))
-      dd.io.save('solver.hdf5',{'TL':TL,'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error_vec':error_vec,'ms_vec':ms_vec,\
+      dd.io.save('solver.hdf5',{'TL':TL,'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error_vec':error_vec,'ms_vec':ms_vec,'temperature':TL[0],\
               'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'TB':TB})
      
    if rank==0:

@@ -131,7 +131,7 @@ class WriteVtk(object):
 
  def get_node_data(self,variable):
 
-
+ 
     node_data = self.cell_to_node(variable)
     is_scalar = len(list(np.shape(variable))) == 1
     increment = [0,0,0]

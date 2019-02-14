@@ -103,7 +103,7 @@ class Plot(object):
    #vw.add_variable(solver['fourier_temperature'],label = 'Fourier Temperature [K]')
    #vw.add_variable(solver['fourier_flux'],label = r'''Thermal Flux [W/m/m]''')
 
-   vw.add_variable(solver['TL'][0],label = r'''BTE Temperature [K]''')
+   vw.add_variable(solver['temperature'],label = r'''BTE Temperature [K]''')
    vw.add_variable(solver['flux'],label = r'''BTE Thermal Flux [W/m/m]''')
    vw.write_vtk()
 
@@ -284,7 +284,6 @@ class Plot(object):
   variable = argv['variable'].split('/')[1]
   solver = dd.io.load('solver.hdf5')
   argv.update({'Geometry':self.geo})
-
 
   vw = WriteVtk(argv)
   (triangulation,tmp,nodes) = vw.get_node_data(solver[variable])
