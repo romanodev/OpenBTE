@@ -59,38 +59,39 @@ class Plot(object):
  def __init__(self,**argv):
 
 
-  self.solver = dd.io.load('solver.hdf5')
-  self.Nx = argv.setdefault('repeat_x',1)
-  self.Ny = argv.setdefault('repeat_y',1)
+  if MPI.COMM_WORLD.Get_rank() == 0:
+   self.solver = dd.io.load('solver.hdf5')
+   self.Nx = argv.setdefault('repeat_x',1)
+   self.Ny = argv.setdefault('repeat_y',1)
 
-  if '/' in argv['variable']:
-   model= argv['variable'].split('/')[0]
-   if model == 'map':
-    self.plot_map(argv)
-   if model == 'line':
-    self.plot_over_line(argv)
+   if '/' in argv['variable']:
+    model= argv['variable'].split('/')[0]
+    if model == 'map':
+     self.plot_map(argv)
+    if model == 'line':
+     self.plot_over_line(argv)
 
-  #if argv['variable'] == 'suppression_function' :
-  # self.plot_suppression_function(argv)
+   #if argv['variable'] == 'suppression_function' :
+   # self.plot_suppression_function(argv)
 
-  if argv['variable'] == 'SUP' :
-   self.SUP()
-
-
-  if argv['variable'] == 'distribution' :
-   self.plot_distribution(argv)
-
-  if argv['variable'] == 'vtk' :
-   self.save_vtk(argv)
+   if argv['variable'] == 'SUP' :
+    self.SUP()
 
 
-  if argv['variable'] == 'kappa_bte' :
-   solver = dd.io.load('state.hdf5')
-   kappa_bte = solver['kappa_bte']
-   if argv.setdefault('save',True) :
-    f = open('kappa_bte.dat','w+')
-    f.write(str(kappa_bte))
-    f.close()
+   if argv['variable'] == 'distribution' :
+    self.plot_distribution(argv)
+
+   if argv['variable'] == 'vtk' :
+    self.save_vtk(argv)
+
+
+   if argv['variable'] == 'kappa_bte' :
+    solver = dd.io.load('state.hdf5')
+    kappa_bte = solver['kappa_bte']
+    if argv.setdefault('save',True) :
+     f = open('kappa_bte.dat','w+')
+     f.write(str(kappa_bte))
+     f.close()
 
  def save_vtk(self,argv):
   #if MPI.COMM_WORLD.Get_rank() == 0:
@@ -309,7 +310,6 @@ class Plot(object):
 
  def plot_map(self,argv):
 
-  if MPI.COMM_WORLD.Get_rank() == 0:
 
    self.geo = Geometry(type='load')
    (Lx,Ly) = self.geo.get_repeated_size(argv)

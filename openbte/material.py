@@ -49,31 +49,26 @@ class Material(object):
    
    #Import material
    if argv.setdefault('model','nongray')=='nonfray':
-
     tmp = np.loadtxt(os.path.dirname(__file__) + '/materials/'+ argv['matfile'])
-    mfp_bulk = tmp[:,0]*1e9; n_mfp_bulk = len(mfp_bulk) #in nm
-    mfp = np.logspace(-3,np.log10(max(mfp_bulk)),argv.setdefault('n_mfp',100)) 
+    mfp_bulk = tmp[:,0]*1e9; 
     kappa_bulk = tmp[:,1]
    else:
-    mfp_bulk = np.array(argv['mfp']); n_mfp_bulk = len(mfp_bulk) #in nm  
-    mfp = mfp_bulk
-    kappa_bulk = argv.setdefault('kappa_bulk',np.ones(len(mfp)))
+    mfp_bulk = np.array(argv['mfp']); 
+    kappa_bulk = argv.setdefault('kappa_bulk',np.ones(len(mfp_bulk)))
 
-
+   n_mfp_bulk = len(mfp_bulk) 
+   mfp = np.logspace(-3,np.log10(max(mfp_bulk)),argv.setdefault('n_mfp',100)) 
    trials = np.outer(mfp_bulk,ftheta*np.sin(theta))
    J0 = np.outer(np.ones(n_mfp_bulk),dtheta)
    J1 = np.outer(kappa_bulk/mfp_bulk,ftheta*dtheta*np.sin(theta))/sum(kappa_bulk/mfp_bulk)   
    J2 = np.outer(kappa_bulk/pow(mfp_bulk,2),dtheta)/sum(kappa_bulk/pow(mfp_bulk,2))   #x2 (symmetry) and /2 (average)
    J3 = np.outer(1/mfp_bulk,ftheta*dtheta*np.sin(theta))
 
-
    G = mfp/2
    kappa_mfe = np.square(mfp)/2
 
    domega = np.ones(n_phi)*Dphi/2.0/np.pi
  
-
-   
    data = {'kappa_bulk_tot':sum(kappa_bulk),'kappa_bulk':kappa_bulk,\
                 'mfp_bulk':mfp_bulk,\
                 'fphi':fphi,\
@@ -123,36 +118,25 @@ class Material(object):
     #---------------------------------------------------------------
     control_angle = direction_ave.reshape((n_phi*n_theta,3))
 
-    #dire_ave_index_2 = []
-    #n = 0
-    #for t in range(n_theta):
-    # for p in range(n_phi):
-    #    dire_ave_index_2.append(direction_ave[t][p])
-    #    print(dire_ave_index[n])
-    #    print(direction_ave[t][p])
-    #    print(" ")
-    #    n +=1
     
-    #quit()
-    #dire_ave_index = np.array(dire_ave_index_2)
-    # print(np.shape(dire_ave_index))
-
-    #quit()     
-
     #Import material
-    tmp = np.loadtxt(os.path.dirname(__file__) + '/materials/'+ argv['matfile'])
-    mfp_bulk = tmp[:,0]*1e9; n_mfp_bulk = len(mfp_bulk)
-    trials = mfp_bulk
+    if argv.setdefault('model','nongray')=='nonfray':
+     tmp = np.loadtxt(os.path.dirname(__file__) + '/materials/'+ argv['matfile'])
+     mfp_bulk = tmp[:,0]*1e9; n_mfp_bulk = len(mfp_bulk)
+     kappa_bulk = tmp[:,1]
+    else: 
+     mfp_bulk = np.array(argv['mfp']); 
+     kappa_bulk = argv.setdefault('kappa_bulk',np.ones(len(mfp_bulk)))
 
-    kappa_bulk = tmp[:,1]
-    mfp = np.logspace(-3,np.log10(max(mfp_bulk)),argv.setdefault('n_mfp',100))
-   
+    n_mfp_bulk = len(mfp_bulk)
     J0 = np.ones(n_mfp_bulk)
     J1 = kappa_bulk/mfp_bulk/sum(kappa_bulk/mfp_bulk)   
     J2 = kappa_bulk/pow(mfp_bulk,2)/sum(kappa_bulk/pow(mfp_bulk,2))   
     J3 = 1/mfp_bulk
 
     
+    mfp = np.logspace(-3,np.log10(max(mfp_bulk)),argv.setdefault('n_mfp',100))
+    trials = mfp_bulk
     J0 = np.array([J0]).T
     J1 = np.array([J1]).T
     J2 = np.array([J2]).T

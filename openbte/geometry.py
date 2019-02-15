@@ -9,8 +9,8 @@ from .GenerateSquareLatticePores import *
 from .GenerateHexagonalLatticePores import *
 from .GenerateStaggeredLatticePores import *
 from .GenerateCustomPores import *
-#from GenerateRandomPores import *
 from .GenerateRandomPoresOverlap import *
+from .GenerateRandomPoresGrid import *
 from . import GenerateMesh2D
 from . import GenerateBulk2D
 from . import GenerateBulk3D
@@ -24,11 +24,6 @@ import shapely
 import pickle
 import sparse
 
-CSS = """
-   .output {
-       align-items: center;
-    }
-    """
 #import GenerateInterface2D
 #from nanowire import *
 import deepdish as dd
@@ -67,7 +62,7 @@ class Geometry(object):
   if geo_type == 'load':
   # if MPI.COMM_WORLD.Get_rank() == 0:
     self.state = pickle.load(open('geometry.p','rb'))
-    
+      
     self._update_data()
 
   else:
@@ -79,6 +74,7 @@ class Geometry(object):
     if  geo_type == 'porous/square_lattice' or\
         geo_type == 'porous/hexagonal_lattice' or\
         geo_type == 'porous/staggered_lattice' or\
+        geo_type == 'porous/random_over_grid' or\
         geo_type == 'porous/random' or\
         geo_type == 'porous/custom':
 
@@ -97,6 +93,12 @@ class Geometry(object):
      if geo_type == 'porous/random':
       frame,polygons = GenerateRandomPoresOverlap(argv)
 
+     if geo_type == 'porous/random_over_grid':
+      x,polygons = GenerateRandomPoresGrid(**argv)
+      argv['polygons'] = polygons
+      frame,polygons = GenerateCustomPores(argv)
+
+
     self.Lz = float(argv.setdefault('lz',0.0))
     if geo_type == 'bulk':
       Lx = float(argv['lx'])
@@ -114,10 +116,10 @@ class Geometry(object):
     if argv.setdefault('mesh',True):
      self.mesh(**argv)
 
-  if argv.setdefault('plot',False):
+   MPI.COMM_WORLD.Barrier()
+  if argv.setdefault('save_fig',False):
    self.plot_polygons()
 
-  MPI.COMM_WORLD.Barrier()
 
  def mesh(self,**argv):
 
@@ -228,22 +230,24 @@ class Geometry(object):
      
      
     #plot Boundary Conditions-----
-    for side in self.side_list['Boundary'] + self.side_list['Interface'] :
-     p1 = self.sides[side][0]
-     p2 = self.sides[side][1]
-     n1 = self.nodes[p1]
-     n2 = self.nodes[p2]
-     plot([n1[0],n2[0]],[n1[1],n2[1]],color='#f77f0e',lw=6)
+    if argv.setdefault('plot_boundary',False):
+     for side in self.side_list['Boundary'] + self.side_list['Interface'] :
+      p1 = self.sides[side][0]
+      p2 = self.sides[side][1]
+      n1 = self.nodes[p1]
+      n2 = self.nodes[p2]
+      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#f77f0e',lw=6)
      
      
       #plot Periodic Conditions-----
-    for side in self.side_list['Periodic'] + self.side_list['Inactive']  :
+    if argv.setdefault('plot_boundary',False):
+     for side in self.side_list['Periodic'] + self.side_list['Inactive']  :
         
-     p1 = self.sides[side][0]
-     p2 = self.sides[side][1]
-     n1 = self.nodes[p1]
-     n2 = self.nodes[p2]
-     plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=12,zorder=3)
+      p1 = self.sides[side][0]
+      p2 = self.sides[side][1]
+      n1 = self.nodes[p1]
+      n2 = self.nodes[p2]
+      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=12,zorder=3)
 
        
     
@@ -260,13 +264,11 @@ class Geometry(object):
 
     #fig:wq
 
-    if argv.setdefault('save_fig',False):
-     savefig(argv.setdefault('fig_file','geometry.png'))
+    savefig(argv.setdefault('fig_file','geometry.png'))
 
     #return fig
 
 
-    #HTML('<style>{}</style>'.format(CSS))
 
 
  def compute_triangle_area(self,p1,p2,p):

@@ -184,9 +184,7 @@ class Solver(object):
      #temp = temp - (max(temp)+min(temp))/2.0
    
      t = temp*self.mat['domega'][index]
-
      s = K.dot(temp-TL[n]).sum() * self.mat['domega'][index] * 3 * self.kappa_factor
-
      j = np.multiply(temp,HW_PLUS) * self.mat['domega'][index]
 
      return t,s,j
@@ -359,8 +357,6 @@ class Solver(object):
 
     #Suppression function   
     SUP = np.sum(np.multiply(self.mat['J3'],log_interp1d(self.mat['mfp'],kernel.clip(min=1e-13))(self.mat['trials'])),axis=1)
-    print(SUP)
-    quit()
     kappa = np.dot(self.mat['kappa_bulk'],SUP)
     kappa_eff.append(kappa)
     error = abs(kappa-kappa_old)/abs(kappa)
