@@ -17,7 +17,7 @@ RUN cp gmsh-3.0.0-Linux/bin/gmsh /usr/bin/
 RUN rm -rf gmsh-3.0.0-Linux
 RUN rm gmsh-3.0.0-Linux64.tgz
 
-RUN pip install  openbte==0.9.33
+RUN pip install openbte
 
 USER openbte
 WORKDIR /home/openbte

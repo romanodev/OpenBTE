@@ -18,11 +18,9 @@ requirements:
     - alabaster
     - deepdish
     - future
-    - grin
     - ipython
     - matplotlib
     - mpi4py
-    - networkx
     - numpy
     - pip
     - python
@@ -31,7 +29,6 @@ requirements:
     - shapely
     - sparse
     - termcolor
-    - twisted
     - unittest2
     - gmsh  
     - lapack  
@@ -39,11 +36,9 @@ requirements:
     - alabaster
     - deepdish
     - future
-    - grin
     - ipython
     - matplotlib
     - mpi4py
-    - networkx
     - numpy
     - python
     - pyvtk
@@ -51,7 +46,6 @@ requirements:
     - shapely
     - sparse
     - termcolor
-    - twisted
     - unittest2
     - gmsh
     - lapack  

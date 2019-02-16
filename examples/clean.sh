@@ -6,3 +6,4 @@ rm *.p
 rm *.geo
 rm *.msh
 rm *.vtk
+rm *.png
