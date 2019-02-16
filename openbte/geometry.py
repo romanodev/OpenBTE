@@ -15,6 +15,8 @@ from . import GenerateMesh2D
 from . import GenerateBulk2D
 from . import GenerateBulk3D
 from . import porous
+import matplotlib
+if not matplotlib.get_backend() == 'Agg': matplotlib.use('Agg')
 import matplotlib.patches as patches
 from .fig_maker import *
 from matplotlib.path import Path

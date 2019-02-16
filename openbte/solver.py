@@ -9,7 +9,6 @@ from scipy.sparse.linalg import splu
 
 #import colored
 from scipy.sparse.linalg import spilu
-import matplotlib.pylab as plt
 from scipy.sparse import spdiags
 import scipy.io
 import deepdish as dd

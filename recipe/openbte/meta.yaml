@@ -1,5 +1,5 @@
 {% set name = "openbte" %}
-{% set version = "0.9.30" %}
+{% set version = "0.9.37" %}
 
 package:
   name: "{{ name|lower }}"
@@ -7,14 +7,11 @@ package:
 
 source:
   url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
-  sha256: c4c4324d88d076d4d841f402fa270f8770b25c82b84218463dce3f71e222a9d5
 
 build:
-  number: 0
-  entry_points:
-    - openbte=openbte.__main__:main
-    - shengbte2openbte=openbte.shengbte2openbte:main
-  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vvv "
+  number : 0      
+  noarch: python
+  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vvv"
 
 requirements:
   host:
@@ -36,6 +33,8 @@ requirements:
     - termcolor
     - twisted
     - unittest2
+    - gmsh  
+    - lapack  
   run:
     - alabaster
     - deepdish
@@ -54,13 +53,12 @@ requirements:
     - termcolor
     - twisted
     - unittest2
+    - gmsh
+    - lapack  
 
 test:
   imports:
     - openbte
-  commands:
-    - openbte --help
-    - shengbte2openbte --help
 
 about:
   home: The package home page

@@ -53,7 +53,7 @@ class Material(object):
     mfp_bulk = tmp[:,0]*1e9; 
     kappa_bulk = tmp[:,1]
    else:
-    mfp_bulk = np.array(argv['mfp']); 
+    mfp_bulk = np.array(argv['mfp'],dtype='double'); 
     kappa_bulk = argv.setdefault('kappa_bulk',np.ones(len(mfp_bulk)))
 
    n_mfp_bulk = len(mfp_bulk) 
@@ -125,7 +125,7 @@ class Material(object):
      mfp_bulk = tmp[:,0]*1e9; n_mfp_bulk = len(mfp_bulk)
      kappa_bulk = tmp[:,1]
     else: 
-     mfp_bulk = np.array(argv['mfp']); 
+     mfp_bulk = np.array(argv['mfp'],dtype='double'); 
      kappa_bulk = argv.setdefault('kappa_bulk',np.ones(len(mfp_bulk)))
 
     n_mfp_bulk = len(mfp_bulk)

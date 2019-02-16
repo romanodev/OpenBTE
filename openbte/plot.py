@@ -6,6 +6,7 @@ import numpy as np
 import deepdish as dd
 import os
 import matplotlib
+if not matplotlib.get_backend() == 'Agg': matplotlib.use('Agg')
 import matplotlib.pylab as plt
 import matplotlib.patches as patches
 from matplotlib.path import Path
