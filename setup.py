@@ -2,7 +2,7 @@ from setuptools import setup,find_packages
 import os
 
 setup(name='openbte',
-      version='0.9.40',
+      version='0.9.41',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',
@@ -24,8 +24,7 @@ setup(name='openbte',
                          ],
       license='GPLv2',\
       packages = ['openbte'],
-      package_data = {'openbte':['materials/*.dat','../extern/gmsh']},
-      #packages = find_packages(exclude=['openbte_new']),
+      package_data = {'openbte':['materials/*.dat']},
       entry_points = {
      'console_scripts': [
       'openbte=openbte.__main__:main','shengbte2openbte=openbte.shengbte2openbte:main'],
