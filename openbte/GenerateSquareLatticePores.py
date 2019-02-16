@@ -10,7 +10,7 @@ def GenerateSquareLatticePores(argv):
   porosity = float(argv['porosity'])
 
   #Read shape
-  shape = argv['shape']
+  shape = argv.setdefault('shape','square')
   if shape == 'circle':
      Na = 24; phi0= 0.0
 

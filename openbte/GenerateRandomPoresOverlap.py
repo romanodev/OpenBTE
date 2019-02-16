@@ -8,8 +8,8 @@ from shapely.ops import cascaded_union
 from shapely.geometry import Point
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
-import matplotlib
-if not matplotlib.get_backend() == 'Agg': matplotlib.use('Agg')
+#import matplotlib
+#if not matplotlib.get_backend() == 'Agg': matplotlib.use('Agg')
 
 import networkx as nx
 import matplotlib.pylab as plt

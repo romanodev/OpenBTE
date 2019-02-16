@@ -1,5 +1,5 @@
 {% set name = "openbte" %}
-{% set version = "0.9.37" %}
+{% set version = "0.9.39" %}
 
 package:
   name: "{{ name|lower }}"
@@ -28,7 +28,6 @@ requirements:
     - scipy
     - shapely
     - sparse
-    - termcolor
     - unittest2
     - gmsh  
     - lapack  
@@ -45,7 +44,6 @@ requirements:
     - scipy
     - shapely
     - sparse
-    - termcolor
     - unittest2
     - gmsh
     - lapack  
@@ -55,13 +53,15 @@ test:
     - openbte
 
 about:
-  home: The package home page
+  home: www.openbte.org
   license: GPLv2
   license_family: GPL2
-  license_file: 
+  license_file: ../LICENSE 
   summary: Boltzmann Transport Equation for Phonons
-  doc_url: 
-  dev_url: 
+  doc_url: https://romanodev.github.io/OpenBTE/_build/html/index.html
+  dev_url: https://github.com/romanodev/OpenBTE
+  description: |
+      On Windows you'll have to install MSMPI. For all platform the full command is: conda install -c guyer/label/hidden -c conda-forge -c gromano openbte
 
 extra:
   recipe-maintainers:

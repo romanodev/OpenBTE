@@ -7,7 +7,6 @@ from mpi4py import MPI
 #import shutil
 from scipy.sparse.linalg import splu
 
-#import colored
 from scipy.sparse.linalg import spilu
 from scipy.sparse import spdiags
 import scipy.io
@@ -45,7 +44,7 @@ class Solver(object):
 
   def __init__(self,**argv):
    
-   self.mesh = Geometry(type='load',filename = argv.setdefault('geometry_filename','geometry'))
+   self.mesh = Geometry(model='load',filename = argv.setdefault('geometry_filename','geometry'))
    self.TT = 0.5*self.mesh.B * np.array([self.mesh.elem_volumes]).T    
    self.ms_error = argv.setdefault('ms_error',0.1)
    self.verbose = argv.setdefault('verbose',True)
@@ -197,7 +196,7 @@ class Solver(object):
 
    if rank == 0:
      print('    Iter    Thermal Conductivity [W/m/K]      Error        Diffusive  -  BTE  -  Ballistic')
-     print('\033[1;32;40m   ---------------------------------------------------------------------------------------')
+     print('   ---------------------------------------------------------------------------------------')
 
   
 
@@ -214,8 +213,8 @@ class Solver(object):
     ms_vec = data['ms_vec']
     if rank == 0:
       for n in range(len(kappa_eff)):
-       print('\033[0;37;40m {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n,kappa_eff[n],error_vec[n],ms_vec[n][0],ms_vec[n][1],ms_vec[n][2]))
-      print('\033[1;31;40m   ---------------------------------------------------------------------------------------')
+       print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n,kappa_eff[n],error_vec[n],ms_vec[n][0],ms_vec[n][1],ms_vec[n][2]))
+      print('   ---------------------------------------------------------------------------------------')
 
    else:   
     kappa_eff = []
@@ -274,7 +273,7 @@ class Solver(object):
      SUP_DIF = np.sum(np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],SDIFF_ave)(self.mat['trials'])),axis=1)   
      if n_iter==0:
        kappa = np.dot(SUP_DIF,self.mat['kappa_bulk'])
-       print('\033[0;37;40m {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,1,1,0,0))
+       print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,1,1,0,0))
        kappa_eff.append(kappa)
     
 
@@ -381,13 +380,13 @@ class Solver(object):
     ms_vec.append([diffusive,1-diffusive-ballistic,ballistic]) 
     #Thermal conductivity   
     if rank==0:
-      print('\033[0;37;40m {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,error,diffusive,1-diffusive-ballistic,ballistic))
+      print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,error,diffusive,1-diffusive-ballistic,ballistic))
       dd.io.save('solver.hdf5',{'TL':TL,'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error_vec':error_vec,'ms_vec':ms_vec,'temperature':TL[0],\
               'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'TB':TB,'temperature_fourier':TFourier,'flux_fourier':FFourier})
      
    if rank==0:
-     print('\033[1;32;40m   ---------------------------------------------------------------------------------------')
-     print('\033[0;37;40m ')
+     print('   ---------------------------------------------------------------------------------------')
+     print(' ')
     
 
   def print_bulk_kappa(self):

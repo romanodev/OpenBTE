@@ -6,7 +6,7 @@ import numpy as np
 import deepdish as dd
 import os
 import matplotlib
-if not matplotlib.get_backend() == 'Agg': matplotlib.use('Agg')
+if not matplotlib.get_backend() == 'Qt5Agg': matplotlib.use('Qt5Agg')
 import matplotlib.pylab as plt
 import matplotlib.patches as patches
 from matplotlib.path import Path
@@ -295,7 +295,7 @@ class Plot(object):
   (triangulation,tmp,nodes) = vw.get_node_data(solver[variable])
 
 
-
+  argv.setdefault('direction','magnitude')
   if argv['direction'] == 'x':
      data = np.array(tmp).T[0]
   elif argv['direction'] == 'y':
@@ -316,7 +316,7 @@ class Plot(object):
  def plot_map(self,argv):
 
 
-   self.geo = Geometry(type='load')
+   self.geo = Geometry(model='load')
    (Lx,Ly) = self.geo.get_repeated_size(argv)
 
    fig = figure(num=' ', figsize=(8*Lx/Ly, 8), dpi=80, facecolor='w', edgecolor='k')

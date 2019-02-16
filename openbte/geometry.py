@@ -16,7 +16,7 @@ from . import GenerateBulk2D
 from . import GenerateBulk3D
 from . import porous
 import matplotlib
-if not matplotlib.get_backend() == 'Agg': matplotlib.use('Agg')
+if not matplotlib.get_backend() == 'Qt5Agg': matplotlib.use('Qt5Agg')
 import matplotlib.patches as patches
 from .fig_maker import *
 from matplotlib.path import Path
@@ -57,9 +57,12 @@ class Geometry(object):
   if direction == 'x':self.direction = 0
   if direction == 'y':self.direction = 1
   if direction == 'z':self.direction = 2
+  
+  
   self.argv = argv
+  #argv.setdefault('shape','square')
+  geo_type = argv.setdefault('model','porous/square_lattice')
 
-  geo_type = argv['type']
 
   if geo_type == 'load':
   # if MPI.COMM_WORLD.Get_rank() == 0:

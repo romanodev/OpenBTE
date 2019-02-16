@@ -10,7 +10,7 @@ class Material(object):
  def __init__(self,**argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
-  
+ 
    output = {}   
    data = self.compute_mat_2D(argv)   
    output.update({'data_2D':data})
@@ -48,12 +48,12 @@ class Material(object):
    #---------------------------------------------------------------
    
    #Import material
-   if argv.setdefault('model','nongray')=='nonfray':
+   if argv.setdefault('model','nongray')=='nongray':
     tmp = np.loadtxt(os.path.dirname(__file__) + '/materials/'+ argv['matfile'])
     mfp_bulk = tmp[:,0]*1e9; 
     kappa_bulk = tmp[:,1]
    else:
-    mfp_bulk = np.array(argv['mfp'],dtype='double'); 
+    mfp_bulk = np.array(argv.setdefault('mfp',[1]),dtype='double'); 
     kappa_bulk = argv.setdefault('kappa_bulk',np.ones(len(mfp_bulk)))
 
    n_mfp_bulk = len(mfp_bulk) 
@@ -120,12 +120,12 @@ class Material(object):
 
     
     #Import material
-    if argv.setdefault('model','nongray')=='nonfray':
+    if argv.setdefault('model','nongray')=='nongray':
      tmp = np.loadtxt(os.path.dirname(__file__) + '/materials/'+ argv['matfile'])
      mfp_bulk = tmp[:,0]*1e9; n_mfp_bulk = len(mfp_bulk)
      kappa_bulk = tmp[:,1]
     else: 
-     mfp_bulk = np.array(argv['mfp'],dtype='double'); 
+     mfp_bulk = np.array(argv.setdefault('mfp',[1]),dtype='double'); 
      kappa_bulk = argv.setdefault('kappa_bulk',np.ones(len(mfp_bulk)))
 
     n_mfp_bulk = len(mfp_bulk)
