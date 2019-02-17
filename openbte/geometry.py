@@ -100,6 +100,7 @@ class Geometry(object):
 
      if geo_type == 'porous/random_over_grid':
       x,polygons = GenerateRandomPoresGrid(**argv)
+      self.x = x
       argv['polygons'] = polygons
       frame,polygons = GenerateCustomPores(argv)
 

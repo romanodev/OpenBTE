@@ -1,15 +1,19 @@
+{% set name = "openbte" %}
+{% set version = "0.9.39" %}
 
 package:
-  name: "openbte"
-  version: "0.9.43"
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
 
 source:
-  url: ../dist/openbte-0.9.43.tar.gz
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
 
 build:
-        
-  number: 3
+  number: 2
   noarch: python
+  entry_points:
+    - openbte=openbte.__main__:main
+    - shengbte2openbte=openbte.shengbte2openbte:main
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vvv "
 
 requirements:
@@ -19,7 +23,7 @@ requirements:
     - future
     - ipython
     - matplotlib
-    - mpi4py==2.0.0
+    - mpi4py
     - networkx
     - numpy
     - pip
@@ -28,8 +32,8 @@ requirements:
     - scipy
     - shapely
     - sparse
-    - twisted  
     - termcolor
+    - twisted
     - unittest2
   run:
     - alabaster
@@ -37,16 +41,16 @@ requirements:
     - future
     - ipython
     - matplotlib
-    - mpi4py==2.0.0
+    - mpi4py
     - networkx
     - numpy
     - python
     - pyvtk
     - scipy
-    - twisted  
     - shapely
     - sparse
     - termcolor
+    - twisted
     - unittest2
 
 test:

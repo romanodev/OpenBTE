@@ -1,14 +1,16 @@
+{% set name = "openbte" %}
+{% set version = "0.9.41" %}
 
 package:
-  name: "openbte"
-  version: "0.9.43"
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
 
 source:
-  url: ../dist/openbte-0.9.43.tar.gz
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
+  sha256: de78d328dd5432e6fedab2404f13f632dbdafe8128ac39381cfd5faac5d6a7f4
 
 build:
-        
-  number: 3
+  number: 0
   noarch: python
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vvv "
 
@@ -19,8 +21,7 @@ requirements:
     - future
     - ipython
     - matplotlib
-    - mpi4py==2.0.0
-    - networkx
+    - mpi4py
     - numpy
     - pip
     - python
@@ -28,8 +29,6 @@ requirements:
     - scipy
     - shapely
     - sparse
-    - twisted  
-    - termcolor
     - unittest2
   run:
     - alabaster
@@ -37,21 +36,19 @@ requirements:
     - future
     - ipython
     - matplotlib
-    - mpi4py==2.0.0
-    - networkx
+    - mpi4py
     - numpy
     - python
     - pyvtk
     - scipy
-    - twisted  
     - shapely
     - sparse
-    - termcolor
     - unittest2
 
 test:
   imports:
     - openbte
+
 about:
   home: The package home page
   license: GPLv2
@@ -59,9 +56,8 @@ about:
   license_file: 
   summary: Boltzmann Transport Equation for Phonons
   doc_url: 
-  dev_url:
-  description: For Windows you'll beed to install MSMPI. Install with    conda install -c guyer/label/hidden -c conda-forge -c gromano openbte
+  dev_url: 
 
 extra:
   recipe-maintainers:
-    - romanodev
+    - your-github-id-here
