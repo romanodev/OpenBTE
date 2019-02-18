@@ -101,13 +101,9 @@ class WriteVtk(object):
                      round(nodes_uc[n,1],4) + P[1]-(self.Nx-1)*0.5*self.mesh.size[1],\
                      round(nodes_uc[n,2],4) + P[2]-(self.Nx-1)*0.5*self.mesh.size[2]]
 
-       #if not node_trial in nodes:
        nodes.append(node_trial)
        data.append(data_uc[n]-dd)
        corr[index+n] = len(nodes)-1
-
-       #else:
-    #    corr[index+n] = nodes.index(node_trial)
 
 
    cells_uc = self.mesh.elems

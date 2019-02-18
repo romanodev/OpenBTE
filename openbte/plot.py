@@ -18,6 +18,7 @@ from .geometry import *
 from scipy.interpolate import griddata
 from shapely.geometry import MultiPoint,Point,Polygon,LineString
 import shapely
+from matplotlib.widgets import Slider, Button, RadioButtons
 
 def get_suppression(mfps,sup,mfp):
 
@@ -278,6 +279,8 @@ class Plot(object):
   return x,data,int_points
 
 
+
+
  def get_data(self,argv):
 
 
@@ -319,26 +322,33 @@ class Plot(object):
    self.geo = Geometry(model='load')
    (Lx,Ly) = self.geo.get_repeated_size(argv)
 
-   fig = figure(num=' ', figsize=(8*Lx/Ly, 8), dpi=80, facecolor='w', edgecolor='k')
+
+
+   Sx = 8
+   Sy = Sx*Ly/Lx
+   delta = 0.2
+  
+
+   fig = figure(num=' ', figsize=(Sx*(1+delta), Sy+Sx*delta), dpi=80, facecolor='w', edgecolor='k')
+   axes([delta,delta*Sx/(Sy+Sx*delta),1.0,1.0])
+
+
+   #fig = figure(num=' ', figsize=(8*Lx/Ly, 8), dpi=80, facecolor='w', edgecolor='k')
    #axes([0,0,0.5,1.0])
-   axes([0,0,1.0,1.0])
+   #axes([0,0,1.0,1.0])
 
 
    #data += 1.0
    (data,nodes,triangulation) =  self.get_data(argv)
    vmin = argv.setdefault('vmin',min(data))
    vmax = argv.setdefault('vmax',max(data))
-
    tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),zorder=1)
-
 
    #colorbar(norm=mpl.colors.Normalize(vmin=min(data),vmax=max(data)))
 
     #Contour-----
    if argv.setdefault('iso_values',True):
     t = tricontour(triangulation,data,levels=np.linspace(vmin,vmax,10),colors='black',linewidths=1.5)
-
-
 
    if argv.setdefault('streamlines',False):# and (variable == 'fourier_flux' or variable == 'flux' ):
 
@@ -362,11 +372,29 @@ class Plot(object):
     pp = self.geo.get_interface_point_couples(argv)
 
 
+
+
+
    axis('off')
    gca().invert_yaxis()
-   xlim([-Lx*0.5,Lx*0.5])
-   ylim([-Ly*0.5,Ly*0.5])
-   axis('equal')
+   xlim([-Lx*0.5,Lx*0.5*(1 + 0.5)])
+   ylim([-Ly*0.5,Ly*0.5*(1 + 0.5)])
+   #axis('equal')
+
+   axcolor = 'lightgoldenrodyellow'
+   rax = plt.axes([delta*0.1, 0.5,delta*0.8, delta*0.8], facecolor=axcolor)
+   #axis('equal')
+   #axis('off')
+   radio = RadioButtons(rax, ('Temperature', 'Thermal Flux'), active=0)
+
+   def stylefunc(label):
+
+    
+    plt.draw()
+
+   radio.on_clicked(data_selector)
+
+
    show()
 
 
