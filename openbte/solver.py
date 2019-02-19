@@ -58,7 +58,6 @@ class Solver(object):
 
    MPI.COMM_WORLD.Barrier() 
     
-
    self.argv = argv
    self.multiscale = argv.setdefault('multiscale',False)
    tmp = dd.io.load('material.hdf5')
@@ -369,6 +368,7 @@ class Solver(object):
    
 
     #Lattice temperature   
+    
     TL = np.tile([np.sum(np.multiply(self.mat['J2'],log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials']))) \
          for e in range(self.n_elems)],(self.mat['n_mfp'],1))
 
@@ -381,8 +381,8 @@ class Solver(object):
     #Thermal conductivity   
     if rank==0:
       print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,error,diffusive,1-diffusive-ballistic,ballistic))
-      dd.io.save('solver.hdf5',{'TL':TL,'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error_vec':error_vec,'ms_vec':ms_vec,'temperature':TL[0],\
-              'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'TB':TB,'temperature_fourier':TFourier,'flux_fourier':FFourier})
+      dd.io.save('solver.hdf5',{'TL':TL,'MFP_SAMPLED':self.mat['mfp'],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error_vec':error_vec,'ms_vec':ms_vec,'temperature':TL[0],\
+              'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'TB':TB,'temperature_fourier':TFourier,'flux_fourier':FFourier,'temperature_vec':T,'flux_vec':Flux})
      
    if rank==0:
      print('   ---------------------------------------------------------------------------------------')

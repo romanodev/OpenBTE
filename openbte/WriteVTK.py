@@ -8,8 +8,6 @@ class WriteVtk(object):
  def __init__(self,argv):
 
   self.mesh = argv['Geometry']
-
-
   self.Nx = argv.setdefault('repeat_x',1)
   self.Ny = argv.setdefault('repeat_y',1)
   self.Nz = argv.setdefault('repeat_z',1)

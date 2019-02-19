@@ -302,18 +302,12 @@ class Plot(object):
   if 'index' in argv.keys():
     ii = int(argv['index'])
     if variable == 'temperature':
-     data = solver['temperature_vec'][ii]
-     #vmin = np.min(solver['temperature_vec'])
-     #vmax = np.max(solver['temperature_vec'])
+     data = solver['temperature_vec'][int(argv['index'])]
     else: 
-     data = solver['flux_vec'][ii]
-     #vmin = np.min(solver['flux_vec'])
-     #vmax = np.max(solver['flux_vec'])
+     data = solver['flux_vec'][int(argv['index'])]
 
   else:
     data = solver[variable]
-    #vmin = min(data)
-    #vmax = min(data)
 
   (triangulation,tmp,nodes) = vw.get_node_data(data)
 
@@ -370,6 +364,13 @@ class Plot(object):
        argv['direction']='magnitude'
        self.current_label = 'fluxm'
 
+    #print(label_in) 
+    #print(label)   
+    #print(self.current_label) 
+    #print(' ')
+    #print(self.plotted)
+    #if self.plotted : del self.clear()
+    #if self.ax == -1:
     self.ax = axes([delta,delta*Sx/(Sy+Sx*delta),1.0,1.0])
     argv['variable'] = 'variable/' + label
     (data,nodes,triangulation) =  self.get_data(argv)
@@ -387,7 +388,6 @@ class Plot(object):
 
 
  def plot_map_new(self,**argv):
-   self.mode = 'integrated'  
    self.ax = -1
    #set main figure----
    self.geo = Geometry(model='load')
@@ -418,41 +418,38 @@ class Plot(object):
    axamp = plt.axes([0.3,0.02,0.6,0.05], facecolor=axcolor)
    samp = Slider(axamp, 'Log Kn', vmin, vmax, valinit=(vmin+vmax)/2,dragging=True,closedmin=False,closedmax=False)
    samp.on_changed(self.update_slider)
-   self.current_slider_value = (vmin+vmax)/2
+
    rax = plt.axes([delta*0.1, 0.3,delta*0.8, delta*0.8], facecolor=axcolor)
-   radio2 = RadioButtons(rax, ('Integrated', 'MFP'), active=0)
-   radio2.on_clicked(self.switch_mode)
+   radio = RadioButtons(rax, ('Integrated', 'MFP'), active=0)
+   radio.on_clicked(self.switch_mode)
 
    show()
 
  def switch_mode(self,label):
 
-     if label == 'Integrated':
-        self.mode == 'integrated' 
-        if self.current_label == 'temperature':   
+     if label == 'integrated':
+        if current_label == 'temperature':   
           self.plot_variable('Temperature') 
 
-        if self.current_label == 'fluxx':   
+        if current_label == 'fluxx':   
           self.plot_variable('Flux (X)') 
        
-        if self.current_label == 'fluxy':   
+        if current_label == 'fluxy':   
           self.plot_variable('Flux (Y)') 
 
-        if self.current_label == 'fluxm':   
+        if current_label == 'fluxm':   
           self.plot_variable('Flux') 
      else:
-      self.mode = 'mfp'
       self.update_slider(self.current_slider_value)
 
 
  def update_slider(self,value):
 
-  self.current_slider_value = value
-  if self.mode == 'mfp':
-   mfp = pow(10,value)*self.original_size
-   mfp_sampled = self.solver['MFP_SAMPLED'].copy()
+  mfp = pow(10,value)*self.original_size
+  mfp_sampled = self.solver['MFP_SAMPLED'].copy()
 
-   for n in range(len(mfp_sampled)-1):
+  self.current_slider_value = value
+  for n in range(len(mfp_sampled)-1):
     if (mfp_sampled[n] > mfp):
       if self.current_label == 'temperature':
          self.plot_variable('Temperature_' + str(n)) 

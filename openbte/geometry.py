@@ -182,6 +182,11 @@ class Geometry(object):
     Ly = size[1]*Ny
     return Lx,Ly
 
+ def get_repeated(self,Nx,Ny):
+    size = self.size
+    Lx = size[0]*Nx
+    Ly = size[1]*Ny
+    return Lx,Ly
 
  def get_interface_point_couples(self,argv):
 

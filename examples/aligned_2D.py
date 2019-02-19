@@ -1,8 +1,9 @@
 from openbte import Material,Geometry,Solver,Plot
-#Material(matfile ='Si-300K.dat')
 
-#Geometry(porosity=0.25,lx=10,ly=10,step=1.0)
-#Solver()
-Plot(variable='map/flux',repeat_x = 1,repeat_y=1)
+#Material(model = 'gray',mfp = [100])
+#Geometry(porosity=0.25,lx=10,ly=10,step=0.3)
+#Solver(max_bte_iter=10)
+Plot(variable='map')
+#Plot(variable='vtk')
 
 
