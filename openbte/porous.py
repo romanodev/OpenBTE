@@ -119,11 +119,15 @@ class Porous(object):
       for s2 in range(s1+1,len(self.surfaces)):
          (a,per) = self.isperiodic(s1,s2)
          if not a == None and self.argv['Periodic'][a]:
+           
           
            corr = {}
            pts1,ind1 = self.get_points_from_surface(s1)
            pts2,ind2 = self.get_points_from_surface(s2)
-          
+
+           #if a == 1:
+           #  print(pts1)
+
            for n1,p1 in zip(ind1,pts1):
             for n2,p2 in zip(ind2,pts2):
              if np.linalg.norm(p1-p2-per) < 1e-3:
@@ -147,8 +151,6 @@ class Porous(object):
      
       
         
-        
-
        
 
  def merge(self):
@@ -225,11 +227,11 @@ class Porous(object):
    #Apply periodicity
    vec = {}
    for key, value in self.periodic.items():
-      
+   
      boundary.remove(key)  
      boundary.remove(value[0])  
 
-     
+     value[3] = np.round(value[3],4)     
      store.write('Periodic Surface ' + str(key+nl+nll) + ' {') 
      
      for n,k in enumerate(value[1]):

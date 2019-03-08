@@ -143,6 +143,7 @@ class Geometry(object):
      argv['frame'] = self.frame
      porous.Porous(**argv)
 
+
     if len(self.polygons) > 0 and self.dim == 2:
      GenerateMesh2D.mesh(self.polygons,self.frame,argv)
     if len(self.polygons) == 0 and self.dim == 2:
@@ -166,11 +167,9 @@ class Geometry(object):
     #  GenerateBulk2D.mesh(argv)
     #  self.dim = 2
      #-----------------------------------
-    data = self.compute_mesh_data()
-    
-        
-    #dd.io.save('geometry.hdf5', data)
-    pickle.dump(data,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
+    if not argv.setdefault('only_geo',False): 
+     data = self.compute_mesh_data()
+     pickle.dump(data,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
     
  # MPI.COMM_WORLD.Barrier()
 

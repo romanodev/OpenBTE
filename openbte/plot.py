@@ -8,6 +8,7 @@ import os
 import matplotlib
 if not matplotlib.get_backend() == 'Qt5Agg': matplotlib.use('Qt5Agg')
 import matplotlib.pylab as plt
+from matplotlib.colors import Colormap
 import matplotlib.patches as patches
 from matplotlib.path import Path
 from .fig_maker import *
@@ -62,7 +63,7 @@ class Plot(object):
 
 
   if MPI.COMM_WORLD.Get_rank() == 0:
-   self.solver = dd.io.load('solver.hdf5')
+   self.solver = dd.io.load(argv.setdefault('filename','solver.hdf5'))
    self.Nx = argv.setdefault('repeat_x',1)
    self.Ny = argv.setdefault('repeat_y',1)
 
@@ -104,14 +105,19 @@ class Plot(object):
    #Write data-------
    #geo = dd.io.load('geometry.hdf5')
    geo = Geometry(model='load')
-   solver = dd.io.load('solver.hdf5')
+   #solver = dd.io.load('solver.hdf5')
+   solver = self.solver
    argv.update({'Geometry':geo})
    vw = WriteVtk(argv)
    #vw.add_variable(solver['fourier_temperature'],label = 'Fourier Temperature [K]')
    #vw.add_variable(solver['fourier_flux'],label = r'''Thermal Flux [W/m/m]''')
 
-   vw.add_variable(solver['temperature'],label = r'''BTE Temperature [K]''')
-   vw.add_variable(solver['flux'],label = r'''BTE Thermal Flux [W/m/m]''')
+   if 'temperature' in solver.keys():
+    vw.add_variable(solver['temperature'],label = r'''BTE Temperature [K]''')
+
+   if 'flux' in solver.keys():
+    vw.add_variable(solver['flux'],label = r'''BTE Thermal Flux [W/m/m]''')
+
    vw.add_variable(solver['temperature_fourier'],label = r'''Fourier Temperature [K]''')
    vw.add_variable(solver['flux_fourier'],label = r'''Fourier Thermal Flux [W/m/m]''')
 
@@ -325,7 +331,6 @@ class Plot(object):
   elif argv['direction'] == 'z':
      data = np.array(tmp).T[2]
   elif argv['direction'] == 'magnitude':
-      #print(variable)
       data = []
       for d in tmp:
        data.append(np.linalg.norm(d))
@@ -471,9 +476,9 @@ class Plot(object):
  def plot_map(self,argv):
 
    self.geo = Geometry(model='load')
-   #(Lx,Ly) = self.geo.get_repeated_size(argv)
-   #Sx = 8
-   #Sy = Sx*Ly/Lx
+   (Lx,Ly) = self.geo.get_repeated_size(argv)
+   Sx = 8
+   Sy = Sx*Ly/Lx
 
    fig = figure(num=' ', figsize=(Sx,Sy), dpi=80, facecolor='w', edgecolor='k')
    axes([0,0,1.0,1.0])
@@ -484,6 +489,8 @@ class Plot(object):
 
 
    #data += 1.0
+   plt.set_cmap(Colormap('hot'))
+   
    (data,nodes,triangulation) =  self.get_data(argv)
    vmin = argv.setdefault('vmin',min(data))
    vmax = argv.setdefault('vmax',max(data))
@@ -492,7 +499,7 @@ class Plot(object):
    #colorbar(norm=mpl.colors.Normalize(vmin=min(data),vmax=max(data)))
 
     #Contour-----
-   if argv.setdefault('iso_values',True):
+   if argv.setdefault('iso_values',False):
     t = tricontour(triangulation,data,levels=np.linspace(vmin,vmax,10),colors='black',linewidths=1.5)
 
    if argv.setdefault('streamlines',False):# and (variable == 'fourier_flux' or variable == 'flux' ):
@@ -508,7 +515,6 @@ class Plot(object):
        z = np.array(data).T[1]
        Fy = griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
 
-
        seed_points = np.array([-Lx*0.5*0.99*np.ones(n_lines),np.linspace(-Ly*0.5*0.98,Ly*0.5*0.98,n_lines)])
        ss = streamplot(xi, yi, Fx, Fy,maxlength = 1e8,start_points=seed_points.T,integration_direction='both',color='r',minlength=0.95,linewidth=1)
 
@@ -520,10 +526,13 @@ class Plot(object):
 
    axis('off')
    gca().invert_yaxis()
-   xlim([-Lx*0.5,Lx*0.5*(1 + 0.5)])
-   ylim([-Ly*0.5,Ly*0.5*(1 + 0.5)])
-   axis('equal')
+   xlim([-Lx*0.5,Lx*0.5])
+   ylim([-Ly*0.5,Ly*0.5])
+   gca().margins(x=0,y=0)
 
+   axis('tight')
+   axis('equal')
+   savefig('fig.png',dpi=200)
    show()
 
 

@@ -8,8 +8,8 @@ from shapely.ops import cascaded_union
 from shapely.geometry import Point
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
-#import matplotlib
-#if not matplotlib.get_backend() == 'Agg': matplotlib.use('Agg')
+import matplotlib
+if not matplotlib.get_backend() == 'Qt5Agg': matplotlib.use('Qt5Agg')
 
 import networkx as nx
 import matplotlib.pylab as plt
@@ -334,8 +334,10 @@ def GenerateRandomPoresOverlap(argv):
   #area = area_min
   Na = Na_p[0]
 
-  if argv.setdefault('manual',False):
-   centers = argv['centers']
+  if argv.setdefault('load_configuration',False):
+   centers = np.load('conf.dat')
+  elif argv.setdefault('manual',False):
+   centers = argv['centers'] 
   else:
    centers = []
    for nn in range(Np):
@@ -395,7 +397,7 @@ def GenerateRandomPoresOverlap(argv):
     polys_cut.append(list(p.exterior.coords)[:-1])
     area += p.area
 
-  if argv['save_configuration']:
+  if argv['save_configuration'] and not argv['load_configuration']:
    #np.array(centers).dump(open('conf.dat','w+'))
    np.array(centers).dump('conf.dat')
 

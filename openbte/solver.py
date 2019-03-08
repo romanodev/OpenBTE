@@ -22,6 +22,7 @@ from numpy.testing import assert_array_equal
 import pickle
 import os
 import shutil
+import matplotlib.pylab as plt
 
 def log_interp1d(xx, y, kind='linear'):
 
@@ -223,8 +224,6 @@ class Solver(object):
     error_vec = [error]
     ms_vec = [[1,0,0]]
 
-     
-
 
    while n_iter < argv.setdefault('max_bte_iter',10) and \
           error > argv.setdefault('max_bte_error',1e-2):
@@ -264,6 +263,7 @@ class Solver(object):
      SDIFF_ave=SDIFF_ave[0]*np.ones(self.mat['n_mfp'])
      TFourier = TDIFF[0].copy()
      FFourier = -self.mat['kappa_bulk_tot']*TDIFFGrad.copy()[0]
+     #dd.io.save('solver_fourier.hdf5',{'temperature_fourier':TFourier,'flux_fourier':FFourier})
     #---------------------------------------------------------------------------------------------------------
 
 
@@ -276,6 +276,7 @@ class Solver(object):
        kappa_eff.append(kappa)
     
 
+   
 
     block = self.n_index // comm.size + 1
     Jp,J = np.zeros((2,self.mat['n_mfp'],self.n_elems))
@@ -372,6 +373,24 @@ class Solver(object):
     TL = np.tile([np.sum(np.multiply(self.mat['J2'],log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials']))) \
          for e in range(self.n_elems)],(self.mat['n_mfp'],1))
 
+    #if rank == 0:
+    # diff = []
+    # i = 50
+    # t1 = []
+    # t2 = []
+    # t3 = []
+    
+    # for n in range(self.mat['n_mfp']):
+    #   t1.append(T[n][i])  
+    #   t2.append(TL[n][i])
+    #   t3.append(T[0][i])
+    # plt.plot(self.mat['mfp'],t1) 
+    # plt.plot(self.mat['mfp'],t2) 
+    # plt.plot(self.mat['mfp'],t3) 
+    # plt.legend(['MFP','TL','T0'])
+    # plt.xscale('log')
+    # plt.show()
+   
 
     FLUX  = np.array([[np.sum(np.multiply(self.mat['J1'],log_interp1d(self.mat['mfp'],Flux.T[d,e])\
            (self.mat['trials'])))*self.mat['kappa_bulk_tot'] for d in range(3) ] for e in range(self.n_elems)])
@@ -381,8 +400,8 @@ class Solver(object):
     #Thermal conductivity   
     if rank==0:
       print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,error,diffusive,1-diffusive-ballistic,ballistic))
-      dd.io.save('solver.hdf5',{'TL':TL,'MFP_SAMPLED':self.mat['mfp'],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error_vec':error_vec,'ms_vec':ms_vec,'temperature':TL[0],\
-              'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'TB':TB,'temperature_fourier':TFourier,'flux_fourier':FFourier,'temperature_vec':T,'flux_vec':Flux})
+      
+      dd.io.save('solver.hdf5',{'TL':TL,'MFP_SAMPLED':self.mat['mfp'],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error_vec':error_vec,'ms_vec':ms_vec,'temperature':TL[0],'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'TB':TB,'temperature_fourier':TFourier,'flux_fourier':FFourier,'temperature_vec':T,'flux_vec':Flux})
      
    if rank==0:
      print('   ---------------------------------------------------------------------------------------')
