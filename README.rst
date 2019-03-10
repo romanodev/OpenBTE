@@ -31,7 +31,7 @@ If this method does not work, then you will have to create an enviroment yoursel
   conda install -c conda-forge -c gromano openbte
   
   
-For Windows you will have to install _MSMPI <https://www.microsoft.com/en-us/download/details.aspx?id=57467?>_
+For Windows you will have to install MSMPI
 
 If you want to avoid installing Anaconda, you can still use the pip system (see below)
 
@@ -69,8 +69,12 @@ Example
 .. code-block:: python
 
    from openbte import Material,Geometry,Solver,Plot
+   
+   #create material
    Material(matfile='Si-300K.dat')
+   #create geometry
    Geometry(porosity=0.25,lx=10,ly=10,step=1)
+   #Solve!
    Solver()
    Plot(variable='map/flux',direction='magnitude')
 
