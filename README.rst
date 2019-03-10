@@ -12,6 +12,29 @@ Community
 Installation
 ====================
 
+The easiest way to install OpenBTE on Linux/MacOS/Windows is through Anaconda:
+
+1) Install Anaconda 3
+2) On Anaconda Prompt type:
+
+.. code-block:: shell
+
+crate env create gromano/openbte-env
+activate openbte-env
+
+If thismethod does not work, then you will have to create an enviroment yourself:
+
+.. code-block:: shell
+
+  conda create -n openbte python=3.6
+  activate openbte
+  conda install -c conda-forge -c gromano openbte
+  
+  
+For Windows you will have to install _`MSMPI <https://www.microsoft.com/en-us/download/details.aspx?id=57467?>'_
+
+If you want to avoid installing Anaconda, you can still use the pip system (see below)
+
 Linux
 ---------------------------------------------------------------
 
@@ -31,6 +54,13 @@ Install `gmsh <http://gmsh.info/>`_
 
 pip install --upgrade openbte     
 
+MacOS
+---------------------------------------------------------------
+ You will have to install gmsh from source, then type
+ 
+ .. code-block:: shell
+ 
+pip install --upgrade openbte
 
 Example
 =======
