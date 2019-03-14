@@ -6,6 +6,8 @@ from scipy.sparse import csc_matrix
 from mpi4py import MPI
 #import shutil
 from scipy.sparse.linalg import splu
+from os import listdir
+from os.path import isfile, join
 
 from scipy.sparse.linalg import spilu
 from scipy.sparse import spdiags
@@ -61,22 +63,26 @@ class Solver(object):
     
    self.argv = argv
    self.multiscale = argv.setdefault('multiscale',False)
+   
    tmp = dd.io.load('material.hdf5')
+   #read materials-------------------
+   if self.mesh.dim == 3:
+      self.mat = tmp['data_3D']
+   else:   
+      self.mat = tmp['data_2D']
+   #-------------------------------------
+
    self.lu = {}
    self.lu_fourier = {}
    self.last_index = -1
 
-   if self.mesh.dim == 3:
-     self.mat = tmp['data_3D']
-   else:   
-     self.mat = tmp['data_2D']
-       
    self.kappa_factor = self.mesh.kappa_factor
    if self.verbose: 
     self.print_logo()
     self.print_dof()
 
-
+   #first material (this will have to change)
+   #mat = self.mat_map[self.mat_map.keys()[0]]
    #Compute directional connections-------
    if self.mesh.dim == 3:   
     self.n_index = self.mat['n_phi'] * self.mat['n_theta']
@@ -109,6 +115,10 @@ class Solver(object):
    #if MPI.COMM_WORLD.Get_rank() == 0:
    #  dd.io.save('solver.hdf5', self.state)
 
+  def get_material_from_element(self,elem):
+
+   return self.mat_map[self.mesh.elem_region_map[elem]]
+
 
   def get_multiscale_diffusive(self,index,n,SDIFF,TDIFF,TDIFFGrad):
 
@@ -121,8 +131,6 @@ class Solver(object):
           j = np.multiply(temp,HW_PLUS)*self.mat['domega'][index]
 
           return t,s,j
-
-
 
   def get_solving_data(self,index,n,TB,TL):
 
@@ -228,7 +236,7 @@ class Solver(object):
    while n_iter < argv.setdefault('max_bte_iter',10) and \
           error > argv.setdefault('max_bte_error',1e-2):
 
-    #Solve Fourier of First Guess
+    #Solve Fourier for First Guess
     #--------------------------------------------------------------------------------------------------          
     if n_iter == 0:          
       n_mfp = 1
@@ -266,17 +274,13 @@ class Solver(object):
      #dd.io.save('solver_fourier.hdf5',{'temperature_fourier':TFourier,'flux_fourier':FFourier})
     #---------------------------------------------------------------------------------------------------------
 
-
     #Print diffusive Kappa---------
-    if rank == 0 and self.multiscale :
+    if rank == 0:# and self.multiscale :
      SUP_DIF = np.sum(np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],SDIFF_ave)(self.mat['trials'])),axis=1)   
      if n_iter==0:
        kappa = np.dot(SUP_DIF,self.mat['kappa_bulk'])
        print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,1,1,0,0))
        kappa_eff.append(kappa)
-    
-
-   
 
     block = self.n_index // comm.size + 1
     Jp,J = np.zeros((2,self.mat['n_mfp'],self.n_elems))
@@ -417,9 +421,6 @@ class Solver(object):
        print('{:8.2f}'.format(self.mat['kappa_bulk_tot'])+ ' W/m/K')    
        #print(region.ljust(15) +  '{:8.2f}'.format(self.region_kappa_map[region])+ ' W/m/K')    
 
-   
-   
-   
 
   def assemble_fourier(self) :
 
@@ -440,8 +441,6 @@ class Solver(object):
      kappa = 1.0
      #kappa = 100.0
      #print(kappa)        print(KAPPAp)
-
-
      (v_orth,dummy) = self.mesh.get_decomposed_directions(kc1,kc2)
      vol1 = self.mesh.get_elem_volume(kc1)
      #vol2 = self.mesh.get_elem_volume(kc2)

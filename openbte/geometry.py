@@ -123,7 +123,7 @@ class Geometry(object):
      self.mesh(**argv)
 
    MPI.COMM_WORLD.Barrier()
-  if argv.setdefault('save_fig',False):
+  if argv.setdefault('save_fig',False) or argv.setdefault('show',False):
    self.plot_polygons()
 
 
@@ -216,9 +216,10 @@ class Geometry(object):
 
     #init_plotting()
     close()
-    fig = figure(num=" ", figsize=(8*lx/ly, 4), dpi=80, facecolor='w', edgecolor='k')
-    #axes([0,0,1.0,1.0])
-    axes([0,0,0.5,1.0])
+    #fig = figure(num=" ", figsize=(8*lx/ly, 4), dpi=80, facecolor='w', edgecolor='k')
+    fig = figure(num=" ", figsize=(4*lx/ly, 4), dpi=80, facecolor='w', edgecolor='k')
+    axes([0,0,1.0,1.0])
+    #axes([0,0,0.5,1.0])
 
 
     xlim([-lx/2.0,lx/2.0])
@@ -266,10 +267,10 @@ class Geometry(object):
      
     axis('off')
 
-    #if selfargv.setdefault('show',False):
+    if self.argv.setdefault('show',False):
      #print(fig.canvas.toolbar)
      #quit()
-    #show()
+     show()
      #rcParams['toolbar']='None'
 
     #fig:wq
@@ -477,10 +478,10 @@ class Geometry(object):
     Af = area*normal
     c1 = self.get_elem_centroid(elem_1)
     c2 = self.get_next_elem_centroid(elem_1,side)
-    dist = c2-c1
-    v_orth = area*np.dot(normal,np.dot(rot,normal))/np.dot(normal,dist)
-    v_non_orth = np.dot(rot,Af) - dist*v_orth
-    return v_orth,v_non_orth
+    dist = c2 - c1
+    v_orth = np.dot(normal,np.dot(rot,normal))/np.dot(normal,dist)
+    v_non_orth = np.dot(rot,normal) - dist*v_orth
+    return area*v_orth,area*v_non_orth
 
 
  def get_side_coeff(self,side):

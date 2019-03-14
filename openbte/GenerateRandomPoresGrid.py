@@ -147,23 +147,23 @@ def  delete_duplicate_points(polygons):
   return polygons
 
 
-def GenerateRandomPoresGrid(argv):
+#def GenerateRandomPoresGrid(argv):
 
-  nx =  argv.setdefault('nx',10)
-  ny =  argv.setdefault('ny',10)
-  Np =  argv.setdefault('Np',40)
-  positions = []
-  for n_pore in range(Np):
-    overlap = True
-    while overlap:
-     xr = np.random.randint(0,nx)
-     yr = np.random.randint(0,ny)
-     if not [xr,yr] in positions:
-      positions.append([xr,yr])
-      overlap = False
+#  nx =  argv.setdefault('nx',10)
+#  ny =  argv.setdefault('ny',10)
+#  Np =  argv.setdefault('Np',40)
+#  positions = []
+#  for n_pore in range(Np):
+#    overlap = True
+#    while overlap:
+#     xr = np.random.randint(0,nx)
+#
+#yr = np.random.randint(0,ny)
+#     if not [xr,yr] in positions:
+#      positions.append([xr,yr])
+#      overlap = False
 
-
-  return positions
+#  return positions
 
 
 def compute_inverse_polygons(positions,nx,ny,area,dx,dy,Lx,Ly,frame):
@@ -376,16 +376,17 @@ def GenerateRandomPoresGrid(**options):
 
  values = np.zeros((nx,ny))
 
- pos = []
- while len(pos) < Np :
-  x = np.random.randint(0,nx)
-  y = np.random.randint(0,ny)
-  tmp = [x,y]
-  if not tmp in pos:
-   pos.append(tmp)
-   values[x,y] = 1
-
- #values = list(np.reshape(pos,(1,2*Np))[0])
+ if options.setdefault('manual',False):
+  values = options['grid']   
+ else: 
+  pos = []
+  while len(pos) < Np :
+   x = np.random.randint(0,nx)
+   y = np.random.randint(0,ny)
+   tmp = [x,y]
+   if not tmp in pos:
+    pos.append(tmp)
+    values[x,y] = 1
 
  polygons = compute_polygons_from_grid(values)
  return values,polygons

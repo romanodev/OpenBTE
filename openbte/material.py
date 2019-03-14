@@ -17,7 +17,9 @@ class Material(object):
    
    data = self.compute_mat_3D(argv)   
    output.update({'data_3D':data})
-   
+  
+   #region = argv.setdefault('region','bulk')
+   #dd.io.save('material_' + region + '.hdf5',output)   
    dd.io.save('material.hdf5',output)   
   MPI.COMM_WORLD.Barrier()
 
