@@ -208,7 +208,6 @@ class Solver(object):
 
   
 
-
    if argv.setdefault('load_state',False):
     data  = dd.io.load('solver.hdf5')
     TB = data['TB']
@@ -281,6 +280,14 @@ class Solver(object):
        kappa = np.dot(SUP_DIF,self.mat['kappa_bulk'])
        print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,1,1,0,0))
        kappa_eff.append(kappa)
+       kappa_old = kappa
+
+    if argv.setdefault('only_fourier',False):
+       dd.io.save('solver.hdf5',{'temperature_fourier':TFourier,'flux_fourier':FFourier})
+
+       break
+
+
 
     block = self.n_index // comm.size + 1
     Jp,J = np.zeros((2,self.mat['n_mfp'],self.n_elems))
@@ -363,7 +370,7 @@ class Solver(object):
     SUP = np.sum(np.multiply(self.mat['J3'],log_interp1d(self.mat['mfp'],kernel.clip(min=1e-13))(self.mat['trials'])),axis=1)
     kappa = np.dot(self.mat['kappa_bulk'],SUP)
     kappa_eff.append(kappa)
-    error = abs(kappa-kappa_old)/abs(kappa)
+    error = abs(kappa-kappa_old)/abs(max([kappa,kappa_old]))
     error_vec.append(error)
     kappa_old = kappa
 
@@ -404,8 +411,9 @@ class Solver(object):
     #Thermal conductivity   
     if rank==0:
       print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,error,diffusive,1-diffusive-ballistic,ballistic))
-      
-      dd.io.save('solver.hdf5',{'TL':TL,'MFP_SAMPLED':self.mat['mfp'],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error_vec':error_vec,'ms_vec':ms_vec,'temperature':TL[0],'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'TB':TB,'temperature_fourier':TFourier,'flux_fourier':FFourier,'temperature_vec':T,'flux_vec':Flux})
+     
+      if not argv.setdefault('only_fourier',False):
+       dd.io.save('solver.hdf5',{'TL':TL,'MFP_SAMPLED':self.mat['mfp'],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error_vec':error_vec,'ms_vec':ms_vec,'temperature':TL[0],'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'TB':TB,'temperature_fourier':TFourier,'flux_fourier':FFourier,'temperature_vec':T,'flux_vec':Flux})
      
    if rank==0:
      print('   ---------------------------------------------------------------------------------------')
@@ -528,7 +536,7 @@ class Solver(object):
 
 
 
-
+  '''
   def solve_fourier(self,**argv):
        
     rank = MPI.COMM_WORLD.rank    
@@ -597,8 +605,8 @@ class Solver(object):
         kappa_old = KAPPAp[index]
         n_iter +=1
         
-      #FLUXp = np.array([-self.elem_kappa_map[k]*tmp for k,tmp in enumerate(flux)])
-      FLUXp[index] = flux.T
+      FLUXp[index] = np.array([-self.mat['kappa_bulk_tot']*tmp for k,tmp in enumerate(flux)])
+      #FLUXp[index] = flux.T
       TLp[index] = temp
      
         
@@ -616,7 +624,7 @@ class Solver(object):
 
 
     return {'kappa_fourier':KAPPA,'temperature_fourier_gradient':FLUX,'temperature_fourier':TLtot}
-
+ '''
       
   def compute_non_orth_contribution(self,temp) :
 

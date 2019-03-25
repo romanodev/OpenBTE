@@ -30,21 +30,32 @@ def GenerateCustomPores(argv):
    #---------------------
 
   if 'polygons' in argv:
-   polygons = np.array(argv['polygons'])
-   for poly in polygons:
-    for p in poly:
-     p[0] *=Lx   
-     p[1] *=Ly
-     #p[0] -=Lx/2.0
-     #p[1] -=Ly/2.0
+   tmp = np.array(argv['polygons'])
   else:
    tmp = np.loadtxt(argv['polyfile'])
-   if len(np.shape(tmp)) == 1:
-    N = 1
-    M = len(tmp)
-   else:
-    (N,M) = np.shape(tmp)
-   polygons = tmp.reshape((N,int(M/2),2))
+
+  polygons = []
+  for k in range(len(tmp)):
+
+   poly_tmp = tmp[k]   
+
+   poly = []
+   
+   for n in range(int(len(poly_tmp)/2)):
+    x = poly_tmp[n*2]+0.5
+    y = poly_tmp[n*2+1]+0.5
+    poly.append([x,y])
+   polygons.append(poly)
+
+
+  #shifting
+  for poly in polygons:
+   for p in poly:
+    p[0] *= Lx  
+    p[1] *= Ly 
+    p[0] -= Lx/2.0  
+    p[1] -= Ly/2.0
+
 
 
   final = []
@@ -58,6 +69,7 @@ def GenerateCustomPores(argv):
      p1 = Polygon(tmp)
      if p1.intersects(frame): 
       final.append(tmp)
+
 
   return np.array(frame_tmp),np.array(final)
   

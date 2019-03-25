@@ -1,13 +1,10 @@
 from openbte import Material,Geometry,Solver,Plot
 
 
-Material(model='gray',mfp=[10],kappa_bulk=[10])
+Material(model='nongray',matfile='Si-300K.dat')
 
-#Geometry(porosity=0.25,lx=10,ly=10,step=1,inclusion=False)
+Geometry(porosity=0.10,lx=10,ly=10,step=1,shape='circle')
 Solver()
-#Plot(variable='map/flux',direction='magnitude')
-#Plot(variable='map')
-#Plot(variable='SUP')
-#Plot(variable='vtk')
+Plot(variable='vtk',repeat_x=3,repeat_y=3)
 
 

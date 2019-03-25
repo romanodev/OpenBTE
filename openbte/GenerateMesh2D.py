@@ -193,7 +193,7 @@ def already_included(all_points,new_point):
 
  for n,p in enumerate(all_points):
   d = np.linalg.norm(np.array(p)-np.array(new_point))
-  if d < 1e-12:
+  if d < 1e-3:
    return n
  return -1
 
@@ -364,7 +364,6 @@ def create_surface(ss,bulk_surface,store):
 
 def mesh(polygons,frame,argv):
 
-
   polygons = regularize_polygons(polygons)
 
   mesh_ext = argv['step']
@@ -393,10 +392,11 @@ def mesh(polygons,frame,argv):
    #pp = list(thin.exterior.coords)[:-1]
 
   #Get boundary wall
-  lx = frame[0][1]*2.0
-  ly = frame[1][1]*2.0
+  lx = abs(frame[0][0])*2.0
+  ly = abs(frame[0][1])*2.0
   pore_wall = []
   delta = 1e-2
+
 
   #-------------------------
 

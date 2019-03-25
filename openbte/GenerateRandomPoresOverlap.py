@@ -404,4 +404,14 @@ def GenerateRandomPoresOverlap(argv):
 
 
   #return frame_tmp,polygons_final
+
+  #scaling to 0-1
+  #polygons = []
+  #for poly_tmp in polys_cut:
+  # poly = []
+  # for p in poly_tmp:
+  #   poly.append([(p[0]-Lx/2)/Lx,(p[1]-Ly/2)/Ly])  
+  # polygons.append(poly) 
+
+
   return frame_tmp,polys_cut

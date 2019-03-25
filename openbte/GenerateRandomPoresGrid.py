@@ -103,7 +103,8 @@ def  delete_unnecessary_points(polygons):
      p3 = np.array(poly[(p+2)%(len(poly))])
      d1 = p2-p1
      d2 = p3-p2
-     if not abs(np.dot(d1,d2))< 1e-2:
+     a = abs(np.dot(d1,d2)/np.linalg.norm(d1)/np.linalg.norm(d2)) #if they are collinear
+     if a > 0.9: #if they are collinear
       tmp.append((p+1)%(len(poly)))
       n_del += 1
     delete_list.append(tmp)
@@ -133,7 +134,7 @@ def  delete_duplicate_points(polygons):
     for p in range(len(poly)):
      p1 = np.array(poly[p])
      p2 =np.array(poly[(p+1)%(len(poly))])
-     if np.linalg.norm(p1-p2)<1e-3:
+     if np.linalg.norm(p1-p2)<1e-2:
       tmp.append(p)
       n_del += 1
     delete_list.append(tmp)
@@ -144,26 +145,10 @@ def  delete_duplicate_points(polygons):
     for d2 in delete_list[d1]:
      del polygons[d1][d2-n]
      n += 1
+
   return polygons
 
 
-#def GenerateRandomPoresGrid(argv):
-
-#  nx =  argv.setdefault('nx',10)
-#  ny =  argv.setdefault('ny',10)
-#  Np =  argv.setdefault('Np',40)
-#  positions = []
-#  for n_pore in range(Np):
-#    overlap = True
-#    while overlap:
-#     xr = np.random.randint(0,nx)
-#
-#yr = np.random.randint(0,ny)
-#     if not [xr,yr] in positions:
-#      positions.append([xr,yr])
-#      overlap = False
-
-#  return positions
 
 
 def compute_inverse_polygons(positions,nx,ny,area,dx,dy,Lx,Ly,frame):
@@ -183,7 +168,7 @@ def compute_inverse_polygons(positions,nx,ny,area,dx,dy,Lx,Ly,frame):
     #quit()
     external = list(total.exterior.coords)[0:-1]
     external = delete_duplicate_points(list([external]))
-    external = delete_unnecessary_points(list(external))
+    #external = delete_unnecessary_points(list(external))
 
 
     internal = []
@@ -326,7 +311,6 @@ def compute_polygons_from_grid(values):
     npp += len(p)
     total = cascaded_union(m)
 
-
     polygons_final.append(list(total.exterior.coords)[0:-1])
 
   else:
@@ -340,7 +324,11 @@ def compute_polygons_from_grid(values):
   #polygons_final = polygons
   #type it up--------
   polygons_final = delete_duplicate_points(list(polygons_final))
+  #[print(len(n)) for n in polygons_final] 
   polygons_final = delete_unnecessary_points(list(polygons_final))
+  #print(' ')
+  #[print(len(n)) for n in polygons_final] 
+
   #------------------
 
   #inverse_polygons = compute_inverse_polygons(positions,nx,ny,area,dx,dy,Lx,Ly,frame)
@@ -360,11 +348,12 @@ def compute_polygons_from_grid(values):
   for poly in polygons_final:
    tmp = []
    for p in poly:
-    tmp.append(np.array(p))
-   polygons.append(np.array(tmp))
+    tmp.append(p[0])
+    tmp.append(p[1])
+   polygons.append(tmp)
 
 
-  return np.array(polygons)
+  return polygons
 
 
 

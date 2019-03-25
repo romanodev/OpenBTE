@@ -5,9 +5,9 @@ from shapely.geometry import Polygon
 
 def GenerateSquareLatticePores(argv):
 
+  porosity = float(argv['porosity'])
   Lx = float(argv['lx'])
   Ly = float(argv['ly'])
-  porosity = float(argv['porosity'])
 
   #Read shape
   shape = argv.setdefault('shape','square')
@@ -75,5 +75,4 @@ def GenerateSquareLatticePores(argv):
    if Polygon(p).intersects(frame_poly):
     polys_cut.append(p)
     
-
   return frame,polys_cut

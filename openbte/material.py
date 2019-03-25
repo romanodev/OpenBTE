@@ -27,7 +27,7 @@ class Material(object):
    
   if MPI.COMM_WORLD.Get_rank() == 0:
    #Polar Angle-----
-   n_phi = int(argv.setdefault('n_phi',46)); Dphi = 2*np.pi/n_phi
+   n_phi = int(argv.setdefault('n_phi',48)); Dphi = 2*np.pi/n_phi
    phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
    #--------------------
    
@@ -97,7 +97,7 @@ class Material(object):
    
   if MPI.COMM_WORLD.Get_rank() == 0:
     #Polar Angle-----
-    n_phi = int(argv.setdefault('n_phi',46)); Dphi = 2.0*np.pi/n_phi
+    n_phi = int(argv.setdefault('n_phi',48)); Dphi = 2.0*np.pi/n_phi
     phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
    #--------------------
    

@@ -63,7 +63,6 @@ class Geometry(object):
   #argv.setdefault('shape','square')
   geo_type = argv.setdefault('model','porous/square_lattice')
 
-
   if geo_type == 'load':
   # if MPI.COMM_WORLD.Get_rank() == 0:
     self.state = pickle.load(open('geometry.p','rb'))
@@ -101,9 +100,10 @@ class Geometry(object):
      if geo_type == 'porous/random_over_grid':
       x,polygons = GenerateRandomPoresGrid(**argv)
       self.x = x
-      argv['polygons'] = polygons
-      frame,polygons = GenerateCustomPores(argv)
 
+      argv['polygons'] = polygons
+      argv['automatic_periodic']=False
+      frame,polygons = GenerateCustomPores(argv)
 
     self.Lz = float(argv.setdefault('lz',0.0))
     if geo_type == 'bulk':
