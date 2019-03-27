@@ -42,29 +42,39 @@ def log_interp1d(xx, y, kind='linear'):
      
      return log_interp
 
-
 class Solver(object):
 
   def __init__(self,**argv):
-   
-   self.mesh = Geometry(model='load',filename = argv.setdefault('geometry_filename','geometry'))
+
+   if 'geometry' in argv.keys():   
+     self.mesh = argv['geometry']
+     self.mesh._update_data()
+   else:  
+    self.mesh = Geometry(model='load',filename = argv.setdefault('geometry_filename','geometry'))
+
+   self.dim = self.mesh.dim
    self.TT = 0.5*self.mesh.B * np.array([self.mesh.elem_volumes]).T    
    self.ms_error = argv.setdefault('ms_error',0.1)
    self.verbose = argv.setdefault('verbose',True)
    self.n_elems = len(self.mesh.elems)
    self.cache = os.getcwd() + '/.cache'
  
-   if MPI.COMM_WORLD.rank == 0:
+   if MPI.COMM_WORLD.rank == 0 and argv.setdefault('save_data',True):
     if os.path.exists(self.cache):
         shutil.rmtree(self.cache)
     os.mkdir('.cache')
-
    MPI.COMM_WORLD.Barrier() 
     
    self.argv = argv
    self.multiscale = argv.setdefault('multiscale',False)
    
-   tmp = dd.io.load('material.hdf5')
+
+   if 'material' in argv.keys():
+     tmp = argv['material'].output
+   else:  
+     tmp = dd.io.load('material.hdf5')
+
+
    #read materials-------------------
    if self.mesh.dim == 3:
       self.mat = tmp['data_3D']
@@ -106,10 +116,11 @@ class Solver(object):
    
 
 
-   #if MPI.COMM_WORLD.Get_rank() == 0:
-   # if os.path.isdir(self.cache):
-   #  shutil.rmtree(self.cache)
-
+   if MPI.COMM_WORLD.Get_rank() == 0:
+    if os.path.isdir(self.cache):
+     shutil.rmtree(self.cache)
+   MPI.COMM_WORLD.Barrier() 
+    
    #SAVE FILE--------------------
    #if argv.setdefault('save',True):
    #if MPI.COMM_WORLD.Get_rank() == 0:
@@ -177,7 +188,7 @@ class Solver(object):
     #----------------------------------------------
 
 
-     if global_index in self.lu.keys():
+     if global_index in self.lu.keys() and self.argv.setdefault('keep_lu',False):
       lu = self.lu[global_index]
      else:
       F = scipy.sparse.eye(self.n_elems,format='csc') +  A.tocsc() * self.mat['mfp'][n] 
@@ -202,7 +213,7 @@ class Solver(object):
    rank = comm.rank 
 
 
-   if rank == 0:
+   if rank == 0 and self.verbose:
      print('    Iter    Thermal Conductivity [W/m/K]      Error        Diffusive  -  BTE  -  Ballistic')
      print('   ---------------------------------------------------------------------------------------')
 
@@ -218,7 +229,7 @@ class Solver(object):
     error = error_vec[-1]
     kappa_old = kappa_eff[-1]
     ms_vec = data['ms_vec']
-    if rank == 0:
+    if rank == 0 and self.verbose:
       for n in range(len(kappa_eff)):
        print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n,kappa_eff[n],error_vec[n],ms_vec[n][0],ms_vec[n][1],ms_vec[n][2]))
       print('   ---------------------------------------------------------------------------------------')
@@ -276,15 +287,14 @@ class Solver(object):
     #Print diffusive Kappa---------
     if rank == 0:# and self.multiscale :
      SUP_DIF = np.sum(np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],SDIFF_ave)(self.mat['trials'])),axis=1)   
-     if n_iter==0:
+     if n_iter==0 and self.verbose:
        kappa = np.dot(SUP_DIF,self.mat['kappa_bulk'])
        print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,1,1,0,0))
        kappa_eff.append(kappa)
        kappa_old = kappa
 
-    if argv.setdefault('only_fourier',False):
+    if argv.setdefault('only_fourier',False) and argv.setdefault('save',True):
        dd.io.save('solver.hdf5',{'temperature_fourier':TFourier,'flux_fourier':FFourier})
-
        break
 
 
@@ -333,7 +343,6 @@ class Solver(object):
            fourier = True
            nd = n
         Tp[n]+= t; Jp[n] += j;  kernelp[n] += s
-
         Fluxp[n] += np.outer(t,self.mat['control_angle'][index])
 
     #S[n] = s/self.mat['mfp'][n]
@@ -349,6 +358,8 @@ class Solver(object):
            ballistic = True
            nb = n
        Tp[n] += t; Jp[n] += j; kernelp[n] += s
+       Fluxp[n] += np.outer(t,self.mat['control_angle'][index])
+
     #   S[n] = s/self.mat['mfp'][n]
 
 
@@ -401,21 +412,24 @@ class Solver(object):
     # plt.legend(['MFP','TL','T0'])
     # plt.xscale('log')
     # plt.show()
-   
-
+  
+    if self.dim == 2:
+     Flux.T[2,:] = 0   
     FLUX  = np.array([[np.sum(np.multiply(self.mat['J1'],log_interp1d(self.mat['mfp'],Flux.T[d,e])\
            (self.mat['trials'])))*self.mat['kappa_bulk_tot'] for d in range(3) ] for e in range(self.n_elems)])
 
     
+    
     ms_vec.append([diffusive,1-diffusive-ballistic,ballistic]) 
     #Thermal conductivity   
-    if rank==0:
+    if rank==0 and self.verbose:
       print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,error,diffusive,1-diffusive-ballistic,ballistic))
+    
+    self.state = {'TL':TL,'MFP_SAMPLED':self.mat['mfp'],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error_vec':error_vec,'ms_vec':ms_vec,'temperature':TL[0],'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'TB':TB,'temperature_fourier':TFourier,'flux_fourier':FFourier,'temperature_vec':T,'flux_vec':Flux}
+    if not argv.setdefault('only_fourier',False) and argv.setdefault('save',True):
+       dd.io.save('solver.hdf5',self.state)
      
-      if not argv.setdefault('only_fourier',False):
-       dd.io.save('solver.hdf5',{'TL':TL,'MFP_SAMPLED':self.mat['mfp'],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error_vec':error_vec,'ms_vec':ms_vec,'temperature':TL[0],'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'TB':TB,'temperature_fourier':TFourier,'flux_fourier':FFourier,'temperature_vec':T,'flux_vec':Flux})
-     
-   if rank==0:
+   if rank==0 and self.verbose:
      print('   ---------------------------------------------------------------------------------------')
      print(' ')
     

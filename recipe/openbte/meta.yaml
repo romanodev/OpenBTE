@@ -1,5 +1,5 @@
 {% set name = "openbte" %}
-{% set version = "0.9.41" %}
+{% set version = "0.9.49" %}
 
 package:
   name: "{{ name|lower }}"

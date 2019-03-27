@@ -11,17 +11,19 @@ class Material(object):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
  
-   output = {}   
+   self.output = {}   
    data = self.compute_mat_2D(argv)   
-   output.update({'data_2D':data})
+   self.output.update({'data_2D':data})
    
    data = self.compute_mat_3D(argv)   
-   output.update({'data_3D':data})
+   self.output.update({'data_3D':data})
   
-   #region = argv.setdefault('region','bulk')
-   #dd.io.save('material_' + region + '.hdf5',output)   
-   dd.io.save('material.hdf5',output)   
+
+   if argv.setdefault('save',True):
+    dd.io.save('material.hdf5',self.output)   
   MPI.COMM_WORLD.Barrier()
+
+
 
  def compute_mat_2D(self,argv):  
    

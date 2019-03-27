@@ -32,6 +32,8 @@ import deepdish as dd
 from scipy.sparse import csc_matrix
 from matplotlib.pylab import *
 from shapely.geometry import MultiPoint,Point,Polygon,LineString
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+
 
 
 def create_path(obj):
@@ -58,8 +60,7 @@ class Geometry(object):
   if direction == 'y':self.direction = 1
   if direction == 'z':self.direction = 2
   
-  
-  self.argv = argv
+  self.argv = argv.copy()
   #argv.setdefault('shape','square')
   geo_type = argv.setdefault('model','porous/square_lattice')
 
@@ -123,7 +124,7 @@ class Geometry(object):
      self.mesh(**argv)
 
    MPI.COMM_WORLD.Barrier()
-  if argv.setdefault('save_fig',False) or argv.setdefault('show',False):
+  if argv.setdefault('save_fig',False) or argv.setdefault('show',False) or argv.setdefault('store_rgb',False) :
    self.plot_polygons()
 
 
@@ -168,9 +169,13 @@ class Geometry(object):
     #  self.dim = 2
      #-----------------------------------
     if not argv.setdefault('only_geo',False): 
-     data = self.compute_mesh_data()
-     pickle.dump(data,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
-    
+     self.state = self.compute_mesh_data()
+
+     if self.argv.setdefault('save',True):
+       pickle.dump(self.state,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
+     
+
+
  # MPI.COMM_WORLD.Barrier()
 
  def get_repeated_size(self,argv):
@@ -268,14 +273,21 @@ class Geometry(object):
     axis('off')
 
     if self.argv.setdefault('show',False):
-     #print(fig.canvas.toolbar)
-     #quit()
      show()
-     #rcParams['toolbar']='None'
+    if self.argv.setdefault('savefig',False) :
+     savefig(argv.setdefault('fig_file','geometry.png'))
 
-    #fig:wq
+    if self.argv.setdefault('store_rgb',False):
 
-    savefig(argv.setdefault('fig_file','geometry.png'))
+     fig.canvas.draw()   
+     self.rgb = np.array(fig.canvas.renderer._renderer)
+     #canvas = FigureCanvas(fig)   
+     #canvas.draw()     
+     #print(X)
+     #quit()
+ 
+     #self.rgb = canvas.tostring_rgb()
+    
 
     #return fig
 
@@ -1067,8 +1079,9 @@ class Geometry(object):
   #self.node_list.setdefault('Interface',[])
   self.periodic_nodes = []
 
-
-
+  if self.argv.setdefault('delete_gmsh_files',False):
+    os.remove(os.getcwd() + '/mesh.msh')
+    os.remove(os.getcwd() + '/mesh.geo')
 
   for label in list(self.side_list.keys()):
 

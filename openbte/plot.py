@@ -20,6 +20,8 @@ from scipy.interpolate import griddata
 from shapely.geometry import MultiPoint,Point,Polygon,LineString
 import shapely
 from matplotlib.widgets import Slider, Button, RadioButtons
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+
 
 def get_suppression(mfps,sup,mfp):
 
@@ -103,14 +105,10 @@ class Plot(object):
  def save_vtk(self,argv):
   #if MPI.COMM_WORLD.Get_rank() == 0:
    #Write data-------
-   #geo = dd.io.load('geometry.hdf5')
    geo = Geometry(model='load')
-   #solver = dd.io.load('solver.hdf5')
    solver = self.solver
    argv.update({'Geometry':geo})
    vw = WriteVtk(argv)
-   #vw.add_variable(solver['fourier_temperature'],label = 'Fourier Temperature [K]')
-   #vw.add_variable(solver['fourier_flux'],label = r'''Thermal Flux [W/m/m]''')
 
    if 'temperature' in solver.keys():
     vw.add_variable(solver['temperature'],label = r'''BTE Temperature [K]''')
