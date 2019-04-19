@@ -64,10 +64,20 @@ class Geometry(object):
   #argv.setdefault('shape','square')
   geo_type = argv.setdefault('model','porous/square_lattice')
 
+  if geo_type == 'geo':
+   if MPI.COMM_WORLD.Get_rank() == 0:
+    self.dim = 3   
+    self.frame=[]
+    self.polygons=[]
+    self.state = self.compute_mesh_data()
+    if self.argv.setdefault('save',True):
+      pickle.dump(self.state,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
+    return
+
+
   if geo_type == 'load':
   # if MPI.COMM_WORLD.Get_rank() == 0:
     self.state = pickle.load(open('geometry.p','rb'))
-      
     self._update_data()
 
   else:
@@ -103,7 +113,7 @@ class Geometry(object):
       self.x = x
 
       argv['polygons'] = polygons
-      argv['automatic_periodic']=False
+      argv['automatic_periodic'] = False
       frame,polygons = GenerateCustomPores(argv)
 
     self.Lz = float(argv.setdefault('lz',0.0))
@@ -130,7 +140,6 @@ class Geometry(object):
 
  def mesh(self,**argv):
 
-     
     if self.Lz > 0.0:
      self.dim = 3
     else:
@@ -168,7 +177,10 @@ class Geometry(object):
     #  GenerateBulk2D.mesh(argv)
     #  self.dim = 2
      #-----------------------------------
-    if not argv.setdefault('only_geo',False): 
+    if not argv.setdefault('only_geo',False):
+        
+     #Create mesh---
+     subprocess.check_output(['gmsh','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
      self.state = self.compute_mesh_data()
 
      if self.argv.setdefault('save',True):
@@ -940,8 +952,6 @@ class Geometry(object):
 
  def import_mesh(self):
 
-  #Create mesh---
-  subprocess.check_output(['gmsh','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
 
   #-------------
 
@@ -1000,7 +1010,6 @@ class Geometry(object):
   self.side_node_map = {}
   self.node_elem_map = {}
   self.side_list = {}
- 
 
   for n in range(n_tot):
    tmp = f.readline().split()
@@ -1014,8 +1023,6 @@ class Geometry(object):
 
    b_sides.append(n)
    nr.append(int(tmp[3]))
-
-
 
    if self.dim == 3 and int(tmp[1]) == 4: #3D Elem
      node_indexes = [int(tmp[5])-1,int(tmp[6])-1,int(tmp[7])-1,int(tmp[8])-1]
@@ -1061,7 +1068,6 @@ class Geometry(object):
   #Set default for hot and cold
   self.side_list.setdefault('Hot',[])
   self.side_list.setdefault('Cold',[])
-
 
 
 

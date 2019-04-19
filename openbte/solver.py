@@ -292,11 +292,10 @@ class Solver(object):
        print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,1,1,0,0))
        kappa_eff.append(kappa)
        kappa_old = kappa
-
-    if argv.setdefault('only_fourier',False) and argv.setdefault('save',True):
+    if  rank == 0:
+     if argv.setdefault('only_fourier',False) and argv.setdefault('save',True):
        dd.io.save('solver.hdf5',{'temperature_fourier':TFourier,'flux_fourier':FFourier})
        break
-
 
 
     block = self.n_index // comm.size + 1

@@ -1,13 +1,13 @@
 from openbte import Geometry,Solver,Material,Plot
 import deepdish as dd
-
+'''
 Material(model='gray',n_theta = 16, n_phi = 48,mfp=[10])
 L = 10
 
 Geometry(model='porous/random',
               lx = L,ly = L,lz=0,
               step = L/5,
-              shape='square',
+              shape='circle',
               Np = 10,
               phi_mean = 0.3,
               manual = False,
@@ -16,7 +16,8 @@ Geometry(model='porous/random',
               save_configuration=True,
               save_fig = False)
 #------------------------------------------------
-Solver(max_bte_iter=10)
-Plot(variable='map/flux',direction='magnitude')
+'''
+#Solver(max_bte_iter=10)
+Plot(variable='vtk')
 
 

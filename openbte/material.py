@@ -4,7 +4,6 @@ import deepdish as dd
 from mpi4py import MPI
 from numpy.testing import assert_array_equal
 
-
 class Material(object):
 
  def __init__(self,**argv):
