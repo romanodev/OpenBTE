@@ -297,10 +297,13 @@ class Solver(object):
 
 
     block = self.n_index // comm.size + 1
-    Jp,J = np.zeros((2,self.mat['n_mfp'],self.n_elems))
-    Fluxp,Flux = np.zeros((2,self.mat['n_mfp'],self.n_elems,3))
-    kernelp,kernel = np.zeros((2,self.mat['n_mfp']))
-    Tp,T = np.zeros((2,self.mat['n_mfp'],self.n_elems))
+
+    total_dof = self.mat['n_mfp']*self.n_index
+
+    Jp,J = np.zeros((2,self.n_elems))
+    Fluxp,Flux = np.zeros((2,self.n_elems,3))
+    kernelp,kernel = np.zeros((2,total_dof))
+    Tp,T = np.zeros((2,total_dof,self.n_elems))
     MSp,MS = np.zeros((2,2))
 
 
@@ -329,6 +332,8 @@ class Solver(object):
      # S =np.zeros(self.mat['n_mfp'])
       fourier = False
       for n in range(self.mat['n_mfp'])[idx[0]::-1]:
+        global_index = n * self.n_index + index
+
         if  fourier : 
          t,s,j = self.get_multiscale_diffusive(index,n,SDIFF,TDIFF,TDIFFGrad)
         else: 
@@ -339,13 +344,14 @@ class Solver(object):
           if error<5e-2:
            fourier = True
            nd = n
-        Tp[n]+= t; Jp[n] += j;  kernelp[n] += s
-        Fluxp[n] += np.outer(t,self.mat['control_angle'][index])
+        Tp[global_index]+= t; Jp += j;  kernelp[global_index] += s
+        Fluxp += np.outer(t,self.mat['control_angle'][index])
 
     #S[n] = s/self.mat['mfp'][n]
 
       ballistic = False
       for n in range(self.mat['n_mfp'])[idx[0]+1:]:
+       global_index = n * self.n_index + index
        if  ballistic :
          s = sbal;t = tbal; j = jbal
        else:  
@@ -354,8 +360,8 @@ class Solver(object):
           if abs(s-sbal)/sbal < 1e-2: 
            ballistic = True
            nb = n
-       Tp[n] += t; Jp[n] += j; kernelp[n] += s
-       Fluxp[n] += np.outer(t,self.mat['control_angle'][index])
+       Tp[global_index] += t; J += j; kernelp[n] += s
+       Fluxp += np.outer(t,self.mat['control_angle'][index])
 
     #   S[n] = s/self.mat['mfp'][n]
 
@@ -367,6 +373,8 @@ class Solver(object):
     comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
     diffusive = MS[0]/self.n_index/self.mat['n_mfp']
     ballistic = (self.n_index*self.mat['n_mfp'] - MS[1])/self.n_index/self.mat['n_mfp']
+    print('gg')
+    quit()
 
     #quit() 
 

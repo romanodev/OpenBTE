@@ -1,4 +1,4 @@
-from .material import Material
+from .material2 import Material
 from .geometry import Geometry
-from .solver import Solver
+from .solver2 import Solver
 from .plot import Plot

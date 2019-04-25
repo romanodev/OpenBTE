@@ -78,11 +78,11 @@ class Material(object):
 
 
 
-   kappa_directional = np.zeros((n_mfp_bulk,n_theta,n_phi)) 
+   kappa_grain = np.zeros(n_mfp_bulk*n_theta*n_phi) 
    for m in range(n_mfp_bulk):
     for t in range(n_theta):  
       for p in range(n_phi):  
-       kappa_directional[m,t,p] = kappa_bulk[m]
+       kappa_directional[m,t,p] = kappa_bulk[m]/mfp_bulk[m]
 
 
    #trials = np.outer(mfp_bulk,ftheta*np.sin(theta)).flatten()
