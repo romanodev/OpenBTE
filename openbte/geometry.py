@@ -106,7 +106,9 @@ class Geometry(object):
       frame,polygons = GenerateCustomPores(argv)
 
      if geo_type == 'porous/random':
-      frame,polygons = GenerateRandomPoresOverlap(argv)
+      frame,polygons,tt = GenerateRandomPoresOverlap(argv)
+      self.tt = tt
+
 
      if geo_type == 'porous/random_over_grid':
       x,polygons = GenerateRandomPoresGrid(**argv)

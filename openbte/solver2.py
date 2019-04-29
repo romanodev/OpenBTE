@@ -324,7 +324,6 @@ class Solver(object):
       else:  
         idx = [self.mat['n_mfp']-1]  
 
-
       nd = 0
       nn = idx[0]
       nb = self.mat['n_mfp']
@@ -346,6 +345,7 @@ class Solver(object):
            nd = n
         Tp[global_index]+= t; Jp += j;  kernelp[global_index] += s
         Fluxp += np.outer(t,self.mat['control_angle'][index])
+        
 
     #S[n] = s/self.mat['mfp'][n]
 
@@ -378,7 +378,7 @@ class Solver(object):
 
     n_iter +=1
     #----------------------------------------------------------- 
-    kappa = np.dot(self.mat['kappa_grain'],kernal)
+    kappa = np.dot(self.mat['kappa_directional'],kernel)
     print(kappa)
     quit()
 

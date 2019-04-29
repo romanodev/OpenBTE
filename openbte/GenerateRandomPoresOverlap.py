@@ -3,11 +3,14 @@ import os,sys
 import numpy as np
 import random
 import math
+import copy
 #from utils_disorder import *
 from shapely.ops import cascaded_union
 from shapely.geometry import Point
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
+from shapely.affinity import translate
+
 import matplotlib
 if not matplotlib.get_backend() == 'Qt5Agg': matplotlib.use('Qt5Agg')
 
@@ -109,7 +112,7 @@ def adjust_position(x,y,r,Na,Lx,Ly,d_min):
  p = Polygon(poly_clip)
 
 
- delta = 1e-4
+ delta = 1e-3
 
  tmp = []
  tmp.append([-Lx/2-delta,Ly/2])
@@ -266,7 +269,6 @@ def GenerateRandomPoresOverlap(argv):
   spread =  argv.setdefault('spread',0.0)
 
 
-
   frame_tmp = []
   frame_tmp.append([float(-Lxp * Nx)/2,float(Lyp * Ny)/2])
   frame_tmp.append([float(Lxp * Nx)/2,float(Lyp * Ny)/2])
@@ -337,7 +339,7 @@ def GenerateRandomPoresOverlap(argv):
   if argv.setdefault('load_configuration',False):
    centers = np.load('conf.dat')
   elif argv.setdefault('manual',False):
-   centers = argv['centers'] 
+   centers = argv['centers']
   else:
    centers = []
    for nn in range(Np):
@@ -345,22 +347,55 @@ def GenerateRandomPoresOverlap(argv):
     y = np.random.uniform(0,1)
     centers.append([x,y])
 
-
-  dphi = 2.0*math.pi/Na;
+  #centers_new = []
+  #index = [1]
+  #for i in index:
+  #  centers_new.append(centers[i]) 
+  #centers = centers_new  
+  #dphi = 2.0*math.pi/Na;
   #Fill polys-----
   polys = []
 
+  tt= []
+  dmin=1e-2
   for center in centers:
    x = Lx*(center[0]-0.5)
    y = Ly*(center[1]-0.5)
    phi = np.random.uniform(phi_mean - spread, phi_mean + spread)
    area = Lx*Ly*phi/float(Np)
    r = math.sqrt(2.0*area/Na/math.sin(2.0 * math.pi/Na))
+   poly_clip = []
+   for ka in range(Na):
+     ph =  dphi/2 + (ka-1) * dphi
+     px  = x + r * math.cos(ph) 
+     py  = y + r * math.sin(ph) 
+     poly_clip.append([px,py])
+   p = Polygon(poly_clip)
+   a = p.intersection(frame).area == p.area
+   dx = 0
+   dy = 0
 
-   (dx,dy) = adjust_position(x,y,r,Na,Lx,Ly,d_min)
+   if argv.setdefault('adjust',False):
+    p1 = copy.deepcopy(translate(p,xoff=dmin))
+    b = p1.intersection(frame).area == p1.area
+    if a != b:
+     dx = -dmin
+    p1 = copy.deepcopy(translate(p,xoff=-dmin))
+    b = p1.intersection(frame).area == p1.area
+    if a != b:
+     dx = +dmin
+    p1 = copy.deepcopy(translate(p,yoff=dmin))
+    b = p1.intersection(frame).area == p1.area
+    if a != b:
+     dy = -dmin
+    p1 = copy.deepcopy(translate(p,yoff=-dmin))
+    b = p1.intersection(frame).area == p1.area
+    if a != b:
+     dy = +dmin
 
-   x +=dx
-   y +=dy
+   x = dx
+   y = dy
+   tt.append([x,y])
 
    for kp in range(len(pbc)):
     poly_clip = []
@@ -369,20 +404,11 @@ def GenerateRandomPoresOverlap(argv):
      px  = x + r * math.cos(ph) + pbc[kp][0]
      py  = y + r * math.sin(ph) + pbc[kp][1]
      poly_clip.append([px,py])
-
     polys.append(Polygon(poly_clip))
-
-
-
 
   n_coll = 1
   while n_coll > 0:
    polys,n_coll = consolidate(polys,argv)
-  #polys,n_coll = consolidate(polys,argv)
-  # polys,n_coll = consolidate(polys,argv)
-  #polys,n_coll = consolidate(polys,argv)
-  #polys,n_coll = consolidate(polys,argv)
-  # print(n_coll)
 
 
   #n_coll = 1
@@ -394,7 +420,8 @@ def GenerateRandomPoresOverlap(argv):
   polys_cut = []
   for p in polys:
    if p.intersects(frame):
-    polys_cut.append(list(p.exterior.coords)[:-1])
+    new = list(p.exterior.coords)[:-1]   
+    polys_cut.append(new)
     area += p.area
 
   if argv['save_configuration'] and not argv['load_configuration']:
@@ -414,4 +441,4 @@ def GenerateRandomPoresOverlap(argv):
   # polygons.append(poly) 
 
 
-  return frame_tmp,polys_cut
+  return frame_tmp,polys_cut,tt

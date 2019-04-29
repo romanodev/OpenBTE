@@ -37,6 +37,17 @@ class Material(object):
    #print(A[6,3])
    #COEFF = np.load('COEFF.BTE')
 
+ def get_linear_indexes(mfp,value):
+
+   if value < mfp[0]:
+     return implement this...
+       
+
+   for m in range(len(mfp)-1):
+    
+
+
+
 
  def compute_mat_2D(self,argv):  
    
@@ -50,14 +61,16 @@ class Material(object):
    n_theta = int(argv.setdefault('n_theta',48)); Dtheta = np.pi/n_theta/2.0
    theta = np.linspace(Dtheta/2.0,np.pi/2.0 - Dtheta/2.0,n_theta)
    dtheta = 2.0*np.sin(Dtheta/2.0)*np.sin(theta)   
+   ftheta = (1-np.cos(2*theta)*np.sinc(Dtheta/np.pi))/(np.sinc(Dtheta/2/np.pi)*(1-np.cos(2*theta)))
+   #Stheta = Dtheta/2.0-np.cos(2*theta)*np.sin(Dtheta)/2
    
+   domega = 2.0*np.outer(dtheta,Dphi*np.ones(n_phi)) #Including the symmetry
    #Compute directions---
    polar = np.array([np.sin(phi),np.cos(phi),np.ones(n_phi)]).T
    azimuthal = np.array([np.sin(theta),np.sin(theta),np.cos(theta)]).T
    direction = np.einsum('ij,kj->ikj',azimuthal,polar)
    
    #Compute average---
-   ftheta = (1-np.cos(2*theta)*np.sinc(Dtheta/np.pi))/(np.sinc(Dtheta/2/np.pi)*(1-np.cos(2*theta)))
    fphi= np.sinc(Dphi/2.0/np.pi)
    polar_ave = np.array([fphi*np.ones(n_phi),fphi*np.ones(n_phi),np.ones(n_phi)]).T
    azimuthal_ave = np.array([ftheta,ftheta,np.cos(Dtheta/2)*np.ones(n_theta)]).T   
@@ -74,16 +87,22 @@ class Material(object):
     kappa_bulk = argv.setdefault('kappa_bulk',np.ones(len(mfp_bulk)))
 
    n_mfp_bulk = len(mfp_bulk) 
-   mfp = np.logspace(-3,np.log10(max(mfp_bulk)),argv.setdefault('n_mfp',100)) 
+   mfp = np.logspace(-3,np.log10(max(mfp_bulk)),argv.setdefault('n_mfp',100))#in nm 
+   n_mfp = len(mfp)
 
+   kappa_directional = np.zeros(n_mfp*n_phi) 
+   for p in range(n_phi): 
+    for t in range(n_theta): 
+     for m in range(n_mfp_bulk):
+      (m1,a1,m2,a2) = get_linear_indexes(mfp,mfp_bulk[m]*ftheta[t])
+      index_1 = p*n_mfp + m1
+      index_2 = p*n_mfp + m2
+      kappa_directional[index_1] += a1 * kappa_bulk[m]/mfp_bulk[m]*np.dot(direction_ave[t,p],[1,0,0])*domega[t,p]
+      kappa_directional[index_2] += a2 * kappa_bulk[m]/mfp_bulk[m]*np.dot(direction_ave[t,p],[1,0,0])*domega[t,p]
 
+   quit()
 
-   kappa_grain = np.zeros(n_mfp_bulk*n_theta*n_phi) 
-   for m in range(n_mfp_bulk):
-    for t in range(n_theta):  
-      for p in range(n_phi):  
-       kappa_directional[m,t,p] = kappa_bulk[m]/mfp_bulk[m]
-
+   
 
    #trials = np.outer(mfp_bulk,ftheta*np.sin(theta)).flatten()
    #J0 = np.outer(np.ones(n_mfp_bulk),dtheta).flatten()
@@ -101,7 +120,7 @@ class Material(object):
    G = mfp/2
    kappa_mfe = np.square(mfp)/2
 
-   domega = np.ones(n_phi)*Dphi/2.0/np.pi
+   domega_polar = np.ones(n_phi)*Dphi/2.0/np.pi
  
    data = {'kappa_bulk_tot':sum(kappa_bulk),'kappa_bulk':kappa_bulk,\
                 'mfp_bulk':mfp_bulk,\
@@ -111,7 +130,7 @@ class Material(object):
                 'dphi':Dphi,\
                 'n_mfp':len(mfp),\
                 'trials':trials,\
-                'domega':domega,\
+                'domega':domega_polar,\
                 'mfp':mfp,\
                 'kappa_directional':kappa_directional,\
                 'J0':J0,'J1':J1,'J2':J2,'J3':J3,\

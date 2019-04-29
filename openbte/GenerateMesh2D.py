@@ -191,9 +191,10 @@ def PolygonArea(corners):
 
 def already_included(all_points,new_point):
 
+ dd = 1e-12   
  for n,p in enumerate(all_points):
   d = np.linalg.norm(np.array(p)-np.array(new_point))
-  if d < 1e-3:
+  if d < dd:
    return n
  return -1
 
@@ -484,7 +485,7 @@ def mesh(polygons,frame,argv):
   plr = np.array([lx/2.0,-ly/2.0])
 
 
-  delta = 1e-8
+  delta = 1e-12
   pore_wall = []
   for l,line in enumerate(lines):
   
