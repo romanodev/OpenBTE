@@ -301,7 +301,7 @@ def plot_region(dd,color='r'):
  ylim([-30,30])
 
 
-def create_line_list(pp,points,lines,store,mesh_ext):
+def create_line_list(pp,points,lines,store):
 
 
    p_list = []
@@ -309,7 +309,7 @@ def create_line_list(pp,points,lines,store,mesh_ext):
     tmp = already_included(points,p)
     if tmp == -1:
      points.append(p)
-     store.write( 'Point('+str(len(points)-1) +') = {' + str(p[0]) +','+ str(p[1])+',0,'+ str(mesh_ext) +'};\n')
+     store.write( 'Point('+str(len(points)-1) +') = {' + str(p[0]) +','+ str(p[1])+',0,h};\n')
      p_list.append(len(points)-1)
     else:
      p_list.append(tmp)
@@ -373,6 +373,7 @@ def mesh(polygons,frame,argv):
 
   #CREATE BULK SURFACE------------------------------------
   store = open('mesh.geo', 'w+')
+  store.write('h='+str(mesh_ext) + ';\n')
   points = []
   lines = []
   loops = 0
@@ -409,10 +410,12 @@ def mesh(polygons,frame,argv):
 
   bulk_surface = []
   inclusions = []
+ 
+   
   for region in bulk:
 
    pp = list(region.exterior.coords)[:-1]
-   line_list = create_line_list(pp,points,lines,store,mesh_ext)
+   line_list = create_line_list(pp,points,lines,store)
 
    loops +=1
    local_loops = [loops]
@@ -421,7 +424,7 @@ def mesh(polygons,frame,argv):
    #Create internal loops-------------
    for interior in region.interiors:
     pp = list(interior.coords)[:-1]
-    line_list = create_line_list(pp,points,lines,store,mesh_ext)
+    line_list = create_line_list(pp,points,lines,store)
     loops +=1
     local_loops.append(loops)
     create_loop(loops,line_list,store)
@@ -443,7 +446,7 @@ def mesh(polygons,frame,argv):
 
     #Points-------
     pp = list(thin.exterior.coords)[:-1]
-    line_list = create_line_list(pp,points,lines,store,mesh_ext)
+    line_list = create_line_list(pp,points,lines,store)
     loops +=1
     create_loop(loops,line_list,store)
     ss +=1
