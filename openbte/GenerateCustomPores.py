@@ -34,13 +34,14 @@ def GenerateCustomPores(argv):
   else:
    tmp = np.loadtxt(argv['polyfile'])
 
-  if np.ndim(tmp) == 1: tmp = [tmp]
+  #if np.ndim(tmp) == 1: tmp = [tmp]
+
+ 
 
   polygons = []
   for k in range(len(tmp)):
 
    poly_tmp = tmp[k]   
-
    poly = []
    
    for n in range(int(len(poly_tmp)/2)):
@@ -49,16 +50,16 @@ def GenerateCustomPores(argv):
     poly.append([x,y])
    polygons.append(poly)
 
-  
+
+  polygons_new = []
   #shifting
   for poly in polygons:
+   new_poly = []
    for p in poly:
     p[0] *= Lx  
     p[1] *= Ly 
-    p[0] -= Lx/2.0  
+    p[0] -= Lx/2.0
     p[1] -= Ly/2.0
-
-
 
   final = []
   for poly in polygons:

@@ -106,9 +106,9 @@ class Geometry(object):
       frame,polygons = GenerateCustomPores(argv)
 
      if geo_type == 'porous/random':
+
       frame,polygons,tt = GenerateRandomPoresOverlap(argv)
       self.tt = tt
-
 
      if geo_type == 'porous/random_over_grid':
       x,polygons = GenerateRandomPoresGrid(**argv)
@@ -122,12 +122,16 @@ class Geometry(object):
     if geo_type == 'bulk':
       Lx = float(argv['lx'])
       Ly = float(argv['ly'])
-
       frame = []
       frame.append([-Lx/2,Ly/2])
       frame.append([Lx/2,Ly/2])
       frame.append([Lx/2,-Ly/2])
       frame.append([-Lx/2,-Ly/2])
+
+
+    #print(polygons)
+    #frame,polygons = self.repeat(argv,polygons)
+    #quit()
 
     self.frame = frame
     self.polygons = polygons
@@ -139,6 +143,35 @@ class Geometry(object):
   if argv.setdefault('save_fig',False) or argv.setdefault('show',False) or argv.setdefault('store_rgb',False) :
    self.plot_polygons()
 
+ def repeat(self,argv,polygons):
+
+    #repetition, experimental----
+    new_polygons = []
+    Nx = argv.setdefault('repeat_x',1)   
+    Ny = argv.setdefault('repeat_y',1)
+    Lx = argv.setdefault('lx')   
+    Ly = argv.setdefault('ly')
+    argv['lx'] = Nx*Lx
+    argv['ly'] = Ny*Ly
+
+    for nx in range(Nx):
+     for ny in range(Ny):
+      hpoly = [] 
+      for poly in polygons:
+       for p in poly:
+        hx = p[0] + nx*Lx-Lx/2
+        hy = p[1] + ny*Ly-Ly/2
+        h = [hx,hy]
+        hpoly.append(h)
+      new_polygons.append(hpoly)
+    polygons = new_polygons.copy()
+    frame = []
+    frame.append([float(-Lx * Nx)/2,float(Ly * Ny)/2])
+    frame.append([float(Lx * Nx)/2,float(Ly * Ny)/2])
+    frame.append([float(Lx * Nx)/2,float(-Ly * Ny)/2])
+    frame.append([float(-Lx * Nx)/2,float(-Ly * Ny)/2])
+ 
+    return frame,polygons
 
  def mesh(self,**argv):
 

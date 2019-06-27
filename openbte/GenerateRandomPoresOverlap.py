@@ -261,6 +261,8 @@ def GenerateRandomPoresOverlap(argv):
 
   random_phi =  argv.setdefault('random_angle',False)
 
+  #Lxp =  argv['lx']*argv.setdefault('repeat_x',1)
+  #Lyp =  argv['ly']*argv.setdefault('repeat_y',1)
   Lxp =  argv['lx']
   Lyp =  argv['ly']
   Nx = 1
@@ -352,7 +354,7 @@ def GenerateRandomPoresOverlap(argv):
   #for i in index:
   #  centers_new.append(centers[i]) 
   #centers = centers_new  
-  #dphi = 2.0*math.pi/Na;
+  dphi = 2.0*math.pi/Na;
   #Fill polys-----
   polys = []
 
@@ -393,8 +395,8 @@ def GenerateRandomPoresOverlap(argv):
     if a != b:
      dy = +dmin
 
-   x = dx
-   y = dy
+   x += dx
+   y += dy
    tt.append([x,y])
 
    for kp in range(len(pbc)):
@@ -406,7 +408,7 @@ def GenerateRandomPoresOverlap(argv):
      poly_clip.append([px,py])
     polys.append(Polygon(poly_clip))
 
-  n_coll = 1
+  n_coll = 0
   while n_coll > 0:
    polys,n_coll = consolidate(polys,argv)
 
@@ -419,7 +421,9 @@ def GenerateRandomPoresOverlap(argv):
   eps = argv['step']/2.0
   polys_cut = []
   for p in polys:
+
    if p.intersects(frame):
+    
     new = list(p.exterior.coords)[:-1]   
     polys_cut.append(new)
     area += p.area

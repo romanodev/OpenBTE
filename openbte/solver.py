@@ -36,7 +36,9 @@ def log_interp1d(xx, y, kind='linear'):
       logx = np.log10(xx)
       logy = np.log10(yy)
       lin_interp = interpolate.interp1d(logx,logy,kind=kind,fill_value='extrapolate')
+      #lin_interp = interpolate.interp1d(xx,yy,kind=kind,fill_value='extrapolate')
       log_interp = lambda zz: np.power(10.0, lin_interp(np.log10(zz)))  +scale -1e-12
+      #log_interp = lambda zz: lin_interp(zz)  +scale -1e-12
      else:
       log_interp = lambda zz: y[0]
      
@@ -387,13 +389,13 @@ class Solver(object):
     TB = 4.0*np.tile([np.sum(np.multiply(self.mat['J1'],log_interp1d(self.mat['mfp'],J.T[e])(self.mat['trials']))) \
          for e in range(self.n_elems)],(self.mat['n_mfp'],1))
    
-
     #Lattice temperature   
     #TL = np.tile([np.sum(np.multiply(self.mat['J2'],log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials']))) \
     #     for e in range(self.n_elems)],(self.mat['n_mfp'],1))
 
     TL = np.tile([np.sum(np.multiply(self.mat['J2'],log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials']))) \
          for e in range(self.n_elems)],(self.mat['n_mfp'],1))
+    print(min(TL[0]),max(TL[0]))
 
     if self.dim == 2:
      Flux.T[2,:] = 0   
@@ -408,8 +410,8 @@ class Solver(object):
       print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,error,diffusive,1-diffusive-ballistic,ballistic))
     
     self.state = {'TL':TL,'MFP_SAMPLED':self.mat['mfp'],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error_vec':error_vec,'ms_vec':ms_vec,'temperature':TL[0],'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'TB':TB,'temperature_fourier':TFourier,'flux_fourier':FFourier,'temperature_vec':T,'flux_vec':Flux}
-    if not argv.setdefault('only_fourier',False) and argv.setdefault('save',True):
-       dd.io.save('solver.hdf5',self.state)
+    #if not argv.setdefault('only_fourier',False) and argv.setdefault('save',True):
+    #   dd.io.save('solver.hdf5',self.state)
      
    if rank==0 and self.verbose:
      print('   ---------------------------------------------------------------------------------------')

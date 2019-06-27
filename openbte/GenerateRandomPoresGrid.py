@@ -150,7 +150,6 @@ def  delete_duplicate_points(polygons):
 
 
 
-
 def compute_inverse_polygons(positions,nx,ny,area,dx,dy,Lx,Ly,frame):
 
    compl = complement_positions(positions,nx+1,ny+1)
@@ -192,28 +191,22 @@ def compute_polygons_from_grid(values):
    positions_old.append([a,b])
 
 
-  #positions_old = argv['x']
-  #positions_old = np.reshape(argv['x'],(len(argv['x'])/2,2))
-
-  #Lx =  argv.setdefault('Lx',40.0)
   Lx = 1.0
   Ly = 1.0
-  #Ly =  argv.setdefault('Ly',40.0)
-  #phi =  argv.setdefault('porosity',0.3)
   Na = 4
-  #nx =  argv.setdefault('nx',10)
-  #ny =  argv.setdefault('ny',10)
-  dx = Lx/nx
-  dy = Ly/ny
+  dx = 1/nx
+  dy = 1/ny
   area = dx*dy
   frame_tmp = []
   frame_tmp.append([float(-Lx)/2,float(Ly)/2])
   frame_tmp.append([float(Lx)/2,float(Ly)/2])
   frame_tmp.append([float(Lx)/2,float(-Ly)/2])
   frame_tmp.append([float(-Lx)/2,float(-Ly)/2])
+  #frame_tmp.append([0,1])
+  #frame_tmp.append([1,1])
+  #frame_tmp.append([1,0])
+  #frame_tmp.append([0,0])
   frame = Polygon(frame_tmp)
-
-
 
   #quit()
   delta = 1e-3
@@ -226,6 +219,9 @@ def compute_polygons_from_grid(values):
     polygons.append(get_square(xr*dx-Lx*0.5,\
                                yr*dy-Lx*0.5,\
                                area))
+    #polygons.append(get_square(xr*dx,\
+    #                           yr*dy,\
+    #                           area))
     positions.append(pos)
 
     #if argv.setdefault('add_periodic',True):
@@ -348,8 +344,8 @@ def compute_polygons_from_grid(values):
   for poly in polygons_final:
    tmp = []
    for p in poly:
-    tmp.append(p[0])
-    tmp.append(p[1])
+    tmp.append(p[0]+Lx/2)
+    tmp.append(p[1]+Lx/2)
    polygons.append(tmp)
 
 

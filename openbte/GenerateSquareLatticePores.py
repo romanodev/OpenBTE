@@ -6,8 +6,8 @@ from shapely.geometry import Polygon
 def GenerateSquareLatticePores(argv):
 
   porosity = float(argv['porosity'])
-  Lx = float(argv['lx'])
-  Ly = float(argv['ly'])
+  Lx = float(argv['lx'])*argv.setdefault('Nx',1)
+  Ly = float(argv['ly'])*argv.setdefault('Ny',1)
 
   #Read shape
   shape = argv.setdefault('shape','square')
