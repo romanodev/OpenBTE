@@ -106,7 +106,6 @@ class Geometry(object):
       frame,polygons = GenerateCustomPores(argv)
 
      if geo_type == 'porous/random':
-
       frame,polygons,tt = GenerateRandomPoresOverlap(argv)
       self.tt = tt
 

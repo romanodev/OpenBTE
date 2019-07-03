@@ -373,6 +373,10 @@ def GenerateRandomPoresGrid(**options):
     pos.append(tmp)
     values[x,y] = 1
 
+ if options.setdefault('save_configuration',False):
+   values.dump(open('conf.dat','wb'))
+  
+
  polygons = compute_polygons_from_grid(values)
  return values,polygons
 

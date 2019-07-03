@@ -17,9 +17,6 @@ import shapely
 
 
 # return loop
-
-
-
 def line_exists_ordered(l,lines):
  for n,line in enumerate(lines) :
   if (line[0] == l[0] and line[1] == l[1]) :

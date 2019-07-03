@@ -395,7 +395,7 @@ class Solver(object):
 
     TL = np.tile([np.sum(np.multiply(self.mat['J2'],log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials']))) \
          for e in range(self.n_elems)],(self.mat['n_mfp'],1))
-    print(min(TL[0]),max(TL[0]))
+    #print(min(TL[0]),max(TL[0]))
 
     if self.dim == 2:
      Flux.T[2,:] = 0   
