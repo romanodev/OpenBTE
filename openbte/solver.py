@@ -342,9 +342,9 @@ class Solver(object):
         if  fourier : 
          t,s,j = self.get_multiscale_diffusive(index,n,SDIFF,TDIFF,TDIFFGrad)
         else: 
-         a= time.time()
+         #a= time.time()
          t,s,j = self.get_solving_data(index,n,TB,TL)
-         print(time.time()-a)
+         #print(time.time()-a)
 
          if self.multiscale:
           error = abs((SDIFF[n]-s/self.mat['mfp'][n])/SDIFF[n])
