@@ -174,9 +174,10 @@ class Solver(object):
       test2  = sparse.tensordot(self.mesh.N,aa,axes=1)
       K = test2 * self.TT #broadcasting (B_ij * V_i)
       AM = test2.clip(max=0)
-      #AP = test2 - AM
+      #AP = test2.clip(min=0)
+      AP = test2 - AM
 
-      AP = spdiags((test2-AM).sum(axis=1).todense(),0,nc,nc,format='csc')
+      AP = spdiags(AP.sum(axis=1).todense(),0,nc,nc,format='csc')
 
       P = (AM*self.mesh.B).sum(axis=1).todense()
 
@@ -208,7 +209,6 @@ class Solver(object):
 
      RHS = self.mat['mfp'][n] * (P + np.multiply(TB[n],HW_MINUS)) + TL[n]      
      temp = lu.solve(RHS)
-     #temp = temp - (max(temp)+min(temp))/2.0
    
      t = temp*self.mat['domega'][index]
      s = K.dot(temp-TL[n]).sum() * self.mat['domega'][index] * 3 * self.kappa_factor
@@ -342,9 +342,7 @@ class Solver(object):
         if  fourier : 
          t,s,j = self.get_multiscale_diffusive(index,n,SDIFF,TDIFF,TDIFFGrad)
         else: 
-         #a= time.time()
          t,s,j = self.get_solving_data(index,n,TB,TL)
-         #print(time.time()-a)
 
          if self.multiscale:
           error = abs((SDIFF[n]-s/self.mat['mfp'][n])/SDIFF[n])
@@ -399,13 +397,13 @@ class Solver(object):
     TB = 4.0*np.tile([np.sum(np.multiply(self.mat['J1'],log_interp1d(self.mat['mfp'],J.T[e])(self.mat['trials']))) \
          for e in range(self.n_elems)],(self.mat['n_mfp'],1))
    
+    print(min(TB[0]),max(TB[0]))
     #Lattice temperature   
     #TL = np.tile([np.sum(np.multiply(self.mat['J2'],log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials']))) \
     #     for e in range(self.n_elems)],(self.mat['n_mfp'],1))
 
     TL = np.tile([np.sum(np.multiply(self.mat['J2'],log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials']))) \
          for e in range(self.n_elems)],(self.mat['n_mfp'],1))
-    #print(min(TL[0]),max(TL[0]))
 
     if self.dim == 2:
      Flux.T[2,:] = 0   

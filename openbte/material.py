@@ -23,20 +23,6 @@ class Material(object):
     dd.io.save('material.hdf5',self.output)   
   MPI.COMM_WORLD.Barrier()
 
- def compute_full_bte(self,**argv):
-
-  if MPI.COMM_WORLD.Get_rank() == 0:
-   data = dd.io.load(argv['matfile'])
-      
-   #Polar Angle-----
-   #n_phi = int(argv.setdefault('n_phi',48)); Dphi = 2*np.pi/n_phi
-   #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
-   #MFP = np.load('MFP.BTE')
-   #A = np.load('A.BTE')
-   #print(A[3,6])
-   #print(A[6,3])
-   #COEFF = np.load('COEFF.BTE')
-
 
  def compute_mat_2D(self,argv):  
    

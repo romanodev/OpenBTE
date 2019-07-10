@@ -8,6 +8,10 @@ Community
 
 `Mailing list <https://groups.google.com/forum/#!forum/openbte>`_
 
+Reference
+=========
+
+`pdf < https://heattransfer.asmedigitalcollection.asme.org/article.aspx?articleid=2119334 >`_
 
 Installation
 ====================
