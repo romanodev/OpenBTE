@@ -1,19 +1,23 @@
 from __future__ import absolute_import
-
 #import os
 import numpy as np
+import scipy.sparse
 from scipy.sparse import csc_matrix
 from mpi4py import MPI
 #import shutil
 from scipy.sparse.linalg import splu
 from os import listdir
+from scipy.sparse import *
 from os.path import isfile, join
-
+import time
+import sparse
+from copy import deepcopy
+from collections import namedtuple
 from scipy.sparse.linalg import spilu
 from scipy.sparse import spdiags
 import scipy.io
 import deepdish as dd
-from .geometry import Geometry
+from .geometry2 import Geometry
 from scipy import interpolate
 import sparse
 import scipy
@@ -25,6 +29,42 @@ import pickle
 import os
 import shutil
 import matplotlib.pylab as plt
+import opt_einsum as einsum
+
+#levi civita
+eijk = np.zeros((3, 3, 3))
+eijk[0, 1, 2] = eijk[1, 2, 0] = eijk[2, 0, 1] = 1
+eijk[0, 2, 1] = eijk[2, 1, 0] = eijk[1, 0, 2] = -1
+
+def is_in(myarr, list_arrays):
+    return next((True for elem in list_arrays if np.allclose(elem, myarr,rtol=1e-4)), False)
+
+def occurrance(myarr, list_arrays):
+    return sum([ int(np.allclose(elem,myarr,rtol=1e-5)) for elem in list_arrays])
+
+
+def unique_versors(list_arrays):
+
+    a = np.ma.array(list_arrays, mask=False)
+
+    versors_irr = []
+    index_list = []
+    index_tot = []
+    for n,v in enumerate(list_arrays):
+     if not n in np.array(index_tot):
+      pick = [ int(np.allclose(elem,v,rtol=1e-3)) for elem in list_arrays]   
+      indexes = np.nonzero(pick)[0]
+    
+      if len(indexes) > 0:
+       index_tot = np.append(index_tot,indexes)
+       index_list.append(indexes)
+       versors_irr.append(v)
+
+
+
+    return sum([ int(np.allclose(elem,myarr,rtol=1e-5)) for elem in list_arrays])
+
+
 
 def log_interp1d(xx, y, kind='linear'):
 
@@ -50,14 +90,20 @@ class Solver(object):
      self.mesh = argv['geometry']
      self.mesh._update_data()
    else:  
-    self.mesh = Geometry(model='load',filename = argv.setdefault('geometry_filename','geometry'))
+    #self.mesh = Geometry(model='load',filename = argv.setdefault('geometry_filename','geometry.p'))
+    self.mesh = Geometry(model='load',filename = argv.setdefault('geometry_filename','geometry.p'))
+   
 
+   self.old_index = -1
+   self.n_side_per_elem = len(self.mesh.elems[0])
    self.dim = self.mesh.dim
    self.TT = 0.5*self.mesh.B * np.array([self.mesh.elem_volumes]).T    
    self.ms_error = argv.setdefault('ms_error',0.1)
    self.verbose = argv.setdefault('verbose',True)
    self.n_elems = len(self.mesh.elems)
    self.cache = os.getcwd() + '/.cache'
+   self.keep_lu  = argv.setdefault('keep_lu',False) 
+   self.alpha = argv.setdefault('alpha',1.0)
  
    if MPI.COMM_WORLD.rank == 0 and argv.setdefault('save_data',True):
     if os.path.exists(self.cache):
@@ -70,17 +116,34 @@ class Solver(object):
    
 
    if 'material' in argv.keys():
-     tmp = argv['material'].output
+     self.mat = argv['material'].output
    else:  
-     tmp = dd.io.load('material.hdf5')
+     self.mat = pickle.load(open('material.p','rb'))
+
+   self.control_angle =  self.rotate(np.array(self.mat['control_angle']),**argv)
+   self.control_angle_not_int =  self.rotate(np.array(self.mat['control_angle_not_int']),**argv)
+   self.kappa_directional =  self.rotate(np.array(self.mat['kappa_directional']),**argv)
+   self.kappa_directional_not_int =  self.rotate(np.array(self.mat['kappa_directional_not_int']),**argv)
+   #self.control_angle =  np.array(self.mat['control_angle'])
+   #self.kappa_directional =  np.array(self.mat['kappa_directional'])
+   #self.angle_plus =  self.rotate(np.array(self.mat['angle_plus']),**argv)
+   #self.angle_minus =  self.rotate(np.array(self.mat['angle_minus']),**argv)
+   #self.control_angle =  self.rotate(np.array(self.mat['control_angle']),**argv)
+   #self.angle_plus =  self.rotate(np.array(self.mat['angle_plus']),**argv)
+   #self.angle_minus =  self.rotate(np.array(self.mat['angle_minus']),**argv)
+   #self.control_angle = self.mat['control_angle']
+   #self.angle_plus = self.mat['angle_plus']
+   #self.angle_minus = self.mat['angle_minus']
+
+   
+
+   self.multiscale = argv.setdefault('multiscale',False)
 
 
-   #read materials-------------------
-   if self.mesh.dim == 3:
-      self.mat = tmp['data_3D']
-   else:   
-      self.mat = tmp['data_2D']
-   #-------------------------------------
+   self.n_parallel = self.mat['n_parallel'] #total indexes
+   self.n_serial = self.mat['n_serial'] #total indexes
+ 
+
 
    self.lu = {}
    self.lu_fourier = {}
@@ -91,21 +154,9 @@ class Solver(object):
     self.print_logo()
     self.print_dof()
 
-   #first material (this will have to change)
-   #mat = self.mat_map[self.mat_map.keys()[0]]
-   #Compute directional connections-------
-   if self.mesh.dim == 3:   
-    self.n_index = self.mat['n_phi'] * self.mat['n_theta']
-   else:   
-    self.n_index = self.mat['n_phi']
 
-   #start = time.time() 
-   #self.compute_directional_connections()  
-    
-   
-   #quit()
-   #------------------------- 
-   #if self.verbose: self.print_bulk_kappa()
+
+   if self.verbose: self.print_bulk_kappa()
    
    self.assemble_fourier()
    
@@ -116,95 +167,148 @@ class Solver(object):
    
 
 
-   if MPI.COMM_WORLD.Get_rank() == 0:
-    if os.path.isdir(self.cache):
-     shutil.rmtree(self.cache)
-   MPI.COMM_WORLD.Barrier() 
-    
-   #SAVE FILE--------------------
-   #if argv.setdefault('save',True):
    #if MPI.COMM_WORLD.Get_rank() == 0:
-   #  dd.io.save('solver.hdf5', self.state)
+   # if os.path.isdir(self.cache):
+   #  shutil.rmtree(self.cache)
+   #MPI.COMM_WORLD.Barrier() 
+    
 
   def get_material_from_element(self,elem):
 
    return self.mat_map[self.mesh.elem_region_map[elem]]
+  
+  def rotate(self,data,**argv):
+
+   dphi = argv.setdefault('rotate_phi',0)
+   if not dphi == 0:
+     angle_rot = dphi*np.pi/180.0   
+     M = np.array([[np.cos(angle_rot),-np.sin(angle_rot)],[np.sin(angle_rot),np.cos(angle_rot)]])
+     drot = data.copy()
+     for n in range(len(data)):
+      drot[n,0:2] = np.dot(M,data[n,0:2])
+     return drot
+   return data
+    
 
 
   def get_multiscale_diffusive(self,index,n,SDIFF,TDIFF,TDIFFGrad):
 
-          angle = self.mat['control_angle'][index]
+          angle = self.control_angle[index]
           aa = sparse.COO([0,1,2],angle,shape=(3))
           HW_PLUS = sparse.tensordot(self.mesh.CP,aa,axes=1).clip(min=0)
           s = SDIFF[n] * self.mat['mfp'][n]
-          temp = TDIFF[n] - self.mat['mfp'][n]*np.dot(self.mat['control_angle'][index],TDIFFGrad[n].T)      
+          temp = TDIFF[n] - self.mat['mfp'][n]*np.dot(self.control_angle[index],TDIFFGrad[n].T)      
           t = temp*self.mat['domega'][index]
           j = np.multiply(temp,HW_PLUS)*self.mat['domega'][index]
 
           return t,s,j
 
-  def get_solving_data(self,index,n,TB,TL):
+  def get_antialiasing(self,matrix,versor,AM,AP):
 
-     global_index = index * self.mat['n_mfp'] +n
-     nc = self.n_elems       
+      h = np.linalg.norm(versor)
 
-     if  index == self.last_index:
-       A = self.A
-       HW_MINUS = self.HW_MINUS
-       HW_PLUS = self.HW_PLUS
-       K = self.K
-       P = self.P
-     elif os.path.exists(self.cache + '/P_' + str(index) + '.p') :
-      A = scipy.sparse.load_npz(self.cache + '/A_' + str(index) + '.npz')
-      K = scipy.sparse.load_npz(self.cache + '/K_' + str(index) + '.npz')
-      HW_MINUS = np.load(open(self.cache +'/HW_MINUS_' + str(index) + '.p','rb'))
-      HW_PLUS = np.load(open(self.cache +'/HW_PLUS_' + str(index) + '.p','rb'))
-      P = np.load(open(self.cache +'/P_' + str(index) +'.p','rb'))
-     else:
-      angle = self.mat['control_angle'][index]
-      aa = sparse.COO([0,1,2],angle,shape=(3))
-      HW_MINUS = -sparse.tensordot(self.mesh.CM,aa,axes=1).clip(max=0)
-      HW_PLUS = sparse.tensordot(self.mesh.CP,aa,axes=1).clip(min=0)
-      test2  = sparse.tensordot(self.mesh.N,aa,axes=1)
-      K = test2 * self.TT #broadcasting (B_ij * V_i)
-      AM = test2.clip(max=0)
-      P = (AM*self.mesh.B).sum(axis=1).todense()
-      AP = spdiags(test2.clip(min=0).sum(axis=1).todense(),0,nc,nc,format='csc')
-      CPB = spdiags(sparse.tensordot(self.mesh.CPB,aa,axes=1).clip(min=0),0,nc,nc,format='csc')
-      A =  AP + AM + CPB
-      if self.argv.setdefault('save_data',True):
-       scipy.sparse.save_npz(self.cache + '/A_' + str(index) + '.npz',A.tocsc())
-       scipy.sparse.save_npz(self.cache + '/K_' + str(index) + '.npz',K.tocsc())
-       P.dump(open(self.cache + '/P_' + str(index) + '.p','wb'))
-       HW_MINUS.dump(open(self.cache + '/HW_MINUS_' + str(index) + '.p','wb'))
-       HW_PLUS.dump(open(self.cache + '/HW_PLUS_' + str(index) + '.p','wb'))
+      #Get delta------------------------------------------------------------------------
+      dim = np.shape(matrix)
+      angle_versor = -np.arctan2(versor[1],versor[0]) +np.pi/2
+      angle_versor = np.round(angle_versor,5)
+      if (angle_versor < 0) : angle_versor += 2 * np.pi
+      if (angle_versor > 2*np.pi) : angle_versor -= 2 * np.pi
 
-      self.A = A
-      self.K = K
-      self.HW_MINUS= HW_MINUS
-      self.HW_PLUS= HW_PLUS
-      self.P = P
-      self.last_index = index
-    #----------------------------------------------
+      angle_minus = angle_versor - self.mat['dphi']/2
+      angle_plus  = angle_versor + self.mat['dphi']/2
+      if (angle_minus < 0) : angle_minus += 2 * np.pi
+      if (angle_plus > 2*np.pi) : angle_plus -= 2 * np.pi
+
+      for i,j in zip(matrix.nonzero()[0],matrix.nonzero()[1]):
+         normal = matrix[i,j].todense() 
+         angle_normal = -np.arctan2(normal[1],normal[0]) +np.pi/2
+         if (angle_normal < 0) : angle_normal += 2 * np.pi
+         angle_normal = np.round(angle_normal,5)
+
+         #surface tangential----
+         angle = angle_normal + np.pi/2
+         if (angle < 0) : angle += 2 * np.pi
+         if (angle > 2*np.pi) : angle -= 2 * np.pi
+         #----------------
+         dangle = np.round(angle_versor - angle,5)
+
+         if abs(dangle) < self.mat['dphi']/2:
+
+           p1 = angle_minus; p2 = angle
+           AP[i,j] = h*((np.cos(p1) - np.cos(p2))*normal[0] + (np.sin(p2) - np.sin(p1))*normal[1])
+
+           p1 = angle; p2 = angle_plus
+           AM[i,j] = h*((np.cos(p1) - np.cos(p2))*normal[0] + (np.sin(p2) - np.sin(p1))*normal[1])
+ 
 
 
-     if global_index in self.lu.keys() and self.argv.setdefault('keep_lu',False):
-      lu = self.lu[global_index]
-     else:
-      F = scipy.sparse.eye(self.n_elems,format='csc') +  A.tocsc() * self.mat['mfp'][n] 
-      lu = splu(F.tocsc())
-      if self.argv.setdefault('keep_lu',False):
-       self.lu.update({global_index:lu})
+  def get_boundary_matrices(self,global_index):
 
-     RHS = self.mat['mfp'][n] * (P + np.multiply(TB[n],HW_MINUS)) + TL[n]      
-     temp = lu.solve(RHS)
-     #temp = temp - (max(temp)+min(temp))/2.0
-   
-     t = temp*self.mat['domega'][index]
-     s = K.dot(temp-TL[n]).sum() * self.mat['domega'][index] * 3 * self.kappa_factor
-     j = np.multiply(temp,HW_PLUS) * self.mat['domega'][index]
 
-     return t,s,j
+     if not os.path.exists(self.cache + '/Am_' + str(global_index) + '.p') :
+      kdir  = self.kappa_directional[global_index]
+      k_angle = sparse.COO([0,1,2],self.kappa_directional[global_index],shape=(3))
+      
+      tmp = sparse.tensordot(self.mesh.CP,k_angle,axes=1)
+      AP = tmp.clip(min=0)#.to_scipy_sparse().todok()
+      AM = (tmp-AP)#.tocsc().todok() #preserve the sign of AM
+      if self.argv.setdefault('antialiasing',False):
+       self.get_antialiasing(self.mesh.CP,self.kappa_directional_not_int[global_index],AM,AP)
+
+      #Am = -tmp.clip(max=0)#.todense()
+      AP = AP.todense()
+      AM = -AM.todense()
+
+      AM.dump(open(self.cache + '/Am_' + str(global_index) + '.p','wb'))
+      AP.dump(open(self.cache + '/Ap_' + str(global_index) + '.p','wb'))
+     else :
+      AM = np.load(open(self.cache +'/Am_' + str(global_index) +'.p','rb'),allow_pickle=True)
+      AP = np.load(open(self.cache +'/Ap_' + str(global_index) +'.p','rb'),allow_pickle=True)
+
+     return AM,AP
+
+  def get_bulk_data(self,global_index,TB,TL):
+
+     index_irr = self.mat['temp_vec'][global_index]
+     aa = sparse.COO([0,1,2],self.control_angle[global_index],shape=(3))
+     mfp   = self.mat['mfp'][global_index]
+     irr_angle = self.mat['angle_map'][global_index]
+
+     if not irr_angle == self.old_index:
+       self.old_index = irr_angle
+
+       if not os.path.exists(self.cache + '/A_' + str(irr_angle) + '.npz'):
+
+        test2  = sparse.tensordot(self.mesh.N,aa,axes=1)
+        AP = test2.clip(min=0)
+        AM = (test2 - AP)
+        AP = spdiags(np.sum(AP,axis=1).todense(),0,self.n_elems,self.n_elems,format='csc')
+        self.mesh.B = self.mesh.B.tocsc()
+        self.P = np.sum(np.multiply(AM,self.mesh.B),axis=1).todense()
+        tmp = sparse.tensordot(self.mesh.CM,aa,axes=1)
+        HW_PLUS = tmp.clip(min=0)
+        self.HW_MINUS = (HW_PLUS-tmp)
+        BP = spdiags(np.sum(HW_PLUS,axis=1).todense(),0,self.n_elems,self.n_elems,format='csc')
+        self.A =  AP + AM + BP
+     
+        self.P.dump(self.cache + '/P_' + str(irr_angle) + '.p')
+        sparse.io.save_npz(self.cache + '/A_' + str(irr_angle) + '.npz',self.A)
+        sparse.io.save_npz(self.cache + '/HW_MINUS_' + str(irr_angle) + '.npz',self.HW_MINUS)
+
+       else:  
+        self.P = np.load(open(self.cache +'/P_' + str(irr_angle) +'.p','rb'),allow_pickle=True)
+        self.A = sparse.load_npz(self.cache + '/A_' + str(irr_angle) + '.npz')
+        self.HW_MINUS = sparse.load_npz(self.cache + '/HW_MINUS_' + str(irr_angle) + '.npz')
+
+     
+     boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1).todense()
+     RHS = mfp * (self.P + boundary) + TL[index_irr]   
+     F = scipy.sparse.eye(self.n_elems,format='csc') + self.A * mfp
+     lu = splu(F.tocsc())
+     return lu.solve(RHS)
+
+
+
 
       
   def solve_bte(self,**argv):
@@ -212,218 +316,257 @@ class Solver(object):
    comm = MPI.COMM_WORLD  
    rank = comm.rank 
 
-
    if rank == 0 and self.verbose:
      print('    Iter    Thermal Conductivity [W/m/K]      Error        Diffusive  -  BTE  -  Ballistic')
      print('   ---------------------------------------------------------------------------------------')
 
+   #kappa_eff = []
+   #kappa_old = 0
+   #n_iter = 0
+   #error = 1.0
+   n_mfp = self.mat['n_serial']
+   temp_vec = self.mat['temp_vec']
+   nT = np.shape(self.mat['CollisionMatrix'])[0]
+   kdir = self.kappa_directional
 
-   if argv.setdefault('load_state',False):
-    data  = dd.io.load('solver.hdf5')
-    TB = data['TB']
-    TL = data['TL']
-    kappa_eff = data['kappa']
-    n_iter = data['n_iter']
-    error_vec = data['error_vec']
-    error = error_vec[-1]
-    kappa_old = kappa_eff[-1]
-    ms_vec = data['ms_vec']
-    if rank == 0 and self.verbose:
-      for n in range(len(kappa_eff)):
-       print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n,kappa_eff[n],error_vec[n],ms_vec[n][0],ms_vec[n][1],ms_vec[n][2]))
-      print('   ---------------------------------------------------------------------------------------')
+   if self.argv.setdefault('load_state',False):
+     data  = dd.io.load(self.argv.setdefault('filename','solver.hdf5'))
+     error_vec = data['error_vec']
+     kappa_vec = data['kappa_vec']
+     ms_vec = data['ms_vec']
+     TL = data['TL']
+     TB = data['TB']
+     temp_fourier = data['temp_fourier']
+     temp_fourier_grad = data['temp_fourier_grad']
+     if rank == 0: 
+      for n in range(len(ms_vec)):
+       print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n+1,kappa_vec[n],error_vec[n],ms_vec[n][0],ms_vec[n][1],ms_vec[n][2]))
 
-   else:   
-    kappa_eff = []
-    kappa_old = 0
-    n_iter = 0
-    error = 1.0
-    error_vec = [error]
-    ms_vec = [[1,0,0]]
+
+   else:          
+     #fourier first guess----
+     if rank == 0: 
+      kappa_fourier,temp_fourier,temp_fourier_grad = self.get_diffusive_suppression_function(self.mat['kappa_bulk_tot'])
+      kappa_fourier = np.array([kappa_fourier])
+      data = {'kappa_fourier':kappa_fourier,'temp_fourier':temp_fourier,'temp_fourier_grad':temp_fourier_grad}
+     else: data = None   
+     data = comm.bcast(data,root=0)
+     comm.Barrier()
+     temp_fourier = data['temp_fourier']
+     temp_fourier_grad = data['temp_fourier']
+     kappa_fourier = data['kappa_fourier']
+     TL = np.tile(temp_fourier,(nT,1))
+     TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
+     #----------------------------------------------------------------
+     kappa_vec = [float(kappa_fourier)]
+     error_vec = [1.0]
+     ms_vec = [[1,0,0]]
+     if rank == 0 and self.verbose:
+       print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(1,kappa_vec[-1],1,1,0,0))
+     #---------------------------
+
+   #Initialize data-----
+   n_iter = len(kappa_vec)
+   TL_old = TL.copy()
+   TB_old = TB.copy()
+   #-------------------------------
 
 
    while n_iter < argv.setdefault('max_bte_iter',10) and \
-          error > argv.setdefault('max_bte_error',1e-2):
+          error_vec[-1] > argv.setdefault('max_bte_error',1e-2):
 
-    #Solve Fourier for First Guess
-    #--------------------------------------------------------------------------------------------------          
-    if n_iter == 0:          
-      n_mfp = 1
-      kappa = [self.mat['kappa_bulk_tot']]
-      G = [0];TL = [[]];TB = [[]]
-    else: 
-      n_mfp = self.mat['n_mfp']
-      kappa = self.mat['kappa_mfe']
-      G = self.mat['G']
-      TL = TL.copy()
-      TB = TB.copy()
+    #Compute diffusive approximation---------------------------          
+    if self.multiscale:
 
-    if n_iter == 0 or self.multiscale:
-     SDIFF_ave,SDIFF_avep = np.zeros((2,n_mfp))          
-     TDIFF,TDIFFp = np.zeros((2,n_mfp,self.n_elems))          
-     TDIFFGrad,TDIFFGradp = np.zeros((2,n_mfp,self.n_elems,3))          
-     block = self.mat['n_mfp'] // comm.size + 1
-     for kk in range(block):
-      n = rank*block + kk   
-      if n < n_mfp :
-       SDIFF_avep[n],TDIFFp[n],TDIFFGradp[n] = self.get_diffusive_suppression_function(kappa[n],G[n],TB[n],TL[n])
-       
-     comm.Allreduce([SDIFF_avep,MPI.DOUBLE],[SDIFF_ave,MPI.DOUBLE],op=MPI.SUM)
-     comm.Allreduce([TDIFFp,MPI.DOUBLE],[TDIFF,MPI.DOUBLE],op=MPI.SUM)
-     comm.Allreduce([TDIFFGradp,MPI.DOUBLE],[TDIFFGrad,MPI.DOUBLE],op=MPI.SUM)
+      TDIFF,TDIFFp = np.zeros((2,n_mfp,self.n_elems))          
+      TDIFFGrad = np.zeros((n_mfp,self.n_elems,3))          
+      TDIFFGradp = np.zeros((n_mfp,self.n_elems,3))          
+      Jx,Jxp = np.zeros((2,n_mfp,self.n_elems))          
+      Jy,Jyp = np.zeros((2,n_mfp,self.n_elems))          
+      Jz,Jzp = np.zeros((2,n_mfp,self.n_elems))          
+      block = self.mat['n_serial'] // comm.size + 1
 
-    if n_iter == 0: 
-     TDIFFGrad=np.repeat(TDIFFGrad,self.mat['n_mfp'],axis = 0)
-     TDIFF=np.repeat(TDIFF,self.mat['n_mfp'],axis = 0)
-     TB = TDIFF.copy()
-     TL = TDIFF.copy()
-     SDIFF_ave=SDIFF_ave[0]*np.ones(self.mat['n_mfp'])
-     TFourier = TDIFF[0].copy()
-     FFourier = -self.mat['kappa_bulk_tot']*TDIFFGrad.copy()[0]
-     #dd.io.save('solver_fourier.hdf5',{'temperature_fourier':TFourier,'flux_fourier':FFourier})
-    #---------------------------------------------------------------------------------------------------------
+      for kk in range(block):
+
+       n = rank*block + kk   
+       if n < n_mfp :
+           
+        kappa_value = self.mat['mfp'][n] * self.mat['mfp'][n]/3.0 #The first index is MFP anyway
+        G = self.mat['mfp'][n]/2.0*np.ones(self.n_side_per_elem) #we have to define this for each side
+        dummy,TDIFFp[n],TDIFFGradp[n] = self.get_diffusive_suppression_function(kappa_value,TL=TL[0],TB=TB,G = G)
+        
+      comm.Allreduce([TDIFFp,MPI.DOUBLE],[TDIFF,MPI.DOUBLE],op=MPI.SUM)
+      comm.Allreduce([TDIFFGradp,MPI.DOUBLE],[TDIFFGrad,MPI.DOUBLE],op=MPI.SUM)
 
     #Print diffusive Kappa---------
-    if n_iter==0 and self.verbose:
-       SUP_DIF = np.multiply(self.mat['J0'],log_interp1d(self.mat['mfp'],SDIFF_ave)(self.mat['mfp_bulk']))   
-       kappa = np.sum(np.multiply(SUP_DIF,self.mat['kappa_bulk']))
-       print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,1,1,0,0))
-       kappa_eff.append(kappa)
-       kappa_old = kappa
-    if  rank == 0:
-     if argv.setdefault('only_fourier',False) and argv.setdefault('save',True):
-       dd.io.save('solver.hdf5',{'temperature_fourier':TFourier,'flux_fourier':FFourier})
-       break
+    TL2p,TL2 = np.zeros((2,nT,self.n_elems))
+    Tp,T = np.zeros((2,self.n_elems))
+    Vp,V = np.zeros((2,self.n_elems,3))
+    Jp,J = np.zeros((2,self.n_elems,3))
+    TBp_minus,TB_minus = np.zeros((2,self.n_elems,self.n_side_per_elem))
+    TBp_plus,TB_plus = np.zeros((2,self.n_elems,self.n_side_per_elem))
+    ndifp = np.zeros(1)
+    ndif = np.zeros(1)
+    nbal = np.zeros(1)
+    nbalp = np.zeros(1)
+    (etavp,etav) = np.zeros((2,nT))
+    (etadp,etad) = np.zeros((2,nT))
 
-
-    block = self.n_index // comm.size + 1
-
-    total_dof = self.mat['n_mfp']*self.n_index
-
-    Jp,J = np.zeros((2,self.n_elems))
-    Fluxp,Flux = np.zeros((2,self.n_elems,3))
-    kernelp,kernel = np.zeros((2,total_dof))
-    Tp,T = np.zeros((2,total_dof,self.n_elems))
-    MSp,MS = np.zeros((2,2))
-
+    K2p = np.zeros(1)
+    K2 = np.zeros(1)
+    block = self.n_parallel // comm.size + 1
 
     for kk in range(block):
-     index = rank*block + kk   
-     if index < self.n_index  :
+     index = rank*block + kk  
+     if index < self.n_parallel :
 
-      if self.multiscale:     
-       tbal,sbal,jbal= self.get_solving_data(index,self.mat['n_mfp']-1,TB,TL)
-       SDIFF = SDIFF_ave*pow(self.mat['control_angle'][index][self.mesh.direction],2)*3*self.mat['domega'][index]
-       if sbal > 0:
-        idx   = np.argwhere(np.diff(np.sign(SDIFF*self.mat['mfp'] - sbal*np.ones(self.mat['n_mfp'])))).flatten()
-       else: 
-        idx = [self.mat['n_mfp']-1]   
-      
-       if len(idx) == 0:
-        idx = [self.mat['n_mfp']-1]  
-      else:  
-        idx = [self.mat['n_mfp']-1]  
+      #-------------------------------------------------------   
+      idx = [self.n_serial]
+      if self.multiscale:
+       #Compute ballistic regime---
+       a = time.time()
+       temp_bal = self.get_bulk_data(index * self.n_serial + self.n_serial -1,TB,TL)
+       eta_bal = np.ones(self.n_serial) * self.mesh.B_with_area_old.dot(temp_bal).sum()
+       #-------------------------------------
 
-      nd = 0
-      nn = idx[0]
-      nb = self.mat['n_mfp']
-
-     # S =np.zeros(self.mat['n_mfp'])
-      fourier = False
-      for n in range(self.mat['n_mfp'])[idx[0]::-1]:
-        global_index = n * self.n_index + index
-
-        if  fourier : 
-         t,s,j = self.get_multiscale_diffusive(index,n,SDIFF,TDIFF,TDIFFGrad)
-        else: 
-         t,s,j = self.get_solving_data(index,n,TB,TL)
-
-         if self.multiscale:
-          error = abs((SDIFF[n]-s/self.mat['mfp'][n])/SDIFF[n])
-          if error<5e-2:
-           fourier = True
-           nd = n
-        Tp[global_index]+= t; Jp += j;  kernelp[global_index] += s
-        Fluxp += np.outer(t,self.mat['control_angle'][index])
+       #Compute diffusive regime----------------------------------
+       eta_diff= []
+       for n in range(n_mfp):
+        m = self.mat['mfp'][n]   
+        a = np.array([m])
+        vv = TDIFF[n] -  self.mat['mfp'][n]*np.einsum('ci,i->c',TDIFFGrad[n],self.control_angle[index*self.n_serial + 1])
+        eta_diff.append(self.mesh.B_with_area_old.dot(vv).sum())
         
+       #----------------------------------------------------------
 
-    #S[n] = s/self.mat['mfp'][n]
+       #Compute the intersection index-----
+       idx   = np.argwhere(np.diff(np.sign(eta_diff - eta_bal))).flatten()
+       if len(idx) == 0: idx = [self.n_serial-1]
+      #------------------------------------------------------
 
-      ballistic = False
-      for n in range(self.mat['n_mfp'])[idx[0]+1:]:
-       global_index = n * self.n_index + index
-       if  ballistic :
-         s = sbal;t = tbal; j = jbal
-       else:  
-         t,s,j = self.get_solving_data(index,n,TB,TL)
+      fourier = False
+      eta_vec = np.zeros(self.n_serial)
+      for n in range(self.n_serial)[idx[0]::-1]:
+          
+        global_index = index * self.n_serial + n 
+        if fourier == True:
+         ndifp[0] += 1   
+         temp = TDIFF[n]
+         eta = eta_diff[n]
+        else:
+         #a = time.time()
+         temp = self.get_bulk_data(global_index,TB,TL)
+         #print(time.time()-a)
+         eta = self.mesh.B_with_area_old.dot(temp).sum()
          if self.multiscale:
-          if abs(s-sbal)/sbal < 1e-2: 
-           ballistic = True
-           nb = n
-       Tp[global_index] += t; J += j; kernelp[n] += s
-       Fluxp += np.outer(t,self.mat['control_angle'][index])
+           if abs(eta_diff[n] - eta)/abs(eta) < 1e-2:
+            fourier = True  
 
-    #   S[n] = s/self.mat['mfp'][n]
+        eta_vec[n] = eta
+        (Am,Ap) = self.get_boundary_matrices(global_index)
+        TBp_minus += Am 
+        TBp_plus  += np.einsum('es,e->es',Ap,temp)
+        #TBp_plus  += Ap
+        TL2p += np.outer(self.mat['CollisionMatrix'][:,global_index],temp)    
+        Tp+= temp*self.mat['TCOEFF'][global_index]
+        kdir = self.mat['kappa_directional'][global_index]
+        K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
+        Jp += np.outer(temp,kdir)*1e9
 
-      MSp += np.array([float(nd),float(nb)])
-    comm.Allreduce([MSp,MPI.DOUBLE],[MS,MPI.DOUBLE],op=MPI.SUM)
-    comm.Allreduce([Fluxp,MPI.DOUBLE],[Flux,MPI.DOUBLE],op=MPI.SUM)
+
+      #Ballistic component
+      ballistic = False
+      for n in range(self.n_serial)[idx[0]+1:]:
+
+        global_index = index * self.n_serial + n 
+        if ballistic == True:
+         nbalp[0] += 1   
+         temp = temp_bal
+         eta = eta_bal[n]
+        else:
+         temp = self.get_bulk_data(global_index,TB,TL)
+         eta = self.mesh.B_with_area_old.dot(temp).sum()
+         if self.multiscale:
+          if abs(eta_bal[n] - eta)/abs(eta) <1e-2 :
+            ballistic = True  
+
+        (Am,Ap) = self.get_boundary_matrices(global_index)
+        TBp_minus += Am 
+        TBp_plus  += np.einsum('es,e->es',Ap,temp)
+        TL2p += np.outer(self.mat['CollisionMatrix'][:,global_index],temp)    
+        Tp+= temp*self.mat['TCOEFF'][global_index]
+        kdir = self.mat['kappa_directional'][global_index]
+        K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
+        Jp += np.outer(temp,kdir)*1e9
+
+    comm.Allreduce([K2p,MPI.DOUBLE],[K2,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([TL2p,MPI.DOUBLE],[TL2,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([TBp_minus,MPI.DOUBLE],[TB_minus,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([TBp_plus,MPI.DOUBLE],[TB_plus,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([Tp,MPI.DOUBLE],[T,MPI.DOUBLE],op=MPI.SUM)
-    comm.Allreduce([kernelp,MPI.DOUBLE],[kernel,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
-    diffusive = MS[0]/self.n_index/self.mat['n_mfp']
-    ballistic = (self.n_index*self.mat['n_mfp'] - MS[1])/self.n_index/self.mat['n_mfp']
+    comm.Allreduce([ndifp,MPI.DOUBLE],[ndif,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([nbalp,MPI.DOUBLE],[nbal,MPI.DOUBLE],op=MPI.SUM)
 
-    #quit() 
+    kappa_vec.append(abs(K2[0] * self.kappa_factor))
+    error_vec.append(abs(kappa_vec[-1]-kappa_vec[-2])/abs(max([kappa_vec[-1],kappa_vec[-2]])))
+    #----------------
 
-    n_iter +=1
-    #----------------------------------------------------------- 
-    kappa = np.dot(self.mat['kappa_directional'],kernel)
-    print(kappa)
-    quit()
-
-    #It's time to generalize kappa to an angular dependent value
-    SUP = np.sum(np.multiply(self.mat['J3'],log_interp1d(self.mat['mfp'],kernel.clip(min=1e-13))(self.mat['trials'])),axis=1)
-    #SUP = np.multiply(self.mat['J3'],log_interp1d(self.mat['mfp'],kernel.clip(min=1e-13))(self.mat['trials']))
-
-    kappa = np.sum(np.multiply(self.mat['kappa_bulk'],SUP))
-    kappa_eff.append(kappa)
-    error = abs(kappa-kappa_old)/abs(max([kappa,kappa_old]))
-    error_vec.append(error)
-    kappa_old = kappa
-
-    #Boundary temperature
-    TB = 4.0*np.tile([np.sum(np.multiply(self.mat['J1'],log_interp1d(self.mat['mfp'],J.T[e])(self.mat['trials']))) \
-         for e in range(self.n_elems)],(self.mat['n_mfp'],1))
-   
-
-    #Lattice temperature   
-    #TL = np.tile([np.sum(np.multiply(self.mat['J2'],log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials']))) \
-    #     for e in range(self.n_elems)],(self.mat['n_mfp'],1))
-
-    TL = np.tile([np.sum(np.multiply(self.mat['J2'],log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials']))) \
-         for e in range(self.n_elems)],(self.mat['n_mfp'],1))
-
-    if self.dim == 2:
-     Flux.T[2,:] = 0   
-    FLUX  = np.array([[np.sum(np.multiply(self.mat['J1'],log_interp1d(self.mat['mfp'],Flux.T[d,e])\
-           (self.mat['trials'])))*self.mat['kappa_bulk_tot'] for d in range(3) ] for e in range(self.n_elems)])
-
+    #Upate lattice and boundary temperaturei
     
-    
-    ms_vec.append([diffusive,1-diffusive-ballistic,ballistic]) 
+    #print(np.min(np.min(TB_plus,axis=0),axis=0),np.max(np.max(TB_plus,axis=0),axis=0))
+    #print(np.max(np.max(TB_plus,axis=0),axis=0),np.min(np.min(TB_plus,axis=0),axis=0))
+    #if rank == 0:
+    TB_new = TB_plus.copy()
+    for i in range(3):
+      for n in range(len(TB_plus.T[i])):
+       if not (TB_plus[n,i] == 0):
+         TB_new[n,i] /= TB_minus[n,i]
+
+    TB = self.alpha * TB_new + (1-self.alpha)*TB_old; TB_old = TB.copy()
+
+
+
+    #T experimental----
+    #if self.argv.setdefault('synthetic',False):
+    # if rank==0:
+    #   JNonFourier = -J*1e-9 + self.mat['kappa_bulk_tot'] * self.mesh.compute_grad(TL_old[0])
+    #   heat_source = self.mesh.compute_divergence(JNonFourier,add_jump=False)
+    #   dummy,t,j = self.get_diffusive_suppression_function(kappa = self.mat['kappa_bulk_tot'],heat_source= heat_source)
+    #   data = {'T':t}
+    # else: data = None
+    # data = comm.bcast(data,root=0)
+    # TL = [data['T']]
+    #else: 
+    TL = self.alpha * TL2.copy() + (1-self.alpha)*TL_old; TL_old = TL.copy()
+    n_iter +=1    
+    #-----
+
+
+
     #Thermal conductivity   
     if rank==0 and self.verbose:
-      print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,error,diffusive,1-diffusive-ballistic,ballistic))
-    
-    self.state = {'TL':TL,'MFP_SAMPLED':self.mat['mfp'],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error_vec':error_vec,'ms_vec':ms_vec,'temperature':TL[0],'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'TB':TB,'temperature_fourier':TFourier,'flux_fourier':FFourier,'temperature_vec':T,'flux_vec':Flux}
-    if not argv.setdefault('only_fourier',False) and argv.setdefault('save',True):
-       dd.io.save('solver.hdf5',self.state)
-     
+      ndif = ndif[0]/(self.n_serial*self.n_parallel)
+      nbal = nbal[0]/(self.n_serial*self.n_parallel)
+      nbte = 1- ndif - nbal
+      ms_vec.append([ndif,nbte,nbal])
+      print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa_vec[-1],error_vec[-1],ndif,nbte,nbal))
+      data = {'kappa_vec':kappa_vec,'temperature':T,'pseudogradient':self.mesh.compute_grad(T),'flux':J,'temp_fourier':temp_fourier,'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad}
+      if self.argv.setdefault('save_state',False):
+          data.update({'TB':TB,'TL':TL,'error_vec':error_vec,'ms_vec':ms_vec,'temp_fourier_grad':temp_fourier_grad})  
+
+      dd.io.save(self.argv.setdefault('filename','solver.hdf5'),data)
+    else: data = None
+    self.state =  MPI.COMM_WORLD.bcast(data,root=0)
+
+
    if rank==0 and self.verbose:
      print('   ---------------------------------------------------------------------------------------')
      print(' ')
     
+
+
+
 
   def print_bulk_kappa(self):
       
@@ -431,7 +574,9 @@ class Solver(object):
      if self.verbose:
       #print('  ')
       #for region in self.region_kappa_map.keys():
+       print('Kappa bulk: ')
        print('{:8.2f}'.format(self.mat['kappa_bulk_tot'])+ ' W/m/K')    
+       print(' ')
        #print(region.ljust(15) +  '{:8.2f}'.format(self.region_kappa_map[region])+ ' W/m/K')    
 
 
@@ -476,13 +621,14 @@ class Solver(object):
      B[kc1] += self.mesh.get_side_periodic_value(kc2,kc1)*v_orth/vol1*kappa
 
     #Boundary_elements
-    FF = np.zeros(self.n_elems)
+    FF = np.zeros((self.n_elems,self.n_side_per_elem))
     boundary_mask = np.zeros(self.n_elems)
     for side in self.mesh.side_list['Boundary']:
      elem = self.mesh.side_elem_map[side][0]
+     side_index = np.where(np.array(self.mesh.elem_side_map[elem])==side)[0][0]
      vol = self.mesh.get_elem_volume(elem)
      area = self.mesh.get_side_area(side)
-     FF[elem] = area/vol
+     FF[elem,side_index] = area/vol
      boundary_mask[elem] = 1.0
 
     F = csc_matrix((np.array(data_tmp),(np.array(row_tmp),np.array(col_tmp))), shape=(self.n_elems,self.n_elems) )
@@ -501,17 +647,42 @@ class Solver(object):
    self.FF = data['FF']
    self.boundary_mask = data['boundary_mask']
 
+    #if self.argv.setdefault('compute_vorticity',False):
+    #     grad = self.mesh.compute_grad(temp).T
+    #     Vp += opt_einsum('ijk,jc,k->ci',eijk,grad,kdir)
 
-  def get_diffusive_suppression_function(self,kappa,G,TB,TL):
+
+    #if self.argv.setdefault('compute_vorticity',False):
+    #   J = -self.mat['kappa_bulk_tot']*flux_fourier
+    #   Jx = self.mesh.compute_grad(J.T[0]).T
+    #   Jy = self.mesh.compute_grad(J.T[1]).T
+    #   Jz = self.mesh.compute_grad(J.T[2]).T
+    #   Hessian = [Jx,Jy,Jz]
+    #   Vf = einsum('ijk,kjc->ci',eijk,Hessian)
+    #else:
+    #   Vf = np.zeros((self.n_elems,3))
+
+  def get_diffusive_suppression_function(self,kappa,**argv):
+
 
 
     A  = kappa * self.F 
     B  = kappa * self.B
-    if len(TL) > 0:
-      B += np.multiply(self.FF,TB) * G + TL
-      A += spdiags(self.FF,0,self.n_elems,self.n_elems) * G
-      A += csc_matrix(scipy.sparse.eye(self.n_elems)) 
-    else:
+
+    if 'G' in argv.keys(): 
+     G = argv['G']   
+     TB = argv['TB']   
+     tmp = np.dot(self.FF,G) #total flux from boundaries
+     A += spdiags(tmp,0,self.n_elems,self.n_elems) 
+     B += np.einsum('ci,ci,i->c',self.FF,TB,G)
+    if 'heat_source' in argv.keys(): 
+      B += argv['heat_source']
+
+
+    if 'TL' in argv.keys():
+      A +=  csc_matrix(scipy.sparse.eye(self.n_elems)) 
+      B += argv['TL']
+    else:  
       A[10,10] = 1.0  
 
     SU = splu(A)
@@ -524,7 +695,8 @@ class Solver(object):
                   n_iter < self.argv.setdefault('max_fourier_iter',10) :
                     
         RHS = B + C*kappa
-        if len(TL) == 0.0: RHS[10] = 0.0      
+        if not 'TL' in argv.keys():
+         RHS[10] = 0.0      
         temp = SU.solve(RHS)
         temp = temp - (max(temp)+min(temp))/2.0
         (C,grad) = self.compute_non_orth_contribution(temp)
@@ -534,10 +706,11 @@ class Solver(object):
         kappa_old = kappa_eff
         n_iter +=1
 
-    s = kappa_eff/kappa
+    s = kappa_eff#/kappa
     
+    #ind = self.mesh.B_with_area_old.dot(temp).sum()
 
-    return s,temp,grad
+    return s,temp.copy(),grad
 
 
 
@@ -704,11 +877,11 @@ class Solver(object):
    if MPI.COMM_WORLD.Get_rank() == 0:
     if self.verbose:
      print(' ')
-     print('Elements:          ' + str(self.n_elems))
-     print('Azimuthal angles:  ' + str(self.mat['n_theta']))
-     print('Polar angles:      ' + str(self.mat['n_phi']))
-     print('Mean-free-paths:   ' + str(self.mat['n_mfp']))
-     print('Bulk Thermal Conductivity:   ' + str(round(self.mat['kappa_bulk_tot'],4)) +' W/m/K')
+     print('Space DOFs:      ' + str(self.n_elems))
+     #print('Azimuthal angles:  ' + str(self.mat['n_theta']))
+     #print('Polar angles:      ' + str(self.mat['n_phi']))
+     print('Momentum DOFs:   ' + str(self.mat['n_serial']*self.mat['n_parallel']))
+     #print('Bulk Thermal Conductivity:   ' + str(round(self.mat['kappa_bulk_tot'],4)) +' W/m/K')
      print(' ')
      
     #Build data and perform superlu factorization---
@@ -730,19 +903,3 @@ class Solver(object):
    # self.data = pickle.load(open(self.cache + '/save_' + str(index) + '.p','rb'))
     
    #else:
-  """
-  def spsolve_lu(self,lu_data,b):
-   perm_r = lu_data['perm_r']
-   perm_c = lu_data['perm_c']
-   L = lu_data['L'].tocsr()
-   U = lu_data['U'].tocsr()
-   if perm_r is not None:
-      b_old = b.copy()
-      for old_ndx, new_ndx in enumerate(perm_r):
-        b[new_ndx] = b_old[old_ndx]
-   c = spsolve_triangular(L, b, lower=True)
-   px = spsolve_triangular(U, c, lower=False)
-   return px[perm_c]
-   """
-
-

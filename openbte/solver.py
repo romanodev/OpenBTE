@@ -165,13 +165,21 @@ class Solver(object):
      else:
       angle = self.mat['control_angle'][index]
       aa = sparse.COO([0,1,2],angle,shape=(3))
-      HW_MINUS = -sparse.tensordot(self.mesh.CM,aa,axes=1).clip(max=0)
-      HW_PLUS = sparse.tensordot(self.mesh.CP,aa,axes=1).clip(min=0)
+
+      tmp = sparse.tensordot(self.mesh.CM,aa,axes=1)
+      HW_PLUS = tmp.clip(min=0)
+      HW_MINUS = HW_PLUS - tmp
+
+      #HW_MINUS = -sparse.tensordot(self.mesh.CM,aa,axes=1).clip(max=0)
       test2  = sparse.tensordot(self.mesh.N,aa,axes=1)
       K = test2 * self.TT #broadcasting (B_ij * V_i)
       AM = test2.clip(max=0)
+      #AP = test2 - AM
+
+      AP = spdiags((test2-AM).sum(axis=1).todense(),0,nc,nc,format='csc')
+
       P = (AM*self.mesh.B).sum(axis=1).todense()
-      AP = spdiags(test2.clip(min=0).sum(axis=1).todense(),0,nc,nc,format='csc')
+
       CPB = spdiags(sparse.tensordot(self.mesh.CPB,aa,axes=1).clip(min=0),0,nc,nc,format='csc')
       A =  AP + AM + CPB
       if self.argv.setdefault('save_data',True):
@@ -334,7 +342,9 @@ class Solver(object):
         if  fourier : 
          t,s,j = self.get_multiscale_diffusive(index,n,SDIFF,TDIFF,TDIFFGrad)
         else: 
+         a= time.time()
          t,s,j = self.get_solving_data(index,n,TB,TL)
+         print(time.time()-a)
 
          if self.multiscale:
           error = abs((SDIFF[n]-s/self.mat['mfp'][n])/SDIFF[n])
@@ -410,8 +420,13 @@ class Solver(object):
       print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa,error,diffusive,1-diffusive-ballistic,ballistic))
     
     self.state = {'TL':TL,'MFP_SAMPLED':self.mat['mfp'],'flux':FLUX,'SUP':SUP,'MFP':self.mat['mfp_bulk'],'error_vec':error_vec,'ms_vec':ms_vec,'temperature':TL[0],'kappa_bulk':self.mat['kappa_bulk'],'n_iter':n_iter,'kappa':kappa_eff,'TB':TB,'temperature_fourier':TFourier,'flux_fourier':FFourier,'temperature_vec':T,'flux_vec':Flux}
-    #if not argv.setdefault('only_fourier',False) and argv.setdefault('save',True):
-    #   dd.io.save('solver.hdf5',self.state)
+
+    if argv.setdefault('write_pseudotemperature',False):
+       self.state.update({'pseudotemperature':self.mesh.compute_grad(TL[0])})
+
+
+    if not argv.setdefault('only_fourier',False) and argv.setdefault('save',True):
+       dd.io.save(argv.setdefault('filename','solver.hdf5'),self.state)
      
    if rank==0 and self.verbose:
      print('   ---------------------------------------------------------------------------------------')

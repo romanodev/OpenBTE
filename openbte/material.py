@@ -66,7 +66,7 @@ class Material(object):
    
    #Import material
    if argv.setdefault('model','nongray')=='nongray':
-    tmp = np.loadtxt(os.path.dirname(__file__) + '/materials/'+ argv['matfile'])
+    tmp = np.loadtxt(os.path.dirname(__file__) + '/materials/'+ argv['matfile'],skiprows=1)
     mfp_bulk = tmp[:,0]*1e9; 
     kappa_bulk = tmp[:,1]
    else:
@@ -155,7 +155,7 @@ class Material(object):
     
     #Import material
     if argv.setdefault('model','nongray')=='nongray':
-     tmp = np.loadtxt(os.path.dirname(__file__) + '/materials/'+ argv['matfile'])
+     tmp = np.loadtxt(os.path.dirname(__file__) + '/materials/'+ argv['matfile'],skiprows=1)
      mfp_bulk = tmp[:,0]*1e9; n_mfp_bulk = len(mfp_bulk)
      kappa_bulk = tmp[:,1]
     else: 

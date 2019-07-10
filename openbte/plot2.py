@@ -65,7 +65,7 @@ class Plot(object):
 
 
   if MPI.COMM_WORLD.Get_rank() == 0:
-   self.solver = dd.io.load(argv.setdefault('solver_filename','solver.hdf5'))
+   self.solver = dd.io.load(argv.setdefault('filename','solver.hdf5'))
    self.Nx = argv.setdefault('repeat_x',1)
    self.Ny = argv.setdefault('repeat_y',1)
 
@@ -105,7 +105,7 @@ class Plot(object):
  def save_vtk(self,argv):
   #if MPI.COMM_WORLD.Get_rank() == 0:
    #Write data-------
-   geo = Geometry(model='load',filename = argv.setdefault('geo_filename','geometry.p'))
+   geo = Geometry(model='load')
    solver = self.solver
    argv.update({'Geometry':geo})
    vw = WriteVtk(argv)
@@ -113,16 +113,20 @@ class Plot(object):
    if 'temperature' in solver.keys():
     vw.add_variable(solver['temperature'],label = r'''BTE Temperature [K]''')
 
+
+   if 'pseudogradient' in solver.keys():
+    vw.add_variable(solver['pseudogradient'],label = r'''Pseudo gradient Temperature [K/nm]''')
+
+
    if 'flux' in solver.keys():
     vw.add_variable(solver['flux'],label = r'''BTE Thermal Flux [W/m/m]''')
+    #vw.add_variable(solver['vorticity'],label = r'''BTE Vorticity [W/m/m/m]''')
+    #vw.add_variable(solver['vorticity_fourier'],label = r'''Fourier Vorticity [W/m/m/m]''')
 
-   vw.add_variable(solver['temperature_fourier'],label = r'''Fourier Temperature [K]''')
+   vw.add_variable(solver['temp_fourier'],label = r'''Fourier Temperature [K]''')
    vw.add_variable(solver['flux_fourier'],label = r'''Fourier Thermal Flux [W/m/m]''')
 
-   if 'pseudotemperature' in solver.keys():
-    vw.add_variable(solver['pseudotemperature'],label = r'''Pseudotemperature [K]''')
-
-   vw.write_vtk()
+   vw.write_vtk(**argv)
 
 
  def SUP(self):

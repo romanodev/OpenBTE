@@ -1,10 +1,10 @@
 
 package:
   name: "openbte"
-  version: "0.9.53"
+  version: "0.9.55"
 
 source:
-  url: ../dist/openbte-0.9.53.tar.gz
+  url: ../dist/openbte-0.9.55.tar.gz
 
 build:
         
