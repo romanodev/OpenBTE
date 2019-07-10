@@ -11,7 +11,7 @@ Community
 Reference
 =========
 
-`pdf <https://heattransfer.asmedigitalcollection.asme.org/article.aspx?articleid=2119334>`_
+`G. Romano et al. J. Heat Transfer (2015) <https://heattransfer.asmedigitalcollection.asme.org/article.aspx?articleid=2119334>`_
 
 Installation
 ====================
