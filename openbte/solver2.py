@@ -121,9 +121,9 @@ class Solver(object):
      self.mat = pickle.load(open('material.p','rb'))
 
    self.control_angle =  self.rotate(np.array(self.mat['control_angle']),**argv)
-   self.control_angle_not_int =  self.rotate(np.array(self.mat['control_angle_not_int']),**argv)
+   #self.control_angle_not_int =  self.rotate(np.array(self.mat['control_angle_not_int']),**argv)
    self.kappa_directional =  self.rotate(np.array(self.mat['kappa_directional']),**argv)
-   self.kappa_directional_not_int =  self.rotate(np.array(self.mat['kappa_directional_not_int']),**argv)
+   #self.kappa_directional_not_int =  self.rotate(np.array(self.mat['kappa_directional_not_int']),**argv)
    #self.control_angle =  np.array(self.mat['control_angle'])
    #self.kappa_directional =  np.array(self.mat['kappa_directional'])
    #self.angle_plus =  self.rotate(np.array(self.mat['angle_plus']),**argv)
@@ -432,7 +432,7 @@ class Solver(object):
     for kk in range(block):
      index = rank*block + kk  
      if index < self.n_parallel :
-
+      #print(index)
       mfp_plot = []
       #-------------------------------------------------------   
       idx = [self.n_serial]
