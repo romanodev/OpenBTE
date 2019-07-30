@@ -468,12 +468,12 @@ class Solver(object):
          temp = TDIFF[n]
          eta = eta_diff[n]
         else:
-         #temp = self.get_bulk_data(global_index,TB,TL)
-        
+         temp = self.get_bulk_data(global_index,TB,TL)
+       
          #-new-----------
-         delta_tmp = self.get_bulk_data(global_index,TB,DeltaTL)
-         self.temp[global_index] += delta_tmp
-         temp = self.temp[global_index]
+         #delta_tmp = self.get_bulk_data(global_index,TB,DeltaTL)
+         #self.temp[global_index] += delta_tmp
+         #temp = self.temp[global_index]
          #------------------------------------- 
 
          #print(time.time()-a)
@@ -486,7 +486,6 @@ class Solver(object):
         (Am,Ap) = self.get_boundary_matrices(global_index)
         TBp_minus += Am 
         TBp_plus  += np.einsum('es,e->es',Ap,temp)
-        #TBp_plus  += Ap
         TL2p += np.outer(self.mat['CollisionMatrix'][:,global_index],temp)    
         Tp+= temp*self.mat['TCOEFF'][global_index]
         kdir = self.mat['kappa_directional'][global_index]
@@ -532,10 +531,8 @@ class Solver(object):
     error_vec.append(abs(kappa_vec[-1]-kappa_vec[-2])/abs(max([kappa_vec[-1],kappa_vec[-2]])))
     #----------------
 
-    #Upate lattice and boundary temperaturei
+    #Upate lattice and boundary temperature
     
-    #print(np.min(np.min(TB_plus,axis=0),axis=0),np.max(np.max(TB_plus,axis=0),axis=0))
-    #print(np.max(np.max(TB_plus,axis=0),axis=0),np.min(np.min(TB_plus,axis=0),axis=0))
     #if rank == 0:
     TB_new = TB_plus.copy()
     for i in range(3):
@@ -545,7 +542,7 @@ class Solver(object):
 
     TB = self.alpha * TB_new + (1-self.alpha)*TB_old; TB_old = TB.copy()
 
-
+    
     #T experimental----
     #if self.argv.setdefault('synthetic',False):
     # if rank==0:
@@ -558,9 +555,10 @@ class Solver(object):
     # TL = [data['T']]
     #else: 
     #print(min(TL2[0]),max(TL2[0])) 
-    TL = self.alpha * TL2.copy() + (1-self.alpha)*TL_old; DeltaTL = TL-TL_old; TL_old = TL.copy()
+    TL = self.alpha * TL2.copy() + (1-self.alpha)*TL_old; 
+    #DeltaTL = TL-TL_old; 
+    TL_old = TL.copy()
     n_iter +=1   
-    #print(min(DeltaTL[0]),max(DeltaTL[0])) 
     #-----
 
 

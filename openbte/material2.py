@@ -654,8 +654,6 @@ class Material(object):
 
        kappa_directional[index_1]         += 3 * a1 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]#*mfp[m1]/mfp_bulk[m]
        kappa_directional[index_2]         += 3 * a2 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]#*mfp[m2]/mfp_bulk[m]
-       #kappa_directional_not_int[index_1] += 3 * a1 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]/np.sin(Dphi/2)/2
-       #kappa_directional_not_int[index_2] += 3 * a2 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]/np.sin(Dphi/2)/2
 
        temp_coeff[index_1] += a1 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]#*mfp[m1]/mfp_bulk[m]
        temp_coeff[index_2] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]#*mfp[m2]/mfp_bulk[m]

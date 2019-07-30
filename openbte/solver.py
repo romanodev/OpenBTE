@@ -211,7 +211,6 @@ class Solver(object):
    
      t = temp*self.mat['domega'][index]
      s = K.dot(temp-TL[n]).sum() * self.mat['domega'][index] * 3 * self.kappa_factor
-     
      j = np.multiply(temp,HW_PLUS) * self.mat['domega'][index]*2*np.pi
 
      return t,s,j

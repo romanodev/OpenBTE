@@ -30,10 +30,18 @@ def GenerateCustomPores(argv):
    #---------------------
 
   if 'polygons' in argv:
-   tmp = np.array(argv['polygons'])
+   tmp = argv['polygons']
   else:
-   tmp = np.loadtxt(argv['polyfile'])
-   if np.ndim(tmp) == 1: tmp = [tmp]
+   f = open(argv['polyfile'],'r')
+   a = [0]; tmp = []
+   while not len(a) == 0:
+    a = f.readline().split()
+    if not len(a) == 0:
+      poly = [float(i) for i in a]
+      tmp.append(poly)
+   #tmp = np.loadtxt(argv['polyfile'])
+   #quit()
+   #if np.ndim(tmp) == 1: tmp = [tmp]
 
  
 

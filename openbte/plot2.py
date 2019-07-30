@@ -306,23 +306,17 @@ class Plot(object):
   solver = dd.io.load('solver.hdf5')
   argv.update({'Geometry':self.geo})
 
-  vw = WriteVtk(argv)
+  vw = WriteVtk(**argv)
 
   if 'index' in argv.keys():
     ii = int(argv['index'])
     if variable == 'temperature':
      data = solver['temperature_vec'][ii]
-     #vmin = np.min(solver['temperature_vec'])
-     #vmax = np.max(solver['temperature_vec'])
     else: 
      data = solver['flux_vec'][ii]
-     #vmin = np.min(solver['flux_vec'])
-     #vmax = np.max(solver['flux_vec'])
 
   else:
     data = solver[variable]
-    #vmin = min(data)
-    #vmax = min(data)
 
   (triangulation,tmp,nodes) = vw.get_node_data(data)
 
@@ -486,13 +480,10 @@ class Plot(object):
    fig = figure(num=' ', figsize=(Sx,Sy), dpi=80, facecolor='w', edgecolor='k')
    axes([0,0,1.0,1.0])
 
-   #fig = figure(num=' ', figsize=(8*Lx/Ly, 8), dpi=80, facecolor='w', edgecolor='k')
-   #axes([0,0,0.5,1.0])
-   #axes([0,0,1.0,1.0])
 
 
    #data += 1.0
-   plt.set_cmap(Colormap('hot'))
+   plt.set_cmap(Colormap('winter'))
    
    (data,nodes,triangulation) =  self.get_data(argv)
    vmin = argv.setdefault('vmin',min(data))
@@ -504,6 +495,8 @@ class Plot(object):
     #Contour-----
    if argv.setdefault('iso_values',False):
     t = tricontour(triangulation,data,levels=np.linspace(vmin,vmax,10),colors='black',linewidths=1.5)
+    clabel(t, fontsize=14, inline=True)
+
 
    if argv.setdefault('streamlines',False):# and (variable == 'fourier_flux' or variable == 'flux' ):
 

@@ -339,7 +339,7 @@ def GenerateRandomPoresOverlap(argv):
   Na = Na_p[0]
 
   if argv.setdefault('load_configuration',False):
-   centers = np.load('conf.dat')
+   centers = np.load('conf.dat',allow_pickle=True)
   elif argv.setdefault('manual',False):
    centers = argv['centers']
   else:
