@@ -5,8 +5,9 @@ from matplotlib.tri import Triangulation
 
 class WriteVtk(object):
 
- def __init__(self,argv):
+ def __init__(self,**argv):
 
+  self.argv = argv
   self.mesh = argv['Geometry']
   self.Nx = argv.setdefault('repeat_x',1)
   self.Ny = argv.setdefault('repeat_y',1)
@@ -142,8 +143,9 @@ class WriteVtk(object):
 
 
 
- def write_vtk(self,filename='output.vtk'):
+ def write_vtk(self):
 
+  filename = self.argv.setdefault('filename','output.vtk')
   if MPI.COMM_WORLD.Get_rank() == 0:
    stored_data = {}
 
@@ -162,6 +164,7 @@ class WriteVtk(object):
     tmp = [[1,0,0],[0,1,0],[0,0,1]]
     if is_scalar:
      increment = tmp[self.mesh.direction]
+
     #---------------------------------------
     ss = '''self.repeat_nodes_and_data(node_data,increment)'''
     nodes,cells,tmp = eval(ss)

@@ -166,11 +166,11 @@ class Solver(object):
       angle = self.mat['control_angle'][index]
       aa = sparse.COO([0,1,2],angle,shape=(3))
 
-      tmp = sparse.tensordot(self.mesh.CP,aa,axes=1)
+      tmp = sparse.tensordot(self.mesh.CM,aa,axes=1)
       HW_PLUS = tmp.clip(min=0)
-      #HW_MINUS = HW_PLUS - tmp
+      HW_MINUS = HW_PLUS - tmp
 
-      HW_MINUS = -sparse.tensordot(self.mesh.CM,aa,axes=1).clip(max=0)
+      #HW_MINUS = -sparse.tensordot(self.mesh.CM,aa,axes=1).clip(max=0)
       test2  = sparse.tensordot(self.mesh.N,aa,axes=1)
       K = test2 * self.TT #broadcasting (B_ij * V_i)
       AM = test2.clip(max=0)
@@ -198,6 +198,7 @@ class Solver(object):
       self.last_index = index
     #----------------------------------------------
 
+
      if global_index in self.lu.keys() and self.argv.setdefault('keep_lu',False):
       lu = self.lu[global_index]
      else:
@@ -211,8 +212,7 @@ class Solver(object):
    
      t = temp*self.mat['domega'][index]
      s = K.dot(temp-TL[n]).sum() * self.mat['domega'][index] * 3 * self.kappa_factor
-     
-     j = np.multiply(temp,HW_PLUS) * self.mat['domega'][index]*2*np.pi
+     j = np.multiply(temp,HW_PLUS) * self.mat['domega'][index]
 
      return t,s,j
 
@@ -341,10 +341,8 @@ class Solver(object):
       for n in range(self.mat['n_mfp'])[idx[0]::-1]:
         if  fourier : 
          t,s,j = self.get_multiscale_diffusive(index,n,SDIFF,TDIFF,TDIFFGrad)
-        else:
-         #a = time.time()
+        else: 
          t,s,j = self.get_solving_data(index,n,TB,TL)
-         #print(time.time()-a)
 
          if self.multiscale:
           error = abs((SDIFF[n]-s/self.mat['mfp'][n])/SDIFF[n])
@@ -380,11 +378,14 @@ class Solver(object):
     diffusive = MS[0]/self.n_index/self.mat['n_mfp']
     ballistic = (self.n_index*self.mat['n_mfp'] - MS[1])/self.n_index/self.mat['n_mfp']
 
+    #quit() 
 
     n_iter +=1
     #----------------------------------------------------------- 
 
+    #It's time to generalize kappa to an angular dependent value
     SUP = np.sum(np.multiply(self.mat['J3'],log_interp1d(self.mat['mfp'],kernel.clip(min=1e-13))(self.mat['trials'])),axis=1)
+    #SUP = np.multiply(self.mat['J3'],log_interp1d(self.mat['mfp'],kernel.clip(min=1e-13))(self.mat['trials']))
 
     kappa = np.sum(np.multiply(self.mat['kappa_bulk'],SUP))
     kappa_eff.append(kappa)
@@ -394,10 +395,10 @@ class Solver(object):
 
     #Boundary temperature
     TB = np.tile([np.sum(np.multiply(self.mat['J1'],log_interp1d(self.mat['mfp'],J.T[e])(self.mat['trials']))) \
-         for e in range(self.n_elems)],(self.mat['n_mfp'],1))/np.pi
-    #TB = np.tile([np.sum(np.multiply(self.mat['J1'],log_interp1d(self.mat['mfp'],[1.0])(self.mat['trials']))) \
-    #     for e in range(self.n_elems)],(self.mat['n_mfp'],1))
+         for e in range(self.n_elems)],(self.mat['n_mfp'],1))
    
+    print(min(TB[0]),max(TB[0]))
+    quit()
     #Lattice temperature   
     #TL = np.tile([np.sum(np.multiply(self.mat['J2'],log_interp1d(self.mat['mfp'],T.T[e])(self.mat['trials']))) \
     #     for e in range(self.n_elems)],(self.mat['n_mfp'],1))
@@ -458,6 +459,8 @@ class Solver(object):
 
      #kappa = self.side_kappa_map[ll]
      kappa = 1.0
+     #kappa = 100.0
+     #print(kappa)        print(KAPPAp)
      (v_orth,dummy) = self.mesh.get_decomposed_directions(kc1,kc2)
      vol1 = self.mesh.get_elem_volume(kc1)
      #vol2 = self.mesh.get_elem_volume(kc2)
@@ -545,6 +548,95 @@ class Solver(object):
 
 
 
+  '''
+  def solve_fourier(self,**argv):
+       
+    rank = MPI.COMM_WORLD.rank    
+    #Update matrices---------------------------------------------------
+    G = argv.setdefault('interface_conductance',np.zeros(1))#*self.dom['correction']
+    TL = argv.setdefault('lattice_temperature',np.zeros((1,self.n_elems)))
+    TB = argv.setdefault('boundary_temperature',np.zeros((1,self.n_elems)))
+    mfe_factor = argv.setdefault('mfe_factor',0.0)
+    kappa_bulk = argv.setdefault('kappa',[1.0])
+    
+
+    n_index = len(kappa_bulk)
+
+    #G = np.zeros(n_index)
+    #-------------------------------
+    KAPPAp,KAPPA = np.zeros((2,n_index))
+    FLUX,FLUXp = np.zeros((2,n_index,3,self.n_elems))
+    TLp,TLtot = np.zeros((2,n_index,self.n_elems))
+
+    comm = MPI.COMM_WORLD  
+    size = comm.size
+    rank = comm.rank
+    block = n_index // size + 1
+    #block = argv.setdefault('fourier_cut_mfp',n_index) // size + 1
+    for kk in range(block):
+     index = rank * block + kk   
+     if index < n_index :# and index < argv['fourier_cut_mfp']:
+     #if index < argv.setdefault('fourier_cut_mfp',n_index) :
+    
+    #set up MPI------------------
+    #for index in range(n_index):
+      #Aseemble matrix-------------       
+    
+    
+      A  = kappa_bulk[index] * self.F + mfe_factor * csc_matrix(scipy.sparse.eye(self.n_elems)) 
+      A += mfe_factor * spdiags(self.FF,0,self.n_elems,self.n_elems) * G[index]  
+      B  = kappa_bulk[index] * self.B + mfe_factor * TL[index] 
+      B += mfe_factor * np.multiply(self.FF,TB[index]) * G[index]
+      
+      if mfe_factor == 0.0: A[10,10] = 1.0
+
+      #if index in self.lu_fourier.keys():
+      # SU = self.lu_fourier[index]
+
+      #else:
+      SU = splu(A)
+      # self.lu_fourier.update({index:SU})
+
+      C = np.zeros(self.n_elems)
+      #--------------------------------------
+     
+      n_iter = 0
+      kappa_old = 0
+      error = 1        
+      while error > argv.setdefault('max_fourier_error',1e-2) and \
+                    n_iter < argv.setdefault('max_fourier_iter',10) :
+                    
+        RHS = B + C*kappa_bulk[index]
+        if mfe_factor == 0.0: RHS[10] = 0.0      
+        temp = SU.solve(RHS)
+        temp = temp - (max(temp)+min(temp))/2.0
+        (C,flux) = self.compute_non_orth_contribution(temp)
+        
+        KAPPAp[index] = self.compute_diffusive_thermal_conductivity(temp)*kappa_bulk[index]
+        error = abs((KAPPAp[index] - kappa_old)/KAPPAp[index])
+        kappa_old = KAPPAp[index]
+        n_iter +=1
+        
+      FLUXp[index] = np.array([-self.mat['kappa_bulk_tot']*tmp for k,tmp in enumerate(flux)])
+      #FLUXp[index] = flux.T
+      TLp[index] = temp
+     
+        
+    comm.Allreduce([KAPPAp,MPI.DOUBLE],[KAPPA,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([TLp,MPI.DOUBLE],[TLtot,MPI.DOUBLE],op=MPI.SUM) #to be changed
+    comm.Allreduce([FLUXp,MPI.DOUBLE],[FLUX,MPI.DOUBLE],op=MPI.SUM)  
+    
+    
+    #if argv.setdefault('verbose',True) and rank==0:
+
+     #print('  ')
+     #print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(KAPPAp.sum())+ ' W/m/K')
+     #print('  ')
+    
+
+
+    return {'kappa_fourier':KAPPA,'temperature_fourier_gradient':FLUX,'temperature_fourier':TLtot}
+ '''
       
   def compute_non_orth_contribution(self,temp) :
 
@@ -593,6 +685,11 @@ class Solver(object):
     (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=mat)
     kappa += v_orth  *(temp[j]+1.0-temp[i])
 
+   #kappa = 0
+   #for i,j in zip(*self.PER.nonzero()):
+   # (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=mat)
+   # kappa += 0.5*v_orth *self.PER[i,j]*(temp[j]+self.PER[i,j]-temp[i])
+
    return kappa*self.kappa_factor
 
   def print_logo(self):
@@ -621,5 +718,38 @@ class Solver(object):
      print('Bulk Thermal Conductivity:   ' + str(round(self.mat['kappa_bulk_tot'],4)) +' W/m/K')
      print(' ')
      
+    #Build data and perform superlu factorization---
+    #lu_data = {'L':lu.L,'U':lu.U,'perm_c':lu.perm_c,'perm_r':lu.perm_r}
+    #pickle.dump(lu_data,open(self.cache + '/lu_' + str(index*self.mat['n_mfp']+n) + '.p','wb'))
+   #a = time.time()
+   #b = time.time() 
+   #start = time.time()
+  # temp = self.spsolve_lu(lu_data,RHS)
+   #c = time.time() 
+   #print((c-b)/(b-a))
+   #quit()
+    #return Tp, kernelp, Jp
+   #return Tp, np.zeros(self.n_elems), Jp
+
+   #global_index = index*self.mat['n_mfp']+n
+   #if  os.path.exists(self.cache + '/lu_' + str(global_index) + '.p') :
+   # lu_data = pickle.load(open(self.cache + '/lu_' + str(index*self.mat['n_mfp']+n) + '.p','rb'))
+   # self.data = pickle.load(open(self.cache + '/save_' + str(index) + '.p','rb'))
+    
+   #else:
+  """
+  def spsolve_lu(self,lu_data,b):
+   perm_r = lu_data['perm_r']
+   perm_c = lu_data['perm_c']
+   L = lu_data['L'].tocsr()
+   U = lu_data['U'].tocsr()
+   if perm_r is not None:
+      b_old = b.copy()
+      for old_ndx, new_ndx in enumerate(perm_r):
+        b[new_ndx] = b_old[old_ndx]
+   c = spsolve_triangular(L, b, lower=True)
+   px = spsolve_triangular(U, c, lower=False)
+   return px[perm_c]
+   """
 
 

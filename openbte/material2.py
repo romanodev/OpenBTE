@@ -529,12 +529,6 @@ class Material(object):
        kappa_directional[index_1] += 3 * a1 * factor/mfp_bulk[m]*direction_ave[t,p]
        kappa_directional[index_2] += 3 * a2 * factor/mfp_bulk[m]*direction_ave[t,p]
 
-       #kappa_directional2[index_1] += 3 * a1 * factor/mfp_bulk[m]*direction_ave2[t,p]
-       #kappa_directional2[index_2] += 3 * a2 * factor/mfp_bulk[m]*direction_ave2[t,p]
-
-       #kappa_directional_plus[index_1] += 3 * a1 * factor/mfp_bulk[m]*direction_ave_plus[t,p]
-       #kappa_directional_minus[index_2] += 3 * a2 * factor/mfp_bulk[m]*direction_ave_minus[t,p]
-
        temp_coeff[index_1] += a1 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
        temp_coeff[index_2] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
 
@@ -573,10 +567,8 @@ class Material(object):
            'angle_map':angle_map,\
            'dphi':Dphi,\
            'kappa_directional':kappa_directional,\
-           #'kappa_directional2':kappa_directional2,\
-           #'kappa_directional_plus':kappa_directional_plus,\
-           #'kappa_directional_minus':kappa_directional_minus,\
            'n_serial':n_mfp,\
+           'log':True,\
            'n_parallel':n_phi,\
            'mfp':mfp,\
            'aliasing':np.cos(Dphi/2)/np.sin(Dphi/2),\
@@ -660,22 +652,13 @@ class Material(object):
        #kappa_directional_not_int[index_1] += 3 * a1 * factor/mfp_bulk[m]*direction_ave2[t,p]
        #kappa_directional_not_int[index_2] += 3 * a2 * factor/mfp_bulk[m]*direction_ave2[t,p]
 
-       kappa_directional[index_1]         += 3 * a1 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]
-       kappa_directional[index_2]         += 3 * a2 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]
-       kappa_directional_not_int[index_1] += 3 * a1 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]/np.sin(Dphi/2)/2
-       kappa_directional_not_int[index_2] += 3 * a2 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]/np.sin(Dphi/2)/2
+       kappa_directional[index_1]         += 3 * a1 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]#*mfp[m1]/mfp_bulk[m]
+       kappa_directional[index_2]         += 3 * a2 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]#*mfp[m2]/mfp_bulk[m]
+       #kappa_directional_not_int[index_1] += 3 * a1 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]/np.sin(Dphi/2)/2
+       #kappa_directional_not_int[index_2] += 3 * a2 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]/np.sin(Dphi/2)/2
 
-       #kappa_directional2[index_1] += 3 * a1 * factor/mfp_bulk[m]*direction_ave2[t,p]
-       #kappa_directional2[index_2] += 3 * a2 * factor/mfp_bulk[m]*direction_ave2[t,p]
-
-       #kappa_directional2[index_1] += 3 * a1 * factor/mfp_bulk[m]*ftheta[t]*np.sin(theta[t])*fphi
-       #kappa_directional2[index_2] += 3 * a2 * factor/mfp_bulk[m]*ftheta[t]*np.sin(theta[t])*fphi
-
-       #kappa_directional_plus[index_1] += 3 * a1 * factor/mfp_bulk[m]*direction_ave_plus[t,p]
-       #kappa_directional_minus[index_2] += 3 * a2 * factor/mfp_bulk[m]*direction_ave_minus[t,p]
-
-       temp_coeff[index_1] += a1 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
-       temp_coeff[index_2] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
+       temp_coeff[index_1] += a1 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]#*mfp[m1]/mfp_bulk[m]
+       temp_coeff[index_2] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]#*mfp[m2]/mfp_bulk[m]
 
        norm += kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
 
@@ -726,6 +709,7 @@ class Material(object):
            'n_serial':n_mfp,\
            'n_parallel':n_phi,\
            'mfp':mfp,\
+           'log':True,\
            'aliasing':np.cos(Dphi/2)/np.sin(Dphi/2),\
            'control_angle_not_int':polar_ave/np.sin(Dphi/2)/2,\
            'control_angle':polar_ave,\

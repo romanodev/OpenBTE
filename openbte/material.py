@@ -49,10 +49,11 @@ class Material(object):
    azimuthal_ave = np.array([ftheta,ftheta,np.cos(Dtheta/2)*np.ones(n_theta)]).T   
    direction_ave = np.multiply(np.einsum('ij,kj->ikj',azimuthal_ave,polar_ave),direction)
    #---------------------------------------------------------------
-   
+  
    #Import material
    if argv.setdefault('model','nongray')=='nongray':
-    tmp = np.loadtxt(os.path.dirname(__file__) + '/materials/'+ argv['matfile'],skiprows=1)
+    source = argv.setdefault('source',os.path.dirname(__file__) + '/materials/')
+    tmp = np.loadtxt(source + argv['matfile'],skiprows=1)
     mfp_bulk = tmp[:,0]*1e9; 
     kappa_bulk = tmp[:,1]
    else:
@@ -61,7 +62,6 @@ class Material(object):
 
    n_mfp_bulk = len(mfp_bulk) 
    mfp = np.logspace(-3,np.log10(max(mfp_bulk)),argv.setdefault('n_mfp',100)) 
-
 
    kappa_directional = np.zeros((n_mfp_bulk,n_theta,n_phi)) 
    for m in range(n_mfp_bulk):
@@ -79,7 +79,8 @@ class Material(object):
    trials = np.outer(mfp_bulk,ftheta*np.sin(theta))
    #J0 = np.outer(np.ones(n_mfp_bulk),dtheta)
    J0 = np.ones(n_mfp_bulk)
-   J1 = np.outer(kappa_bulk/mfp_bulk,ftheta*dtheta*np.sin(theta))/sum(kappa_bulk/mfp_bulk)   
+   J1 = 2*np.outer(kappa_bulk/mfp_bulk,ftheta*dtheta*np.sin(theta))/sum(kappa_bulk/mfp_bulk) #2 stands for symmetry
+
    J2 = np.outer(kappa_bulk/pow(mfp_bulk,2),dtheta)/sum(kappa_bulk/pow(mfp_bulk,2))   #x2 (symmetry) and /2 (average)
    J3 = np.outer(1/mfp_bulk,ftheta*dtheta*np.sin(theta))
 
@@ -106,7 +107,7 @@ class Material(object):
                 'polar':polar,\
                 'azimuthal':azimuthal,\
                 'polar_ave':polar,\
-                'control_angle':polar,\
+                'control_angle':polar*fphi,\
                 'azimuthal_ave':azimuthal}
    
    return data
@@ -141,7 +142,8 @@ class Material(object):
     
     #Import material
     if argv.setdefault('model','nongray')=='nongray':
-     tmp = np.loadtxt(os.path.dirname(__file__) + '/materials/'+ argv['matfile'],skiprows=1)
+     source = argv.setdefault('source',os.path.dirname(__file__) + '/materials/')
+     tmp = np.loadtxt(source + argv['matfile'],skiprows=1)
      mfp_bulk = tmp[:,0]*1e9; n_mfp_bulk = len(mfp_bulk)
      kappa_bulk = tmp[:,1]
     else: 

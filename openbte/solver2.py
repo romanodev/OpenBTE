@@ -300,9 +300,12 @@ class Solver(object):
         self.A = sparse.load_npz(self.cache + '/A_' + str(irr_angle) + '.npz')
         self.HW_MINUS = sparse.load_npz(self.cache + '/HW_MINUS_' + str(irr_angle) + '.npz')
 
-     
      boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1).todense()
+     #if self.n_iter == 1:
      RHS = mfp * (self.P + boundary) + TL[index_irr]   
+     #else:
+     #  RHS = mfp * (boundary) + TL[index_irr]   
+
      F = scipy.sparse.eye(self.n_elems,format='csc') + self.A * mfp
      lu = splu(F.tocsc())
      return lu.solve(RHS)
@@ -342,7 +345,6 @@ class Solver(object):
       for n in range(len(ms_vec)):
        print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n+1,kappa_vec[n],error_vec[n],ms_vec[n][0],ms_vec[n][1],ms_vec[n][2]))
 
-
    else:          
      #fourier first guess----
      if rank == 0: 
@@ -353,28 +355,39 @@ class Solver(object):
      data = comm.bcast(data,root=0)
      comm.Barrier()
      temp_fourier = data['temp_fourier']
-     temp_fourier_grad = data['temp_fourier']
+     temp_fourier_grad = data['temp_fourier_grad']
      kappa_fourier = data['kappa_fourier']
      TL = np.tile(temp_fourier,(nT,1))
      TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
      #----------------------------------------------------------------
-     kappa_vec = [float(kappa_fourier)]
+     #kappa_vec = [float(kappa_fourier)]
+     kappa_vec = [0]
      error_vec = [1.0]
      ms_vec = [[1,0,0]]
      if rank == 0 and self.verbose:
-       print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(1,kappa_vec[-1],1,1,0,0))
+       print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(1,float(kappa_fourier),1,1,0,0))
      #---------------------------
+
+   #Save if only Fourier---
+   if self.argv.setdefault('only_fourier',False):
+     data_save = {'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad,'temp_fourier':temp_fourier,'kappa_fourier':kappa_fourier}
+     dd.io.save(self.argv.setdefault('filename','solver.hdf5'),data_save)
 
    #Initialize data-----
    n_iter = len(kappa_vec)
    TL_old = TL.copy()
    TB_old = TB.copy()
+   DeltaTL = TL.copy()
+   #DeltaTL = np.zeros_like(TL)
+   #TB = np.zeros_like(TB_old)
    #-------------------------------
-
+   
+   self.temp = np.zeros((self.n_parallel * self.n_serial,self.n_elems))
 
    while n_iter < argv.setdefault('max_bte_iter',10) and \
           error_vec[-1] > argv.setdefault('max_bte_error',1e-2):
 
+    self.n_iter = n_iter
     #Compute diffusive approximation---------------------------          
     if self.multiscale:
 
@@ -420,6 +433,7 @@ class Solver(object):
      index = rank*block + kk  
      if index < self.n_parallel :
 
+      mfp_plot = []
       #-------------------------------------------------------   
       idx = [self.n_serial]
       if self.multiscale:
@@ -454,14 +468,20 @@ class Solver(object):
          temp = TDIFF[n]
          eta = eta_diff[n]
         else:
-         #a = time.time()
-         temp = self.get_bulk_data(global_index,TB,TL)
+         #temp = self.get_bulk_data(global_index,TB,TL)
+        
+         #-new-----------
+         delta_tmp = self.get_bulk_data(global_index,TB,DeltaTL)
+         self.temp[global_index] += delta_tmp
+         temp = self.temp[global_index]
+         #------------------------------------- 
+
          #print(time.time()-a)
          eta = self.mesh.B_with_area_old.dot(temp).sum()
          if self.multiscale:
            if abs(eta_diff[n] - eta)/abs(eta) < 1e-2:
             fourier = True  
-
+         
         eta_vec[n] = eta
         (Am,Ap) = self.get_boundary_matrices(global_index)
         TBp_minus += Am 
@@ -472,7 +492,7 @@ class Solver(object):
         kdir = self.mat['kappa_directional'][global_index]
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
         Jp += np.outer(temp,kdir)*1e9
-
+        
 
       #Ballistic component
       ballistic = False
@@ -526,7 +546,6 @@ class Solver(object):
     TB = self.alpha * TB_new + (1-self.alpha)*TB_old; TB_old = TB.copy()
 
 
-
     #T experimental----
     #if self.argv.setdefault('synthetic',False):
     # if rank==0:
@@ -538,8 +557,10 @@ class Solver(object):
     # data = comm.bcast(data,root=0)
     # TL = [data['T']]
     #else: 
-    TL = self.alpha * TL2.copy() + (1-self.alpha)*TL_old; TL_old = TL.copy()
-    n_iter +=1    
+    #print(min(TL2[0]),max(TL2[0])) 
+    TL = self.alpha * TL2.copy() + (1-self.alpha)*TL_old; DeltaTL = TL-TL_old; TL_old = TL.copy()
+    n_iter +=1   
+    #print(min(DeltaTL[0]),max(DeltaTL[0])) 
     #-----
 
 
@@ -550,12 +571,15 @@ class Solver(object):
       nbal = nbal[0]/(self.n_serial*self.n_parallel)
       nbte = 1- ndif - nbal
       ms_vec.append([ndif,nbte,nbal])
-      print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa_vec[-1],error_vec[-1],ndif,nbte,nbal))
+      kappa_current = kappa_vec[-1]
+      #kappa_current = np.sum(kappa_vec)
+      print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa_current,error_vec[-1],ndif,nbte,nbal))
       data = {'kappa_vec':kappa_vec,'temperature':T,'pseudogradient':self.mesh.compute_grad(T),'flux':J,'temp_fourier':temp_fourier,'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad}
       if self.argv.setdefault('save_state',False):
           data.update({'TB':TB,'TL':TL,'error_vec':error_vec,'ms_vec':ms_vec,'temp_fourier_grad':temp_fourier_grad})  
 
-      dd.io.save(self.argv.setdefault('filename','solver.hdf5'),data)
+    if rank == 0:
+     dd.io.save(self.argv.setdefault('filename','solver.hdf5'),data)
     else: data = None
     self.state =  MPI.COMM_WORLD.bcast(data,root=0)
 

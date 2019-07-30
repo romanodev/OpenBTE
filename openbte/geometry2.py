@@ -83,7 +83,7 @@ class Geometry(object):
 
   if geo_type == 'load':
   # if MPI.COMM_WORLD.Get_rank() == 0:
-    self.state = pickle.load(open('geometry.p','rb'))
+    self.state = pickle.load(open(argv.setdefault('filename','geometry.p'),'rb'))
     self._update_data()
 
   else:

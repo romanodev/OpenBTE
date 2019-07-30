@@ -1,4 +1,4 @@
-new = False
+new = True
 if new:
  from .geometry2 import Geometry
  from .material2 import Material

@@ -377,6 +377,7 @@ def GenerateRandomPoresOverlap(argv):
    dx = 0
    dy = 0
 
+   #move pores if they are too close to the boundaries
    if argv.setdefault('adjust',False):
     p1 = copy.deepcopy(translate(p,xoff=dmin))
     b = p1.intersection(frame).area == p1.area
