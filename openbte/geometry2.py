@@ -364,11 +364,13 @@ class Geometry(object):
     self.compute_interpolation_weigths()
     self.compute_contact_areas()
     self.compute_boundary_condition_data()
+    self.n_elems = len(self.elems)
 
 
     data = {'side_list':self.side_list,\
           'node_list':self.node_list,\
           'exlude':self.exlude,\
+          'n_elems':self.n_elems,\
           'elem_side_map':self.elem_side_map,\
           'elem_region_map':self.elem_region_map,\
           'side_elem_map':self.side_elem_map,\
@@ -400,6 +402,7 @@ class Geometry(object):
           'CM':self.CM,\
           'CP':self.CP,\
           'CPB':self.CPB,\
+          'periodic_sides':self.periodic_sides,\
           'boundary_elements':self.boundary_elements,\
           'interface_elements':self.interface_elements,\
           'side_normals':self.side_normals,\
@@ -930,6 +933,7 @@ class Geometry(object):
  def _update_data(self):
     self.nodes = self.state['nodes']
     self.dim = self.state['dim']
+    self.n_elems = self.state['n_elems']
     self.A = self.state['A']
     self.sides = self.state['sides']
     self.elems = self.state['elems']
@@ -967,6 +971,7 @@ class Geometry(object):
     self.N_new = self.state['N_new']
     self.CM = self.state['CM']
     self.CP = self.state['CP']
+    self.periodic_sides = self.state['periodic_sides']
     self.CPB = self.state['CPB']
     self.B = self.state['B']
     self.B_with_area = self.state['B_with_area']
@@ -1110,6 +1115,7 @@ class Geometry(object):
   self.side_list.setdefault('Interface',[])
   #self.node_list.setdefault('Interface',[])
   self.periodic_nodes = []
+  self.periodic_sides = {}
 
   if self.argv.setdefault('delete_gmsh_files',False):
     os.remove(os.getcwd() + '/mesh.msh')
@@ -1149,6 +1155,10 @@ class Geometry(object):
       pairs.append([s1,s2])
       self.side_periodicity[s1][1] = pp
       self.side_periodicity[s2][1] = -pp
+
+      
+      self.periodic_sides[s1] = s2 
+      self.periodic_sides[s2] = s1
 
       if np.linalg.norm(self.nodes[self.sides[s1][0]] - self.nodes[self.sides[s2][0]]) == np.linalg.norm(pp):
        self.periodic_nodes.append([self.sides[s1][0],self.sides[s2][0]])
@@ -1674,7 +1684,7 @@ class Geometry(object):
   return div
 
 
- def compute_grad(self,temp,lattice_temp =[],add_jump=True,verbose=0) :
+ def compute_grad(self,temp,lattice_temp =[],add_jump=True,verbose=0,pbcs=None) :
 
    if len(lattice_temp) == 0: lattice_temp = temp
 
@@ -1703,7 +1713,10 @@ class Geometry(object):
 
      temp_1 = temp[kc1]
      temp_2 = temp[kc2]
-     if add_jump: temp_2 += self.get_side_periodic_value(kc2,kc1) 
+     if add_jump: 
+       temp_2 += self.get_side_periodic_value(kc2,kc1) 
+     else:
+       temp_2 += pbcs[kc1,kc2]        
 
      diff_t = temp_2 - temp_1
 

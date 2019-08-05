@@ -284,17 +284,6 @@ def GenerateRandomPoresOverlap(argv):
   area_tot = Lx*Ly
 
 
-  #area_tmp = 0.0;
-
-
-  #area_max = Lx*phi/float(Np)
-
-
-  #area_min = Lx*Ly*phi/float(Np)
-
-  #area_bounds = range(2);
-  #area_bounds[0] = area_min;
-  #area_bounds[1] = area_max;
 
   #f1 = 1.5
   area_tmp = 0.0;
@@ -327,15 +316,11 @@ def GenerateRandomPoresOverlap(argv):
   Ymax =  Ly/2*ext
 
   final = []
-  #pyclipper.SCALING_FACTOR=1e3
 
-  #while (area_miss > 1e-4):
   buf = 0.0
   nn = 0
   confs = []
-  #while nn < Np:
 
-  #area = area_min
   Na = Na_p[0]
 
   if argv.setdefault('load_configuration',False):
@@ -349,11 +334,6 @@ def GenerateRandomPoresOverlap(argv):
     y = np.random.uniform(0,1)
     centers.append([x,y])
 
-  #centers_new = []
-  #index = [1]
-  #for i in index:
-  #  centers_new.append(centers[i]) 
-  #centers = centers_new  
   dphi = 2.0*math.pi/Na;
   #Fill polys-----
   polys = []
@@ -409,15 +389,15 @@ def GenerateRandomPoresOverlap(argv):
      poly_clip.append([px,py])
     polys.append(Polygon(poly_clip))
 
-  n_coll = 0
+  if argv.setdefault('consolidate',True) :
+   n_coll = 1
+  else:
+   n_coll = 0
+  
   while n_coll > 0:
    polys,n_coll = consolidate(polys,argv)
 
 
-  #n_coll = 1
-  #while n_coll > 0:
-  # polys,n_coll = consolidate(polys,argv)
-  #Create polys
   area = 0.0
   eps = argv['step']/2.0
   polys_cut = []

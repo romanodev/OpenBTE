@@ -5,6 +5,7 @@ from mpi4py import MPI
 from numpy.testing import assert_array_equal
 import math
 import pickle
+from matplotlib.pylab import *
 
 class Material(object):
 
@@ -17,6 +18,9 @@ class Material(object):
 
    if model == 'full_2D':
      data = self.compute_full_2D(**argv)
+
+   if model == 'full_2D_new':
+     data = self.compute_full_2D_new(**argv)
 
    if model == 'isotropic_2DSym' or model == 'nongray':
      data = self.compute_isotropic_2DSym_new(**argv)
@@ -33,6 +37,70 @@ class Material(object):
    if argv.setdefault('save',True):
     #dd.io.save('material.hdf5',data)  
     pickle.dump(data,open('material.p','wb+'))
+
+
+ def compute_full_2D_new(self,**argv):
+
+  if MPI.COMM_WORLD.Get_rank() == 0:
+
+   data = dd.io.load(argv['matfile'])
+   mfp = data['FBTE']
+   mfp_rta = data['FRTA']
+   #gmfp = data['GMFP']
+   #gmfp_b,gtheta_b,gphi_b = self.spherical(gmfp)
+
+   mfp_b,theta_b,phi_b = self.spherical(mfp)
+   nm = len(mfp_b)
+   versors = np.zeros((nm,3))
+   gversors = np.zeros((nm,3))
+   for i in range(nm):
+    if mfp_b[i] == 0:
+     versors[i] = [0,0,0]
+    else: 
+     versors[i] = mfp[i]/mfp_b[i]
+    #if gmfp_b[i] == 0:
+    # gversors[i] = [0,0,0]
+    #else: 
+    # gversors[i] = gmfp[i]/gmfp_b[i]
+
+
+   #gversors = np.array(gversors)
+   versors = np.array(versors)
+   mfp_b *= 1e9   #from m to nm
+   #gmfp_b *= 1e9   #from m to nm
+
+   #if argv['rta'] :
+    #A = data['ARTA']
+    #kbulk = data['KBULKRTA']
+    #Tcoeff = data['TCOEFFRTA']
+   #else: 
+   #A = data['AFULL']
+   kbulk = data['KBULKFULL']
+   Tcoeff = data['TCOEFF']
+
+   k_coeff = np.array(data['KCOEFF'])*1e-9
+   k_coeff[:,2] = 0 #Enforce zeroflux on z (for visualization purposed)
+
+   #scatter(mfp[:,0]*1e9,mfp[:,1]*1e9)
+   #scatter(mfp_rta[:,0]*1e9,mfp_rta[:,1]*1e9,color='r')
+   #show()
+   A = np.tile(Tcoeff,(nm,1))
+
+
+   return {'CollisionMatrix': A,\
+           'invH':data['invH'],\
+           'FRTA':data['FRTA']*1e9,\
+           'TCOEFF':Tcoeff,\
+           'angle_map':np.arange(nm),\
+           'temp_vec':range(nm),\
+           'kappa_directional':k_coeff,\
+           'n_serial':1,
+           'n_parallel':nm,
+           'mfp':mfp_b,
+           #'gmfp':gmfp_b,
+           'control_angle':versors,\
+           #'gcontrol_angle':gversors,\
+           'kappa_bulk_tot':kbulk}
 
 
 

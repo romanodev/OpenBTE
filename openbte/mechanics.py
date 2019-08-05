@@ -31,7 +31,6 @@ import shutil
 import matplotlib.pylab as plt
 import opt_einsum as einsum
 
-
 #levi civita
 eijk = np.zeros((3, 3, 3))
 eijk[0, 1, 2] = eijk[1, 2, 0] = eijk[2, 0, 1] = 1
@@ -144,10 +143,6 @@ class Solver(object):
    self.n_parallel = self.mat['n_parallel'] #total indexes
    self.n_serial = self.mat['n_serial'] #total indexes
  
-   #if MPI.COMM_WORLD.Get_rank() == 0:
-   # if os.path.isdir(self.cache):
-   #  shutil.rmtree(self.cache)
-   #MPI.COMM_WORLD.Barrier() 
 
 
    self.lu = {}
@@ -166,18 +161,22 @@ class Solver(object):
    self.assemble_fourier()
    
    #---------------------------
-  
- 
+   
    #solve the BTE
    self.solve_bte(**argv)
-
    
+
+
+   #if MPI.COMM_WORLD.Get_rank() == 0:
+   # if os.path.isdir(self.cache):
+   #  shutil.rmtree(self.cache)
+   #MPI.COMM_WORLD.Barrier() 
+    
+
   def get_material_from_element(self,elem):
 
    return self.mat_map[self.mesh.elem_region_map[elem]]
- 
-
- 
+  
   def rotate(self,data,**argv):
 
    dphi = argv.setdefault('rotate_phi',0)
@@ -306,12 +305,11 @@ class Solver(object):
 
 
      #Add connection-----
-     #RHS -= self.TL_old[index_irr] - self.temp_old[index_irr] - self.delta_old[index_irr]
-     #RHS -= self.delta_old[index_irr]
-     #print(np.sum(RHS),np.sum(self.delta_old[index_irr]))
-     #print(np.sum(self.temp_old[index_irr]),np.sum(self.TL_old[index_irr]))
+     #RHS += self.TL_old[global_index] - self.temp_old[global_index] - self.delta_old[global_index]
      #-------------------
  
+     #else:
+     #  RHS = mfp * (boundary) + TL[index_irr]   
 
      F = scipy.sparse.eye(self.n_elems,format='csc') + self.A * mfp
      lu = splu(F.tocsc())
@@ -381,10 +379,12 @@ class Solver(object):
    self.TL_old = TL.copy()
    self.delta_old = np.zeros_like(TL)
    TB_old = TB.copy()
+ 
 
    self.temp_old = self.TL_old.copy()
    #-------------------------------
    
+
    while n_iter < argv.setdefault('max_bte_iter',10) and \
           error_vec[-1] > argv.setdefault('max_bte_error',1e-2):
 
@@ -428,8 +428,8 @@ class Solver(object):
     #experimental---
     delta = np.zeros_like(TL)
     deltap = np.zeros_like(TL)
-    temp_matrix = np.zeros((self.n_parallel * self.n_serial,self.n_elems))
-    tempp_matrix = np.zeros((self.n_parallel * self.n_serial,self.n_elems))
+    temp_vec = np.zeros((self.n_parallel * self.n_serial,self.n_elems))
+    tempp_vec = np.zeros((self.n_parallel * self.n_serial,self.n_elems))
     #--------------
 
     K2p = np.zeros(1)
@@ -477,6 +477,10 @@ class Solver(object):
          temp = self.get_bulk_data(global_index,TB,TL)
        
          #-new-----------
+         #delta_tmp = self.get_bulk_data(global_index,TB,DeltaTL)
+         tempp_vec[global_index] = temp
+         #temp = self.temp[global_index]
+         #------------------------------------- 
 
          #print(time.time()-a)
          eta = self.mesh.B_with_area_old.dot(temp).sum()
@@ -494,8 +498,10 @@ class Solver(object):
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
         Jp += np.outer(temp,kdir)*1e9
 
-        #tempp_matrix[global_index] = temp
-        #deltap -= np.outer(self.mat['invH'][:,global_index],np.einsum('j,cj->c',self.mat['FRTA'][global_index],self.mesh.compute_grad(temp))) 
+        tempp_vec[global_index] = temp
+        #correction--
+
+        deltap -= np.outer(self.mat['invH'][:,global_index],np.einsum('j,cj->c',self.mat['FRTA'][global_index],self.mesh.compute_grad(temp))) 
         #-----------
 
       #Ballistic component
@@ -509,9 +515,7 @@ class Solver(object):
          eta = eta_bal[n]
         else:
          temp = self.get_bulk_data(global_index,TB,TL)
-
-
-         #self.temp[global_index] = temp
+         self.temp[global_index] = temp
          eta = self.mesh.B_with_area_old.dot(temp).sum()
          if self.multiscale:
           if abs(eta_bal[n] - eta)/abs(eta) <1e-2 :
@@ -525,7 +529,6 @@ class Solver(object):
         kdir = self.mat['kappa_directional'][global_index]
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
         Jp += np.outer(temp,kdir)*1e9
-        tempp_matrix[global_index] = temp 
 
     comm.Allreduce([K2p,MPI.DOUBLE],[K2,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([TL2p,MPI.DOUBLE],[TL2,MPI.DOUBLE],op=MPI.SUM)
@@ -536,7 +539,7 @@ class Solver(object):
     comm.Allreduce([ndifp,MPI.DOUBLE],[ndif,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([nbalp,MPI.DOUBLE],[nbal,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([deltap,MPI.DOUBLE],[delta,MPI.DOUBLE],op=MPI.SUM)
-    comm.Allreduce([tempp_matrix,MPI.DOUBLE],[temp_matrix,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([tempp_vec,MPI.DOUBLE],[temp_vec,MPI.DOUBLE],op=MPI.SUM)
 
     kappa_vec.append(abs(K2[0] * self.kappa_factor))
     error_vec.append(abs(kappa_vec[-1]-kappa_vec[-2])/abs(max([kappa_vec[-1],kappa_vec[-2]])))
@@ -571,8 +574,8 @@ class Solver(object):
     self.TL_old = TL.copy()
 
     #experimental--
-    #self.temp_old = temp_matrix.copy()
-    #self.delta_old = delta.copy()
+    self.temp_old = temp_vec.copy()
+    self.delta_old = delta.copy()
      #---
 
     n_iter +=1   

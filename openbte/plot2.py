@@ -65,12 +65,14 @@ class Plot(object):
 
 
   if MPI.COMM_WORLD.Get_rank() == 0:
-   self.solver = dd.io.load(argv.setdefault('solver_filename','solver.hdf5'))
+
+   if not ('data' in argv.keys()):
+    self.solver = dd.io.load(argv.setdefault('solver_filename','solver.hdf5'))
    self.Nx = argv.setdefault('repeat_x',1)
    self.Ny = argv.setdefault('repeat_y',1)
 
-   if argv['variable'] == 'map':
-     self.plot_map_new(**argv)
+   #if argv['variable'] == 'map':
+   #  self.plot_map_new(**argv)
 
 
    if '/' in argv['variable']:
@@ -303,7 +305,6 @@ class Plot(object):
   Lx = size[0]*self.Nx
   Ly = size[1]*self.Ny
   variable = argv['variable'].split('/')[1]
-  solver = dd.io.load('solver.hdf5')
   argv.update({'Geometry':self.geo})
 
   vw = WriteVtk(**argv)
@@ -316,7 +317,11 @@ class Plot(object):
      data = solver['flux_vec'][ii]
 
   else:
-    data = solver[variable]
+    if 'data' in argv.keys():
+     data = argv['data']
+    else:
+     solver = dd.io.load('solver.hdf5')
+     data = solver[variable]
 
   (triangulation,tmp,nodes) = vw.get_node_data(data)
 
@@ -490,7 +495,7 @@ class Plot(object):
    vmax = argv.setdefault('vmax',max(data))
    tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),zorder=1)
 
-   #colorbar(norm=mpl.colors.Normalize(vmin=min(data),vmax=max(data)))
+   colorbar(norm=mpl.colors.Normalize(vmin=min(data),vmax=max(data)))
 
     #Contour-----
    if argv.setdefault('iso_values',False):
@@ -517,7 +522,6 @@ class Plot(object):
 
    if argv.setdefault('plot_interfaces',False):
     pp = self.geo.get_interface_point_couples(argv)
-
 
 
    axis('off')
