@@ -62,10 +62,10 @@ MacOS
 ---------------------------------------------------------------
 
 You will have to install gmsh from source, then type
+
+.. code-block:: shell
  
- .. code-block:: shell
- 
-pip install --upgrade openbte
+  pip install --upgrade openbte
 
 Example
 =======
@@ -86,9 +86,10 @@ Example
   #Plot the temperature map
   Plot(variable='map/temperature',iso_values=True)
 
+
 .. image:: flux.png
-   :height: 100px
-   :width: 100 px
+   :height: 600px
+   :width: 600 px
    :scale: 50 %
    :align: left
 
