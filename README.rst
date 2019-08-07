@@ -86,6 +86,6 @@ Example
   #Plot the temperature map
   Plot(variable='map/temperature',iso_values=True)
 
-.. image:: doc/images/flux.png
+.. image:: docs/images/flux.png
 
 
