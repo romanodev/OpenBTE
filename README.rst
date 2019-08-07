@@ -72,13 +72,20 @@ Example
 
 .. code-block:: python
 
-   from openbte import Material,Geometry,Solver,Plot
-   
-   #create material
-   Material(matfile='Si-300K.dat')
-   #create geometry
-   Geometry(porosity=0.25,lx=10,ly=10,step=1)
-   #Solve!
-   Solver()
-   Plot(variable='map/flux',direction='magnitude')
+  from openbte import Material,Geometry,Solver,Plot
+
+  #Create material file
+  Material(filename='Si-300K.dat')
+
+  #Create geometry file
+  Geometry(porosity=0.30,lx=100,ly=100,step=10,shape='square')
+
+  #Create solver file
+  Solver(multiscale=True,max_bte_error=1e-2)
+
+  #Plot the temperature map
+  Plot(variable='map/temperature',iso_values=True)
+
+.. image:: doc/images/flux.png
+
 

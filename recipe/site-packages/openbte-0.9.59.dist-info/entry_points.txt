@@ -1,0 +1,4 @@
+[console_scripts]
+openbte = openbte.__main__:main
+shengbte2openbte = openbte.shengbte2openbte:main
+
