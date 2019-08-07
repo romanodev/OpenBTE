@@ -88,8 +88,8 @@ Example
 
 
 .. image:: flux.png
-   :height: 600 px
-   :width: 600 px
+   :height: 400 px
+   :width: 400 px
    :scale: 50 %
    :align: left
 
