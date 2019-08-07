@@ -11,7 +11,6 @@ __pycache__/
 # app specific
 *.hdf5
 *.vtk
-*.png
 
 examples/Si/tmp/
 
