@@ -87,5 +87,9 @@ Example
   Plot(variable='map/temperature',iso_values=True)
 
 .. image:: docs/images/flux.png
+   :height: 100px
+   :width: 100 px
+   :scale: 50 %
+   :align: left
 
 
