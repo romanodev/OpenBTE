@@ -1,14 +1,14 @@
 
 package:
   name: "openbte"
-  version: "0.9.63"
+  version: "0.9.64"
 
 source:
-  url: ../dist/openbte-0.9.63.tar.gz
+  url: ../dist/openbte-0.9.64.tar.gz
 
 build:
         
-  number: 2
+  number: 3
   noarch: python
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vvv "
 

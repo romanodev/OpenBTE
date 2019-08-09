@@ -590,11 +590,12 @@ class Solver(object):
       #kappa_current = np.sum(kappa_vec)
       if rank==0 and self.verbose:
        print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa_current,error_vec[-1],ndif,nbte,nbal))
-      data = {'kappa_vec':kappa_vec,'temperature':T,'pseudogradient':self.mesh.compute_grad(T),'flux':J,'temp_fourier':temp_fourier,'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad}
+      data = {'kappa_vec':kappa_vec,'temperature':T,'pseudogradient':self.mesh.compute_grad(T),'flux':J,'temp_fourier':temp_fourier,'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad,'kappa':kappa_vec[-1]}
       data.update({'TB':TB,'TL':TL,'error_vec':error_vec,'ms_vec':ms_vec,'temp_fourier_grad':temp_fourier_grad})  
       self.state = data
       if self.save_state:
-       dd.io.save(self.argv.setdefault('filename','solver.hdf5'),self.state)
+       pickle.dump(self.state,open('solver.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
+       #dd.io.save(self.argv.setdefault('filename','solver.hdf5'),self.state)
     else: data = None
     self.state =  MPI.COMM_WORLD.bcast(data,root=0)
 

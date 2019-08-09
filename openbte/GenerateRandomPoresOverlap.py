@@ -257,9 +257,12 @@ def GenerateRandomPoresOverlap(argv):
   if argv['shape'] == 'square':
    Na_p = [4]
 
+  if argv['shape'] == 'triangle':
+   Na_p = [3]
+
   Np = argv['Np']
 
-  random_phi =  argv.setdefault('random_angle',False)
+  random_phi =  argv.setdefault('random_angle',True)
 
   #Lxp =  argv['lx']*argv.setdefault('repeat_x',1)
   #Lyp =  argv['ly']*argv.setdefault('repeat_y',1)

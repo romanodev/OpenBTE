@@ -69,7 +69,9 @@ class Plot(object):
    #load solver---
    if not ('data' in argv.keys()):
     if not ('solver' in argv.keys()):
-     self.solver = dd.io.load(argv.setdefault('solver_filename','solver.hdf5'))
+     #self.solver = dd.io.load(argv.setdefault('solver_filename','solver.hdf5'))
+     #self.solver = dd.io.load(argv.setdefault('solver_filename','solver.p'))
+     self.solver = pickle.load(open(argv.setdefault('filename','solver.p'),'rb'))
     else:
      self.solver = argv['solver'].state
 
