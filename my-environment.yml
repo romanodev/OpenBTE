@@ -1,4 +1,0 @@
-name: openbte
-channels:
-  - defaults
-prefix: /home/gromano/anaconda3/envs/openbte
