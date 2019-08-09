@@ -4,20 +4,16 @@ import numpy as np
 import random
 import math
 import copy
-#from utils_disorder import *
 from shapely.ops import cascaded_union
 from shapely.geometry import Point
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
 from shapely.affinity import translate
 
-import matplotlib
-if not matplotlib.get_backend() == 'Qt5Agg': matplotlib.use('Qt5Agg')
 
 import networkx as nx
 import matplotlib.pylab as plt
 
-#random.seed(3)
 
 def frame_consolidate(argv,polys,frame_tmp):
 
@@ -62,42 +58,6 @@ def frame_consolidate(argv,polys,frame_tmp):
   return new_p
 
 
-
-
-
-
-
-
-  # coords = p.exterior.coords
-  # for n in range(len(coords)-1):
-  #  plt.plot([coords[n][0],coords[n+1][0]],[coords[n][1],coords[n+1][1]],color='black')
-
-  # mm = np.mean(coords,axis=0)
-
-  # plt.text(mm[0],mm[1],str(nn))
-
-
-  #for n in range(4):
-  #  n1 = n%4
-  #  n2 = (n+1)%4
-  #  plt.plot([frame_tmp[n1][0],frame_tmp[n2][0]],[frame_tmp[n1][1],frame_tmp[n2][1]],color='red')
-
-
-  #plt.axis('equal')
-  #plt.show()
-
-  #n = len(polys)
-  #newp = []
-  #for n1 in range(n):
-  # p1 = polys[n1]
-  # dd = p1.distance(thin)
-  # if dd ==0:
-  #  print(n1)
-  # if dd < d_min and dd > 0:
-  #  print(n1)
-
-
-  #return newp
 
 def adjust_position(x,y,r,Na,Lx,Ly,d_min):
 
@@ -420,16 +380,3 @@ def GenerateRandomPoresOverlap(argv):
    np.array(centers).dump('conf.dat')
 
 
-
-  #return frame_tmp,polygons_final
-
-  #scaling to 0-1
-  #polygons = []
-  #for poly_tmp in polys_cut:
-  # poly = []
-  # for p in poly_tmp:
-  #   poly.append([(p[0]-Lx/2)/Lx,(p[1]-Ly/2)/Ly])  
-  # polygons.append(poly) 
-
-
-  return frame_tmp,polys_cut,tt

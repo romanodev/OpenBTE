@@ -44,7 +44,7 @@ Linux
 
 Requirements:
 
-apt-get install -y libopenmpi-dev mpich
+apt-get install -y libopenmpi-dev 
 
 Install `gmsh <http://gmsh.info/>`_
 
@@ -64,8 +64,8 @@ MacOS
 You will have to install gmsh from source, then type
 
 .. code-block:: shell
- 
-  pip install --upgrade openbte
+
+  pip install --no-cache-dir --upgrade openbte 
 
 Example
 =======

@@ -6,7 +6,9 @@ import numpy as np
 import deepdish as dd
 import os
 import matplotlib
-if not matplotlib.get_backend() == 'Qt5Agg': matplotlib.use('Qt5Agg')
+be = matplotlib.get_backend()
+if not be=='nbAgg':
+ if not be == 'Qt5Agg': matplotlib.use('Qt5Agg')
 import matplotlib.pylab as plt
 from matplotlib.colors import Colormap
 import matplotlib.patches as patches

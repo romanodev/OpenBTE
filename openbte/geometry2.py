@@ -15,8 +15,12 @@ from . import GenerateMesh2D
 from . import GenerateBulk2D
 from . import GenerateBulk3D
 from . import porous
+
 import matplotlib
-if not matplotlib.get_backend() == 'Qt5Agg': matplotlib.use('Qt5Agg')
+be = matplotlib.get_backend()
+if not be=='nbAgg':
+ if not be == 'Qt5Agg': matplotlib.use('Qt5Agg')
+
 import matplotlib.patches as patches
 from .fig_maker import *
 from matplotlib.path import Path

@@ -14,10 +14,6 @@ def is_neighbor(pos1,pos2,nx,ny):
   return True
  if abs(abs(pos1[0] - pos2[0]) -1)  < delta and abs(pos1[1] - pos2[1]) < delta:
   return True
- #if abs(abs(pos1[0] - pos2[0]) - (nx-1))  < delta and abs(pos1[1] - pos2[1]) < delta:
- # return True
- #if abs(pos1[0] - pos2[0])<delta and abs(abs(pos1[1]-pos2[1]) -(ny-1)) < delta:
- # return True
 
  return False
 

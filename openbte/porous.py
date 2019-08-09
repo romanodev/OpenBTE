@@ -29,20 +29,6 @@ class Porous(object):
   
   self.write_geo()
 
-
-
- #def get_surface_normal(self,ss):
-     
-  # s = self.surfaces[ss][0]  
-   #p1 = self.points[self.lines[self.loops[s,0]]]
-  # p1 = self.points[self.lines[abs(self.loops[s,0])-1]]
-  # p2 = self.points[self.lines[abs(self.loops[s,1])-1]]
-  # normal = np.cross(p1[1]-p1[0],p2[1]-p2[0])
-  # normal /= np.linalg.norm(normal)
-   #if ss==2:
-   #    print(normal)
-   #    print(p1)
-  # return normal
      
  def get_surface_centroid(self,ss):
      
