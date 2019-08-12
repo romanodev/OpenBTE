@@ -71,8 +71,6 @@ class Plot(object):
    #load solver---
    if not ('data' in argv.keys()):
     if not ('solver' in argv.keys()):
-     #self.solver = dd.io.load(argv.setdefault('solver_filename','solver.hdf5'))
-     #self.solver = dd.io.load(argv.setdefault('solver_filename','solver.p'))
      self.solver = pickle.load(open(argv.setdefault('filename','solver.p'),'rb'))
     else:
      self.solver = argv['solver'].state
@@ -82,27 +80,32 @@ class Plot(object):
      self.geo = Geometry(model='load',filename = argv.setdefault('geometry_filename','geometry.p'))
    else:
      self.geo = argv['geometry']
-
     
+   #load material---
+   if not ('material' in argv.keys()):
+     self.mat = pickle.load(open(argv.setdefault('mat_file','material.p'),'rb'))
+   else:
+     self.mat = argv['material']
+    
+
+
    self.Nx = argv.setdefault('repeat_x',1)
    self.Ny = argv.setdefault('repeat_y',1)
 
    #if argv['variable'] == 'map':
    #  self.plot_map_new(**argv)
 
-
    if '/' in argv['variable']:
     model= argv['variable'].split('/')[0]
+
     if model == 'map':
      self.plot_map(argv)
+
     if model == 'line':
      self.plot_over_line(argv)
 
-   #if argv['variable'] == 'suppression_function' :
-   # self.plot_suppression_function(argv)
-
-   if argv['variable'] == 'SUP' :
-    self.SUP()
+   if argv['variable'] == 'suppression_function' :
+    self.plot_suppression_function(argv)
 
    if argv['variable'] == 'distribution' :
     self.plot_distribution(argv)
@@ -110,17 +113,8 @@ class Plot(object):
    if argv['variable'] == 'vtk' :
     self.save_vtk(argv)
 
-   if argv['variable'] == 'kappa_bte' :
-    solver = dd.io.load('state.hdf5')
-    kappa_bte = solver['kappa_bte']
-    if argv.setdefault('save',True) :
-     f = open('kappa_bte.dat','w+')
-     f.write(str(kappa_bte))
-     f.close()
-
  def save_vtk(self,argv):
    #Write data-------
-  # geo = Geometry(model='load',filename = argv.setdefault('geometry_filename','geometry.p'))
    solver = self.solver
    argv.update({'Geometry':self.geo})
    vw = WriteVtk(**argv)
@@ -143,18 +137,6 @@ class Plot(object):
    vw.add_variable(solver['flux_fourier'],label = r'''Fourier Thermal Flux [W/m/m]''')
 
    vw.write_vtk()
-
-
- def SUP(self):
-
-    SUP = self.solver['SUP'] 
-    MFP = self.solver['MFP']
-
-    plt.plot(MFP,SUP)
-
-    plt.xscale('log')
-
-    plt.show()
 
 
  def plot_material(self,argv):
@@ -554,12 +536,34 @@ class Plot(object):
 
  def plot_suppression_function(self,argv):
 
-  #if MPI.COMM_WORLD.Get_rank() == 0:
    #init_plotting(extra_bottom_padding= 0.01,extra_x_padding = 0.02)
-   data = dd.io.load(argv.setdefault('filename','solver.hdf5'))
+   #data = dd.io.load(argv.setdefault('filename','solver.hdf5'))
 
-   suppression = data['suppression']
-   iso_sup = data['iso_suppression']
+   #print(self.mat) 
+   #print(self.solver['sup'])
+
+   #this works only in 2D for now
+   #mfp = self.mat['mfp']
+   #eta = self.solver['sup'] 
+   #n_phi = self.mat['n_parallel'] 
+   #n_mfp = self.mat['n_serial']
+   #sup = np.zeros(n_mfp)
+   #mfp_vec = np.zeros(n_mfp)
+   #for n in range(n_mfp):
+   # for p in range(n_phi):
+   #  global_index = p*n_mfp +n
+   #  sup[n] += eta[global_index]/mfp[global_index]*
+   #  mfp_vec[n] = mfp[global_index]
+     
+
+   #plt.plot(mfp_vec,-sup)
+   #xscale('log')  
+   #plt.show()
+
+   quit()
+
+   #suppression = data['suppression']
+   #iso_sup = data['iso_suppression']
    #iso_sup = [iso_suppression[m].sum() for m in range(np.shape(iso_suppression)[0])]
 
    #print(suppression)

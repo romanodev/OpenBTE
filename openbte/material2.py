@@ -48,7 +48,7 @@ class Material(object):
   if MPI.COMM_WORLD.Get_rank() == 0:
 
    data = dd.io.load(argv['matfile'])
-   mfp = data['FBTE']
+   mfp = data['FRTA']
    mfp_rta = data['FRTA']
 
    mfp_b,theta_b,phi_b = self.spherical(mfp)
@@ -531,7 +531,6 @@ class Material(object):
    azimuthal = np.array([np.sin(theta),np.sin(theta),np.zeros(n_theta)]).T
    direction = np.einsum('ij,kj->ikj',azimuthal,polar)
  
-
    #Compute average---
    ftheta = (1-np.cos(2*theta)*np.sinc(Dtheta/np.pi))/(np.sinc(Dtheta/2/np.pi)*(1-np.cos(2*theta)))
    fphi= np.sinc(Dphi/2.0/np.pi)
@@ -550,7 +549,6 @@ class Material(object):
     mfp_bulk = argv['mfp_bulk']
     kappa_bulk = argv['kappa_bulk']
    #------------------------------------------------------
-
 
    n_mfp_bulk = len(mfp_bulk) 
    n_mfp = argv.setdefault('n_mfp',100)
@@ -603,15 +601,15 @@ class Material(object):
            'temp_vec':temp_vec,\
            'angle_map':angle_map,\
            'dphi':Dphi,\
-           'antialiasing':True,\
+           #'antialiasing':True,\
            'kappa_directional':kappa_directional,\
-           'kappa_directional_not_int':kappa_directional_not_int,\
+           #'kappa_directional_not_int':kappa_directional_not_int,\
            'n_serial':n_mfp,\
            'n_parallel':n_phi,\
            'mfp':mfp,\
-           'log':True,\
-           'aliasing':np.cos(Dphi/2)/np.sin(Dphi/2),\
-           'control_angle_not_int':polar_ave/np.sin(Dphi/2)/2,\
+           #'log':True,\
+           #'aliasing':np.cos(Dphi/2)/np.sin(Dphi/2),\
+           #'control_angle_not_int':polar_ave/np.sin(Dphi/2)/2,\
            'control_angle':polar_ave,\
            'angle':polar,\
            'factor':[np.sin(Dphi/2),np.cos(Dphi/2)/Dphi],

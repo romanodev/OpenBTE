@@ -119,7 +119,7 @@ class Solver(object):
    if 'material' in argv.keys():
      self.mat = argv['material'].state
    else:  
-     self.mat = pickle.load(open('material.p','rb'))
+     self.mat = pickle.load(open(argv.setdefault('matfile','material.p'),'rb'))
 
    self.control_angle =  self.rotate(np.array(self.mat['control_angle']),**argv)
    self.kappa_directional =  self.rotate(np.array(self.mat['kappa_directional']),**argv)
@@ -303,7 +303,7 @@ class Solver(object):
 
     #Add connection-----
     #RHS -= self.TL_old[index_irr] - self.temp_old[index_irr] - self.delta_old[index_irr]
-    #RHS += self.delta_old[index_irr]
+    RHS += self.delta_old[index_irr]
     #print(np.sum(RHS),np.sum(self.delta_old[index_irr]))
     #print(np.sum(self.temp_old[index_irr]),np.sum(self.TL_old[index_irr]))
     #-------------------
@@ -378,7 +378,7 @@ class Solver(object):
    #Initialize data-----
    n_iter = len(kappa_vec)
    self.TL_old = TL.copy()
-   #self.delta_old = np.zeros_like(TL)
+   self.delta_old = np.zeros_like(TL)
    TB_old = TB.copy()
 
    self.temp_old = self.TL_old.copy()
@@ -422,8 +422,12 @@ class Solver(object):
     ndif = np.zeros(1)
     nbal = np.zeros(1)
     nbalp = np.zeros(1)
-    (etavp,etav) = np.zeros((2,nT))
-    (etadp,etad) = np.zeros((2,nT))
+    #(etavp,etav) = np.zeros((2,nT))
+    #(etadp,etad) = np.zeros((2,nT))
+    #(sup,supp) = np.zeros((2,self.n_serial * self.n_parallel))
+    #(sup,supp) = np.zeros((2,self.n_serial * self.n_parallel))
+    (KAPPA,KAPPAp) = np.zeros((2,self.n_parallel,self.n_serial))
+
     #experimental---
     delta = np.zeros_like(TL)
     deltap = np.zeros_like(TL)
@@ -475,8 +479,6 @@ class Solver(object):
         else:
          temp = self.get_bulk_data(global_index,TB,TL)
        
-         #-new-----------
-
          #print(time.time()-a)
          eta = self.mesh.B_with_area_old.dot(temp).sum()
          if self.multiscale:
@@ -484,6 +486,7 @@ class Solver(object):
             fourier = True  
          
         eta_vec[n] = eta
+        #supp[global_index] = eta
         (Am,Ap) = self.get_boundary_matrices(global_index)
         TBp_minus += Am 
         TBp_plus  += np.einsum('es,e->es',Ap,temp)
@@ -491,11 +494,14 @@ class Solver(object):
         Tp+= temp*self.mat['TCOEFF'][global_index]
         kdir = self.mat['kappa_directional'][global_index]
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
+        KAPPAp[index,n] = np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
+
+
         Jp += np.outer(temp,kdir)*1e9
 
         #tempp_matrix[global_index] = temp
-        #deltap -= np.outer(self.mat['invH'][:,global_index],np.einsum('j,cj->c',self.mat['FRTA'][global_index],self.mesh.compute_grad(temp)))
-        #deltap[global_index] += np.einsum('j,cj->c',self.mat['FBTE'][global_index],self.mesh.compute_grad(temp))
+        deltap -= np.outer(self.mat['invH'][:,global_index],np.einsum('j,cj->c',self.mat['FRTA'][global_index],self.mesh.compute_grad(temp)))
+        deltap[global_index] += np.einsum('j,cj->c',self.mat['FBTE'][global_index],self.mesh.compute_grad(temp))
         #-----------
 
       #Ballistic component
@@ -525,7 +531,9 @@ class Solver(object):
         kdir = self.mat['kappa_directional'][global_index]
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
         Jp += np.outer(temp,kdir)*1e9
-        tempp_matrix[global_index] = temp 
+        #tempp_matrix[global_index] = temp 
+        #supp[global_index] = eta
+        KAPPAp[index,n] = np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
 
     comm.Allreduce([K2p,MPI.DOUBLE],[K2,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([TL2p,MPI.DOUBLE],[TL2,MPI.DOUBLE],op=MPI.SUM)
@@ -537,6 +545,8 @@ class Solver(object):
     comm.Allreduce([nbalp,MPI.DOUBLE],[nbal,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([deltap,MPI.DOUBLE],[delta,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([tempp_matrix,MPI.DOUBLE],[temp_matrix,MPI.DOUBLE],op=MPI.SUM)
+    #comm.Allreduce([supp,MPI.DOUBLE],[sup,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([KAPPAp,MPI.DOUBLE],[KAPPA,MPI.DOUBLE],op=MPI.SUM)
 
     kappa_vec.append(abs(K2[0] * self.kappa_factor))
     error_vec.append(abs(kappa_vec[-1]-kappa_vec[-2])/abs(max([kappa_vec[-1],kappa_vec[-2]])))
@@ -587,15 +597,14 @@ class Solver(object):
       nbte = 1- ndif - nbal
       ms_vec.append([ndif,nbte,nbal])
       kappa_current = kappa_vec[-1]
-      #kappa_current = np.sum(kappa_vec)
+
       if rank==0 and self.verbose:
        print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa_current,error_vec[-1],ndif,nbte,nbal))
       data = {'kappa_vec':kappa_vec,'temperature':T,'pseudogradient':self.mesh.compute_grad(T),'flux':J,'temp_fourier':temp_fourier,'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad,'kappa':kappa_vec[-1]}
       data.update({'TB':TB,'TL':TL,'error_vec':error_vec,'ms_vec':ms_vec,'temp_fourier_grad':temp_fourier_grad})  
       self.state = data
       if self.save_state:
-       pickle.dump(self.state,open('solver.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
-       #dd.io.save(self.argv.setdefault('filename','solver.hdf5'),self.state)
+       pickle.dump(self.state,open(argv.setdefault('filename','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
     else: data = None
     self.state =  MPI.COMM_WORLD.bcast(data,root=0)
 
