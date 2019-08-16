@@ -264,7 +264,7 @@ class Solver(object):
     irr_angle = self.mat['angle_map'][global_index]
 
     if (self.keep_lu) and (global_index in self.lu.keys()) :
-     lu = self.lu[global_index]    
+     lu = self.lu[irr_angle]    
     else:
 
      if not irr_angle == self.old_index:
@@ -295,7 +295,7 @@ class Solver(object):
 
      F = scipy.sparse.eye(self.n_elems,format='csc') + self.A * mfp
      lu = splu(F.tocsc())
-     if (self.keep_lu) : self.lu[global_index] = lu
+     if (self.keep_lu) :self.lu[irr_angle] = lu
 
     boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1).todense()
     RHS = mfp * (self.P + boundary) + TL[index_irr]  
@@ -303,12 +303,11 @@ class Solver(object):
 
     #Add connection-----
     #RHS -= self.TL_old[index_irr] - self.temp_old[index_irr] - self.delta_old[index_irr]
-    RHS += self.delta_old[index_irr]
+    #RHS += self.delta_old[index_irr]
     #print(np.sum(RHS),np.sum(self.delta_old[index_irr]))
     #print(np.sum(self.temp_old[index_irr]),np.sum(self.TL_old[index_irr]))
     #-------------------
  
-
     return lu.solve(RHS)
 
 
@@ -371,9 +370,7 @@ class Solver(object):
    self.state = data_save
    if self.argv.setdefault('only_fourier',False):
      if self.save_state:
-      #dd.io.save(self.argv.setdefault('filename','solver.hdf5'),self.state)
       pickle.dump(self.state,open('solver.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
-      #dd.io.save(self.argv.setdefault('filename','solver.hdf5'),self.state)
 
    #Initialize data-----
    n_iter = len(kappa_vec)
@@ -422,19 +419,17 @@ class Solver(object):
     ndif = np.zeros(1)
     nbal = np.zeros(1)
     nbalp = np.zeros(1)
-    #(etavp,etav) = np.zeros((2,nT))
-    #(etadp,etad) = np.zeros((2,nT))
-    #(sup,supp) = np.zeros((2,self.n_serial * self.n_parallel))
-    #(sup,supp) = np.zeros((2,self.n_serial * self.n_parallel))
     (KAPPA,KAPPAp) = np.zeros((2,self.n_parallel,self.n_serial))
 
     #experimental---
-    delta = np.zeros_like(TL)
-    deltap = np.zeros_like(TL)
-    temp_matrix = np.zeros((self.n_parallel * self.n_serial,self.n_elems))
-    tempp_matrix = np.zeros((self.n_parallel * self.n_serial,self.n_elems))
+    #delta = np.zeros_like(TL)
+    #deltap = np.zeros_like(TL)
+    #temp_matrix = np.zeros((self.n_parallel * self.n_serial,self.n_elems))
+    #tempp_matrix = np.zeros((self.n_parallel * self.n_serial,self.n_elems))
     #--------------
 
+    #eta_plot = []
+    #mfp_plot = []
     K2p = np.zeros(1)
     K2 = np.zeros(1)
     block = self.n_parallel // comm.size + 1
@@ -443,7 +438,6 @@ class Solver(object):
      index = rank*block + kk  
      if index < self.n_parallel :
       #print(index)
-      mfp_plot = []
       #-------------------------------------------------------   
       idx = [self.n_serial]
       if self.multiscale:
@@ -484,7 +478,13 @@ class Solver(object):
          if self.multiscale:
            if abs(eta_diff[n] - eta)/abs(eta) < 1e-2:
             fourier = True  
-         
+
+
+        #test---
+        #eta = self.control_angle[global_index][0]*self.mat['mfp'][global_index]
+        #if index==12:
+        # eta_plot.append(eta)
+        # mfp_plot.append(self.mat['mfp'][n])
         eta_vec[n] = eta
         #supp[global_index] = eta
         (Am,Ap) = self.get_boundary_matrices(global_index)
@@ -500,10 +500,9 @@ class Solver(object):
         Jp += np.outer(temp,kdir)*1e9
 
         #tempp_matrix[global_index] = temp
-        deltap -= np.outer(self.mat['invH'][:,global_index],np.einsum('j,cj->c',self.mat['FRTA'][global_index],self.mesh.compute_grad(temp)))
-        deltap[global_index] += np.einsum('j,cj->c',self.mat['FBTE'][global_index],self.mesh.compute_grad(temp))
+        #deltap -= np.outer(self.mat['invH'][:,global_index],np.einsum('j,cj->c',self.mat['FRTA'][global_index],self.mesh.compute_grad(temp)))
+        #deltap[global_index] += np.einsum('j,cj->c',self.mat['FBTE'][global_index],self.mesh.compute_grad(temp))
         #-----------
-
       #Ballistic component
       ballistic = False
       for n in range(self.n_serial)[idx[0]+1:]:
@@ -543,9 +542,6 @@ class Solver(object):
     comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([ndifp,MPI.DOUBLE],[ndif,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([nbalp,MPI.DOUBLE],[nbal,MPI.DOUBLE],op=MPI.SUM)
-    comm.Allreduce([deltap,MPI.DOUBLE],[delta,MPI.DOUBLE],op=MPI.SUM)
-    comm.Allreduce([tempp_matrix,MPI.DOUBLE],[temp_matrix,MPI.DOUBLE],op=MPI.SUM)
-    #comm.Allreduce([supp,MPI.DOUBLE],[sup,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([KAPPAp,MPI.DOUBLE],[KAPPA,MPI.DOUBLE],op=MPI.SUM)
 
     kappa_vec.append(abs(K2[0] * self.kappa_factor))
@@ -564,32 +560,21 @@ class Solver(object):
     TB = self.alpha * TB_new + (1-self.alpha)*TB_old; TB_old = TB.copy()
 
     
-    #T experimental----
-    #if self.argv.setdefault('synthetic',False):
-    # if rank==0:
-    #   JNonFourier = -J*1e-9 + self.mat['kappa_bulk_tot'] * self.mesh.compute_grad(TL_old[0])
-    #   heat_source = self.mesh.compute_divergence(JNonFourier,add_jump=False)
-    #   dummy,t,j = self.get_diffusive_suppression_function(kappa = self.mat['kappa_bulk_tot'],heat_source= heat_source)
-    #   data = {'T':t}
-    # else: data = None
-    # data = comm.bcast(data,root=0)
-    # TL = [data['T']]
-    #else: 
-    #print(min(TL2[0]),max(TL2[0])) 
-    TL = self.alpha * TL2.copy() + (1-self.alpha)*self.TL_old; 
-    #DeltaTL = TL-TL_old; 
+    #TL = self.alpha * TL2.copy() + (1-self.alpha)*self.TL_old; 
+    TL = TL2.copy() #+ (1-self.alpha)*self.TL_old; 
     self.TL_old = TL.copy()
 
-    #experimental--
-    #self.temp_old = temp_matrix.copy()
-    self.delta_old = delta.copy()
-     #---
+    #print(min(TL[0]),max(TL[0]))
 
     n_iter +=1   
-    #-----
 
-
-
+    #mfp_plot = np.array(mfp_plot)
+    #eta_plot = np.array(eta_plot)
+    #plt.plot(mfp_plot,eta_plot)
+     
+    #plt.xscale('log')
+    #plt.show()
+   
     #Thermal conductivity   
     if rank==0 :
       ndif = ndif[0]/(self.n_serial*self.n_parallel)

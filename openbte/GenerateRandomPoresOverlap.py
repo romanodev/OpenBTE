@@ -206,7 +206,6 @@ def consolidate(polys,argv):
 
 def GenerateRandomPoresOverlap(argv):
 
-
   d_min =  argv['step']/20.0
   delta_pore = argv.setdefault('pore_distance',0.2)
 
@@ -287,7 +286,7 @@ def GenerateRandomPoresOverlap(argv):
   Na = Na_p[0]
 
   if argv.setdefault('load_configuration',False):
-   centers = np.load('conf.dat',allow_pickle=True)
+   centers = np.load(argv.setdefault('configuration_file','conf.dat'),allow_pickle=True)
   elif argv.setdefault('manual',False):
    centers = argv['centers']
   else:
@@ -363,7 +362,6 @@ def GenerateRandomPoresOverlap(argv):
   #------------------------------
 
 
-
   area = 0.0
   eps = argv['step']/2.0
   polys_cut = []
@@ -376,7 +374,7 @@ def GenerateRandomPoresOverlap(argv):
     area += p.area
 
   if argv['save_configuration'] and not argv['load_configuration']:
-   #np.array(centers).dump(open('conf.dat','w+'))
-   np.array(centers).dump('conf.dat')
+   np.array(centers).dump(argv.setdefault('configuration_file','conf.dat'))
 
+  return frame_tmp,polys_cut,np.array(centers)
 
