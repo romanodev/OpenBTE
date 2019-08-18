@@ -300,6 +300,13 @@ class Solver(object):
     boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1).todense()
     RHS = mfp * (self.P + boundary) + TL[index_irr]  
 
+    temp = lu.solve(RHS)
+
+    #eta = self.mesh.B_with_area_old.dot(temp-TL[index_irr]).sum()
+
+    #print(eta,mfp*aa[0])
+
+    #quit()
 
     #Add connection-----
     #RHS -= self.TL_old[index_irr] - self.temp_old[index_irr] - self.delta_old[index_irr]
@@ -308,7 +315,7 @@ class Solver(object):
     #print(np.sum(self.temp_old[index_irr]),np.sum(self.TL_old[index_irr]))
     #-------------------
  
-    return lu.solve(RHS)
+    return temp,TL[index_irr]
 
 
 
@@ -421,6 +428,9 @@ class Solver(object):
     nbalp = np.zeros(1)
     (KAPPA,KAPPAp) = np.zeros((2,self.n_parallel,self.n_serial))
 
+    eta_vec = np.zeros(self.n_parallel*self.n_serial)
+    eta_vecp = np.zeros(self.n_parallel*self.n_serial)
+
     #experimental---
     #delta = np.zeros_like(TL)
     #deltap = np.zeros_like(TL)
@@ -462,7 +472,6 @@ class Solver(object):
       #------------------------------------------------------
 
       fourier = False
-      eta_vec = np.zeros(self.n_serial)
       for n in range(self.n_serial)[idx[0]::-1]:
           
         global_index = index * self.n_serial + n 
@@ -471,21 +480,20 @@ class Solver(object):
          temp = TDIFF[n]
          eta = eta_diff[n]
         else:
-         temp = self.get_bulk_data(global_index,TB,TL)
+         temp,tt = self.get_bulk_data(global_index,TB,TL)
        
          #print(time.time()-a)
-         eta = self.mesh.B_with_area_old.dot(temp).sum()
+         eta = self.mesh.B_with_area_old.dot(temp-tt).sum()
          if self.multiscale:
            if abs(eta_diff[n] - eta)/abs(eta) < 1e-2:
             fourier = True  
-
 
         #test---
         #eta = self.control_angle[global_index][0]*self.mat['mfp'][global_index]
         #if index==12:
         # eta_plot.append(eta)
         # mfp_plot.append(self.mat['mfp'][n])
-        eta_vec[n] = eta
+        eta_vecp[global_index] = eta 
         #supp[global_index] = eta
         (Am,Ap) = self.get_boundary_matrices(global_index)
         TBp_minus += Am 
@@ -533,6 +541,7 @@ class Solver(object):
         #tempp_matrix[global_index] = temp 
         #supp[global_index] = eta
         KAPPAp[index,n] = np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
+        #eta_vec[global_index] = eta
 
     comm.Allreduce([K2p,MPI.DOUBLE],[K2,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([TL2p,MPI.DOUBLE],[TL2,MPI.DOUBLE],op=MPI.SUM)
@@ -543,6 +552,7 @@ class Solver(object):
     comm.Allreduce([ndifp,MPI.DOUBLE],[ndif,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([nbalp,MPI.DOUBLE],[nbal,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([KAPPAp,MPI.DOUBLE],[KAPPA,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([eta_vecp,MPI.DOUBLE],[eta_vec,MPI.DOUBLE],op=MPI.SUM)
 
     kappa_vec.append(abs(K2[0] * self.kappa_factor))
     error_vec.append(abs(kappa_vec[-1]-kappa_vec[-2])/abs(max([kappa_vec[-1],kappa_vec[-2]])))
@@ -586,7 +596,7 @@ class Solver(object):
       if rank==0 and self.verbose:
        print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa_current,error_vec[-1],ndif,nbte,nbal))
       data = {'kappa_vec':kappa_vec,'temperature':T,'pseudogradient':self.mesh.compute_grad(T),'flux':J,'temp_fourier':temp_fourier,'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad,'kappa':kappa_vec[-1]}
-      data.update({'TB':TB,'TL':TL,'error_vec':error_vec,'ms_vec':ms_vec,'temp_fourier_grad':temp_fourier_grad})  
+      data.update({'TB':TB,'TL':TL,'error_vec':error_vec,'ms_vec':ms_vec,'temp_fourier_grad':temp_fourier_grad,'eta':eta_vec})  
       self.state = data
       if self.save_state:
        pickle.dump(self.state,open(argv.setdefault('filename','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)

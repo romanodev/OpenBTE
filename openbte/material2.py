@@ -540,6 +540,7 @@ class Material(object):
    azimuthal_ave = np.array([ftheta*np.sin(theta),ftheta*np.sin(theta),np.zeros(n_theta)]).T   
    direction_ave = np.einsum('ij,kj->ikj',azimuthal_ave,polar_ave)
 
+   direction_int = np.einsum('ijl,ij->ijl',direction_ave,domega)
 
    #Import material-------------------------------------------------------------------
    if 'filename' in argv.keys():
@@ -555,6 +556,7 @@ class Material(object):
    n_mfp_bulk = len(mfp_bulk) 
    n_mfp = argv.setdefault('n_mfp',100)
    mfp = np.logspace(min([-2,np.log10(min(mfp_bulk)*0.99)]),np.log10(max(mfp_bulk)*1.01),n_mfp)#min MFP = 1e-2 
+   mfp = np.logspace(-1,3,n_mfp)#min MFP = 1e-2 
    #mfp = np.logspace(np.log10(min(mfp_bulk)*0.99),np.log10(max(mfp_bulk)*1.01),n_mfp) 
 
 
@@ -636,6 +638,7 @@ class Material(object):
            'temp_vec':temp_vec,\
            'angle_map':angle_map,\
            'dphi':Dphi,\
+           'ftheta':ftheta*np.sin(theta),\
            #'antialiasing':True,\
            'kappa_directional':kappa_directional,\
            #'kappa_directional_not_int':kappa_directional_not_int,\
@@ -647,7 +650,10 @@ class Material(object):
            #'control_angle_not_int':polar_ave/np.sin(Dphi/2)/2,\
            'control_angle':polar_ave,\
            'angle':polar,\
-           'factor':[np.sin(Dphi/2),np.cos(Dphi/2)/Dphi],
+           'direction_int':direction_int,\
+           'factor':[np.sin(Dphi/2),np.cos(Dphi/2)/Dphi],\
+           'mfp_bulk':mfp_bulk,\
+           'kappa_bulk':kappa_bulk,\
            'kappa_bulk_tot':np.sum(kappa_bulk)}
 
 

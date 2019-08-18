@@ -422,6 +422,7 @@ class Geometry(object):
           'flux_sides':self.flux_sides,\
           'frame':self.frame,\
           'polygons':self.polygons,\
+          'applied_grad':self.applied_grad,\
           'argv':self.argv,\
           'side_periodic_value':self.side_periodic_value}
 
@@ -981,6 +982,7 @@ class Geometry(object):
     self.N = self.state['N']
     self.N_new = self.state['N_new']
     self.CM = self.state['CM']
+    self.applied_grad = self.state['applied_grad']
     self.CP = self.state['CP']
     self.periodic_sides = self.state['periodic_sides']
     self.CPB = self.state['CPB']

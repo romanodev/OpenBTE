@@ -21,6 +21,7 @@ from .geometry import *
 from scipy.interpolate import griddata
 from shapely.geometry import MultiPoint,Point,Polygon,LineString
 import shapely
+from scipy import interpolate
 from matplotlib.widgets import Slider, Button, RadioButtons
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
@@ -105,10 +106,14 @@ class Plot(object):
      self.plot_over_line(argv)
 
    if argv['variable'] == 'suppression_function' :
-    self.plot_suppression_function(argv)
+    self.compute_suppression_function(argv)
 
    if argv['variable'] == 'distribution' :
-    self.plot_distribution(argv)
+    s = argv.setdefault('show',False)
+    argv['show'] = False
+    self.compute_suppression_function(argv)
+    argv['show'] = s
+    self.compute_distribution(argv)
 
    if argv['variable'] == 'vtk' :
     self.save_vtk(argv)
@@ -160,50 +165,72 @@ class Plot(object):
 
 
 
- def plot_distribution(self,argv):
-  if MPI.COMM_WORLD.Get_rank() == 0:
-   init_plotting(extra_x_padding = 0.05)
-   data = dd.io.load('material.hdf5')
-   dis_bulk = list(data['kappa_bulk'])
-   mfp = list(data['mfp_bulk']) #m
+ def compute_distribution(self,argv):
 
-   #plot nano------
-   solver = dd.io.load(argv.setdefault('filename','solver.hdf5'))
-   mfp_sampled = data['mfp_sampled'] #m
-   suppression = solver['suppression']
-   sup = [suppression[m,:,:].sum() for m in range(np.shape(suppression)[0])]
+
+   dis_bulk = self.mat['kappa_bulk']
+   mfp_bulk = self.mat['mfp_bulk']
+
+   suppression = self.suppression
    kappa_nano = []
    mfp_nano = []
-   for n in range(len(mfp)):
-    sup_interp = get_suppression(mfp_sampled,sup,mfp[n])
+   for n,mfp in enumerate(mfp_bulk):
+    sup_interp = get_suppression(self.suppression[0],self.suppression[1],mfp)
     kappa_nano.append(dis_bulk[n]*sup_interp)
-    mfp_nano.append(mfp[n]*sup_interp*1e9)
+    mfp_nano.append(mfp*sup_interp)
 
-   #reordering-----
+
+   #reordering---
    I = np.argsort(np.array(mfp_nano))
    kappa_sorted = []
    for i in I:
     kappa_sorted.append(kappa_nano[i])
-   mfp_nano = sorted(mfp_nano)
-
-   #----------------
-   mfp_bulk = np.array(mfp)*1e9
+   #mfp_nano = np.array([0]+sorted(mfp_nano))
+   mfp_nano = np.array(sorted(mfp_nano))
 
 
-   #fill([mfp_bulk[0]] + list(mfp_bulk) + [mfp_bulk[-1]+1e-6],[0] + dis_bulk + [0],lw=2,alpha=0.6)
-   fill([mfp_nano[0]] + mfp_nano + [mfp_nano[-1]],[0] + kappa_sorted + [0],color=c2)
+   #build cumulative kappa
+   acc = np.zeros(len(mfp_nano))
+   acc[0] = kappa_sorted[0]
+   for n in range(len(mfp_nano)-1):
+    acc[n+1] = acc[n] + kappa_sorted[n+1] 
+  
+   self.nano_dis = [mfp_nano*1e-9,acc]
+   
+ 
+   #write
+   if argv.setdefault('save',False):
+    f = open('mfp_nano.dat','w+')
+    for n in range(len(mfp_nano)):
+     f.write('{0:10.4E} {1:20.4E}'.format(mfp_nano[n],acc[n]))
+     f.write('\n')
+    f.close()
 
-   f = open('mfp_nano.dat','w+')
-   for n in range(len(mfp)):
-    f.write('{0:10.4E} {1:20.4E}'.format(mfp_nano[n]*1e-9,kappa_sorted[n]))
-    f.write('\n')
-   f.close()
+   #plot
+   if argv.setdefault('show',False):
 
-   xscale('log')
-   xlabel('$\Lambda$ [nm]')
-   ylabel('$Kd\Lambda$ [Wm$^{-1}$K$^{-1}$]')
-   grid()
-   show()
+    init_plotting()
+    mfp_new = []
+    acc_new = []
+    th = 0
+    for n in range(len(mfp_nano)-1):
+      mfp_new.append(mfp_nano[n])
+      acc_new.append(acc[n])
+      mfp_new.append(mfp_nano[n+1])
+      acc_new.append(acc[n])
+      if acc[n]/acc[-1] < 1e-3:
+        th = n
+    acc_new.append(acc[-1])
+    mfp_new.append(mfp_nano[n-1]*5)
+
+    plot(mfp_new,acc_new)
+    xlim([mfp_nano[th],mfp_nano[-1]*5])
+    xscale('log')
+    xlabel('$\Lambda$ [nm]')
+    ylabel(r'''$\alpha(\Lambda)$ [Wm$^{-1}$K$^{-1}$]''')
+    
+    grid()
+    show()
 
 
  def plot_over_line(self,argv):
@@ -534,56 +561,56 @@ class Plot(object):
     plt.show()
 
 
- def plot_suppression_function(self,argv):
-
-   #init_plotting(extra_bottom_padding= 0.01,extra_x_padding = 0.02)
-   #data = dd.io.load(argv.setdefault('filename','solver.hdf5'))
-
-   #print(self.mat) 
-   #print(self.solver['sup'])
-
-   #this works only in 2D for now
-   #mfp = self.mat['mfp']
-   #eta = self.solver['sup'] 
-   #n_phi = self.mat['n_parallel'] 
-   #n_mfp = self.mat['n_serial']
-   #sup = np.zeros(n_mfp)
-   #mfp_vec = np.zeros(n_mfp)
-   #for n in range(n_mfp):
-   # for p in range(n_phi):
-   #  global_index = p*n_mfp +n
-   #  sup[n] += eta[global_index]/mfp[global_index]*
-   #  mfp_vec[n] = mfp[global_index]
-     
-
-   #plt.plot(mfp_vec,-sup)
-   #xscale('log')  
-   #plt.show()
-
-   quit()
-
-   #suppression = data['suppression']
-   #iso_sup = data['iso_suppression']
-   #iso_sup = [iso_suppression[m].sum() for m in range(np.shape(iso_suppression)[0])]
-
-   #print(suppression)
-   #quit()
-   tmp = data['fourier_suppression']
-   sup = [suppression[m,:,:].sum() for m in range(np.shape(suppression)[0])]
-   sup_fourier = [tmp[m,:,:].sum() for m in range(np.shape(tmp)[0])]
+ def compute_suppression_function(self,argv):
 
 
-   mfp = data['mfp']*1e6
-   #print(sup_fourier[0])
-   if argv.setdefault('show',True):
-    plot(mfp,sup,color=c1)
-    plot(mfp,sup_fourier,color=c2)
-    plot(mfp,iso_sup,color=c3)
+   mfp = self.mat['mfp']
+   n_mfp = len(mfp)
+   control_angle = self.mat['control_angle']
+   kappa_directional = self.mat['kappa_directional']
+   n_serial = self.mat['n_serial']
+   n_parallel = self.mat['n_parallel']
+   eta = self.solver['eta']
+   direction_int = self.mat['direction_int']
+  
+   #------------------
+   eta_m = np.zeros((n_parallel,n_serial))
+   kappa_m = np.zeros((n_parallel,n_serial,3))
+   mfp_m = np.zeros((n_parallel,n_serial))
+   angle_m = np.zeros((n_parallel,n_serial,3))
+   for s in range(n_serial):
+    for p in range(n_parallel):
+     eta_m[p,s] = eta[p*n_serial+s]
+     mfp_m[p,s] = mfp[p*n_serial+s]
+     kappa_m[p,s,:] = kappa_directional[p*n_serial+s,:]
+     angle_m[p,s,:] = control_angle[p*n_serial+s,:]
+   #-----------------------------------------------------
 
-    xscale('log')
-    grid('on')
-    xlabel('Mean Free Path [$\mu$ m]')
-    ylabel('Suppression Function')
-    show()
-   if argv.setdefault('write',True):
-    suppression.dump('suppression.dat')
+
+   #Interpolation------
+   ftheta = self.mat['ftheta'] #this can be arbitrary
+   n_theta = len(ftheta)
+   mfp_sampled = self.mat['mfp'][0:n_serial] #this can be arbitrary
+   N = len(mfp_sampled) 
+   kappa = 0
+   sup = np.zeros(N)
+   for p in range(n_parallel):
+    aa = angle_m[p,0,0]
+    f = interpolate.interp1d(mfp_m[p],eta_m[p],fill_value='extrapolate')
+    for m in range(N):
+     for t in range(n_theta):
+      T = f(mfp_sampled[m]*ftheta[t])
+      #T = f(mfp_sampled[m])
+      #sup[m] += T/mfp_sampled[m]*aa*self.mat['dphi']/np.pi
+      sup[m] += 2*T/mfp_sampled[m]*direction_int[t,p,0]/4.0/np.pi*3*self.geo.kappa_factor
+   #------------------------------------------------------------------ 
+   self.suppression = [mfp_sampled,sup]
+
+   if argv.setdefault('show',False):
+
+    plt.plot(mfp_sampled,sup)
+    plt.ylim([0,2])
+    plt.xscale('log')
+    plt.show()
+
+   return sup
