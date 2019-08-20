@@ -1688,6 +1688,8 @@ class Geometry(object):
 
 
 
+
+
  def compute_divergence(self,data,add_jump=True,verbose=0) :
 
   div = np.zeros(len(self.elems))     
@@ -1742,7 +1744,7 @@ class Geometry(object):
      if ll in self.side_list['Cold'] :
       diff_temp[kc1][ind1]  = -0.5-temp[kc1]
 
-     if ll in self.side_list['Boundary'] :
+     if ll in self.side_list['Boundary'] : 
       diff_temp[kc1][ind1]  = lattice_temp[kc1]-temp[kc1]
 
    for k in range(n_el) :

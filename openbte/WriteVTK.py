@@ -9,6 +9,7 @@ class WriteVtk(object):
 
   self.argv = argv
   self.mesh = argv['Geometry']
+ 
   self.Nx = argv.setdefault('repeat_x',1)
   self.Ny = argv.setdefault('repeat_y',1)
   self.Nz = argv.setdefault('repeat_z',1)
@@ -24,11 +25,7 @@ class WriteVtk(object):
  def cell_to_node(self,data):
 
 
-   #n_nodes = len(self.mesh.nodes)
-
-   #print(len(self.mesh.node_list['Interface']))
    delta = 2e-6*np.ones(3)
-   #delta[2] = 0.0
 
    add_nodes = True
    if add_nodes:
@@ -53,13 +50,16 @@ class WriteVtk(object):
    #for node  in self.mesh.node_list['Interface']:
 #     print(len(self.mesh.node_elem_map[node]))
 
-   #quit()
    n_nodes = len(self.mesh.nodes)
     #-----------------------
-    #quit()
+
    n_col = len(np.shape(data))
-   if n_col == 2: n_col = 3
-   node_data = np.zeros((n_nodes,n_col))
+
+   if n_col == 3:
+    node_data = np.zeros((n_nodes,3,3))
+   else:
+    if n_col == 2: n_col = 3 #vector
+    node_data = np.zeros((n_nodes,n_col))
 
    conn = np.zeros(n_nodes)
    for n in self.mesh.node_elem_map.keys():
@@ -69,6 +69,7 @@ class WriteVtk(object):
 
    for n in range(n_nodes):
     node_data[n] /= conn[n]
+
 
    return node_data
 
@@ -145,18 +146,21 @@ class WriteVtk(object):
 
  def write_vtk(self):
 
-  filename = self.argv.setdefault('filename','output.vtk')
+  filename = self.argv.setdefault('filename_vtk','output.vtk')
   if MPI.COMM_WORLD.Get_rank() == 0:
    stored_data = {}
-
 
    output = []
    strc = 'PointData('
    for n,variable in enumerate(self.data) :
 
     is_scalar = len(list(np.shape(variable))) == 1
+    is_vector = len(list(np.shape(variable))) == 2
+    is_tensor = len(list(np.shape(variable))) == 3
+
 
     node_data = self.cell_to_node(variable)
+    #print(np.shape(node_data))
     #stored_data.update({self.label[n]:{variable:node_data[:,0],'label':self.label[n]}})
 
     #Get increment for plotting-------------
@@ -171,15 +175,18 @@ class WriteVtk(object):
     output.append(tmp)
     if is_scalar:
       strc += r'''Scalars(output[''' + str(n) + r'''],name =' ''' + self.label[n] +  r''' ')'''
-    else:
+    if is_vector:
       strc += r'''Vectors(output[''' + str(n) + r'''],name =' ''' + self.label[n] +  r''' ')'''
+    if is_tensor:
+      strc += r'''Tensors(output[''' + str(n) + r'''],name =' ''' + self.label[n] +  r''' ')'''
 
     if n == len(self.data)-1:
      strc += ')'
     else:
      strc += ','
- 
-   data=eval(strc)
+
+
+   data = eval(strc)
 
    if self.mesh.dim == 3:
     vtk = VtkData(UnstructuredGrid(nodes,tetra=cells),data)
@@ -188,4 +195,5 @@ class WriteVtk(object):
      vtk = VtkData(UnstructuredGrid(nodes,triangle=cells),data)
     else:
      vtk = VtkData(PolyData(points = nodes,polygons = cells),data)
+
    vtk.tofile(filename,'ascii')

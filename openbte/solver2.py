@@ -637,15 +637,10 @@ class Solver(object):
     B = np.zeros(self.n_elems)
     kappa_mask = []
     for kc1,kc2 in zip(*self.mesh.A.nonzero()):
-     #ll = self.mesh.get_side_between_two_elements(kc1,kc2)
 
-     #kappa = self.side_kappa_map[ll]
      kappa = 1.0
-     #kappa = 100.0
-     #print(kappa)        print(KAPPAp)
      (v_orth,dummy) = self.mesh.get_decomposed_directions(kc1,kc2)
      vol1 = self.mesh.get_elem_volume(kc1)
-     #vol2 = self.mesh.get_elem_volume(kc2)
      row_tmp.append(kc1)
      col_tmp.append(kc2)
      data_tmp.append(-v_orth/vol1*kappa)

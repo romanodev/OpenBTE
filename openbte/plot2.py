@@ -22,6 +22,7 @@ from scipy.interpolate import griddata
 from shapely.geometry import MultiPoint,Point,Polygon,LineString
 import shapely
 from scipy import interpolate
+import os.path
 from matplotlib.widgets import Slider, Button, RadioButtons
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
@@ -84,7 +85,9 @@ class Plot(object):
     
    #load material---
    if not ('material' in argv.keys()):
-     self.mat = pickle.load(open(argv.setdefault('mat_file','material.p'),'rb'))
+     fname = argv.setdefault('mat_file','material.p')
+     if os.path.isfile(fname) :
+      self.mat = pickle.load(open(fname,'rb'))
    else:
      self.mat = argv['material']
     
@@ -120,26 +123,31 @@ class Plot(object):
 
  def save_vtk(self,argv):
    #Write data-------
-   solver = self.solver
+
    argv.update({'Geometry':self.geo})
    vw = WriteVtk(**argv)
 
-   if 'temperature' in solver.keys():
-    vw.add_variable(solver['temperature'],label = r'''BTE Temperature [K]''')
+   if 'data' in argv.keys():
+    vw.add_variable(argv['data'],label = argv.setdefault('label','a.u.'))
+   else:
+    solver = self.solver
+
+    if 'temperature' in solver.keys():
+     vw.add_variable(solver['temperature'],label = r'''BTE Temperature [K]''')
 
 
-   if 'pseudogradient' in solver.keys():
-    vw.add_variable(solver['pseudogradient'],label = r'''Pseudo gradient Temperature [K/nm]''')
+    if 'pseudogradient' in solver.keys():
+     vw.add_variable(solver['pseudogradient'],label = r'''Pseudo gradient Temperature [K/nm]''')
 
 
-   if 'flux' in solver.keys():
-    vw.add_variable(solver['flux'],label = r'''BTE Thermal Flux [W/m/m]''')
-    #vw.add_variable(solver['vorticity'],label = r'''BTE Vorticity [W/m/m/m]''')
-    #vw.add_variable(solver['vorticity_fourier'],label = r'''Fourier Vorticity [W/m/m/m]''')
+    if 'flux' in solver.keys():
+     vw.add_variable(solver['flux'],label = r'''BTE Thermal Flux [W/m/m]''')
+     #vw.add_variable(solver['vorticity'],label = r'''BTE Vorticity [W/m/m/m]''')
+     #vw.add_variable(solver['vorticity_fourier'],label = r'''Fourier Vorticity [W/m/m/m]''')
 
-   vw.add_variable(solver['temp_fourier'],label = r'''Fourier Temperature [K]''')
+    vw.add_variable(solver['temp_fourier'],label = r'''Fourier Temperature [K]''')
 
-   vw.add_variable(solver['flux_fourier'],label = r'''Fourier Thermal Flux [W/m/m]''')
+    vw.add_variable(solver['flux_fourier'],label = r'''Fourier Thermal Flux [W/m/m]''')
 
    vw.write_vtk()
 
@@ -188,7 +196,6 @@ class Plot(object):
    #mfp_nano = np.array([0]+sorted(mfp_nano))
    mfp_nano = np.array(sorted(mfp_nano))
 
-
    #build cumulative kappa
    acc = np.zeros(len(mfp_nano))
    acc[0] = kappa_sorted[0]
@@ -197,7 +204,6 @@ class Plot(object):
   
    self.nano_dis = [mfp_nano*1e-9,acc]
    
- 
    #write
    if argv.setdefault('save',False):
     f = open('mfp_nano.dat','w+')
@@ -231,6 +237,8 @@ class Plot(object):
     
     grid()
     show()
+
+   
 
 
  def plot_over_line(self,argv):
@@ -510,7 +518,7 @@ class Plot(object):
    plt.axes([0,0,1.0,1.0])
 
    #data += 1.0
-   plt.set_cmap(Colormap('winter'))
+   #plt.set_cmap(Colormap('winter'))
    
    (data,nodes,triangulation) =  self.get_data(argv)
    vmin = argv.setdefault('vmin',min(data))
