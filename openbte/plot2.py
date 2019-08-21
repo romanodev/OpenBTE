@@ -509,9 +509,8 @@ class Plot(object):
 
  def plot_map(self,argv):
 
-   #self.geo = Geometry(model='load')
    (Lx,Ly) = self.geo.get_repeated_size(argv)
-   Sx = 8
+   Sx = argv.setdefault('fig_size',5)
    Sy = Sx*Ly/Lx
 
    fig = plt.figure(num=' ', figsize=(Sx,Sy), dpi=80, facecolor='w', edgecolor='k')

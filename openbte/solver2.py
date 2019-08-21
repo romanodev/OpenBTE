@@ -302,13 +302,6 @@ class Solver(object):
 
     temp = lu.solve(RHS)
 
-    #eta = self.mesh.B_with_area_old.dot(temp-TL[index_irr]).sum()
-    #Add connection-----
-    #RHS -= self.TL_old[index_irr] - self.temp_old[index_irr] - self.delta_old[index_irr]
-    #RHS += self.delta_old[index_irr]
-    #print(np.sum(RHS),np.sum(self.delta_old[index_irr]))
-    #print(np.sum(self.temp_old[index_irr]),np.sum(self.TL_old[index_irr]))
-    #-------------------
  
     return temp
 
@@ -554,12 +547,6 @@ class Solver(object):
 
     n_iter +=1   
 
-    #mfp_plot = np.array(mfp_plot)
-    #eta_plot = np.array(eta_plot)
-    #plt.plot(mfp_plot,eta_plot)
-     
-    #plt.xscale('log')
-    #plt.show()
    
     #Thermal conductivity   
     if rank==0 :

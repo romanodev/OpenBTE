@@ -18,7 +18,7 @@ from . import porous
 
 import matplotlib
 be = matplotlib.get_backend()
-if not be=='nbAgg':
+if not be=='nbAgg' and not be=='module://ipykernel.pylab.backend_inline':
  if not be == 'Qt5Agg': matplotlib.use('Qt5Agg')
 
 import matplotlib.patches as patches

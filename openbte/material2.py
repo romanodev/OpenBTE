@@ -603,34 +603,8 @@ class Material(object):
    kappa_directional[:,2] = 0 #Enforce zeroflux on z (for visualization purposed)
 
 
-   #test---
-   #kappa = 0
-   #for p in range(n_phi): 
-   # for t in range(n_theta): 
-   #  reduced_mfp = mfp_bulk[m]*ftheta[t]*np.sin(theta[t])
-   #  for m in range(n_mfp_bulk):
-      #kappa  += 3 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p,0]*domega[t,p]*direction_ave[t,p,0]*mfp_bulk[m]
-   #   kappa  += 3 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p,0]*domega[t,p]*polar_ave[p,0]*reduced_mfp
-
-   #print(kappa)
-   #quit()
-   #  if t == 20 and p==47:
-   #   reduced_mfp = mfp_bulk[m]*ftheta[t]*np.sin(theta[t])
-   #   (m1,a1,m2,a2) = self.get_linear_indexes(mfp,reduced_mfp,scale='inverse',extent=True)
-     #print(a1,a2,m1,m2)
-   #   trial = a1 + a2
-   #   print(trial)
-      #print(trial,reduced_mfp,t,p)
-   #quit()   
-
    polar_ave = np.array([np.repeat(polar_ave[:,i],n_mfp) for i in range(3)]).T
    polar = np.array([np.repeat(polar[:,i],n_mfp) for i in range(3)]).T
-   #sanity check for the bulk case---
-   #kappa = 0
-   #for n in range(n_mfp*n_phi):
-   # kappa += kappa_directional[n,0]*mfp[n]*polar_ave[n][0]
-   #print(kappa)
-   #quit()
    #---------------------------------
 
    return {'CollisionMatrix':A,\
@@ -639,15 +613,10 @@ class Material(object):
            'angle_map':angle_map,\
            'dphi':Dphi,\
            'ftheta':ftheta*np.sin(theta),\
-           #'antialiasing':True,\
            'kappa_directional':kappa_directional,\
-           #'kappa_directional_not_int':kappa_directional_not_int,\
            'n_serial':n_mfp,\
            'n_parallel':n_phi,\
            'mfp':mfp,\
-           #'log':True,\
-           #'aliasing':np.cos(Dphi/2)/np.sin(Dphi/2),\
-           #'control_angle_not_int':polar_ave/np.sin(Dphi/2)/2,\
            'control_angle':polar_ave,\
            'angle':polar,\
            'direction_int':direction_int,\
