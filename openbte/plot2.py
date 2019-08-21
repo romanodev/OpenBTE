@@ -1,13 +1,13 @@
 from __future__ import absolute_import
 from mpi4py import MPI
-from .solver import Solver
+from .solver2 import Solver
 from pyvtk import *
 import numpy as np
 import deepdish as dd
 import os
 import matplotlib
 be = matplotlib.get_backend()
-if not be=='nbAgg':
+if not be=='nbAgg' and not be=='module://ipykernel.pylab.backend_inline':
  if not be == 'Qt5Agg': matplotlib.use('Qt5Agg')
 import matplotlib.pylab as plt
 from matplotlib.colors import Colormap
