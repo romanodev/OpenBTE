@@ -25,7 +25,7 @@ setup(name='openbte',
                          ],
       license='GPLv2',\
       packages = ['openbte'],
-      package_data = {'openbte':['materials/*.dat']},
+      package_data = {'openbte':['materials/*.dat','fonts/*.ttf']},
       entry_points = {
      'console_scripts': [
       'openbte=openbte.__main__:main','shengbte2openbte=openbte.shengbte2openbte:main'],
