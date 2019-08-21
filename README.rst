@@ -44,17 +44,7 @@ Linux
 
 Requirements:
 
-apt-get install -y libopenmpi-dev 
-
-Install `gmsh <http://gmsh.info/>`_
-
-.. code-block:: shell
-
-     sudo wget http://geuz.org/gmsh/bin/Linux/gmsh-3.0.0-Linux64.tgz && \
-      tar -xzf gmsh-3.0.0-Linux64.tgz && \
-      cp gmsh-3.0.0-Linux/bin/gmsh /usr/bin/ && \
-      rm -rf gmsh-3.0.0-Linux && \
-      rm gmsh-3.0.0-Linux64.tgz
+apt-get install -y libopenmpi-dev libgmsh3 
 
 pip install --upgrade openbte     
 

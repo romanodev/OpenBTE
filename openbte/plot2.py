@@ -215,7 +215,8 @@ class Plot(object):
    #plot
    if argv.setdefault('show',False):
 
-    init_plotting()
+
+    fonts = init_plotting()
     mfp_new = []
     acc_new = []
     th = 0
@@ -232,8 +233,18 @@ class Plot(object):
     plot(mfp_new,acc_new)
     xlim([mfp_nano[th],mfp_nano[-1]*5])
     xscale('log')
-    xlabel('$\Lambda$ [nm]')
-    ylabel(r'''$\alpha(\Lambda)$ [Wm$^{-1}$K$^{-1}$]''')
+
+    #Update fonts
+    xlabel('$\Lambda$ [nm]',fontproperties=fonts['regular'])
+    ylabel(r'''$\alpha(\Lambda)$ [Wm$^{-1}$K$^{-1}$]''',fontproperties=fonts['regular'])
+
+    for label in gca().get_xticklabels():
+     label.set_fontproperties(fonts['regular'])
+
+    for label in gca().get_yticklabels():
+     label.set_fontproperties(fonts['regular'])
+    #-------------------
+
     
     grid()
     show()

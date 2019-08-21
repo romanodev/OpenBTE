@@ -1,4 +1,4 @@
-
+import matplotlib.font_manager as fm
 from matplotlib.pylab import *
 
 import os,sys
@@ -19,31 +19,50 @@ def savefigure(prefix = './'):
 
 
 
-
 def init_plotting(extra_x_padding = 0.0,extra_y_padding=0.0,extra_bottom_padding = 0.0,extra_top_padding=  0.0,paraview=False,square=False,delta_square = 0,presentation=False):
 
- rc('font',**{'family':'serif','serif':['Computer Modern Roman']})
- rc('font',**{'family':'serif','sans-serif':['Computer Modern Sans serif']})
+ #rc('font',**{'family':'serif','serif':['Computer Modern Roman']})
+ #rc('font',**{'family':'serif','sans-serif':['Computer Modern Sans serif']})
+
+ #rcParams['font.family'] = 'serif'
+ #rcParams['font.sans-serif'] = 'Computer Modern Sans Serif'
+ #rcParams['font.serif'] = 'Computer Modern Sans Roman'
+
 
  rcParams['xtick.major.pad']='10'
- rc('text', usetex=True)
+ #rc('text', usetex=True)
+
+ rcParams['mathtext.fontset'] = 'cm'
 
  rcParams['lines.linewidth'] = 4
  rcParams['font.size'] = LARGE
  rcParams['xtick.labelsize'] = LARGE
  rcParams['ytick.labelsize'] = LARGE
  if square:
-  mpl.rcParams['figure.figsize'] = [4.0, 4.0]
+  rcParams['figure.figsize'] = [4.0, 4.0]
  else:
-  mpl.rcParams['figure.figsize'] = [8.0, 5.0]
+  rcParams['figure.figsize'] = [8.0, 5.0]
  if presentation:
-  mpl.rcParams['figure.figsize'] = [16.0, 12.0]
+  rcParams['figure.figsize'] = [16.0, 12.0]
 
- rcParams['text.latex.preamble'] = [r'\usepackage{hyperref}',]
+ #print(rcParams.keys())
+ #quit()
+ 
+ #rcParams['text.latex.preamble'] = [r'\usepackage{hyperref}',]
 
+ #load fonts----
+ filename = os.path.dirname(__file__) + '/fonts/cmunrm.ttf'
+ prop_regular = fm.FontProperties(fname=filename,family='serif')
+ filename = os.path.dirname(__file__) + '/fonts/cmunbx.ttf'
+ prop_bold = fm.FontProperties(fname=filename,family='serif')
+ filename = os.path.dirname(__file__) + '/fonts/cmunti.ttf'
+ prop_italic = fm.FontProperties(fname=filename,family='serif')
+ fonts = {'regular':prop_regular,'italic':prop_italic,'bold':prop_bold}
 
- mpl.rcParams['figure.dpi'] = 80
- mpl.rcParams['savefig.dpi'] = 300
+ #-----------------------------------
+
+ rcParams['figure.dpi'] = 80
+ rcParams['savefig.dpi'] = 300
  rcParams['xtick.major.size'] = 3
  rcParams['xtick.minor.size'] = 3
  rcParams['figure.edgecolor'] = 'k'
@@ -58,4 +77,5 @@ def init_plotting(extra_x_padding = 0.0,extra_y_padding=0.0,extra_bottom_padding
  rcParams['legend.fontsize'] = 25
  rcParams['axes.linewidth'] = 1
  axes([0.15+extra_x_padding,0.20+extra_bottom_padding,0.78-extra_x_padding-extra_y_padding,0.75-extra_bottom_padding-extra_top_padding])
- #axes([0,0,1.0,1.0])
+ #axes([0,0,1.0,1.0])i
+ return fonts
