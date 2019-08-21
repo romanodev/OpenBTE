@@ -3,6 +3,7 @@ if new:
  from .geometry2 import Geometry
  from .material2 import Material
  from .solver2 import Solver
+ from .solverfull import SolverFull
  from .elasticity_2 import Elasticity
  from .plot2 import Plot
 else:

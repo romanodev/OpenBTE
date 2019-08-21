@@ -1,14 +1,14 @@
 
 package:
   name: "openbte"
-  version: "0.9.68"
+  version: "0.9.72"
 
 source:
-  url: ../dist/openbte-0.9.68.tar.gz
+  url: ../dist/openbte-0.9.72.tar.gz
 
 build:
         
-  number: 3
+  number: 4
   noarch: python
   script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vvv "
 
@@ -49,7 +49,7 @@ requirements:
     - termcolor
     - unittest2
     - gmsh==3.0.6
-    - pyqt5
+    - pyqt
 
 test:
   imports:
@@ -62,7 +62,7 @@ about:
   summary: Boltzmann Transport Equation for Phonons
   doc_url: 
   dev_url:
-  description: For Windows you'll beed to install MSMPI. Install with    conda install -c conda-forge -c gromano openbte
+  description: For Windows you'll need to install MSMPI. Install with conda install -c conda-forge -c gromano openbte
 
 extra:
   recipe-maintainers:

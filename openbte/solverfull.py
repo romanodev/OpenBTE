@@ -81,7 +81,7 @@ def log_interp1d(xx, y, kind='linear'):
      
      return log_interp
 
-class Solver(object):
+class SolverFull(object):
 
   def __init__(self,**argv):
 
@@ -302,13 +302,6 @@ class Solver(object):
 
     temp = lu.solve(RHS)
 
-    #eta = self.mesh.B_with_area_old.dot(temp-TL[index_irr]).sum()
-    #Add connection-----
-    #RHS -= self.TL_old[index_irr] - self.temp_old[index_irr] - self.delta_old[index_irr]
-    #RHS += self.delta_old[index_irr]
-    #print(np.sum(RHS),np.sum(self.delta_old[index_irr]))
-    #print(np.sum(self.temp_old[index_irr]),np.sum(self.TL_old[index_irr]))
-    #-------------------
  
     return temp
 
@@ -426,15 +419,6 @@ class Solver(object):
     eta_vec = np.zeros(self.n_parallel*self.n_serial)
     eta_vecp = np.zeros(self.n_parallel*self.n_serial)
 
-    #experimental---
-    #delta = np.zeros_like(TL)
-    #deltap = np.zeros_like(TL)
-    #temp_matrix = np.zeros((self.n_parallel * self.n_serial,self.n_elems))
-    #tempp_matrix = np.zeros((self.n_parallel * self.n_serial,self.n_elems))
-    #--------------
-
-    #eta_plot = []
-    #mfp_plot = []
     K2p = np.zeros(1)
     K2 = np.zeros(1)
     block = self.n_parallel // comm.size + 1
@@ -498,10 +482,6 @@ class Solver(object):
 
         Jp += np.outer(temp,kdir)*1e9
 
-        #tempp_matrix[global_index] = temp
-        #deltap -= np.outer(self.mat['invH'][:,global_index],np.einsum('j,cj->c',self.mat['FRTA'][global_index],self.mesh.compute_grad(temp)))
-        #deltap[global_index] += np.einsum('j,cj->c',self.mat['FBTE'][global_index],self.mesh.compute_grad(temp))
-        #-----------
       #Ballistic component
       ballistic = False
       for n in range(self.n_serial)[idx[0]+1:]:
@@ -529,10 +509,8 @@ class Solver(object):
         kdir = self.mat['kappa_directional'][global_index]
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
         Jp += np.outer(temp,kdir)*1e9
-        #tempp_matrix[global_index] = temp 
-        #supp[global_index] = eta
         KAPPAp[index,n] = np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
-        #eta_vec[global_index] = eta
+        eta_vecp[global_index] = eta 
 
     comm.Allreduce([K2p,MPI.DOUBLE],[K2,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([TL2p,MPI.DOUBLE],[TL2,MPI.DOUBLE],op=MPI.SUM)
@@ -569,12 +547,6 @@ class Solver(object):
 
     n_iter +=1   
 
-    #mfp_plot = np.array(mfp_plot)
-    #eta_plot = np.array(eta_plot)
-    #plt.plot(mfp_plot,eta_plot)
-     
-    #plt.xscale('log')
-    #plt.show()
    
     #Thermal conductivity   
     if rank==0 :
