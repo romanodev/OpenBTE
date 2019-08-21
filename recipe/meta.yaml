@@ -49,7 +49,7 @@ requirements:
     - termcolor
     - unittest2
     - gmsh==3.0.6
-    - pyqt
+    - pyqt5
 
 test:
   imports:
