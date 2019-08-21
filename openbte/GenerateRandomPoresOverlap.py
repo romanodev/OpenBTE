@@ -209,6 +209,8 @@ def GenerateRandomPoresOverlap(argv):
   d_min =  argv['step']/20.0
   delta_pore = argv.setdefault('pore_distance',0.2)
 
+  argv.setdefault('load_configuration',False)
+  argv.setdefault('save_configuration',False)
   argv.setdefault('shape','square')
   if argv['shape'] == 'circle':
    Na_p = [24]
