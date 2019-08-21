@@ -4,7 +4,7 @@ if new:
  from .material2 import Material
  from .solver2 import Solver
  from .solverfull import SolverFull
- from .elasticity_2 import Elasticity
+ from .elasticity import Elasticity
  from .plot2 import Plot
 else:
  from .material import Material

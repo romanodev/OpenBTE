@@ -41,7 +41,6 @@ def is_in(myarr, list_arrays):
 def occurrance(myarr, list_arrays):
     return sum([ int(np.allclose(elem,myarr,rtol=1e-5)) for elem in list_arrays])
 
-
 def unique_versors(list_arrays):
 
     a = np.ma.array(list_arrays, mask=False)
@@ -81,7 +80,7 @@ def log_interp1d(xx, y, kind='linear'):
      
      return log_interp
 
-class SolverFull(object):
+class Solver(object):
 
   def __init__(self,**argv):
 
@@ -243,7 +242,6 @@ class SolverFull(object):
       #if self.argv.setdefault('antialiasing',False):
       # self.get_antialiasing(self.mesh.CP,self.kappa_directional_not_int[global_index],AM,AP)
 
-      #Am = -tmp.clip(max=0)#.todense()
       AP = AP.todense()
       AM = -AM.todense()
 
@@ -527,9 +525,6 @@ class SolverFull(object):
     error_vec.append(abs(kappa_vec[-1]-kappa_vec[-2])/abs(max([kappa_vec[-1],kappa_vec[-2]])))
     #----------------
 
-    #Upate lattice and boundary temperature
-    
-    #if rank == 0:
     TB_new = TB_plus.copy()
     for i in range(3):
       for n in range(len(TB_plus.T[i])):
@@ -539,14 +534,11 @@ class SolverFull(object):
     TB = self.alpha * TB_new + (1-self.alpha)*TB_old; TB_old = TB.copy()
 
     
-    #TL = self.alpha * TL2.copy() + (1-self.alpha)*self.TL_old; 
-    TL = TL2.copy() #+ (1-self.alpha)*self.TL_old; 
+    TL = self.alpha * TL2.copy() + (1-self.alpha)*self.TL_old; 
     self.TL_old = TL.copy()
 
-    #print(min(TL[0]),max(TL[0]))
 
     n_iter +=1   
-
    
     #Thermal conductivity   
     if rank==0 :
@@ -571,8 +563,6 @@ class SolverFull(object):
      print('   ---------------------------------------------------------------------------------------')
      print(' ')
     
-
-
 
 
   def print_bulk_kappa(self):
