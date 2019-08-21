@@ -81,7 +81,7 @@ def log_interp1d(xx, y, kind='linear'):
      
      return log_interp
 
-class SolverFull(object):
+class Solver(object):
 
   def __init__(self,**argv):
 
