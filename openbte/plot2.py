@@ -17,7 +17,7 @@ from .fig_maker import *
 from shapely import geometry,wkt
 from scipy.interpolate import BarycentricInterpolator
 from .WriteVTK import *
-from .geometry import *
+from .geometry2 import *
 from scipy.interpolate import griddata
 from shapely.geometry import MultiPoint,Point,Polygon,LineString
 import shapely
