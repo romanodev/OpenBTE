@@ -73,19 +73,19 @@ class Plot(object):
    #load solver---
    if not ('data' in argv.keys()):
     if not ('solver' in argv.keys()):
-     self.solver = pickle.load(open(argv.setdefault('filename','solver.p'),'rb'))
+     self.solver = pickle.load(open(argv.setdefault('filename_solver','solver.p'),'rb'))
     else:
      self.solver = argv['solver'].state
 
    #load geometry---
    if not ('geometry' in argv.keys()):
-     self.geo = Geometry(model='load',filename = argv.setdefault('geometry_filename','geometry.p'))
+     self.geo = Geometry(model='load',filename = argv.setdefault('filename_geometry','geometry.p'))
    else:
      self.geo = argv['geometry']
     
    #load material---
    if not ('material' in argv.keys()):
-     fname = argv.setdefault('mat_file','material.p')
+     fname = argv.setdefault('filename_material','material.p')
      if os.path.isfile(fname) :
       self.mat = pickle.load(open(fname,'rb'))
    else:
