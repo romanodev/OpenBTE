@@ -57,7 +57,6 @@ def merge_positions(pos,nx,ny):
   total_merged_pores.append(pores)
   flat_merged_pores = [element for tupl in total_merged_pores for element in tupl]
   n_filled = len(flat_merged_pores)
-  #print(n_filled)
   #Get next available pores-------------
   while True:
     start +=1
@@ -178,7 +177,7 @@ def compute_inverse_polygons(positions,nx,ny,area,dx,dy,Lx,Ly,frame):
 
 
 
-def compute_polygons_from_grid(values):
+def compute_polygons_from_grid(argv,values):
   #Convert--
   (nx,ny)=np.shape(values)
   (ix,iy) = values.nonzero()
@@ -220,8 +219,8 @@ def compute_polygons_from_grid(values):
     #                           area))
     positions.append(pos)
 
-    #if argv.setdefault('add_periodic',True):
-    if 1 ==1:
+    if argv.setdefault('add_periodic',True):
+    #if 1 ==1:
     #ADD PERIODIC PORES--------------------------
      if xr == 0:
        polygons.append(get_square(xr*dx-Lx*0.5 + Lx, yr*dy-Lx*0.5,area))
@@ -240,8 +239,8 @@ def compute_polygons_from_grid(values):
   #print('START')
   lone_pores = []
   #if argv.setdefault('eliminate_lone_pores',True):
-  if 1 == 1:
-  #if argv.setdefault('eliminate_lone_pores',True):
+  #if 1 == 1:
+  if argv.setdefault('eliminate_lone_pores',True):
    #Eliminate holes-----
    th = 15
    compl = complement_positions(np.array(positions),nx,ny)
@@ -286,8 +285,7 @@ def compute_polygons_from_grid(values):
   #print('Added lone pores:' + str(len(lone_pores)))
   #quit()
   #MERGE POLYGONS:#---------
-  merge_poly = True
-  if merge_poly:
+  if argv.setdefault('merge',True):
    polygons = np.array(polygons)
    merged = merge_positions(positions,nx,ny)
 
@@ -351,15 +349,18 @@ def compute_polygons_from_grid(values):
 
 def GenerateRandomPoresGrid(**options):
 
- nx = options['nx']
- ny = options['ny']
- Np = options['np']
 
- values = np.zeros((nx,ny))
 
  if options.setdefault('manual',False):
-  values = options['grid']   
+  values = options['values']   
+  nx = np.shape(values)[0]
+  ny = np.shape(values)[1]
+  Np = np.sum(np.sum(values))
  else: 
+  nx = options['nx']
+  ny = options['ny']
+  Np = options['np']
+  values = np.zeros((nx,ny))
   pos = []
   while len(pos) < Np :
    x = np.random.randint(0,nx)
@@ -373,7 +374,7 @@ def GenerateRandomPoresGrid(**options):
    values.dump(open('conf.dat','wb'))
   
 
- polygons = compute_polygons_from_grid(values)
+ polygons = compute_polygons_from_grid(options,values)
  return values,polygons
 
 

@@ -9,6 +9,7 @@ from .GenerateSquareLatticePores import *
 from .GenerateHexagonalLatticePores import *
 from .GenerateStaggeredLatticePores import *
 from .GenerateCustomPores import *
+from .Generate2DInterface import *
 from .GenerateRandomPoresOverlap import *
 from .GenerateRandomPoresGrid import *
 from . import GenerateMesh2D
@@ -99,6 +100,7 @@ class Geometry(object):
     #if geo_type == 'porous/random' or \
     polygons = []
 
+    self.porous = False
     if  geo_type == 'porous/square_lattice' or\
         geo_type == 'porous/hexagonal_lattice' or\
         geo_type == 'porous/staggered_lattice' or\
@@ -106,20 +108,21 @@ class Geometry(object):
         geo_type == 'porous/random' or\
         geo_type == 'porous/custom':
 
+     self.porous = True
      if geo_type == 'porous/square_lattice':
-      frame,polygons = GenerateSquareLatticePores(argv)
+      self.frame,self.polygons = GenerateSquareLatticePores(argv)
 
      if geo_type == 'porous/hexagonal_lattice':
-      frame,polygons = GenerateHexagonalLatticePores(argv)
+      self.frame,self.polygons = GenerateHexagonalLatticePores(argv)
 
      if geo_type == 'porous/staggered_lattice':
-      frame,polygons = GenerateStaggeredLatticePores(argv)
+      self.frame,self.polygons = GenerateStaggeredLatticePores(argv)
 
      if geo_type == 'porous/custom':
-      frame,polygons = GenerateCustomPores(argv)
+      self.frame,self.polygons = GenerateCustomPores(argv)
 
      if geo_type == 'porous/random':
-      frame,polygons,tt = GenerateRandomPoresOverlap(argv)
+      self.frame,self.polygons,tt = GenerateRandomPoresOverlap(argv)
       self.tt = tt
 
      if geo_type == 'porous/random_over_grid':
@@ -128,26 +131,24 @@ class Geometry(object):
 
       argv['polygons'] = polygons
       argv['automatic_periodic'] = False
-      frame,polygons = GenerateCustomPores(argv)
-
-
-    #polygons = self.eliminate_holes(polygons)
-    #quit()
+      self.frame,self.polygons = GenerateCustomPores(argv)
 
 
     self.Lz = float(argv.setdefault('lz',0.0))
     if geo_type == 'bulk':
+      self.porous = True
+      self.polygons = []
       Lx = float(argv['lx'])
       Ly = float(argv['ly'])
 
-      frame = []
-      frame.append([-Lx/2,Ly/2])
-      frame.append([Lx/2,Ly/2])
-      frame.append([Lx/2,-Ly/2])
-      frame.append([-Lx/2,-Ly/2])
+      self.frame = []
+      self.frame.append([-Lx/2,Ly/2])
+      self.frame.append([Lx/2,Ly/2])
+      self.frame.append([Lx/2,-Ly/2])
+      self.frame.append([-Lx/2,-Ly/2])
 
-    self.frame = frame
-    self.polygons = polygons
+    #self.frame = frame
+    #self.polygons = polygons
 
     if argv.setdefault('mesh',True):
      state = self.mesh(**argv)
@@ -158,26 +159,25 @@ class Geometry(object):
 
    MPI.COMM_WORLD.Barrier()
   if argv.setdefault('save_fig',False) or argv.setdefault('show',False) or argv.setdefault('store_rgb',False) :
-   self.plot_polygons()
-
- #def eliminate_holes(self,polygons):
-  #quit()
+   self.plot_polygons(**argv)
 
 
  def mesh(self,**argv):
 
-    if self.Lz > 0.0:
-     self.dim = 3
-    else:
-     self.dim = 2
-    
-    argv.update({'lz':self.Lz})
+
+   if self.Lz > 0.0:
+    self.dim = 3
+   else:
+    self.dim = 2
+   argv.update({'lz':self.Lz})
+  
+   if self.porous:
+     
     if len(self.polygons) > 0 and self.dim == 3:
      #GenerateMesh3D.mesh(self.polygons,self.frame,argv)
      argv['polygons'] = self.polygons
      argv['frame'] = self.frame
      porous.Porous(**argv)
-
 
     if len(self.polygons) > 0 and self.dim == 2:
      GenerateMesh2D.mesh(self.polygons,self.frame,argv)
@@ -185,25 +185,22 @@ class Geometry(object):
      GenerateBulk2D.mesh(argv)
     if len(self.polygons) == 0 and self.dim == 3:
      GenerateBulk3D.mesh(argv)
-    #if argv['model'] == 'nanowire':
-    # nanowire(argv)
-    # self.dim = 3
-    #Interface----EXPERIMENTAL
-    #if argv['model'] == '2DInterface':
-    #  Generate:/2D.mesh(argv)
-    #  self.dim = 2
-
-    #bulk----------
-    #if geo_type == 'bulk':
-    # if 'lz' in argv.keys() == 3:
-    #  GenerateBulk3D.mesh(argv)
-    #  self.dim = 3
-    # else:
-    #  GenerateBulk2D.mesh(argv)
-    #  self.dim = 2
      #-----------------------------------
-    if not argv.setdefault('only_geo',False):
-        
+
+   else:
+     if argv['model'] == '2DInterface':
+       Generate2DInterface(argv)
+       Lx = float(argv['lx'])
+       Ly = float(argv['ly'])
+       self.frame = []
+       self.frame.append([-Lx/2,Ly/2])
+       self.frame.append([Lx/2,Ly/2])
+       self.frame.append([Lx/2,-Ly/2])
+       self.frame.append([-Lx/2,-Ly/2])
+       self.polygons = []
+
+
+   if not argv.setdefault('only_geo',False):
      #Create mesh---
      subprocess.check_output(['gmsh','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
      state = self.compute_mesh_data()
@@ -211,7 +208,6 @@ class Geometry(object):
      if self.argv.setdefault('save',True):
        pickle.dump(state,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
      return state
-     
 
 
  # MPI.COMM_WORLD.Barrier()
@@ -282,7 +278,7 @@ class Geometry(object):
      patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=2,joinstyle='miter')
      gca().add_patch(patch);
      
-     
+    
     #plot Boundary Conditions-----
     if argv.setdefault('plot_boundary',False):
      for side in self.side_list['Boundary'] + self.side_list['Interface'] :
@@ -296,18 +292,16 @@ class Geometry(object):
       #plot Periodic Conditions-----
     if argv.setdefault('plot_boundary',False):
      for side in self.side_list['Periodic'] + self.side_list['Inactive']  :
-        
       p1 = self.sides[side][0]
       p2 = self.sides[side][1]
       n1 = self.nodes[p1]
       n2 = self.nodes[p2]
       plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=12,zorder=3)
-
        
     
     #----------------------------
     axis('off')
-
+    data = {}
     if self.argv.setdefault('show',False):
      show()
     if self.argv.setdefault('savefig',False) :
@@ -320,7 +314,9 @@ class Geometry(object):
      clf()
    else: data = None
    data =  MPI.COMM_WORLD.bcast(data,root=0)
-   self.rgb = data['rgb']
+
+   if self.argv.setdefault('store_rgb',False):
+    self.rgb = data['rgb']
 
 
 
@@ -369,6 +365,7 @@ class Geometry(object):
     self.compute_side_normals()
     self.compute_elem_centroids()
     self.compute_side_centroids()
+   
     self.compute_least_square_weigths()
     self.compute_connecting_matrix()
     self.compute_connecting_matrix_new()
@@ -1011,11 +1008,10 @@ class Geometry(object):
    tmp = f.readline().split()
    l = tmp[2].replace('"',r'')
    self.blabels.update({int(tmp[1]):l})
-
-
   #------------------------------------------
   self.elem_region_map = {}
   self.region_elem_map = {}
+
 
 
   #import nodes------------------------
@@ -1080,7 +1076,6 @@ class Geometry(object):
      self.elem_region_map.update({len(self.elems)-1:self.blabels[int(tmp[3])]})
      self.region_elem_map.setdefault(self.blabels[int(tmp[3])],[]).append(len(self.elems)-1)
 
-
    if self.dim == 2 and int(tmp[1]) == 2: #2D Elem (triangle)
      node_indexes = [int(tmp[5])-1,int(tmp[6])-1,int(tmp[7])-1]
      n = sorted(node_indexes)
@@ -1088,7 +1083,6 @@ class Geometry(object):
      perm_n =[[n[0],n[1]],\
              [n[0],n[2]],\
              [n[1],n[2]]]
-
      self.elem_region_map.update({len(self.elems)-1:self.blabels[int(tmp[3])]})
      self.region_elem_map.setdefault(self.blabels[int(tmp[3])],[]).append(len(self.elems)-1)
 
@@ -1112,7 +1106,6 @@ class Geometry(object):
   #Set default for hot and cold
   self.side_list.setdefault('Hot',[])
   self.side_list.setdefault('Cold',[])
-
 
 
   #Apply Periodic Boundary Conditions

@@ -254,7 +254,7 @@ class Solver(object):
 
      return AM,AP
 
-  def get_bulk_data(self,global_index,TB,TL):
+  def get_bulk_data(self,global_index,TB,TL,Tnew):
 
     index_irr = self.mat['temp_vec'][global_index]
     aa = sparse.COO([0,1,2],self.control_angle[global_index],shape=(3))
@@ -296,7 +296,7 @@ class Solver(object):
      if (self.keep_lu) :self.lu[irr_angle] = lu
 
     boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1).todense()
-    RHS = mfp * (self.P + boundary) + TL[index_irr]  
+    RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]
 
     temp = lu.solve(RHS)
 
@@ -318,7 +318,7 @@ class Solver(object):
 
    n_mfp = self.mat['n_serial']
    temp_vec = self.mat['temp_vec']
-   nT = np.shape(self.mat['CollisionMatrix'])[0]
+   nT = np.shape(self.mat['B'])[0]
    kdir = self.kappa_directional
 
    if self.argv.setdefault('load_state',False):
@@ -347,11 +347,13 @@ class Solver(object):
      temp_fourier = data['temp_fourier']
      temp_fourier_grad = data['temp_fourier_grad']
      kappa_fourier = data['kappa_fourier']
-     TL = np.tile(temp_fourier,(nT,1))
+     #TL = np.tile(temp_fourier,(nT,1))
+     TL = np.zeros((nT,self.n_elems))
+     Tnew = temp_fourier.copy()
      TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
      #----------------------------------------------------------------
-     #kappa_vec = [float(kappa_fourier)]
-     kappa_vec = [0]
+     kappa_vec = [float(kappa_fourier)]
+     #kappa_vec = [0]
      error_vec = [1.0]
      ms_vec = [[1,0,0]]
      if rank == 0 and self.verbose:
@@ -362,9 +364,10 @@ class Solver(object):
    data_save = {'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad,'temp_fourier':temp_fourier,'kappa_fourier':kappa_fourier}
    self.state = data_save
    if self.argv.setdefault('only_fourier',False):
-     if self.save_state:
-      pickle.dump(self.state,open(argv.setdefault('filename_state','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
+    if self.save_state:
+      pickle.dump(self.state,open(argv.setdefault('filename','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
 
+   
    #Initialize data-----
    n_iter = len(kappa_vec)
    self.TL_old = TL.copy()
@@ -373,7 +376,7 @@ class Solver(object):
 
    self.temp_old = self.TL_old.copy()
    #-------------------------------
-   
+    
    while n_iter < argv.setdefault('max_bte_iter',10) and \
           error_vec[-1] > argv.setdefault('max_bte_error',1e-2):
 
@@ -430,7 +433,7 @@ class Solver(object):
       if self.multiscale:
        #Compute ballistic regime---
        a = time.time()
-       temp_bal = self.get_bulk_data(index * self.n_serial + self.n_serial -1,TB,TL)
+       temp_bal = self.get_bulk_data(index * self.n_serial + self.n_serial -1,TB,TL,Tnew)
        self.mesh.B_with_area_old.dot(temp_bal).sum()
        eta_bal = np.ones(self.n_serial) * self.mesh.B_with_area_old.dot(temp_bal).sum()
        #-------------------------------------
@@ -458,7 +461,7 @@ class Solver(object):
          temp = TDIFF[n]
          eta = eta_diff[n]
         else:
-         temp = self.get_bulk_data(global_index,TB,TL)
+         temp = self.get_bulk_data(global_index,TB,TL,Tnew)
        
          #print(time.time()-a)
          eta = self.mesh.B_with_area_old.dot(temp).sum()
@@ -471,7 +474,7 @@ class Solver(object):
         (Am,Ap) = self.get_boundary_matrices(global_index)
         TBp_minus += Am 
         TBp_plus  += np.einsum('es,e->es',Ap,temp)
-        TL2p += np.outer(self.mat['CollisionMatrix'][:,global_index],temp)    
+        TL2p += np.outer(self.mat['B'][:,global_index],temp)    
         Tp+= temp*self.mat['TCOEFF'][global_index]
         kdir = self.mat['kappa_directional'][global_index]
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
@@ -533,6 +536,7 @@ class Solver(object):
 
     TB = self.alpha * TB_new + (1-self.alpha)*TB_old; TB_old = TB.copy()
 
+    Tnew = T.copy()
     
     TL = self.alpha * TL2.copy() + (1-self.alpha)*self.TL_old; 
     self.TL_old = TL.copy()

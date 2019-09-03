@@ -154,6 +154,7 @@ class Plot(object):
 
  def plot_material(self,argv):
   if MPI.COMM_WORLD.Get_rank() == 0:
+
    init_plotting()
    data = dd.io.load('material.hdf5')
    #dis_nano = list(data['B0']*data['kappa_bulk_tot'])
@@ -235,18 +236,11 @@ class Plot(object):
     xscale('log')
 
     #Update fonts
-    xlabel('$\Lambda$ [nm]',fontproperties=fonts['regular'])
-    ylabel(r'''$\alpha(\Lambda)$ [Wm$^{-1}$K$^{-1}$]''',fontproperties=fonts['regular'])
+    xlabel('$\Lambda$ [nm]',font_properties=fonts['regular'])
+    ylabel(r'''$\alpha(\Lambda)$ [Wm$^{-1}$K$^{-1}$]''',font_properties=fonts['regular'])
 
-    for label in gca().get_xticklabels():
-     label.set_fontproperties(fonts['regular'])
 
-    for label in gca().get_yticklabels():
-     label.set_fontproperties(fonts['regular'])
-    #-------------------
-
-    
-    grid()
+    finalize_plotting()
     show()
 
    

@@ -1,6 +1,6 @@
 import numpy as np
 import os
-import deepdish as dd
+import pickle
 from mpi4py import MPI
 from numpy.testing import assert_array_equal
 import math
@@ -35,7 +35,6 @@ class Material(object):
      data = self.compute_isotropic_3D(**argv)
 
    if argv.setdefault('save',True):
-    #dd.io.save('material.hdf5',data)  
     pickle.dump(data,open('material.p','wb+'))
   
   else : data = None
@@ -47,9 +46,8 @@ class Material(object):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
 
-   data = dd.io.load(argv['matfile'])
-   mfp = data['FRTA']
-   mfp_rta = data['FRTA']
+   data = pickle.load(open(argv['matfile'],'rb'))
+   mfp = data['MFP']
 
    mfp_b,theta_b,phi_b = self.spherical(mfp)
    nm = len(mfp_b)
@@ -63,18 +61,13 @@ class Material(object):
 
    versors = np.array(versors)
    mfp_b *= 1e9   #from m to nm
-   kbulk = data['KBULKFULL']
+   kbulk = data['KBULK']
    Tcoeff = data['TCOEFF']
 
    k_coeff = np.array(data['KCOEFF'])*1e-9
    k_coeff[:,2] = 0 #Enforce zeroflux on z (for visualization purposed)
 
-   A = np.tile(Tcoeff,(nm,1))
-
-
-   return {'CollisionMatrix': A,\
-           'invH':data['invH'],\
-           'FRTA':data['FRTA']*1e9,\
+   return {'B': data['B'],\
            'TCOEFF':Tcoeff,\
            'angle_map':np.arange(nm),\
            'temp_vec':range(nm),\
@@ -82,7 +75,6 @@ class Material(object):
            'n_serial':1,
            'n_parallel':nm,
            'mfp':mfp_b,
-           'FBTE':mfp*1e9,
            'control_angle':versors,\
            'kappa_bulk_tot':kbulk}
 
@@ -589,7 +581,8 @@ class Material(object):
    #replicate bulk values---
    mfp = np.tile(mfp,n_phi)  
    #-----------------------
-   A = np.array([temp_coeff/norm])
+   #A = np.array([temp_coeff/norm])
+   A = np.zeros_like([temp_coeff])
 
 
    TCOEFF = temp_coeff/norm
@@ -607,7 +600,7 @@ class Material(object):
    polar = np.array([np.repeat(polar[:,i],n_mfp) for i in range(3)]).T
    #---------------------------------
 
-   return {'CollisionMatrix':A,\
+   return {'B':A,\
            'TCOEFF':TCOEFF,\
            'temp_vec':temp_vec,\
            'angle_map':angle_map,\
