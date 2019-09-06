@@ -35,7 +35,7 @@ class Material(object):
      data = self.compute_isotropic_3D(**argv)
 
    if argv.setdefault('save',True):
-    pickle.dump(data,open(argv.setdefault('matfile','material.p'),'wb+'))
+    pickle.dump(data,open(argv.setdefault('save_filename','material.p'),'wb+'))
   
   else : data = None
 
