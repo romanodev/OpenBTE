@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 #import os
 import numpy as np
-import scipy.sparse
+#import scipy.sparse
 from scipy.sparse import csc_matrix
 from mpi4py import MPI
 from scipy.sparse.linalg import splu
@@ -9,7 +9,6 @@ from os import listdir
 from scipy.sparse import *
 from os.path import isfile, join
 import time
-import sparse
 from copy import deepcopy
 from collections import namedtuple
 from scipy.sparse.linalg import spilu
