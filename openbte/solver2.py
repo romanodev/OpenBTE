@@ -499,7 +499,7 @@ class Solver(object):
          temp = temp_bal
          eta = eta_bal[n]
         else:
-         temp = self.get_bulk_data(global_index,TB,TL)
+         temp = self.get_bulk_data(global_index,TB,TL,Tnew)
 
 
          #self.temp[global_index] = temp
