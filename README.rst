@@ -23,13 +23,6 @@ The easiest way to install OpenBTE on Linux/MacOS/Windows is through Anaconda:
 
 .. code-block:: shell
 
-   conda env create gromano/openbte-env
-   activate openbte-env
-
-If this method does not work, you will have to create an enviroment yourself:
-
-.. code-block:: shell
-
   conda create -n openbte python=3.6
   activate openbte
   conda install -c conda-forge -c gromano openbte
