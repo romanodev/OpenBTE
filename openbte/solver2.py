@@ -275,26 +275,33 @@ class Solver(object):
         AP = spdiags(np.sum(AP,axis=1).todense(),0,self.n_elems,self.n_elems,format='csc')
         self.mesh.B = self.mesh.B.tocsc()
         self.P = np.sum(np.multiply(AM,self.mesh.B),axis=1).todense()
-        tmp = sparse.tensordot(self.mesh.CM,aa,axes=1)
+        tmp = sparse.tensordot(self.mesh.CM,aa,axes=1).todense()
+        #tmp = sparse.tensordot(self.mesh.CM,aa,axes=1)
         HW_PLUS = tmp.clip(min=0)
         self.HW_MINUS = (HW_PLUS-tmp)
-        BP = spdiags(np.sum(HW_PLUS,axis=1).todense(),0,self.n_elems,self.n_elems,format='csc')
+        #BP = spdiags(np.sum(HW_PLUS,axis=1).todense(),0,self.n_elems,self.n_elems,format='csc')
+        BP = spdiags(np.sum(HW_PLUS,axis=1),0,self.n_elems,self.n_elems,format='csc')
         self.A =  AP + AM + BP
         if self.save_data: 
          self.P.dump(self.cache + '/P_' + str(irr_angle) + '.p')
          sio.save_npz(self.cache + '/A_' + str(irr_angle) + '.npz',self.A)
-         sio.save_npz(self.cache + '/HW_MINUS_' + str(irr_angle) + '.npz',self.HW_MINUS)
+         #sio.save_npz(self.cache + '/HW_MINUS_' + str(irr_angle) + '.npz',self.HW_MINUS)
+         self.HW_MINUS.dump(open(self.cache + '/HW_MINUS_' + str(irr_angle) + '.npz','wb'))
 
        else:  
         self.P = np.load(open(self.cache +'/P_' + str(irr_angle) +'.p','rb'),allow_pickle=True)
         self.A = sparse.load_npz(self.cache + '/A_' + str(irr_angle) + '.npz')
         self.HW_MINUS = sparse.load_npz(self.cache + '/HW_MINUS_' + str(irr_angle) + '.npz')
+        self.HW_MINUS = np.load(open(self.cache + '/HW_MINUS_' + str(irr_angle) + '.npz','rb'))
 
      F = scipy.sparse.eye(self.n_elems,format='csc') + self.A * mfp
      lu = splu(F.tocsc())
      if (self.keep_lu) :self.lu[irr_angle] = lu
 
-    boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1).todense()
+    #boundary = np.multiply(TB,self.HW_MINUS)
+    boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1)#.todense()
+    #print(type(TB))
+    #quit()
     RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]
 
     temp = lu.solve(RHS)
@@ -375,7 +382,7 @@ class Solver(object):
 
    self.temp_old = self.TL_old.copy()
    #-------------------------------
-    
+   a = time.time() 
    while n_iter < argv.setdefault('max_bte_iter',10) and \
           error_vec[-1] > argv.setdefault('max_bte_error',1e-2):
 
