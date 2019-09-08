@@ -12,6 +12,7 @@ import time
 from copy import deepcopy
 from collections import namedtuple
 from scipy.sparse import spdiags
+import sparse.io as sio
 import scipy.io
 import deepdish as dd
 from .geometry2 import Geometry
@@ -281,8 +282,8 @@ class Solver(object):
         self.A =  AP + AM + BP
         if self.save_data: 
          self.P.dump(self.cache + '/P_' + str(irr_angle) + '.p')
-         sparse.io.save_npz(self.cache + '/A_' + str(irr_angle) + '.npz',self.A)
-         sparse.io.save_npz(self.cache + '/HW_MINUS_' + str(irr_angle) + '.npz',self.HW_MINUS)
+         sio.save_npz(self.cache + '/A_' + str(irr_angle) + '.npz',self.A)
+         sio.save_npz(self.cache + '/HW_MINUS_' + str(irr_angle) + '.npz',self.HW_MINUS)
 
        else:  
         self.P = np.load(open(self.cache +'/P_' + str(irr_angle) +'.p','rb'),allow_pickle=True)
