@@ -6,12 +6,11 @@ from scipy.sparse import csc_matrix
 from mpi4py import MPI
 from scipy.sparse.linalg import splu
 from os import listdir
-from scipy.sparse import *
+#from scipy.sparse import *
 from os.path import isfile, join
 import time
 from copy import deepcopy
 from collections import namedtuple
-from scipy.sparse.linalg import spilu
 from scipy.sparse import spdiags
 import scipy.io
 import deepdish as dd
