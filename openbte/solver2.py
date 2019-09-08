@@ -485,8 +485,6 @@ class Solver(object):
         kdir = self.mat['kappa_directional'][global_index]
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
         KAPPAp[index,n] = np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
-
-
         Jp += np.outer(temp,kdir)*1e9
 
       #Ballistic component
@@ -511,12 +509,12 @@ class Solver(object):
         (Am,Ap) = self.get_boundary_matrices(global_index)
         TBp_minus += Am 
         TBp_plus  += np.einsum('es,e->es',Ap,temp)
-        TL2p += np.outer(self.mat['CollisionMatrix'][:,global_index],temp)    
+        TL2p += np.outer(self.mat['B'][:,global_index],temp)    
         Tp+= temp*self.mat['TCOEFF'][global_index]
         kdir = self.mat['kappa_directional'][global_index]
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
-        Jp += np.outer(temp,kdir)*1e9
         KAPPAp[index,n] = np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
+        Jp += np.outer(temp,kdir)*1e9
         eta_vecp[global_index] = eta 
 
     comm.Allreduce([K2p,MPI.DOUBLE],[K2,MPI.DOUBLE],op=MPI.SUM)
