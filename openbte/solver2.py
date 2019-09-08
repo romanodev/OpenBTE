@@ -292,7 +292,7 @@ class Solver(object):
         self.P = np.load(open(self.cache +'/P_' + str(irr_angle) +'.p','rb'),allow_pickle=True)
         self.A = sparse.load_npz(self.cache + '/A_' + str(irr_angle) + '.npz')
         self.HW_MINUS = sparse.load_npz(self.cache + '/HW_MINUS_' + str(irr_angle) + '.npz')
-        self.HW_MINUS = np.load(open(self.cache + '/HW_MINUS_' + str(irr_angle) + '.npz','rb'))
+        self.HW_MINUS = np.load(open(self.cache + '/HW_MINUS_' + str(irr_angle) + '.npz','rb'),allow_pickle=True)
 
      F = scipy.sparse.eye(self.n_elems,format='csc') + self.A * mfp
      lu = splu(F.tocsc())
