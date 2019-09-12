@@ -240,7 +240,7 @@ class Plot(object):
     ylabel(r'''$\alpha(\Lambda)$ [Wm$^{-1}$K$^{-1}$]''',font_properties=fonts['regular'])
 
 
-    finalize_plotting()
+    finalize_plotting(fonts)
     show()
 
    

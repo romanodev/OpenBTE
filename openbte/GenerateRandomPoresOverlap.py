@@ -14,7 +14,7 @@ from shapely.affinity import translate
 import networkx as nx
 import matplotlib.pylab as plt
 
-
+r''' (superseded by adjust)
 def frame_consolidate(argv,polys,frame_tmp):
 
   d_min =  argv['step']/2.0
@@ -30,33 +30,13 @@ def frame_consolidate(argv,polys,frame_tmp):
    dd = p.distance(thin)
    if dd < d_min:
     inflate = d_min
-    #inflate[nn] = d_min
 
-  #new_p = []
-  #for n,poly in enumerate(polys):
    poly = p.buffer(inflate, resolution=1,mitre_limit=20.0,join_style=2)
    new_p.append(poly)
 
 
-   #new_p2 = []
-   #lone pores-----
-   #for n in np.where(collision == 0)[0]:
-   # new_p2.append(new_p[n])
-
-
-   #merge pores-----
-   #n_coll = 0
-   #for n in conn.keys():
-   # n_coll +=1
-   # tmp = [new_p[n]]
-   # for p in conn[n]:
-   #  tmp.append(new_p[p])
-   # m = MultiPolygon(tmp)
-   # new_p2.append(cascaded_union(m))
-
-  #-----------------------
   return new_p
-
+'''
 
 
 def adjust_position(x,y,r,Na,Lx,Ly,d_min):
@@ -322,7 +302,7 @@ def GenerateRandomPoresOverlap(argv):
    dy = 0
 
    #move pores if they are too close to the boundaries
-   if argv.setdefault('adjust',False):
+   if argv.setdefault('adjust',True):
     p1 = copy.deepcopy(translate(p,xoff=dmin))
     b = p1.intersection(frame).area == p1.area
     if a != b:
@@ -355,6 +335,10 @@ def GenerateRandomPoresOverlap(argv):
 
 
   #Consolidate pores that are very close---
+
+  #self.frame_consolidate(argv,polys,frame_tmp):
+      
+
   if argv.setdefault('consolidate',True) :
    n_coll = 1
   else:

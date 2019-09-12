@@ -202,7 +202,8 @@ class Geometry(object):
 
    if not argv.setdefault('only_geo',False):
      #Create mesh---
-     subprocess.check_output(['gmsh','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
+     subprocess.check_output(['gmsh','-format','msh2','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
+    
      state = self.compute_mesh_data()
 
      if self.argv.setdefault('save',True):
@@ -1012,6 +1013,8 @@ class Geometry(object):
   self.elem_region_map = {}
   self.region_elem_map = {}
 
+
+  
 
 
   #import nodes------------------------

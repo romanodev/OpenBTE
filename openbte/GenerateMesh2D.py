@@ -104,13 +104,13 @@ def FindPeriodic(control,others,points,lines):
  #line1 = LineString([points[lines[control][0]],points[lines[control][1]]])  
     
  delta = 1e-3
- p1c = np.array(points[lines[control][0]])
- p2c = np.array(points[lines[control][1]])
+ p1c = np.array(points[lines[control-1][0]])
+ p2c = np.array(points[lines[control-1][1]])
  pc = (p1c + p2c)/2.0
  
  for n in range(len(others)):
-  p1o = np.array(points[lines[others[n]][0]])
-  p2o = np.array(points[lines[others[n]][1]])
+  p1o = np.array(points[lines[others[n]-1][0]])
+  p2o = np.array(points[lines[others[n]-1][1]])
   po = (p1o + p2o)/2.0   
   
   
@@ -319,8 +319,8 @@ def create_line_list(pp,points,lines,store):
 
      if tmp == 0 : #craete line
       lines.append([p1,p2])
-      store.write( 'Line('+str(len(lines)-1) +') = {' + str(p1) +','+ str(p2)+'};\n')
-      line_list.append(len(lines)-1)
+      store.write( 'Line('+str(len(lines)) +') = {' + str(p1) +','+ str(p2)+'};\n')
+      line_list.append(len(lines))
      else:
       line_list.append(tmp)
 
@@ -370,7 +370,7 @@ def mesh(polygons,frame,argv):
   store.write('h='+str(mesh_ext) + ';\n')
   points = []
   lines = []
-  loops = 0
+  loops = 1000
   ss = 0
   polypores = []
 
@@ -489,25 +489,24 @@ def mesh(polygons,frame,argv):
    
    is_on_boundary = True
    if compute_line_point_distance(pul,pur,pl) < delta:     
-     upper.append(l)
-    
+     upper.append(l+1)
      is_on_boundary = False
      
    if compute_line_point_distance(pll,plr,pl) < delta:
-     lower.append(l)
+     lower.append(l+1)
      is_on_boundary = False 
      
    if compute_line_point_distance(plr,pur,pl) < delta:
-     cold.append(l)
+     cold.append(l+1)
      is_on_boundary = False 
      
    if compute_line_point_distance(pll,pul,pl) < delta:
-     hot.append(l)
+     hot.append(l+1)
      is_on_boundary = False   
      
-   
+
    if is_on_boundary:
-    pore_wall.append(l)
+    pore_wall.append(l+1)
 
   additional_boundary = []
   if argv.setdefault('Periodic',[True,True,True])[0]:
@@ -578,7 +577,6 @@ def mesh(polygons,frame,argv):
      strc += ','
 
 
- 
   for n in range(len(hot)):
    periodic = FindPeriodic(hot[n],cold,points,lines)
    strc = 'Periodic Line{' + str(hot[n]) + '}={' + str(periodic) + '};\n'
