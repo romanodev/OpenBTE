@@ -9,10 +9,9 @@ from shapely.geometry import Point
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
 from shapely.affinity import translate
-
-
 import networkx as nx
 import matplotlib.pylab as plt
+from .special_shapes import *
 
 r''' (superseded by adjust)
 def frame_consolidate(argv,polys,frame_tmp):
@@ -182,6 +181,21 @@ def consolidate(polys,argv):
   return new_p3,n_coll
 
 
+def make_polygon(x,y,A,**options):
+
+   Na = options['Na']
+   dphi = 2.0*math.pi/Na;
+   r = math.sqrt(2.0*A/Na/math.sin(2.0 * math.pi/Na))
+   poly_clip = []
+   for ka in range(Na):
+     ph =  dphi/2 + (ka-1) * dphi
+     px  = x + r * math.cos(ph) 
+     py  = y + r * math.sin(ph) 
+     poly_clip.append([px,py])
+
+   return poly_clip  
+
+
 
 
 def GenerateRandomPoresOverlap(argv):
@@ -192,14 +206,24 @@ def GenerateRandomPoresOverlap(argv):
   #argv.setdefault('load_configuration',False)
   #argv.setdefault('save_configuration',False)
   argv.setdefault('shape','square')
-  if argv['shape'] == 'circle':
-   Na_p = [24]
 
-  if argv['shape'] == 'square':
-   Na_p = [4]
 
-  if argv['shape'] == 'triangle':
-   Na_p = [3]
+  if argv['shape'] == 'smoothed_square':
+    make_pore = get_smoothed_square  
+    options = {'smooth':argv.setdefault('smooth',3),'Na':6}
+  else:  
+    make_pore = make_polygon
+
+    if argv['shape'] == 'circle':
+        options = {'Na': 24}
+
+    if argv['shape'] == 'square':
+        options = {'Na': 4}
+
+    if argv['shape'] == 'triangle':
+        options = {'Na': 3}
+    
+
 
   Np = argv['Np']
 
@@ -265,7 +289,7 @@ def GenerateRandomPoresOverlap(argv):
   nn = 0
   confs = []
 
-  Na = Na_p[0]
+  #Na = Na_p[0]
 
   if argv.setdefault('load_configuration',False):
    centers = np.load(argv.setdefault('configuration_file','conf.dat'),allow_pickle=True)
@@ -278,7 +302,7 @@ def GenerateRandomPoresOverlap(argv):
     y = np.random.uniform(0,1)
     centers.append([x,y])
 
-  dphi = 2.0*math.pi/Na;
+  #dphi = 2.0*math.pi/Na;
   #Fill polys-----
   polys = []
 
@@ -289,13 +313,18 @@ def GenerateRandomPoresOverlap(argv):
    y = Ly*(center[1]-0.5)
    phi = np.random.uniform(phi_mean - spread, phi_mean + spread)
    area = Lx*Ly*phi/float(Np)
-   r = math.sqrt(2.0*area/Na/math.sin(2.0 * math.pi/Na))
-   poly_clip = []
-   for ka in range(Na):
-     ph =  dphi/2 + (ka-1) * dphi
-     px  = x + r * math.cos(ph) 
-     py  = y + r * math.sin(ph) 
-     poly_clip.append([px,py])
+
+
+   poly_clip = make_pore(x,y,area,**options)
+
+   #r = math.sqrt(2.0*area/Na/math.sin(2.0 * math.pi/Na))
+   #poly_clip = []
+   #for ka in range(Na):
+   #  ph =  dphi/2 + (ka-1) * dphi
+   #  px  = x + r * math.cos(ph) 
+   #  py  = y + r * math.sin(ph) 
+   #  poly_clip.append([px,py])
+
    p = Polygon(poly_clip)
    a = p.intersection(frame).area == p.area
    dx = 0
@@ -325,12 +354,14 @@ def GenerateRandomPoresOverlap(argv):
    tt.append([x,y])
 
    for kp in range(len(pbc)):
-    poly_clip = []
-    for ka in range(Na):
-     ph =  dphi/2 + (ka-1) * dphi
-     px  = x + r * math.cos(ph) + pbc[kp][0]
-     py  = y + r * math.sin(ph) + pbc[kp][1]
-     poly_clip.append([px,py])
+    poly_clip = make_pore(x + pbc[kp][0],y+pbc[kp][1],area,**options)
+
+    #poly_clip = []
+    #for ka in range(Na):
+    # ph =  dphi/2 + (ka-1) * dphi
+    # px  = x + r * math.cos(ph) + pbc[kp][0]
+    # py  = y + r * math.sin(ph) + pbc[kp][1]
+    # poly_clip.append([px,py])
     polys.append(Polygon(poly_clip))
 
 

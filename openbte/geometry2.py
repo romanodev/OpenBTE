@@ -5,6 +5,8 @@ import numpy as np
 import subprocess
 from mpi4py import MPI
 from pyvtk import *
+from pyvtk import *
+from .GenerateSquareLatticePoresSmooth import *
 from .GenerateSquareLatticePores import *
 from .GenerateHexagonalLatticePores import *
 from .GenerateStaggeredLatticePores import *
@@ -102,6 +104,7 @@ class Geometry(object):
 
     self.porous = False
     if  geo_type == 'porous/square_lattice' or\
+        geo_type == 'porous/square_lattice_smooth' or\
         geo_type == 'porous/hexagonal_lattice' or\
         geo_type == 'porous/staggered_lattice' or\
         geo_type == 'porous/random_over_grid' or\
@@ -111,6 +114,9 @@ class Geometry(object):
      self.porous = True
      if geo_type == 'porous/square_lattice':
       self.frame,self.polygons = GenerateSquareLatticePores(argv)
+     
+     if geo_type == 'porous/square_lattice_smooth':
+      self.frame,self.polygons = GenerateSquareLatticePoresSmooth(argv)
 
      if geo_type == 'porous/hexagonal_lattice':
       self.frame,self.polygons = GenerateHexagonalLatticePores(argv)
