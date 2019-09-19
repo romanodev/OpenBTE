@@ -136,9 +136,7 @@ class Elasticity(object):
     
     A = dok_matrix((3*self.mesh.n_elems,3*self.mesh.n_elems), dtype=float32)
     for e1,e2 in zip(*self.mesh.A.nonzero()):
-
      if not e1 == e2:
-
       for i,k in zip(*self.iter):
        (v_orth,dummy) = self.mesh.get_decomposed_directions(e1,e2,rot = self.C[i,:,k,:])
        A[e1*3+i,e1*3+k] += v_orth

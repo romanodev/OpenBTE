@@ -34,6 +34,7 @@ class Material(object):
    if model == 'isotropic_3D':
      data = self.compute_isotropic_3D(**argv)
 
+   data.update({'kappa_inclusion':argv.setdefault('kappa_inclusion',1e-3)})
    if argv.setdefault('save',True):
     pickle.dump(data,open(argv.setdefault('save_filename','material.p'),'wb+'))
   

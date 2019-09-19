@@ -20,9 +20,9 @@ import shapely
 def line_exists_ordered(l,lines):
  for n,line in enumerate(lines) :
   if (line[0] == l[0] and line[1] == l[1]) :
-   return n
+   return n+1
   if (line[0] == l[1] and line[1] == l[0]) :
-   return -n
+   return -(n+1)
  return 0
 
 

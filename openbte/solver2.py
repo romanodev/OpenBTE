@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 #import os
 import numpy as np
+from scipy.sparse import *
+from scipy import *
 #import scipy.sparse
 from scipy.sparse import csc_matrix
 from mpi4py import MPI
@@ -119,6 +121,11 @@ class Solver(object):
    else:  
      self.mat = pickle.load(open(argv.setdefault('matfile','material.p'),'rb'))
 
+
+   self.compute_kappa_map()
+
+
+
    self.control_angle =  self.rotate(np.array(self.mat['control_angle']),**argv)
    self.kappa_directional =  self.rotate(np.array(self.mat['kappa_directional']),**argv)
    
@@ -141,10 +148,14 @@ class Solver(object):
     self.print_dof()
 
 
-
+   self.build_kappa_mask()
    if self.verbose: self.print_bulk_kappa()
    
-   self.assemble_fourier()
+   self.assemble_fourier_new()
+
+   if self.multiscale:
+    self.assemble_modified_fourier()
+
    
    #---------------------------
   
@@ -156,10 +167,27 @@ class Solver(object):
     if os.path.isdir(self.cache):
      shutil.rmtree(self.cache)
    MPI.COMM_WORLD.Barrier() 
-   
+  
+  
+
+  def compute_kappa_map(self):
+
+   kappa_matrix = np.sum(self.mat['kappa_bulk'])
+   kappa_inclusion = self.mat['kappa_inclusion']
+
+   self.elem_kappa_map = {}
+   for elem in self.mesh.region_elem_map['Matrix']:
+      self.elem_kappa_map[elem] = kappa_matrix
+
+   if 'Inclusion' in self.mesh.region_elem_map.keys():   
+     for elem in self.mesh.region_elem_map['Inclusion']:
+      self.elem_kappa_map[elem] = kappa_inclusion
+
+
+
   def get_material_from_element(self,elem):
 
-   return self.mat_map[self.mesh.elem_region_map[elem]]
+   return self.elem_kappa_map[elem]
  
 
  
@@ -364,9 +392,10 @@ class Solver(object):
      #---------------------------
 
    #Save if only Fourier---
-   data_save = {'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad,'temp_fourier':temp_fourier,'kappa_fourier':kappa_fourier}
+   data_save = {'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad,'temperature_fourier':temp_fourier,'kappa_fourier':kappa_fourier}
    self.state = data_save
    if self.argv.setdefault('only_fourier',False):
+
     if self.save_state:
       pickle.dump(self.state,open(argv.setdefault('filename','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -402,7 +431,10 @@ class Solver(object):
            
         kappa_value = self.mat['mfp'][n] * self.mat['mfp'][n]/3.0 #The first index is MFP anyway
         G = self.mat['mfp'][n]/2.0*np.ones(self.n_side_per_elem) #we have to define this for each side
-        dummy,TDIFFp[n],TDIFFGradp[n] = self.get_diffusive_suppression_function(kappa_value,TL=TL[0],TB=TB,G = G)
+
+
+        #dummy,TDIFFp[n],TDIFFGradp[n] = self.get_diffusive_suppression_function(kappa_value,TL=TL[0],TB=TB,G = G)
+        dummy,TDIFFp[n],TDIFFGradp[n] = self.solve_modified_fourier_law(kappa_value,TL=TL[0],TB=TB,G = G)
         
       comm.Allreduce([TDIFFp,MPI.DOUBLE],[TDIFF,MPI.DOUBLE],op=MPI.SUM)
       comm.Allreduce([TDIFFGradp,MPI.DOUBLE],[TDIFFGrad,MPI.DOUBLE],op=MPI.SUM)
@@ -577,6 +609,35 @@ class Solver(object):
      print('   ---------------------------------------------------------------------------------------')
      print(' ')
     
+  def assemble_fourier_new(self):
+
+
+   if  MPI.COMM_WORLD.Get_rank() == 0:
+    F = dok_matrix((self.mesh.n_elems,self.mesh.n_elems))
+    B = np.zeros(self.mesh.n_elems)
+    for e1,e2 in zip(*self.mesh.A.nonzero()):
+     v1 = self.mesh.get_elem_volume(e1)
+     kappa = self.get_kappa(e1,e2)
+     (v_orth,dummy) = self.mesh.get_decomposed_directions(e1,e2)
+
+     if not e1 == e2:
+      F[e1,e1] += v_orth/v1*kappa
+      F[e1,e2] -= v_orth/v1*kappa
+
+     B[e1] += self.mesh.get_side_periodic_value(e2,e1)*v_orth/v1*kappa
+
+    #apply B.C.
+    for e1,e2 in zip(*self.mesh.A.nonzero()):
+     if self.argv.setdefault('topology',False): #put zero all around
+      if e1 == e2:
+        F[e1,e1] += v_orth/v1*kappa
+        B[e1] += 0# v_orth/v1*kappa
+
+    data = {'F':F.tocsc(),'B':B}
+   else: data = None
+   data = MPI.COMM_WORLD.bcast(data,root=0)
+   self.B = data['B']
+   self.F = data['F']
 
 
   def print_bulk_kappa(self):
@@ -586,12 +647,189 @@ class Solver(object):
       #print('  ')
       #for region in self.region_kappa_map.keys():
        print('Kappa bulk: ')
-       print('{:8.2f}'.format(self.mat['kappa_bulk_tot'])+ ' W/m/K')    
+       print('{:8.2f}'.format(self.mat['kappa_bulk_tot'])+ ' W/m/K')   
        print(' ')
+       if 'Inclusion' in self.mesh.region_elem_map.keys():
+        print('Kappa inclusion: ')
+        print('{:8.2f}'.format(self.mat['kappa_inclusion'])+ ' W/m/K')   
+        print(' ')
        #print(region.ljust(15) +  '{:8.2f}'.format(self.region_kappa_map[region])+ ' W/m/K')    
 
+  def get_kappa(self,i,j):
+
+   kappa_i = self.elem_kappa_map[i]
+   kappa_j = self.elem_kappa_map[j]
+   kappa = 2 * kappa_i * kappa_j/(kappa_i + kappa_j)
+ 
+   return kappa
+
+
+  def build_kappa_mask(self):
+    self.kappa_mask = []
+    for kc1,kc2 in zip(*self.mesh.A.nonzero()):
+      tt = self.mesh.get_side_periodic_value(kc2,kc1)
+      if tt == 1.0:
+       self.kappa_mask.append([kc1,kc2])
+     
 
   def assemble_fourier(self) :
+
+   if  MPI.COMM_WORLD.Get_rank() == 0:
+    row_tmp = []
+    col_tmp = []
+    data_tmp = []
+    #row_tmp_b = []
+    #col_tmp_b = []
+    #data_tmp_b = []
+    #data_tmp_b2 = []
+    B = np.zeros(self.n_elems)
+    #kappa_mask = []
+    for kc1,kc2 in zip(*self.mesh.A.nonzero()):
+     kappa = self.get_kappa(kc1,kc2)
+     #kappa = 1.0
+     (v_orth,dummy) = self.mesh.get_decomposed_directions(kc1,kc2)
+     vol1 = self.mesh.get_elem_volume(kc1)
+     row_tmp.append(kc1)
+     col_tmp.append(kc2)
+     data_tmp.append(-v_orth/vol1*kappa)
+     row_tmp.append(kc1)
+     col_tmp.append(kc1)
+     data_tmp.append(v_orth/vol1*kappa)
+     #----------------------
+     #row_tmp_b.append(kc1)
+     #col_tmp_b.append(kc2)
+     #tt = self.mesh.get_side_periodic_value(kc2,kc1)
+     #data_tmp_b.append(tt*v_orth*kappa)
+     #data_tmp_b2.append(tt)
+     #if tt == 1.0:
+     # kappa_mask.append([kc1,kc2])
+     
+     #---------------------
+     B[kc1] += self.mesh.get_side_periodic_value(kc2,kc1)*v_orth/vol1*kappa
+
+    #Boundary_elements
+    FF = np.zeros((self.n_elems,self.n_side_per_elem))
+    #boundary_mask = np.zeros(self.n_elems)
+    for side in self.mesh.side_list['Boundary']:
+     elem = self.mesh.side_elem_map[side][0]
+     side_index = np.where(np.array(self.mesh.elem_side_map[elem])==side)[0][0]
+     vol = self.mesh.get_elem_volume(elem)
+     area = self.mesh.get_side_area(side)
+     FF[elem,side_index] = area/vol
+     #boundary_mask[elem] = 1.0
+
+    F = csc_matrix((np.array(data_tmp),(np.array(row_tmp),np.array(col_tmp))), shape=(self.n_elems,self.n_elems) )
+    #RHS = csc_matrix( (np.array(data_tmp_b),(np.array(row_tmp_b),np.array(col_tmp_b))), shape=(self.n_elems,self.n_elems) )
+    #PER = csc_matrix( (np.array(data_tmp_b2),(np.array(row_tmp_b),np.array(col_tmp_b))), shape=(self.n_elems,self.n_elems) )
+
+    #-------
+    data = {'F':F,'B':B,'FF':FF}
+   else: data = None
+   data =  MPI.COMM_WORLD.bcast(data,root=0)
+   self.F = data['F']
+   #self.RHS = data['RHS']
+   #self.PER = data['PER']
+   #self.kappa_mask = data['kappa_mask']
+   self.B = data['B']
+   self.FF = data['FF']
+   #self.boundary_mask = data['boundary_mask']
+
+
+  def solve_modified_fourier_law(self,kappa,**argv):
+
+    A  = kappa * self.Fm 
+    B  = kappa * self.Bm
+    G = argv['G']   
+    TB = argv['TB']   
+    tmp = np.dot(self.FF,G) #total flux from boundaries
+    A += spdiags(tmp,0,self.n_elems,self.n_elems) 
+    B += np.einsum('ci,ci,i->c',self.FF,TB,G)
+    A +=  csc_matrix(scipy.sparse.eye(self.n_elems)) 
+    B += argv['TL']
+
+    
+    SU = splu(A)
+    C = np.zeros(self.n_elems)
+    
+    n_iter = 0
+    kappa_old = 0
+    error = 1        
+    while error > self.argv.setdefault('max_fourier_error',1e-2) and \
+                  n_iter < self.argv.setdefault('max_fourier_iter',10) :
+                    
+        RHS = B + C*kappa
+        
+        temp = SU.solve(RHS)
+        temp = temp - (max(temp)+min(temp))/2.0
+        (C,grad) = self.compute_non_orth_contribution(temp)
+        
+        kappa_eff = self.compute_diffusive_thermal_conductivity(temp)*kappa
+        error = abs((kappa_eff - kappa_old)/kappa_eff)
+        kappa_old = kappa_eff
+        n_iter +=1
+
+    s = kappa_eff
+    
+
+    return s,temp.copy(),grad
+
+
+  def get_diffusive_suppression_function(self,kappa,**argv):
+
+    A  = self.F 
+    B  = self.B
+    if 'heat_source' in self.argv.keys(): 
+
+     for elem in self.mesh.region_elem_map['Inclusion']: 
+      B[elem] += self.argv['heat_source']
+
+    #  B += argv['heat_source']
+   
+
+    #if 'TL' in argv.keys():
+    #  A +=  csc_matrix(scipy.sparse.eye(self.n_elems)) 
+    #  B += argv['TL']
+    #else:  
+    #if not 'topology' in self.argv.keys():
+
+
+    SU = splu(A)
+    C = np.zeros(self.n_elems)
+    
+    n_iter = 0
+    kappa_old = 0
+    error = 1        
+    while error > self.argv.setdefault('max_fourier_error',1e-2) and \
+                  n_iter < self.argv.setdefault('max_fourier_iter',10) :
+                    
+        RHS = B + C#*kappa
+        #if not 'TL' in argv.keys():
+        #if not 'topology' in self.argv.keys():
+        #RHS[10] = 1.0      
+
+        temp = SU.solve(RHS)
+        #temp = temp - (max(temp)+min(temp))/2.0
+
+        (C,grad) = self.compute_non_orth_contribution(temp)
+   
+        kappa_eff = self.compute_diffusive_thermal_conductivity(temp)#*kappa
+
+        if kappa_eff == 0:
+            error = 1
+        else:    
+         error = abs((kappa_eff - kappa_old)/kappa_eff)
+        kappa_old = kappa_eff
+        n_iter +=1
+
+    s = kappa_eff#/kappa
+    
+    #ind = self.mesh.B_with_area_old.dot(temp).sum()
+
+    #print(min(temp),max(temp))
+    return s,temp.copy(),grad
+
+
+  def assemble_modified_fourier(self) :
 
    if  MPI.COMM_WORLD.Get_rank() == 0:
     row_tmp = []
@@ -604,27 +842,25 @@ class Solver(object):
     B = np.zeros(self.n_elems)
     kappa_mask = []
     for kc1,kc2 in zip(*self.mesh.A.nonzero()):
-
-     kappa = 1.0
      (v_orth,dummy) = self.mesh.get_decomposed_directions(kc1,kc2)
      vol1 = self.mesh.get_elem_volume(kc1)
      row_tmp.append(kc1)
      col_tmp.append(kc2)
-     data_tmp.append(-v_orth/vol1*kappa)
+     data_tmp.append(-v_orth/vol1)
      row_tmp.append(kc1)
      col_tmp.append(kc1)
-     data_tmp.append(v_orth/vol1*kappa)
+     data_tmp.append(v_orth/vol1)
      #----------------------
      row_tmp_b.append(kc1)
      col_tmp_b.append(kc2)
      tt = self.mesh.get_side_periodic_value(kc2,kc1)
-     data_tmp_b.append(tt*v_orth*kappa)
+     data_tmp_b.append(tt*v_orth)
      data_tmp_b2.append(tt)
      if tt == 1.0:
       kappa_mask.append([kc1,kc2])
      
      #---------------------
-     B[kc1] += self.mesh.get_side_periodic_value(kc2,kc1)*v_orth/vol1*kappa
+     B[kc1] += self.mesh.get_side_periodic_value(kc2,kc1)*v_orth/vol1
 
     #Boundary_elements
     FF = np.zeros((self.n_elems,self.n_side_per_elem))
@@ -645,78 +881,12 @@ class Solver(object):
     data = {'F':F,'RHS':RHS,'B':B,'PER':PER,'boundary_mask':boundary_mask,'FF':FF,'kappa_mask':kappa_mask}
    else: data = None
    data =  MPI.COMM_WORLD.bcast(data,root=0)
-   self.F = data['F']
-   self.RHS = data['RHS']
-   self.PER = data['PER']
-   self.kappa_mask = data['kappa_mask']
-   self.B = data['B']
-   self.FF = data['FF']
-   self.boundary_mask = data['boundary_mask']
-
-    #if self.argv.setdefault('compute_vorticity',False):
-    #     grad = self.mesh.compute_grad(temp).T
-    #     Vp += opt_einsum('ijk,jc,k->ci',eijk,grad,kdir)
-
-
-    #if self.argv.setdefault('compute_vorticity',False):
-    #   J = -self.mat['kappa_bulk_tot']*flux_fourier
-    #   Jx = self.mesh.compute_grad(J.T[0]).T
-    #   Jy = self.mesh.compute_grad(J.T[1]).T
-    #   Jz = self.mesh.compute_grad(J.T[2]).T
-    #   Hessian = [Jx,Jy,Jz]
-    #   Vf = einsum('ijk,kjc->ci',eijk,Hessian)
-    #else:
-    #   Vf = np.zeros((self.n_elems,3))
-
-  def get_diffusive_suppression_function(self,kappa,**argv):
-
-
-
-    A  = kappa * self.F 
-    B  = kappa * self.B
-
-    if 'G' in argv.keys(): 
-     G = argv['G']   
-     TB = argv['TB']   
-     tmp = np.dot(self.FF,G) #total flux from boundaries
-     A += spdiags(tmp,0,self.n_elems,self.n_elems) 
-     B += np.einsum('ci,ci,i->c',self.FF,TB,G)
-    if 'heat_source' in argv.keys(): 
-      B += argv['heat_source']
-
-
-    if 'TL' in argv.keys():
-      A +=  csc_matrix(scipy.sparse.eye(self.n_elems)) 
-      B += argv['TL']
-    else:  
-      A[10,10] = 1.0  
-
-    SU = splu(A)
-    C = np.zeros(self.n_elems)
-    
-    n_iter = 0
-    kappa_old = 0
-    error = 1        
-    while error > self.argv.setdefault('max_fourier_error',1e-2) and \
-                  n_iter < self.argv.setdefault('max_fourier_iter',10) :
-                    
-        RHS = B + C*kappa
-        if not 'TL' in argv.keys():
-         RHS[10] = 0.0      
-        temp = SU.solve(RHS)
-        temp = temp - (max(temp)+min(temp))/2.0
-        (C,grad) = self.compute_non_orth_contribution(temp)
-        
-        kappa_eff = self.compute_diffusive_thermal_conductivity(temp)*kappa
-        error = abs((kappa_eff - kappa_old)/kappa_eff)
-        kappa_old = kappa_eff
-        n_iter +=1
-
-    s = kappa_eff#/kappa
-    
-    #ind = self.mesh.B_with_area_old.dot(temp).sum()
-
-    return s,temp.copy(),grad
+   self.Fm = data['F']
+   self.RHSm = data['RHS']
+   #self.PERm = data['PER']
+   self.kappa_maskm = data['kappa_mask']
+   self.Bm = data['B']
+   self.FFm = data['FF']
 
 
 
@@ -810,7 +980,7 @@ class Solver(object):
     return {'kappa_fourier':KAPPA,'temperature_fourier_gradient':FLUX,'temperature_fourier':TLtot}
  '''
       
-  def compute_non_orth_contribution(self,temp) :
+  def compute_non_orth_contribution(self,temp,kappa=-1) :
 
     gradT = self.mesh.compute_grad(temp)
     C = np.zeros(self.n_elems)
@@ -827,41 +997,48 @@ class Solver(object):
       (dumm,v_non_orth) = self.mesh.get_decomposed_directions(i,j)
 
       
-      C[i] += np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(i)#*kappa
-      C[j] -= np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(j)#*kappa
+      if kappa==-1:
+       C[i] += np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(i)#*kappa
+       C[j] -= np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(j)#*kappa
+      else: 
+       C[i] += np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(i)*self.get_kappa(i,j)
+       C[j] -= np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(j)*self.get_kappa(i,j)
 
 
     return C, gradT# [-self.elem_kappa_map[n]*tmp for n,tmp in enumerate(self.gradT)]
 
 
-  def compute_inho_diffusive_thermal_conductivity(self,temp,mat=np.eye(3)):
+  #def compute_inho_diffusive_thermal_conductivity(self,temp,mat=np.eye(3)):
 
-   kappa = 0
-   for i,j in zip(*self.PER.nonzero()):
+  # kappa = 0
+  # for i,j in zip(*self.PER.nonzero()):
 
-    #ll = self.mesh.get_side_between_two_elements(i,j)
-    #kappa_b = self.side_kappa_map[ll]
-    (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=mat)
+    #(v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=mat)
    
     
-    kappa += 0.5*v_orth *self.PER[i,j]*(temp[j]+self.PER[i,j]-temp[i])#*kappa_b
+ #   kappa += 0.5*v_orth *self.PER[i,j]*(temp[j]+self.PER[i,j]-temp[i])#*kappa_b
+#
+   #return kappa*self.kappa_factor
 
-   return kappa*self.kappa_factor
 
-
-  def compute_diffusive_thermal_conductivity(self,temp,mat=np.eye(3)):
+  def compute_diffusive_thermal_conductivity(self,temp,mat=np.eye(3),kappa = -1):
 
    
    kappa = 0
    for (i,j) in self.kappa_mask:
     (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=mat)
-    kappa += v_orth  *(temp[j]+1.0-temp[i])
+    if kappa == -1:
+     kappa += v_orth * (temp[j]+1.0-temp[i])#*self.get_kappa(i,j)
+    else: 
+     kappa += v_orth * (temp[j]+1.0-temp[i])*self.get_kappa(i,j)
+     #kappa += v_orth * (temp[j]-temp[i])*self.get_kappa(i,j)
+     #print(temp[j]-temp[i])
+      
 
    #kappa = 0
    #for i,j in zip(*self.PER.nonzero()):
    # (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=mat)
    # kappa += 0.5*v_orth *self.PER[i,j]*(temp[j]+self.PER[i,j]-temp[i])
-
    return kappa*self.kappa_factor
 
   def print_logo(self):
@@ -889,7 +1066,8 @@ class Solver(object):
      print('Momentum DOFs:   ' + str(self.mat['n_serial']*self.mat['n_parallel']))
      #print('Bulk Thermal Conductivity:   ' + str(round(self.mat['kappa_bulk_tot'],4)) +' W/m/K')
      print(' ')
-     
+   
+
     #Build data and perform superlu factorization---
     #lu_data = {'L':lu.L,'U':lu.U,'perm_c':lu.perm_c,'perm_r':lu.perm_r}
     #pickle.dump(lu_data,open(self.cache + '/lu_' + str(index*self.mat['n_mfp']+n) + '.p','wb'))
@@ -909,3 +1087,20 @@ class Solver(object):
    # self.data = pickle.load(open(self.cache + '/save_' + str(index) + '.p','rb'))
     
    #else:
+
+
+
+    #if self.argv.setdefault('compute_vorticity',False):
+    #     grad = self.mesh.compute_grad(temp).T
+    #     Vp += opt_einsum('ijk,jc,k->ci',eijk,grad,kdir)
+
+
+    #if self.argv.setdefault('compute_vorticity',False):
+    #   J = -self.mat['kappa_bulk_tot']*flux_fourier
+    #   Jx = self.mesh.compute_grad(J.T[0]).T
+    #   Jy = self.mesh.compute_grad(J.T[1]).T
+    #   Jz = self.mesh.compute_grad(J.T[2]).T
+    #   Hessian = [Jx,Jy,Jz]
+    #   Vf = einsum('ijk,kjc->ci',eijk,Hessian)
+    #else:
+    #   Vf = np.zeros((self.n_elems,3))

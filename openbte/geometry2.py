@@ -129,8 +129,9 @@ class Geometry(object):
       self.frame,self.polygons = GenerateCustomPores(argv)
 
      if geo_type == 'porous/random':
-      self.frame,self.polygons,tt = GenerateRandomPoresOverlap(argv)
+      self.frame,self.polygons,tt,mind = GenerateRandomPoresOverlap(argv)
       self.tt = tt
+      self.mind = mind
 
      if geo_type == 'porous/random_over_grid':
       x,polygons = GenerateRandomPoresGrid(**argv)
@@ -424,6 +425,7 @@ class Geometry(object):
           'grad_direction':self.direction,\
           'area_flux':self.area_flux,\
           'flux_sides':self.flux_sides,\
+          'labels':self.blabels,\
           'frame':self.frame,\
           'polygons':self.polygons,\
           'applied_grad':self.applied_grad,\
@@ -535,16 +537,22 @@ class Geometry(object):
 
  def get_decomposed_directions(self,elem_1,elem_2,rot = np.eye(3)):
 
-   if elem_1 == elem_2:
-    return 0.0,0.0
-   else:
+   #if elem_1 == elem_2:
+   # return 0.0,0.0
+   #else:
     side = self.get_side_between_two_elements(elem_1,elem_2)
     normal = self.compute_side_normal(elem_1,side)
     area = self.compute_side_area(side)
     Af = area*normal
     c1 = self.get_elem_centroid(elem_1)
-    c2 = self.get_next_elem_centroid(elem_1,side)
+
+    if elem_1 == elem_2:
+     c2 = self.get_side_centroid(side)
+    else:    
+     c2 = self.get_next_elem_centroid(elem_1,side)
+
     dist = c2 - c1
+
     v_orth = np.dot(normal,np.dot(rot,normal))/np.dot(normal,dist)
     v_non_orth = np.dot(rot,normal) - dist*v_orth
     return area*v_orth,area*v_non_orth
@@ -763,8 +771,6 @@ class Geometry(object):
  def get_side_between_two_elements(self,elem_1,elem_2):
 
    if elem_1 == elem_2: #Boundary side
-    
-
     for side in self.elem_side_map[elem_1]:
      if side in self.side_list['Boundary']:
       return side
@@ -991,6 +997,7 @@ class Geometry(object):
     self.periodic_sides = self.state['periodic_sides']
     self.CPB = self.state['CPB']
     self.B = self.state['B']
+    self.labels = self.state['labels']
     self.B_with_area = self.state['B_with_area']
     self.B_with_area_old = self.state['B_with_area_old']
     self.side_periodic_value = self.state['side_periodic_value']

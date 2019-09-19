@@ -307,7 +307,7 @@ def GenerateRandomPoresOverlap(argv):
   polys = []
 
   tt= []
-  dmin=1e-2
+  dmin=1e-1
   for center in centers:
    x = Lx*(center[0]-0.5)
    y = Ly*(center[1]-0.5)
@@ -355,13 +355,6 @@ def GenerateRandomPoresOverlap(argv):
 
    for kp in range(len(pbc)):
     poly_clip = make_pore(x + pbc[kp][0],y+pbc[kp][1],area,**options)
-
-    #poly_clip = []
-    #for ka in range(Na):
-    # ph =  dphi/2 + (ka-1) * dphi
-    # px  = x + r * math.cos(ph) + pbc[kp][0]
-    # py  = y + r * math.sin(ph) + pbc[kp][1]
-    # poly_clip.append([px,py])
     polys.append(Polygon(poly_clip))
 
 
@@ -379,6 +372,16 @@ def GenerateRandomPoresOverlap(argv):
   #------------------------------
 
 
+  #compute distance between pores---
+  mind = 1e9
+  n = len(polys)
+  for p1 in range(n):
+   for p2 in range(p1+1,n):
+     poly1 = polys[p1]
+     poly2 = polys[p2]
+     mind = min([mind,poly1.distance(poly2)])
+  #--------------------------------
+
   area = 0.0
   eps = argv['step']/2.0
   polys_cut = []
@@ -390,8 +393,9 @@ def GenerateRandomPoresOverlap(argv):
     polys_cut.append(new)
     area += p.area
 
+
   if argv.setdefault('save_configuration',False) and not argv['load_configuration']:
    np.array(centers).dump(argv.setdefault('configuration_file','conf.dat'))
 
-  return frame_tmp,polys_cut,np.array(centers)
+  return frame_tmp,polys_cut,np.array(centers),mind
 
