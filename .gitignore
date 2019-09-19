@@ -11,7 +11,7 @@ __pycache__/
 # app specific
 *.hdf5
 *.vtk
-
+*.swp
 examples/Si/tmp/
 
 # Distribution / packaging
