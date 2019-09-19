@@ -298,10 +298,7 @@ class Solver(object):
      lu = splu(F.tocsc())
      if (self.keep_lu) :self.lu[irr_angle] = lu
 
-    #boundary = np.multiply(TB,self.HW_MINUS)
     boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1)#.todense()
-    #print(type(TB))
-    #quit()
     RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]
 
     temp = lu.solve(RHS)
@@ -382,10 +379,10 @@ class Solver(object):
 
    self.temp_old = self.TL_old.copy()
    #-------------------------------
-   a = time.time() 
    while n_iter < argv.setdefault('max_bte_iter',10) and \
           error_vec[-1] > argv.setdefault('max_bte_error',1e-2):
 
+    a = time.time() 
     self.n_iter = n_iter
     #Compute diffusive approximation---------------------------          
     if self.multiscale:
@@ -437,6 +434,7 @@ class Solver(object):
       #-------------------------------------------------------   
       idx = [self.n_serial]
       if self.multiscale:
+          
        #Compute ballistic regime---
        a = time.time()
        temp_bal = self.get_bulk_data(index * self.n_serial + self.n_serial -1,TB,TL,Tnew)
@@ -459,8 +457,8 @@ class Solver(object):
       #------------------------------------------------------
 
       fourier = False
+      eta_plot = []
       for n in range(self.n_serial)[idx[0]::-1]:
-          
         global_index = index * self.n_serial + n 
         if fourier == True:
          ndifp[0] += 1   
@@ -469,11 +467,12 @@ class Solver(object):
         else:
          temp = self.get_bulk_data(global_index,TB,TL,Tnew)
        
-         #print(time.time()-a)
          eta = self.mesh.B_with_area_old.dot(temp).sum()
-         if self.multiscale:
-           if abs(eta_diff[n] - eta)/abs(eta) < 1e-2:
-            fourier = True  
+         if index == 11:
+             eta_plot.append(eta)
+         #if self.multiscale:
+         #  if abs(eta_diff[n] - eta)/abs(eta) < 1e-2:
+         #   fourier = True  
 
         #test---
         eta_vecp[global_index] = eta 
@@ -545,6 +544,12 @@ class Solver(object):
     TL = self.alpha * TL2.copy() + (1-self.alpha)*self.TL_old; 
     self.TL_old = TL.copy()
 
+    #plt.plot(self.mat['mfp'][:100],eta_diff)
+    #plt.plot(self.mat['mfp'][:100],eta_plot)
+    #plt.xscale('log')
+    #plt.show()
+    #quit()
+
 
     n_iter +=1   
    
@@ -565,6 +570,7 @@ class Solver(object):
        pickle.dump(self.state,open(argv.setdefault('filename','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
     else: data = None
     self.state =  MPI.COMM_WORLD.bcast(data,root=0)
+    #print(time.time()-a)
 
 
    if rank==0 and self.verbose:

@@ -41,6 +41,19 @@ apt-get install -y libopenmpi-dev libgmsh3
 
 pip install --upgrade openbte     
 
+Note that some users report that Gmsh does not work properly if installed via the package manager and launched in parallel. If you have trouble, install Gmsh via command line
+
+.. code-block:: shell
+
+  wget http://geuz.org/gmsh/bin/Linux/gmsh-3.0.0-Linux64.tgz
+  tar -xzf gmsh-3.0.0-Linux64.tgz
+  cp gmsh-3.0.0-Linux/bin/gmsh /usr/bin/
+  rm -rf gmsh-3.0.0-Linux
+  rm gmsh-3.0.0-Linux64.tgz
+
+
+
+
 MacOS
 ---------------------------------------------------------------
 

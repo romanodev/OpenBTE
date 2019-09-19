@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import os,sys
 import numpy as np
 import subprocess
-from mpi4py import MPI
+import mpi4py
 from pyvtk import *
 from pyvtk import *
 from .GenerateSquareLatticePoresSmooth import *
@@ -24,6 +24,8 @@ be = matplotlib.get_backend()
 if not be=='nbAgg' and not be=='module://ipykernel.pylab.backend_inline':
  if not be == 'Qt5Agg': matplotlib.use('Qt5Agg')
 
+
+
 import matplotlib.patches as patches
 from .fig_maker import *
 from matplotlib.path import Path
@@ -40,7 +42,6 @@ from scipy.sparse import csc_matrix
 from matplotlib.pylab import *
 from shapely.geometry import MultiPoint,Point,Polygon,LineString
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-
 
 
 def create_path(obj):
@@ -78,7 +79,7 @@ class Geometry(object):
   geo_type = argv.setdefault('model','porous/square_lattice')
 
   if geo_type == 'geo':
-   if MPI.COMM_WORLD.Get_rank() == 0:
+   if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
     self.dim = 3   
     self.frame=[]
     self.polygons=[]
@@ -88,7 +89,7 @@ class Geometry(object):
       pickle.dump(state,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
     return
    else: data = None
-   data = MPI.COMM_WORLD.bcast(data,root=0)
+   data = mpi4py.MPI.COMM_WORLD.bcast(data,root=0)
    self.state = data['state']
 
   if geo_type == 'load':
@@ -97,7 +98,7 @@ class Geometry(object):
     self._update_data()
 
   else:
-   if MPI.COMM_WORLD.Get_rank() == 0:
+   if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
     #porous-----
     #if geo_type == 'porous/random' or \
     polygons = []
@@ -160,11 +161,11 @@ class Geometry(object):
      state = self.mesh(**argv)
      data = {'state':state}
    else: data = None
-   data= MPI.COMM_WORLD.bcast(data,root=0)
+   data= mpi4py.MPI.COMM_WORLD.bcast(data,root=0)
    self.state = data['state']
 
-   MPI.COMM_WORLD.Barrier()
-  if argv.setdefault('save_fig',False) or argv.setdefault('show',False) or argv.setdefault('store_rgb',False) :
+   mpi4py.MPI.COMM_WORLD.Barrier()
+  if argv.setdefault('savefig',False) or argv.setdefault('show',False) or argv.setdefault('store_rgb',False) :
    self.plot_polygons(**argv)
 
 
@@ -209,7 +210,6 @@ class Geometry(object):
    if not argv.setdefault('only_geo',False):
      #Create mesh---
      subprocess.check_output(['gmsh','-format','msh2','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
-    
      state = self.compute_mesh_data()
 
      if self.argv.setdefault('save',True):
