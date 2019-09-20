@@ -627,11 +627,11 @@ class Solver(object):
      B[e1] += self.mesh.get_side_periodic_value(e2,e1)*v_orth/v1*kappa
 
     #apply B.C.
-    for e1,e2 in zip(*self.mesh.A.nonzero()):
-     if self.argv.setdefault('topology',False): #put zero all around
-      if e1 == e2:
-        F[e1,e1] += v_orth/v1*kappa
-        B[e1] += 0# v_orth/v1*kappa
+    #if self.argv.setdefault('topology',False): #put zero all around
+    # for e1,e2 in zip(*self.mesh.A.nonzero()):
+    #  if e1 == e2:
+    #    F[e1,e1] += v_orth/v1*kappa
+    #    B[e1] += 0# v_orth/v1*kappa
 
     data = {'F':F.tocsc(),'B':B}
    else: data = None
@@ -657,9 +657,12 @@ class Solver(object):
 
   def get_kappa(self,i,j):
 
+
+   side = self.mesh.get_side_between_two_elements(i,j)
+   w = self.mesh.get_interpolation_weigths(side,i)
    kappa_i = self.elem_kappa_map[i]
    kappa_j = self.elem_kappa_map[j]
-   kappa = 2 * kappa_i * kappa_j/(kappa_i + kappa_j)
+   kappa = 2 * kappa_i * kappa_j/(kappa_i*w + (1-w)*kappa_j)
  
    return kappa
 
@@ -808,7 +811,7 @@ class Solver(object):
         #RHS[10] = 1.0      
 
         temp = SU.solve(RHS)
-        #temp = temp - (max(temp)+min(temp))/2.0
+        temp = temp - (max(temp)+min(temp))/2.0
 
         (C,grad) = self.compute_non_orth_contribution(temp)
    
@@ -996,13 +999,12 @@ class Solver(object):
       #------------------------
       (dumm,v_non_orth) = self.mesh.get_decomposed_directions(i,j)
 
-      
       if kappa==-1:
-       C[i] += np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(i)#*kappa
-       C[j] -= np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(j)#*kappa
-      else: 
        C[i] += np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(i)*self.get_kappa(i,j)
        C[j] -= np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(j)*self.get_kappa(i,j)
+      else: 
+       C[i] += np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(i)#*kappa
+       C[j] -= np.dot(grad_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(j)#*kappa
 
 
     return C, gradT# [-self.elem_kappa_map[n]*tmp for n,tmp in enumerate(self.gradT)]

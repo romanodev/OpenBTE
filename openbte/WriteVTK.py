@@ -27,7 +27,7 @@ class WriteVtk(object):
 
    delta = 2e-6*np.ones(3)
 
-   add_nodes = True
+   add_nodes = False
    if add_nodes:
 
     for node in self.mesh.node_list['Interface']:
@@ -184,7 +184,6 @@ class WriteVtk(object):
      strc += ')'
     else:
      strc += ','
-
 
    data = eval(strc)
 
