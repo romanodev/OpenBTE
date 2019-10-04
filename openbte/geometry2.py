@@ -261,7 +261,7 @@ class Geometry(object):
 
  def plot_polygons(self,**argv):
 
-   if MPI.COMM_WORLD.Get_rank() == 0:
+   if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
 
     lx = abs(self.frame[0][0])*2
     ly = abs(self.frame[0][1])*2
@@ -326,7 +326,7 @@ class Geometry(object):
      data = {'rgb':rgb}
      clf()
    else: data = None
-   data =  MPI.COMM_WORLD.bcast(data,root=0)
+   data =  mpi4py.MPI.COMM_WORLD.bcast(data,root=0)
 
    if self.argv.setdefault('store_rgb',False):
     self.rgb = data['rgb']
@@ -636,7 +636,7 @@ class Geometry(object):
     #--------------------------
     self.side_list.update({'active':range(len(self.sides)-2*n)})
     self.side_list.update({'active_global':range(len(self.sides)-2*n)})
-    self.elem_list = {'active':range(len(self.elems))}
+    #self.elem_list = {'active':range(len(self.elems))}
 
     #select active sides and active nodes---
     #We substract 2*n because we don't want to include the inactive periodic sides
@@ -684,7 +684,7 @@ class Geometry(object):
        # self.A[elems[1],elems[0]] = 0
 
      self.side_list.update({'active':list(active_sides)})
-     self.elem_list = {'active':self.region_elem_map['Matrix']}
+     #self.elem_list = {'active':self.region_elem_map['Matrix']}
     #---------------------
 
     #Interfacial sides---------------------------
@@ -729,7 +729,7 @@ class Geometry(object):
 
     
     data = {'nle':len(self.l2g),'g2l':self.g2l,'l2g':self.l2g,'side_elem_map':self.side_elem_map,'elem_side_map':self.elem_side_map,\
-            'side_list':self.side_list,'elem_list':self.elem_list,'region_elem_map':self.region_elem_map,\
+            'side_list':self.side_list,'region_elem_map':self.region_elem_map,\
             'elem_region_map':self.elem_region_map,'A':self.A}
 
   else: data = None
@@ -810,7 +810,7 @@ class Geometry(object):
 
     data = {'side_list':self.side_list,\
           'node_list':self.node_list,\
-          'elem_list':self.elem_list,\
+          #'elem_list':self.elem_list,\
           'exlude':self.exlude,\
           'n_elems':self.n_elems,\
           'elem_side_map':self.elem_side_map,\
@@ -1383,7 +1383,7 @@ class Geometry(object):
 
  def _update_data(self):
     self.nodes = self.state['nodes']
-    self.elem_list = self.state['elem_list']
+    #self.elem_list = self.state['elem_list']
     self.dim = self.state['dim']
     self.n_elems = self.state['n_elems']
     self.A = self.state['A']
@@ -1687,6 +1687,12 @@ class Geometry(object):
      interface_nodes.append(node)
   self.node_list.update({'Interface':interface_nodes})
 
+  self.side_list.update({'active_global':self.side_list['active']})
+  self.adjust_boundary_elements()
+
+  self.l2g=range(len(self.elems))
+  self.g2l=range(len(self.elems))
+  self.nle = len(self.elems)
 
   #print(self.node_list['Interface'])
 
@@ -2110,8 +2116,9 @@ class Geometry(object):
      dist = self.compute_side_centroid(ll) - c1
      for i in range(self.dim):
       diff_dist[kc1][ind1][i] = dist[i]
+      
 
-     if ll in self.side_list['Interface'] or self.side_list['Boundary']:
+     if ll in self.side_list['Interface']:# or self.side_list['Boundary']:
       kc2 = elems[1]
       c2 = self.get_next_elem_centroid(kc1,ll)
       dist = self.compute_side_centroid(ll) - c2
