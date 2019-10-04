@@ -8,6 +8,7 @@ from pyvtk import *
 from pyvtk import *
 from .GenerateSquareLatticePoresSmooth import *
 from .GenerateSquareLatticePores import *
+from .ComputeStructuredMesh import *
 from .GenerateHexagonalLatticePores import *
 from .GenerateStaggeredLatticePores import *
 from .GenerateCustomPores import *
@@ -43,7 +44,6 @@ from matplotlib.pylab import *
 from shapely.geometry import MultiPoint,Point,Polygon,LineString
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
-
 def create_path(obj):
 
    codes = [Path.MOVETO]
@@ -63,6 +63,7 @@ class Geometry(object):
 
  def __init__(self,**argv):
 
+  self.structured = False
   direction = argv.setdefault('direction','x')
   if direction == 'x':
      self.direction = 0
@@ -155,9 +156,6 @@ class Geometry(object):
       self.frame.append([Lx/2,-Ly/2])
       self.frame.append([-Lx/2,-Ly/2])
 
-    #self.frame = frame
-    #self.polygons = polygons
-
     if argv.setdefault('mesh',True):
      state = self.mesh(**argv)
      data = {'state':state}
@@ -168,7 +166,6 @@ class Geometry(object):
    mpi4py.MPI.COMM_WORLD.Barrier()
   if argv.setdefault('savefig',False) or argv.setdefault('show',False) or argv.setdefault('store_rgb',False) :
    self.plot_polygons(**argv)
-
 
  def mesh(self,**argv):
 
@@ -195,8 +192,8 @@ class Geometry(object):
      GenerateBulk3D.mesh(argv)
      #-----------------------------------
 
-   else:
-     if argv['model'] == '2DInterface':
+   
+   if argv['model'] == '2DInterface':
        Generate2DInterface(argv)
        Lx = float(argv['lx'])
        Ly = float(argv['ly'])
@@ -208,13 +205,21 @@ class Geometry(object):
        self.polygons = []
 
 
+
    if not argv.setdefault('only_geo',False):
+    if argv['model'] == 'structured':
+     self.compute_structured_mesh(**argv)   
+    else:
      #Create mesh---
      subprocess.check_output(['gmsh','-format','msh2','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
-     state = self.compute_mesh_data()
+     self.import_mesh()
 
-     if self.argv.setdefault('save',True):
-       pickle.dump(state,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
+    state = self.compute_mesh_data()
+    if self.argv.setdefault('save',True):
+     pickle.dump(state,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
+
+
+
      return state
 
 
@@ -332,27 +337,98 @@ class Geometry(object):
    p = Polygon([(p1[0],p1[1]),(p2[0],p2[1]),(p[0],p[1])])
    return p.area
 
+ def point_in_elem(self,elem,p):
+
+  poly = []
+  for n in self.elems[elem]:
+   t1 = self.nodes[n][0]
+   t2 = self.nodes[n][1]
+   poly.append((t1,t2))
+  polygon = Polygon(poly)
+  if polygon.contains(Point(p[0],p[1])):
+   return True
+  else:
+   return False
+
+
+ def compute_line_data(self,p1,p2,data):
+
+    #get the first element---
+    x = [0]
+    elem = self.get_elem_from_point(p1) 
+    value = self.compute_2D_interpolation(data,p1,elem)
+    line_data = [value]
+
+    int_points = []
+    N = 100
+    delta = np.linalg.norm(p2-p1)/N
+    gamma = 1e-4
+    r_old = p1
+    for n in range(1,N+1):
+     neighbors = self.get_elem_extended_neighbors(elem)  
+     r = p1 + n*(p2-p1)/N
+     tmp = self.cross_interface(r_old,r)
+     if len(tmp) > 0:
+       #print(tmp) 
+       x.append(n*delta-np.linalg.norm(r-tmp)-gamma)
+       x.append(n*delta-np.linalg.norm(r-tmp)+gamma)
+       int_points.append(n*delta-np.linalg.norm(r-tmp))
+       versor = r - r_old;versor /= np.linalg.norm(versor)
+       elem = self.get_elem_from_point(tmp-gamma*versor,guess = neighbors) 
+       value = self.compute_2D_interpolation(data,tmp-gamma*versor,elem)
+       elem = self.get_elem_from_point(tmp+gamma*versor,guess = neighbors) 
+       value = self.compute_2D_interpolation(data,tmp+gamma*versor,elem)
+       line_data.append(value)
+       line_data.append(value)
+       neighbors = self.get_elem_extended_neighbors(elem)  
+     else:
+      elem = self.get_elem_from_point(r,guess = neighbors) 
+      #print(elem)
+      value = self.compute_2D_interpolation(data,r,elem)
+      line_data.append(value)
+      x.append(n*delta)
+     r_old = r
+
+    
+    return x,line_data,int_points 
+
+
+ def get_elem_from_point(self,r,guess = []): 
+   
+    for elem in guess:
+     if self.point_in_elem(elem,r) :
+       return elem
+   
+    for elem in range(len(self.elems)):
+     if self.point_in_elem(elem,r) :
+       #print('no guess')  
+       return elem
+
 
  def compute_2D_interpolation(self,data,p,elem):
 
-   nodes = self.elems[elem]
-   p1 = self.nodes[nodes[0]]
-   p2 = self.nodes[nodes[1]]
-   p3 = self.nodes[nodes[2]]
+    if self.point_in_elem(elem,p) :
+       
+      nodes = self.elems[elem]
+      p1 = self.nodes[nodes[0]]
+      p2 = self.nodes[nodes[1]]
+      p3 = self.nodes[nodes[2]]
 
-   v1 = data[nodes[0]]
-   v2 = data[nodes[1]]
-   v3 = data[nodes[2]]
+      v1 = data[nodes[0]]
+      v2 = data[nodes[1]]
+      v3 = data[nodes[2]]
 
-   area_1 = self.compute_triangle_area(p2,p3,p)
-   area_2 = self.compute_triangle_area(p1,p3,p)
-   area_3 = self.compute_triangle_area(p1,p2,p)
-   area = area_1 + area_2 + area_3
-   v = v1*area_1 + v2*area_2 + v3*area_3
-   v /= area
+      area_1 = self.compute_triangle_area(p2,p3,p)
+      area_2 = self.compute_triangle_area(p1,p3,p)
+      area_3 = self.compute_triangle_area(p1,p2,p)
+      area = area_1 + area_2 + area_3
+      v = v1*area_1 + v2*area_2 + v3*area_3
+      v /= area
 
-   return v
-
+      return v
+   
+    print('ERROR: no elem found')
+    quit()
 
 
 
@@ -361,19 +437,367 @@ class Geometry(object):
   for side in self.side_list['Boundary']:
    self.side_elem_map[side].append(self.side_elem_map[side][0])
 
+
+ def plot_elem(self,ne,color='gray') :
+
+     elem = self.elems[ne]
+     pp = []
+     for e in elem:
+      pp.append(self.nodes[e][:2])
+     path = create_path(pp)
+     patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=1,joinstyle='miter',alpha=0.7)
+     gca().add_patch(patch);
+     ave = np.sum(np.array(pp),axis=0)/4
+     return ave
+
+
+ def compute_structured_mesh(self,**argv):
+
+    #self.structured = True 
+    l = argv['l']
+    self.frame = [[-l/2,-l/2],[-l/2,l/2],[l/2,l/2],[l/2,-l/2]]
+    self.polygons = []
+    self.size = [l,l,0]
+
+    n = argv['n']
+
+    delta = l/n
+    #generate points---
+    self.nodes = []
+    for y in range(n+1):
+     for x in range(n+1):
+       self.nodes.append([-l/2 + delta*x,l/2 - delta*y,0])
+    self.nodes = np.array(self.nodes)   
+
+    #Build Periodic Nodes----
+    self.periodic_nodes = []
+    for x in range(n+1):
+     self.periodic_nodes.append([x,n*(n+1) + x])
+    #-----------------------
+
+    for y in range(n+1):
+     self.periodic_nodes.append([y*(n+1),y*(n+1) + n])
+    #-----------------------
+
+    #generate sides---
+    #horizontal
+    self.sides = []
+    for y in range(n):
+     for x in range(n): #the lower is periodic
+       self.sides.append([y*(n+1)+x,y*(n+1)+x+1])
+   
+    #vertical
+    for y in range(n):
+     for x in range(n): #the lower is periodic
+       self.sides.append([x*(n+1)+y,(x+1)*(n+1)+y])
+
+    #elements---
+    self.elems = []
+    for y in range(n):
+     for x in range(n):
+      self.elems.append([y*(n+1)+x,y*(n+1)+x+1,(y+1)*(n+1)+x+1,(y+1)*(n+1)+x])
+    #------------------------
+
+    #side_elem_map
+    #lower elements 
+    self.side_elem_map = {}
+    for x in range(n):
+     for y in range(n):
+       self.side_elem_map.setdefault(y*n+x,[]).append(y*n+x)
+
+    #upper elements   
+    for x in range(n):
+     for y in range(1,n):
+       self.side_elem_map.setdefault(y*n+x,[]).append((y-1)*n+x) 
+  
+    #right elements   
+    for x in range(n-1):
+     for y in range(n):
+        self.side_elem_map.setdefault(n*n + n*(x+1) + y,[]).append(y*n+x) 
+
+    #left elements   
+    for y in range(n):
+     for x in range(n):
+        self.side_elem_map.setdefault(n*n + n*x + y,[]).append(y*n+x) 
+
+    #border sides---
+    for x in range(n):
+      self.side_elem_map.setdefault(x,[]).append(n*n-n+x) 
+      #self.elem_side_map.setdefault(n*n-n+x,[]).append(x) 
+
+    for y in range(n):
+      self.side_elem_map.setdefault(n*n+y,[]).append(n*y+n-1) 
+      #self.elem_side_map.setdefault(n*y+n-1,[]).append(n*n+y) 
+
+
+    #---------------------------------------------------
+    self.elem_side_map = {}
+    for side in self.side_elem_map.keys():
+     for elem in self.side_elem_map[side]:   
+      self.elem_side_map.setdefault(elem,[]).append(side)
+
+    #------------------------------------------------------
+    self.node_side_map = {}
+    for ns,side in enumerate(self.sides):
+     for node in side:   
+      self.node_side_map.setdefault(node,[]).append(ns)
+    for node in range(len(self.nodes)):
+      self.node_side_map.setdefault(node,[])  
+    #------------------------------------------------------
+
+    
+    #-------------------
+    node_elem_map = {}
+    for node in self.node_side_map.keys():
+      for side in self.node_side_map[node]:
+        for elem in self.side_elem_map[side]:
+          node_elem_map.setdefault(node,set()).add(elem)
+
+    #------------------------------------------------
+
+    self.node_elem_map = {}
+    for node in node_elem_map.keys():
+        self.node_elem_map.update({node:list(node_elem_map[node])})  
+    self.side_node_map = self.sides
+
+    #ad-hoc hacking for connection of nodes on the periodic elements
+    self.node_elem_map[0].append(n*n-1)
+    self.node_elem_map[n].append(0)
+    self.node_elem_map[n].append(n*n-n)
+    for y in range(n-1):
+      self.node_elem_map[(y+1)*(n+1)+n].append(y*n)
+      self.node_elem_map[(y+1)*(n+1)+n].append((y+1)*n)
+    
+    self.node_elem_map[(n+1)*n].append(0)
+    self.node_elem_map[(n+1)*n].append(n-1)
+        
+    for x in range(n-1):
+      self.node_elem_map[(n+1)*n+x+1].append(x)
+      self.node_elem_map[(n+1)*n+x+1].append(x+1)
+
+    #last node
+    self.node_elem_map[(n+1)*(n+1)-1] = []
+    self.node_elem_map[(n+1)*(n+1)-1].append(0)
+    self.node_elem_map[(n+1)*(n+1)-1].append(n*n-1)
+    self.node_elem_map[(n+1)*(n+1)-1].append(n-1)
+    self.node_elem_map[(n+1)*(n+1)-1].append(n*(n-1))
+
+
+    #Periodic sides-----
+    self.side_list = {'Boundary':[],'Interface':[]}
+    p_sides = []
+    for x in range(n):
+      p_sides.append(x)   
+      p_sides.append(n*n+x)   
+    self.side_list.update({'Periodic':p_sides})
+
+    #------------------------------------------------
+    self.side_list.setdefault('Hot',[])
+    self.side_list.setdefault('Cold',[])
+    #-----------------------------------
+
+    #Interface nodes---
+    self.node_list = {}
+    tmp = set()
+    for side in self.side_list['Interface']:
+     tmp.add(self.sides[side][0])
+     tmp.add(self.sides[side][1])
+    self.node_list.update({'Interface':list(tmp)})
+
+    #region elem map
+    self.region_elem_map = {'Matrix':range(len(self.elems))}
+    self.elem_region_map = {i:'Matrix' for i in range(len(self.elems)) }
+
+
+    #create inactive sides---- (for back-compatibility)
+
+    #right sides
+    self.side_periodicity = np.zeros((len(self.sides)+n*n,2,3))
+    for x in range(n):
+      self.side_periodicity[x,1] = [0,l,0] 
+      self.side_periodicity[n*n+x,1] = [-l,0,0] 
+
+    self.pairs = []
+    self.exlude = []
+    for y in range(n): 
+      self.sides.append([y*(n+1)+n,(y+1)*(n+1)+n])
+      self.pairs.append([n*n+y,len(self.sides)-1])
+      self.side_elem_map[len(self.sides)-1]=[n*y+n-1,n*y] 
+      self.side_periodicity[len(self.sides)-1,1] = [l,0,0] 
+      self.exlude.append(len(self.sides)-1)
+
+    #lower sides
+    for x in range(n): 
+      self.sides.append([(n+1)*n+x,(n+1)*n +x +1])
+      self.pairs.append([x,len(self.sides)-1])
+      self.side_elem_map[len(self.sides)-1]=[n*n-n+x,x] 
+      self.side_periodicity[len(self.sides)-1,1] = [0,-l,0] 
+      self.exlude.append(len(self.sides)-1)
+    #--------------------------
+    self.side_list.update({'active':range(len(self.sides)-2*n)})
+    self.side_list.update({'active_global':range(len(self.sides)-2*n)})
+    self.elem_list = {'active':range(len(self.elems))}
+
+    #select active sides and active nodes---
+    #We substract 2*n because we don't want to include the inactive periodic sides
+    #create local_global_map
+    self.l2g = range(len(self.elems))
+    self.g2l = range(len(self.elems))
+
+    #---------------------
+
+   
+   #self.add_patterning(**argv)
+
+
+ def add_patterning(self,**argv):
+
+  if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
+    grid = argv['grid']
+    n = int(sqrt(len(self.nodes)))-1
+    inclusion = argv.setdefault('inclusion',False)
+
+    self.elem_region_map = {}
+    self.region_elem_map = {'Inclusion':[],'Matrix':[]}
+    for g in np.array(grid).T:
+     ne = g[1]*n + g[0]
+     self.region_elem_map['Inclusion'].append(ne)
+     self.elem_region_map[ne] = 'Inclusion'
+      
+    for elem in range(len(self.elems)):
+     if not elem in self.elem_region_map.keys():
+      self.elem_region_map[elem] = 'Matrix'
+      self.region_elem_map['Matrix'].append(elem)
+   
+    if not inclusion:
+     active_sides = set()
+     for side in self.side_list['active_global']:
+      #is_in = False
+      elems = self.side_elem_map[side]
+      for elem in elems:   
+       if self.elem_region_map[elem] == 'Matrix':  #at least one element is connected with one side
+        active_sides.add(side)
+        #is_in = True
+      #if is_in == False:
+        #delete connection on the connection matrix
+       # self.A[elems[0],elems[1]] = 0
+       # self.A[elems[1],elems[0]] = 0
+
+     self.side_list.update({'active':list(active_sides)})
+     self.elem_list = {'active':self.region_elem_map['Matrix']}
+    #---------------------
+
+    #Interfacial sides---------------------------
+    if inclusion:
+     tmp = set()
+     for g in np.array(grid).T:
+      ne = g[1]*n + g[0]
+      for side in self.elem_side_map[ne]:
+        tmp.add(side)
+     self.side_list.update({'Interface':list(tmp)})
+    else:
+     tmp = set()
+     for g in np.array(grid).T:
+      ne = g[1]*n + g[0]
+      for side in self.elem_side_map[ne]:
+        tmp.add(side)
+     self.side_list.update({'Boundary':list(tmp)})
+
+    #adjust side_elem_map to make it sure Matrix comes first
+
+    for ll in self.side_list['Boundary'] :
+      i,j  = self.side_elem_map[ll]
+      if i in self.region_elem_map['Inclusion']:
+        self.side_elem_map[ll] = [j,i]
+
+    #we need to change this--
+    #make weigths smaller
+    #--------------------------
+
+    if not inclusion:
+     self.l2g = []
+     self.g2l = np.zeros(len(self.elems),dtype=int)
+     for i in range(len(self.elems)):
+       if i in self.region_elem_map['Matrix']:
+         self.l2g.append(i)
+         self.g2l[i] = len(self.l2g)-1
+
+
+    #print(len(self.side_list['active']))
+    self.compute_connecting_matrix()
+    #print(np.shape(self.A))
+
+    
+    data = {'nle':len(self.l2g),'g2l':self.g2l,'l2g':self.l2g,'side_elem_map':self.side_elem_map,'elem_side_map':self.elem_side_map,\
+            'side_list':self.side_list,'elem_list':self.elem_list,'region_elem_map':self.region_elem_map,\
+            'elem_region_map':self.elem_region_map,'A':self.A}
+
+  else: data = None
+
+
+  self.state.update(mpi4py.MPI.COMM_WORLD.bcast(data,root=0))
+
+
+
+ def plot_structured_mesh(self,**argv):
+
+
+    ptext = argv.setdefault('text',False)
+
+    if ss:
+     axis('equal')
+     axis('off')
+     for node in self.nodes:
+       scatter(node[0],node[1],color='r')
+ 
+     for y in range(n+1):
+      for x in range(n+1):
+       if ptext:
+        text(-l/2 + delta*x,l/2 - delta*y+0.15,str(y*(n+1)+x),color='r',ha='center')
+
+
+     for n_side,side in enumerate(self.sides):
+      p0 = self.nodes[side[0]]
+      p1 = self.nodes[side[1]]
+      m = (np.array(p0) + np.array(p1))/2
+      plot([p0[0],p1[0]],[p0[1],p1[1]],color='b')
+      if ptext:
+       text(m[0],m[1],str(n_side),color='b')
+
+     for ne in range(len(self.elems)):
+      ave = self.plot_elem(ne,color='gray')
+
+      if ptext:
+       text(ave[0],ave[1],str(ne),color='black')
+     
+     #for g in np.array(grid).T:
+     # ne = g[1]*n + g[0]
+     # self.plot_elem(ne,color='green')
+
+     #s = 23
+     #for elem in self.side_elem_map[s]:    
+     # self.plot_elem(elem,color='red')
+     #p = 15
+     #for elem in self.node_elem_map[p]:    
+     # self.plot_elem(elem,color='red')
+
+     show()
+
  def compute_mesh_data(self):
 
 
-    self.import_mesh()
+    #self.import_mesh()
 
-    self.compute_elem_map()
-    self.adjust_boundary_elements()
+    #self.compute_elem_map()
+    #print(self.side_elem_map)
+    #self.adjust_boundary_elements()
+
+
     self.compute_elem_volumes()
     self.compute_side_areas()
     self.compute_side_normals()
     self.compute_elem_centroids()
     self.compute_side_centroids()
-   
     self.compute_least_square_weigths()
     self.compute_connecting_matrix()
     self.compute_connecting_matrix_new()
@@ -381,10 +805,12 @@ class Geometry(object):
     self.compute_contact_areas()
     self.compute_boundary_condition_data()
     self.n_elems = len(self.elems)
+    self.nle = len(self.l2g)
 
 
     data = {'side_list':self.side_list,\
           'node_list':self.node_list,\
+          'elem_list':self.elem_list,\
           'exlude':self.exlude,\
           'n_elems':self.n_elems,\
           'elem_side_map':self.elem_side_map,\
@@ -392,7 +818,7 @@ class Geometry(object):
           'side_elem_map':self.side_elem_map,\
           'side_node_map':self.side_node_map,\
           'node_elem_map':self.node_elem_map,\
-          'elem_map':self.elem_map,\
+          #'elem_map':self.elem_map,\
           'nodes':self.nodes,\
           'N_new':self.N_new,\
           'N':self.N,\
@@ -413,19 +839,23 @@ class Geometry(object):
           'side_areas':self.side_areas,\
           'pairs':self.pairs,\
           'B':self.B,\
+          'node_side_map':self.node_side_map,\
           'B_with_area':self.B_with_area,\
           'B_with_area_old':self.B_with_area_old,\
           'CM':self.CM,\
           'CP':self.CP,\
           'CPB':self.CPB,\
-          'periodic_sides':self.periodic_sides,\
-          'boundary_elements':self.boundary_elements,\
-          'interface_elements':self.interface_elements,\
+          #'periodic_sides':self.periodic_sides,\
+          #'boundary_elements':self.boundary_elements,\
+          #'interface_elements':self.interface_elements,\
           'side_normals':self.side_normals,\
           'grad_direction':self.direction,\
+          'l2g':self.l2g,\
+          'g2l':self.g2l,\
+          'nle':self.nle,\
           'area_flux':self.area_flux,\
           'flux_sides':self.flux_sides,\
-          'labels':self.blabels,\
+          #'labels':self.blabels,\
           'frame':self.frame,\
           'polygons':self.polygons,\
           'applied_grad':self.applied_grad,\
@@ -444,8 +874,7 @@ class Geometry(object):
 
    for ll in self.side_list['active'] :
     if not ll in self.side_list['Hot'] and\
-     not ll in self.side_list['Cold']:
-
+     not ll in self.side_list['Cold'] and not ll in self.side_list['Boundary']:
          
      elems = self.get_elems_from_side(ll)
      kc1 = elems[0]
@@ -456,7 +885,7 @@ class Geometry(object):
      row_tmp.append(kc2)
      col_tmp.append(kc1)
      data_tmp.append(1)
-   
+    
    self.A = csc_matrix( (np.array(data_tmp),(np.array(row_tmp),np.array(col_tmp))), shape=(nc,nc) ).todense()
 
  def compute_connecting_matrix_new(self):
@@ -503,13 +932,13 @@ class Geometry(object):
 
 
 
- def compute_elem_map(self):
+ #def compute_elem_map(self):
 
-  self.elem_map = {}
-  for elem1 in self.elem_side_map:
-    for side in self.elem_side_map[elem1]:
-     elem2 = self.get_neighbor_elem(elem1,side)
-     self.elem_map.setdefault(elem1,[]).append(elem2)
+ # self.elem_map = {}
+ # for elem1 in self.elem_side_map:
+ #   for side in self.elem_side_map[elem1]:
+ #    elem2 = self.get_neighbor_elem(elem1,side)
+ #    self.elem_map.setdefault(elem1,[]).append(elem2)
 
 
  def get_side_orthognal_direction(self,side):
@@ -954,6 +1383,7 @@ class Geometry(object):
 
  def _update_data(self):
     self.nodes = self.state['nodes']
+    self.elem_list = self.state['elem_list']
     self.dim = self.state['dim']
     self.n_elems = self.state['n_elems']
     self.A = self.state['A']
@@ -968,6 +1398,7 @@ class Geometry(object):
     self.elem_side_map = self.state['elem_side_map']
     self.side_node_map = self.state['side_node_map']
     self.node_elem_map = self.state['node_elem_map']
+    self.node_side_map = self.state['node_side_map']
     self.side_elem_map = self.state['side_elem_map']
     self.side_list = self.state['side_list']
     self.interp_weigths = self.state['interp_weigths']
@@ -976,8 +1407,8 @@ class Geometry(object):
     self.side_centroids = self.state['side_centroids']
     self.periodic_nodes = self.state['periodic_nodes']
     self.elem_volumes = self.state['elem_volumes']
-    self.boundary_elements = self.state['boundary_elements']
-    self.interface_elements = self.state['interface_elements']
+    #self.boundary_elements = self.state['boundary_elements']
+    #self.interface_elements = self.state['interface_elements']
     self.side_normals = self.state['side_normals']
     self.side_areas = self.state['side_areas']
     self.exlude = self.state['exlude']
@@ -986,6 +1417,9 @@ class Geometry(object):
     self.area_flux = self.state['area_flux']
     self.node_list = self.state['node_list']
     self.flux_sides = self.state['flux_sides']
+    self.l2g = self.state['l2g']
+    self.g2l = self.state['g2l']
+    self.nle = self.state['nle']
     self.frame = self.state['frame']
     self.argv = self.state['argv']
     self.polygons = self.state['polygons']
@@ -994,10 +1428,10 @@ class Geometry(object):
     self.CM = self.state['CM']
     self.applied_grad = self.state['applied_grad']
     self.CP = self.state['CP']
-    self.periodic_sides = self.state['periodic_sides']
+    #self.periodic_sides = self.state['periodic_sides']
     self.CPB = self.state['CPB']
     self.B = self.state['B']
-    self.labels = self.state['labels']
+    #self.labels = self.state['labels']
     self.B_with_area = self.state['B_with_area']
     self.B_with_area_old = self.state['B_with_area_old']
     self.side_periodic_value = self.state['side_periodic_value']
@@ -1022,6 +1456,7 @@ class Geometry(object):
    tmp = f.readline().split()
    l = tmp[2].replace('"',r'')
    self.blabels.update({int(tmp[1]):l})
+
   #------------------------------------------
   self.elem_region_map = {}
   self.region_elem_map = {}
@@ -1137,7 +1572,7 @@ class Geometry(object):
   self.side_list.setdefault('Interface',[])
   #self.node_list.setdefault('Interface',[])
   self.periodic_nodes = []
-  self.periodic_sides = {}
+  #self.periodic_sides = {}
 
   if self.argv.setdefault('delete_gmsh_files',False):
     os.remove(os.getcwd() + '/mesh.msh')
@@ -1178,10 +1613,8 @@ class Geometry(object):
       self.side_periodicity[s1][1] = pp
       self.side_periodicity[s2][1] = -pp
 
-      
-      self.periodic_sides[s1] = s2 
-      self.periodic_sides[s2] = s1
-
+      #self.periodic_sides[s1] = s2 
+      #self.periodic_sides[s2] = s1
       if np.linalg.norm(self.nodes[self.sides[s1][0]] - self.nodes[self.sides[s2][0]]) == np.linalg.norm(pp):
        self.periodic_nodes.append([self.sides[s1][0],self.sides[s2][0]])
        self.periodic_nodes.append([self.sides[s1][1],self.sides[s2][1]])
@@ -1232,23 +1665,23 @@ class Geometry(object):
 
   #Create boundary_elements--------------------
 
-  self.boundary_elements = []
-  self.interface_elements = []
+  #self.boundary_elements = []
+  #self.interface_elements = []
 
   self.node_list = {}
   boundary_nodes = []
   for ll in self.side_list['Boundary']:
-   self.boundary_elements.append(self.side_elem_map[ll][0])
+   #self.boundary_elements.append(self.side_elem_map[ll][0])
    for node in self.sides[ll]:
     if not node in boundary_nodes:
      boundary_nodes.append(node)
   self.node_list.update({'Boundary':boundary_nodes})
 
   interface_nodes = []
-  self.interface_elements = []
+  #self.interface_elements = []
   for ll in self.side_list['Interface']:
-   self.interface_elements.append(self.side_elem_map[ll][0])
-   self.interface_elements.append(self.side_elem_map[ll][1])
+   #self.interface_elements.append(self.side_elem_map[ll][0])
+   #self.interface_elements.append(self.side_elem_map[ll][1])
    for node in self.sides[ll]:
     if not node in interface_nodes:
      interface_nodes.append(node)
@@ -1455,6 +1888,7 @@ class Geometry(object):
 
   if self.dim == 2: #Assuming Tetraedron
 
+    
    points = self.nodes[self.elems[kc1]]
    x = []; y= []
    for p in points:
@@ -1607,7 +2041,6 @@ class Geometry(object):
 
     tmp = self.side_list.setdefault('Periodic',[]) + self.exlude
 
-
     for kl,ll in enumerate(tmp) :
      normal = self.compute_side_normal(self.side_elem_map[ll][0],ll)
      tmp = np.dot(normal,flux_dir)
@@ -1627,9 +2060,6 @@ class Geometry(object):
     B_with_area = sparse.DOK((n_el,n_el,3),dtype=float32)
 
     B_with_area_old = sparse.DOK((n_el,n_el),dtype=float32)
-    #ll = self.get_side_between_two_elements(elem,elem_p)
-    #ind = self.side_elem_map[ll].index(elem)
-    #return self.side_periodic_value[ll][ind]
 
      
     if len(self.side_list.setdefault('Periodic',[])) > 0:
@@ -1638,18 +2068,14 @@ class Geometry(object):
       side_periodic_value[side[0]][1] = side_value[side[1]]
 
       elem1,elem2 = self.side_elem_map[side[0]]
-      B[elem1,elem2] = side_value[side[0]]#*self.get_elem_volume(elem1)
-      B[elem2,elem1] = side_value[side[1]]#*self.get_elem_volume(elem2)
+      B[elem1,elem2] = side_value[side[0]]
+      B[elem2,elem1] = side_value[side[1]]
 
-      #B_with_area[elem1,elem2] = side_value[side[0]]*self.get_side_area(side[0])*self.get_side_normal(0,side[0])   #*self.get_elem_volume(elem1)
 
       if np.linalg.norm(np.cross(self.get_side_normal(1,side[0]),self.applied_grad)) < 1e-5:
        B_with_area[elem1,elem2] = abs(side_value[side[0]]*self.get_side_area(side[0]))*self.get_side_normal(0,side[0])
        B_with_area_old[elem1,elem2] = abs(side_value[side[0]]*self.get_side_area(side[0]))
       
-      #*self.get_elem_volume(elem1)
-      #B_with_area[elem2,elem1] = side_value[side[1]]*self.get_side_area(side[0])*self.get_side_normal(1,side[0])   #*self.get_elem_volume(elem2)
-
     self.area_flux = abs(np.dot(flux_dir,self.c_areas))
     self.flux_sides = flux_sides
     self.side_periodic_value = side_periodic_value
@@ -1661,21 +2087,16 @@ class Geometry(object):
 
  def compute_least_square_weigths(self):
 
-   n_el = len(self.elems)
-
    nd = len(self.elems[0])
-   diff_dist = np.zeros((n_el,nd,self.dim))
+   diff_dist = np.zeros((len(self.elems),nd,self.dim))
 
 
-   for ll in self.side_list['active'] :
-
+   for ll in self.side_list['active_global'] :
     elems = self.side_elem_map[ll]
     kc1 = elems[0]
     c1 = self.compute_elem_centroid(kc1)
     ind1 = self.elem_side_map[kc1].index(ll)
-
-    if not ll in (self.side_list['Boundary'] + self.side_list['Hot'] + self.side_list['Cold']):
-
+    if not ll in (self.side_list['Boundary'] + self.side_list['Hot'] + self.side_list['Cold'] + self.side_list['Interface']):
      #Diff in the distance
      kc2 = elems[1]
      c2 = self.get_next_elem_centroid(kc1,ll)
@@ -1690,13 +2111,63 @@ class Geometry(object):
      for i in range(self.dim):
       diff_dist[kc1][ind1][i] = dist[i]
 
+     if ll in self.side_list['Interface'] or self.side_list['Boundary']:
+      kc2 = elems[1]
+      c2 = self.get_next_elem_centroid(kc1,ll)
+      dist = self.compute_side_centroid(ll) - c2
+      ind2 = self.elem_side_map[kc2].index(ll)
+      for i in range(self.dim):
+        diff_dist[kc2][ind2][i] = dist[i]
+
+
+
    #Compute weights
    self.weigths = []
    for tmp in diff_dist :
     self.weigths.append(np.dot(np.linalg.inv(np.dot(np.transpose(tmp),tmp)),np.transpose(tmp)  ))
 
 
+ def compute_interfacial_node_temperature(self,temp,kappa):
+     
+     int_temp_matrix = {}
+     int_temp_inclusion = {}
+     for ll in self.side_list['Interface'] :
 
+       (i,j) = self.side_elem_map[ll]
+       w = self.get_interpolation_weigths(ll,i)
+       Ti = temp[i]
+       Tj = temp[j]
+       ki = kappa[i]
+       kj = kappa[j]
+       Tb = (kj*w*Tj + ki*(1-w)*Ti)/(kj*w + ki*(1-w))
+
+       (n1,n2) = self.side_node_map[ll]
+
+       int_temp_matrix[n1] = int_temp_matrix.setdefault(n1,0) + Tb/2
+       int_temp_matrix[n2] = int_temp_matrix.setdefault(n2,0) + Tb/2
+
+       int_temp_inclusion[n1] = int_temp_inclusion.setdefault(n1,0) + Tb/2
+       int_temp_inclusion[n2] = int_temp_inclusion.setdefault(n2,0) + Tb/2
+
+     return {'inclusion':int_temp_inclusion,'matrix':int_temp_matrix}
+
+ def compute_interfacial_temperature_side(self,temp,kappa):
+     
+     int_temp = {}
+     
+     for ll in self.side_list['Interface'] :
+
+       (i,j) = self.side_elem_map[ll]
+       w = self.get_interpolation_weigths(ll,i)
+       Ti = temp[i]
+       Tj = temp[j]
+       ki = kappa[i]
+       kj = kappa[j]
+       Tb = (kj*w*Tj + ki*(1-w)*Ti)/(kj*w + ki*(1-w))
+
+       int_temp[ll] = Tb
+
+     return int_temp
 
 
  def compute_divergence(self,data,add_jump=True,verbose=0) :
@@ -1708,35 +2179,34 @@ class Geometry(object):
   return div
 
 
- def compute_grad(self,temp,lattice_temp =[],add_jump=True,verbose=0,pbcs=None) :
+ def compute_grad(self,temp,lattice_temp =[],add_jump=True,verbose=0,pbcs=None,interfacial_temperature = None) :
 
    if len(lattice_temp) == 0: lattice_temp = temp
 
-   n_el = len(self.elems)
    nd = len(self.elems[0])
 
    if self.dim == 2:
-    diff_temp = np.zeros((n_el,nd))
+    diff_temp = np.zeros((self.nle,nd))
    else:
-    diff_temp = np.zeros((n_el,4))
+    diff_temp = np.zeros((self.nle,4))
 
-   gradT = np.zeros((n_el,3))
+   gradT = np.zeros((self.nle,3))
 
    #Diff in the temp
    for ll in self.side_list['active'] :
+   #for ll in range(len(self.sides))  :
 
     elems = self.side_elem_map[ll]
     kc1 = elems[0]
     c1 = self.get_elem_centroid(kc1)
     ind1 = self.elem_side_map[kc1].index(ll)
 
-    if not ll in (self.side_list['Boundary'] + self.side_list['Hot'] + self.side_list['Cold']) :
-
+    if not ll in (self.side_list['Boundary'] + self.side_list['Hot'] + self.side_list['Cold'] + self.side_list['Interface']) :
      kc2 = elems[1]
      ind2 = self.elem_side_map[kc2].index(ll)
 
-     temp_1 = temp[kc1]
-     temp_2 = temp[kc2]
+     temp_1 = temp[self.g2l[kc1]]
+     temp_2 = temp[self.g2l[kc2]]
      if add_jump: 
        temp_2 += self.get_side_periodic_value(kc2,kc1) 
      else:
@@ -1744,8 +2214,8 @@ class Geometry(object):
 
      diff_t = temp_2 - temp_1
 
-     diff_temp[kc1][ind1]  = diff_t
-     diff_temp[kc2][ind2]  = -diff_t
+     diff_temp[self.g2l[kc1]][ind1]  = diff_t
+     diff_temp[self.g2l[kc2]][ind2]  = -diff_t
     else :
      if ll in self.side_list['Hot'] :
       diff_temp[kc1][ind1]  = 0.5-temp[kc1]
@@ -1754,11 +2224,24 @@ class Geometry(object):
       diff_temp[kc1][ind1]  = -0.5-temp[kc1]
 
      if ll in self.side_list['Boundary'] : 
-      diff_temp[kc1][ind1]  = lattice_temp[kc1]-temp[kc1]
+      diff_temp[self.g2l[kc1]][ind1]  = lattice_temp[self.g2l[kc1]]-temp[self.g2l[kc1]]
 
-   for k in range(n_el) :
+     if ll in self.side_list['Interface'] : 
+      kc2 = elems[1]
+      ind2 = self.elem_side_map[kc2].index(ll)
+      if interfacial_temperature == None:
+       Tb1 = temp[kc1]
+       Tb2 = temp[kc2]
+      else:    
+       Tb1 = interfacial_temperature[ll][0]
+       Tb2 = interfacial_temperature[ll][1]
+
+      diff_temp[self.g2l[kc1]][ind1]  = Tb1 - temp[self.g2l[kc1]]
+      diff_temp[self.g2l[kc2]][ind2]  = Tb2 - temp[self.g2l[kc2]]
+
+   for k in range(self.nle) :
        
-    tmp = np.dot(self.weigths[k],diff_temp[k])
+    tmp = np.dot(self.weigths[self.l2g[k]],diff_temp[k])
     gradT[k][0] = tmp[0] #THESE HAS TO BE POSITIVE
     gradT[k][1] = tmp[1]
     if self.dim == 3:

@@ -9,8 +9,6 @@ class WriteVtk(object):
 
   self.argv = argv
   self.mesh = argv['Geometry']
-  self.matrix_inclusion_map = argv.setdefault('matrix_inclusion_map',None)
-  #-----------------------------
   self.solver = argv['Solver']
  
   self.Nx = argv.setdefault('repeat_x',1)
@@ -25,50 +23,43 @@ class WriteVtk(object):
   self.data.append(variable)
   self.label.append(argv['label'])
 
+ def cell_to_node(self,data):
 
-
- def cell_to_node(self,**argv):
-
-   data = argv['variable']
    delta = 2e-6*np.ones(3)
 
-   if argv.setdefault('add_interfacial_nodes',False):
-    data_int = argv['data_int']
+   add_nodes = True
+
+   if add_nodes:
 
     #-------------------------------
-    data_int_inclusion = {}
-    data_int_matrix = {}
-    #matrix_inclusion_map = {}
+    matrix_inclusion_map = {}
     for node in self.mesh.node_list['Interface']:
 
-     #self.mesh.nodes = np.append(self.mesh.nodes,[self.mesh.nodes[node]],axis=0)
-     for ll in self.mesh.node_side_map[node]:
-       if ll in self.mesh.side_list['Interface']: 
-         (i,j) = self.mesh.side_elem_map[ll]
-         if self.mesh.elem_region_map[i] == 'Matrix':
-            im = 0 
-            ii = 1
-         else  :
-            im = 1 
-            ii = 0
+     self.mesh.nodes = np.append(self.mesh.nodes,[self.mesh.nodes[node]],axis=0)
 
-         if node in data_int_matrix.keys():
-          data_int_matrix[node] += data_int[ll][im]/2
-         else: 
-          data_int_matrix[node] = data_int[ll][im]/2
+     matrix_inclusion_map[node] = len(self.mesh.nodes)-1
 
-         node2 = self.matrix_inclusion_map[node]
-         if node2 in data_int_inclusion.keys():
-          data_int_inclusion[node2] += data_int[ll][ii]/2
-         else: 
-          data_int_inclusion[node2] = data_int[ll][ii]/2
 
-    data_int_node = {'matrix':data_int_matrix,'inclusion':data_int_inclusion}
+     node_elem_map_1 = []
+     node_elem_map_2 = []
+
+     for elem in self.mesh.node_elem_map[node]:
+      if self.mesh.get_region_from_elem(elem) == 'Matrix':
+        node_elem_map_1.append(elem)
+      else:
+        node_elem_map_2.append(elem)
+        index = self.mesh.elems[elem].index(node)
+        self.mesh.elems[elem][index]= len(self.mesh.nodes)-1
+
+     self.mesh.node_elem_map[node] = node_elem_map_1
+     self.mesh.node_elem_map.update({len(self.mesh.nodes)-1:node_elem_map_2})
 
    #add new
    n_nodes = len(self.mesh.nodes)
     #-----------------------
+
    n_col = len(np.shape(data))
+
    if n_col == 3:
     node_data = np.zeros((n_nodes,3,3))
    else:
@@ -80,36 +71,24 @@ class WriteVtk(object):
     for elem in self.mesh.node_elem_map[n]:
      node_data[n] += data[elem]
      conn[n] +=1
-     C = self.mesh.compute_elem_centroid(elem)
-
-     if len(self.mesh.elems[0])==4 and n_col == 1:
-      if C[self.mesh.direction] - self.mesh.nodes[n][self.mesh.direction] > self.mesh.size[self.mesh.direction]/2:
-        node_data[n] +=1
-     
-      if C[self.mesh.direction] - self.mesh.nodes[n][self.mesh.direction] < -self.mesh.size[self.mesh.direction]/2:
-        node_data[n] -=1
 
    for n in range(n_nodes):
     node_data[n] /= conn[n]
-    
 
-   if argv.setdefault('add_interfacial_nodes',False):
+   if add_nodes:
 
+    #add interfacial data--------------------------------------------------------------
+    (int_temp_matrix,inte_temp_inclusion) = self.mesh.compute_interfacial_node_temperature(data,self.solver['kappa_map'])
     for node in self.mesh.node_list['Interface']:
-     node_data[node] = data_int_node['matrix'][node]
-     node_data[self.matrix_inclusion_map[node]] =  data_int_node['inclusion'][self.matrix_inclusion_map[node]]
-
+     node_data[node] = int_temp_matrix[node]
+     node_data[matrix_inclusion_map[node]] = int_temp_inclusion[node]
     #-----------------------------------------------------------------------------------
+
+
 
    return node_data
 
  def repeat_nodes_and_data(self,data_uc,increment):
-
-   #periodic_nodes = set()
-   #for side in self.mesh.side_list['Periodic']:
-   # periodic_nodes.add(self.mesh.sides[side][0])
-   # periodic_nodes.add(self.mesh.sides[side][1])
-   #periodic_nodes = list(periodic_nodes)
 
    periodic_nodes = np.array(self.mesh.periodic_nodes)
    periodic_1 = [i[0] for i in periodic_nodes]
@@ -158,27 +137,26 @@ class WriteVtk(object):
        cells.append(tmp)
 
 
+
    return np.array(nodes),np.array(cells),np.array(data)
 
- def get_node_data(self,**argv):
+ def get_node_data(self,variable):
 
-    variable = argv['variable'] 
      
-    node_data = self.cell_to_node(**argv)
-
+    node_data = self.cell_to_node(variable)
     is_scalar = len(list(np.shape(variable))) == 1
     increment = [0,0,0]
     tmp = [[1,0,0],[0,1,0],[0,0,1]]
     if is_scalar:
      increment = tmp[self.mesh.direction]
-
-
     nodes,cells,data = self.repeat_nodes_and_data(node_data,increment)
 
     #return Triangulation(np.array(self.mesh.nodes)[:,0],np.array(self.nodes)[:,1], triangles=self.mesh.elems, mask=None),node_data,self.mesh.nodes
 
 
+
     return Triangulation(nodes[:,0],nodes[:,1], triangles=cells, mask=None),data,nodes
+
 
 
  def write_vtk(self):
@@ -189,21 +167,16 @@ class WriteVtk(object):
 
    output = []
    strc = 'PointData('
-   for n,name in enumerate(self.data) :
-    variable = self.solver[name]
+   for n,variable in enumerate(self.data) :
+
     is_scalar = len(list(np.shape(variable))) == 1
     is_vector = len(list(np.shape(variable))) == 2
     is_tensor = len(list(np.shape(variable))) == 3
 
-    if name+ '_int' in self.solver.keys():
-     data_int = self.solver[name+ '_int']
-     self.argv.update({'data_int':data_int})
 
-
-    self.argv.update({'variable':self.solver[name]})
-    node_data = self.cell_to_node(**self.argv)
+    node_data = self.cell_to_node(variable)
+    #print(np.shape(node_data))
     #stored_data.update({self.label[n]:{variable:node_data[:,0],'label':self.label[n]}})
-
 
     #Get increment for plotting-------------
     increment = [0,0,0]
@@ -211,14 +184,10 @@ class WriteVtk(object):
     if is_scalar:
      increment = tmp[self.mesh.direction]
 
-
     #---------------------------------------
     ss = '''self.repeat_nodes_and_data(node_data,increment)'''
     nodes,cells,tmp = eval(ss)
-
     output.append(tmp)
-
-
     if is_scalar:
       strc += r'''Scalars(output[''' + str(n) + r'''],name =' ''' + self.label[n] +  r''' ')'''
     if is_vector:
@@ -231,9 +200,7 @@ class WriteVtk(object):
     else:
      strc += ','
 
-  
    data = eval(strc)
-
 
    if self.mesh.dim == 3:
     vtk = VtkData(UnstructuredGrid(nodes,tetra=cells),data)

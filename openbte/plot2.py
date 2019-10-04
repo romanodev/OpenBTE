@@ -25,7 +25,7 @@ from scipy import interpolate
 import os.path
 from matplotlib.widgets import Slider, Button, RadioButtons
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-
+from  matplotlib import cm
 
 def get_suppression(mfps,sup,mfp):
 
@@ -82,6 +82,8 @@ class Plot(object):
      self.geo = Geometry(model='load',filename = argv.setdefault('filename_geometry','geometry.p'))
    else:
      self.geo = argv['geometry']
+
+
     
    #load material---
    if not ('material' in argv.keys()):
@@ -103,9 +105,20 @@ class Plot(object):
     model= argv['variable'].split('/')[0]
 
     if model == 'map':
+     argv['variable'] = argv['variable'].split('/')[1]
+     #Add interfacial_nodes
+     if argv.setdefault('add_interfacial_nodes',False):
+      self.add_interfacial_nodes()
+      argv.update({'matrix_inclusion_map':self.matrix_inclusion_map})
      self.plot_map(argv)
 
+    if model == 'map_cell':
+     argv['variable'] = argv['variable'].split('/')[1]
+     self.plot_map_cell(argv)
+
+
     if model == 'line':
+     argv['variable'] = argv['variable'].split('/')[1]
      self.plot_over_line(argv)
 
    if argv['variable'] == 'suppression_function' :
@@ -119,35 +132,65 @@ class Plot(object):
     self.compute_distribution(argv)
 
    if argv['variable'] == 'vtk' :
+    #Add interfacial_nodes
+    if argv.setdefault('add_interfacial_nodes',False):
+      self.add_interfacial_nodes()
+      argv.update({'matrix_inclusion_map':self.matrix_inclusion_map})
     self.save_vtk(argv)
+
+ def add_interfacial_nodes(self):
+ 
+    self.matrix_inclusion_map = {}
+    for node in self.geo.node_list['Interface']:
+     self.geo.nodes = np.append(self.geo.nodes,[self.geo.nodes[node]],axis=0)
+
+     node2 = len(self.geo.nodes)-1
+     self.matrix_inclusion_map[node] = node2
+     node_elem_map_1 = []
+     node_elem_map_2 = []
+     for elem in self.geo.node_elem_map[node]:
+      if self.geo.get_region_from_elem(elem) == 'Matrix':
+        node_elem_map_1.append(elem)
+      else:
+        node_elem_map_2.append(elem)
+        index = self.geo.elems[elem].index(node)
+        self.geo.elems[elem][index]= len(self.geo.nodes)-1
+
+     self.geo.node_elem_map[node] = node_elem_map_1
+     self.geo.node_elem_map.update({len(self.geo.nodes)-1:node_elem_map_2})
+
+
 
  def save_vtk(self,argv):
    #Write data-------
+   if 'data' in argv.keys():
+       seld.solver.update({'data':data})
 
    argv.update({'Geometry':self.geo})
+   argv.update({'Solver':self.solver})
    vw = WriteVtk(**argv)
 
    if 'data' in argv.keys():
-    vw.add_variable(argv['data'],label = argv.setdefault('label','a.u.'))
+    vw.add_variable('data',label = argv.setdefault('label','a.u.'))
    else:
     solver = self.solver
 
     if 'temperature' in solver.keys():
-     vw.add_variable(solver['temperature'],label = r'''BTE Temperature [K]''')
+     vw.add_variable('temperature',label = r'''BTE Temperature [K]''')
 
 
     if 'pseudogradient' in solver.keys():
-     vw.add_variable(solver['pseudogradient'],label = r'''Pseudo gradient Temperature [K/nm]''')
+     vw.add_variable('pseudogradient',label = r'''Pseudo gradient Temperature [K/nm]''')
 
 
     if 'flux' in solver.keys():
-     vw.add_variable(solver['flux'],label = r'''BTE Thermal Flux [W/m/m]''')
+     vw.add_variable('flux',label = r'''BTE Thermal Flux [W/m/m]''')
      #vw.add_variable(solver['vorticity'],label = r'''BTE Vorticity [W/m/m/m]''')
      #vw.add_variable(solver['vorticity_fourier'],label = r'''Fourier Vorticity [W/m/m/m]''')
 
-    vw.add_variable(solver['temp_fourier'],label = r'''Fourier Temperature [K]''')
+    vw.add_variable('temperature_fourier',label = r'''Fourier Temperature [K]''')
 
-    vw.add_variable(solver['flux_fourier'],label = r'''Fourier Thermal Flux [W/m/m]''')
+    vw.add_variable('flux_fourier',label = r'''Fourier Thermal Flux [W/m/m]''')
 
    vw.write_vtk()
 
@@ -256,84 +299,19 @@ class Plot(object):
    #--------
    p1 = np.array([-Lx/2.0+1e-7,0.0])
    p2 = np.array([Lx/2.0*(1-1e-7),0.0])
-   (x,data,int_points) = self.compute_line_data(p1,p2,data)
+   (x,data,int_points) = self.geo.compute_line_data(p1,p2,data)
    #--------
-   axes([0.5,0.01,0.5,1.0])
+   #axes([0.5,0.01,0.5,1.0])
    plot(x,data,linewidth=2)
 
    for p in int_points:
     plot([p,p],[min(data),max(data)],ls='--',color='k')
    plot([min(x),max(x)],[0,0],ls='--',color='k')
    gca().yaxis.tick_right()
+   show()
 
 
- def point_in_elem(self,elem,p):
-  poly = []
-  for n in self.geo.elems[elem]:
-   t1 = self.geo.nodes[n][0]
-   t2 = self.geo.nodes[n][1]
-   poly.append((t1,t2))
-  polygon = Polygon(poly)
-  if polygon.contains(Point(p[0],p[1])):
-   return True
-  else:
-   return False
-
- def compute_line_data(self,p1,p2,original):
-
-  N = 1000
-  tt = []
-  delta = np.linalg.norm(p2-p1)/N
-  neighbors = range(len(self.geo.elems))
-  h1 = 0
-  h2 = 0
-  gamma = 1e-4
-  data = []
-  x = []
-  int_points = []
-  for n in range(N+1):
-   r = p1 + n*delta*(p2-p1)
-   #Here we include extra points close to the interfaces-------
-   if n > 0:
-    tmp = self.geo.cross_interface(p1 + (n-1)*delta*(p2-p1),r)
-    versor = r - p1 + (n-1)*delta*(p2-p1)
-    versor /= np.linalg.norm(versor)
-    if len(tmp) > 0:
-     pp = [tmp-gamma*versor,tmp + gamma*versor,r]
-     x.append(n*delta-np.linalg.norm(r-tmp)-gamma)
-     x.append(n*delta-np.linalg.norm(r-tmp)+gamma)
-     x.append(n*delta)
-     int_points.append(n*delta-np.linalg.norm(r-tmp)-gamma)
-    else:
-     pp = [r]
-     x.append(n*delta)
-   else:
-    pp = [r]
-    x.append(n*delta)
-   #----------------------------------------------------------
-   for p in pp:
-    is_in = False
-    for elem in neighbors:
-     if self.point_in_elem(elem,p) :
-      is_in = True
-      value = self.geo.compute_2D_interpolation(original,p,elem)
-      data.append(value)
-      neighbors = self.geo.get_elem_extended_neighbors(elem)
-      break
-    if not is_in:
-     for elem in range(len(self.geo.elems)):
-      if self.point_in_elem(elem,p) :
-       neighbors = self.geo.get_elem_extended_neighbors(elem)
-       value = self.geo.compute_2D_interpolation(original,p,elem)
-       data.append(value)
-       break
-
-  return x,data,int_points
-
-
-
-
- def get_data(self,argv):
+ def get_data(self,**argv):
 
   size = self.geo.size
   Nx = argv.setdefault('repeat_x',1)
@@ -341,11 +319,14 @@ class Plot(object):
   Nz = argv.setdefault('repeat_z',1)
   Lx = size[0]*self.Nx
   Ly = size[1]*self.Ny
-  variable = argv['variable'].split('/')[1]
+  #variable = argv['variable'].split('/')[1]
+  variable = argv['variable']
   argv.update({'Geometry':self.geo})
+  argv.update({'Solver':self.solver})
 
   vw = WriteVtk(**argv)
 
+  data_int = None
   if 'index' in argv.keys():
     ii = int(argv['index'])
     if variable == 'temperature':
@@ -360,7 +341,12 @@ class Plot(object):
      #solver = dd.io.load('solver.hdf5')
      data = self.solver[variable]
 
-  (triangulation,tmp,nodes) = vw.get_node_data(data)
+  if 'Interface' in self.geo.side_list.keys():
+    data_int =  self.solver[variable + '_int'] 
+    argv.update({'data_int':data_int})
+
+  argv.update({'variable':data})
+  (triangulation,tmp,nodes) = vw.get_node_data(**argv)
 
   argv.setdefault('direction',None)  
   if argv['direction'] == 'x':
@@ -416,7 +402,7 @@ class Plot(object):
 
     self.ax = axes([delta,delta*Sx/(Sy+Sx*delta),1.0,1.0])
     argv['variable'] = 'variable/' + label
-    (data,nodes,triangulation) =  self.get_data(argv)
+    (data,nodes,triangulation) =  self.get_data(**argv)
     vmin = argv.setdefault('vmin',min(data))
     vmax = argv.setdefault('vmax',max(data))
     self.ax.tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),zorder=1)
@@ -512,6 +498,68 @@ class Plot(object):
          return
 
 
+ def plot_map_cell(self,argv):
+
+   (Lx,Ly) = self.geo.get_repeated_size(argv)
+
+   Sx = argv.setdefault('fig_size',5)
+   Sy = Sx*Ly/Lx
+
+   fig = plt.figure(num=' ', figsize=(Sx,Sy), dpi=80, facecolor='w', edgecolor='k')
+   ax = plt.axes([0,0,1.0,1.0])
+
+   tmp = self.solver[argv['variable']]
+
+
+   argv.setdefault('direction',None)  
+   if argv['direction'] == 'x':
+     data = np.array(tmp).T[0]
+   elif argv['direction'] == 'y':
+     data = np.array(tmp).T[1]
+   elif argv['direction'] == 'z':
+     data = np.array(tmp).T[2]
+   elif argv['direction'] == 'magnitude':
+      data = []
+      for d in tmp:
+       data.append(np.linalg.norm(d))
+      data = np.array(data)
+   else:
+    data = tmp
+
+   minv = min(data)
+   maxv = max(data)
+   viridis = cm.get_cmap('jet')
+
+   #if len(self.geo.elems[0]) == 12:
+   # N = int(np.sqrt(len(data)))
+   # a = data.reshape(N,N)
+   # ax.imshow(a, interpolation='bilinear', cmap=viridis)
+   # plt.xlim([0,N])
+   # plt.ylim([0,N])
+   #else:
+
+   #if argv.setdefault('plot_interfaces',False):
+   #  pp = self.geo.get_interface_point_couples(argv)
+
+   for n in range(self.geo.nle):
+     
+       color = viridis((data[n] - minv)/(maxv-minv))
+       pp = []
+       for s in self.geo.elems[self.geo.l2g[n]]:
+        pp.append(self.geo.nodes[s][:2])  
+       path = create_path(pp)
+       patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=1,joinstyle='miter')
+       gca().add_patch(patch);
+
+   plt.xlim([-Lx/2,Lx/2])
+   plt.ylim([-Ly/2,Ly/2])
+   plt.show()
+
+
+
+
+
+
  def plot_map(self,argv):
 
    (Lx,Ly) = self.geo.get_repeated_size(argv)
@@ -523,13 +571,14 @@ class Plot(object):
 
    #data += 1.0
    #plt.set_cmap(Colormap('winter'))
-   
-   (data,nodes,triangulation) =  self.get_data(argv)
+   (data,nodes,triangulation) =  self.get_data(**argv)
+
    vmin = argv.setdefault('vmin',min(data))
    vmax = argv.setdefault('vmax',max(data))
-   plt.tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),zorder=1)
+
+   plt.tripcolor(triangulation,np.array(data),cmap='jet',shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),zorder=1)
    if argv.setdefault('colorbar',False):
-    colorbar(norm=mpl.colors.Normalize(vmin=min(data),vmax=max(data)))
+    colorbar(norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax))
 
     #Contour-----
    if argv.setdefault('iso_values',False):
@@ -557,6 +606,15 @@ class Plot(object):
 
    if argv.setdefault('plot_interfaces',False):
     pp = self.geo.get_interface_point_couples(argv)
+
+   if argv.setdefault('plot_elements',False):
+     for n,e in enumerate(self.geo.elems):
+       c = self.geo.get_elem_centroid(n)  
+       p0 = self.geo.nodes[e[0]]  
+       p1 = self.geo.nodes[e[1]]  
+       p2 = self.geo.nodes[e[2]]  
+       plt.plot([p0[0],p1[0],p2[0],p0[0]],[p0[1],p1[1],p2[1],p0[1]],color='w')
+       plt.text(c[0],c[1],str(n),color='w',fontsize=8,va='center',ha='center')
 
 
    plt.axis('off')
