@@ -20,7 +20,9 @@ def create_structured_bulk(argv):
  layers_x = int(Lx/mesh_ext)
  layers_y = int(Ly/mesh_ext)
  store = open("mesh.geo", 'w+')
- store.write( 'Point(0) = {' + str(-Lx/2.0) +','+ str(-Ly/2.0)+',0,'+ str(mesh_ext) +'};\n')
+ store.write('h='+str(mesh_ext) + ';\n')
+
+ store.write( 'Point(0) = {' + str(-Lx/2.0) +','+ str(-Ly/2.0)+',0,h};\n')
  store.write('out[] = Extrude{0,''' + str(Ly) + r''',0}{ Point{0};Layers{''' + str(layers_x) + r'''};Recombine;};''' + '\n')
  store.write('out[] = Extrude{' + str(Lx) + r''',0,0}{ Line{out[0]};Layers{''' + str(layers_y) + r'''};Recombine;};''' + '\n')
 
@@ -98,9 +100,10 @@ def create_unstructured_bulk(argv):
   lines = []
 
   store = open("mesh.geo", 'w+')
+  store.write('h='+str(mesh_ext) + ';\n')
 
   for k,p in enumerate(frame) :
-   store.write( 'Point('+str(k) +') = {' + str(p[0]) +','+ str(p[1])+',0,'+ str(mesh_ext) +'};\n')
+   store.write( 'Point('+str(k) +') = {' + str(p[0]) +','+ str(p[1])+',0,h};\n')
 
   ll = 0
   for k,p in enumerate(frame) :
@@ -109,7 +112,7 @@ def create_unstructured_bulk(argv):
    ll += 1
    store.write( 'Line('+str(ll) +') = {' + str(p1) +','+ str(p2)+'};\n')
 
-  strc = 'Line Loop(0) = {'
+  strc = 'Line Loop(5) = {'
   for p,point in enumerate(frame) :
    strc +=str(p+1)
    if p == len(frame)-1:
@@ -119,9 +122,9 @@ def create_unstructured_bulk(argv):
   store.write(strc)
 
   #Create Surface
-  strc = 'Plane Surface(0) = {0};\n'
+  strc = 'Plane Surface(10) = {5};\n'
   store.write(strc)
-  strc = r'''Physical Surface('Matrix') = {0};'''+'\n'
+  strc = r'''Physical Surface('Matrix') = {10};'''+'\n'
   store.write(strc)
 
   bs = []

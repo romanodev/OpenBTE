@@ -807,7 +807,6 @@ class Geometry(object):
     self.n_elems = len(self.elems)
     self.nle = len(self.l2g)
 
-
     data = {'side_list':self.side_list,\
           'node_list':self.node_list,\
           #'elem_list':self.elem_list,\

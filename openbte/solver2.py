@@ -601,7 +601,7 @@ class Solver(object):
 
       if rank==0 and self.verbose:
        print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa_current,error_vec[-1],ndif,nbte,nbal))
-      data = {'kappa_vec':kappa_vec,'temperature':T,'pseudogradient':self.mesh.compute_grad(T),'flux':J,'temp_fourier':temp_fourier,'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad,'kappa':kappa_vec[-1]}
+      data = {'kappa_vec':kappa_vec,'temperature':T,'pseudogradient':self.mesh.compute_grad(T),'flux':J,'temperature_fourier':temp_fourier,'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad,'kappa':kappa_vec[-1]}
       data.update({'TB':TB,'TL':TL,'error_vec':error_vec,'ms_vec':ms_vec,'temp_fourier_grad':temp_fourier_grad,'eta':eta_vec})  
       self.state = data
       if self.save_state:

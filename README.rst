@@ -8,10 +8,12 @@ Community
 
 `Mailing list <https://groups.google.com/forum/#!forum/openbte>`_
 
+
 Reference
 =========
 
 `G. Romano et al. J. Heat Transfer (2015) <https://heattransfer.asmedigitalcollection.asme.org/article.aspx?articleid=2119334>`_
+
 
 Installation
 ====================
@@ -37,7 +39,7 @@ Linux
 
 Requirements:
 
-apt-get install -y libopenmpi-dev libgmsh3 
+apt-get install -y libopenmpi-dev 
 
 pip install --upgrade openbte     
 
