@@ -341,7 +341,7 @@ class Plot(object):
      #solver = dd.io.load('solver.hdf5')
      data = self.solver[variable]
 
-  if 'Interface' in self.geo.side_list.keys():
+  if len(self.geo.side_list['Interface'])> 0:
     data_int =  self.solver[variable + '_int'] 
     argv.update({'data_int':data_int})
 
