@@ -25,6 +25,7 @@ if not be=='nbAgg' and not be=='module://ipykernel.pylab.backend_inline':
  if not be == 'Qt5Agg': matplotlib.use('Qt5Agg')
 
 
+
 import matplotlib.patches as patches
 from .fig_maker import *
 from matplotlib.path import Path
@@ -681,30 +682,26 @@ class Geometry(object):
     #---------------------
 
     #Interfacial sides---------------------------
-
-    #get boundary/interface sides---
-    tmp = set()
-    for g in np.array(grid).T:
+    if inclusion:
+     tmp = set()
+     for g in np.array(grid).T:
       ne = g[1]*n + g[0]
       for side in self.elem_side_map[ne]:
-        i,j = self.side_elem_map[side]
-        if (self.elem_region_map[i] == 'Matrix' and self.elem_region_map[j] == 'Inclusion') or \
-           (self.elem_region_map[i] == 'Inclusion' and self.elem_region_map[j] == 'Matrix'):
-            tmp.add(side)
-    if inclusion:
+        tmp.add(side)
      self.side_list.update({'Interface':list(tmp)})
-    else: 
+    else:
+     tmp = set()
+     for g in np.array(grid).T:
+      ne = g[1]*n + g[0]
+      for side in self.elem_side_map[ne]:
+        tmp.add(side)
      self.side_list.update({'Boundary':list(tmp)})
-    #----------------------------
 
-     
     #adjust side_elem_map to make it sure Matrix comes first
     for ll in self.side_list['Boundary'] :
       i,j  = self.side_elem_map[ll]
       if i in self.region_elem_map['Inclusion']:
-        self.side_elem_map[ll] = [j,j]
-      else:  
-        self.side_elem_map[ll] = [i,i]
+        self.side_elem_map[ll] = [j,i]
 
     #we need to change this--
     #make weigths smaller
@@ -719,16 +716,16 @@ class Geometry(object):
          self.g2l[i] = len(self.l2g)-1
 
 
-    self.nle = len(self.l2g)
-    self.compute_boundary_condition_data()
+    #print(len(self.side_list['active']))
+    #self.adjust_boundary_elements()
     self.compute_connecting_matrix()
     self.compute_connecting_matrix_new()
+    #print(np.shape(self.A))
 
-    data = {'nle':self.nle,'g2l':self.g2l,'l2g':self.l2g,'side_elem_map':self.side_elem_map,'elem_side_map':self.elem_side_map,\
+    
+    data = {'nle':len(self.l2g),'g2l':self.g2l,'l2g':self.l2g,'side_elem_map':self.side_elem_map,'elem_side_map':self.elem_side_map,\
             'side_list':self.side_list,'region_elem_map':self.region_elem_map,\
-            'elem_region_map':self.elem_region_map,'A':self.A,'CM':self.CM,\
-            'B':self.B,'B_with_area_old':self.B_with_area_old,\
-            'CP':self.CP,'N':self.N,'N_new':self.N_new}
+            'elem_region_map':self.elem_region_map}#,'A':self.A,'CM':self.CM,'CP':self.CP,'N':self.N,'N_new':self.N_new}
 
 
 
@@ -736,16 +733,11 @@ class Geometry(object):
 
 
   self.state.update(mpi4py.MPI.COMM_WORLD.bcast(data,root=0))
-  #if self.argv.setdefault('save',False):
-  #  pickle.dump(self.state,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
-
-
 
 
 
  def plot_structured_mesh(self,**argv):
 
-     
      n = int(sqrt(self.nle))
      l = self.size[0]
      delta = l/n
@@ -770,9 +762,8 @@ class Geometry(object):
       if ptext:
        text(m[0],m[1],str(n_side),color='b')
 
-     for ne in range(self.nle):
-         
-      ave = self.plot_elem(self.l2g[ne],color='gray')
+     for ne in range(len(self.elems)):
+      ave = self.plot_elem(ne,color='gray')
 
       if ptext:
        text(ave[0],ave[1],str(ne),color='black')
@@ -846,10 +837,11 @@ class Geometry(object):
           'pairs':self.pairs,\
           'B':self.B,\
           'node_side_map':self.node_side_map,\
+          'B_with_area':self.B_with_area,\
           'B_with_area_old':self.B_with_area_old,\
           'CM':self.CM,\
           'CP':self.CP,\
-          #'CPB':self.CPB,\
+          'CPB':self.CPB,\
           #'periodic_sides':self.periodic_sides,\
           #'boundary_elements':self.boundary_elements,\
           #'interface_elements':self.interface_elements,\
@@ -885,7 +877,6 @@ class Geometry(object):
    self.A = A.tocsc()
 
 
-
  def compute_connecting_matrix_new(self):
 
    nc = len(self.l2g)
@@ -897,10 +888,9 @@ class Geometry(object):
 
    N_new = sparse.DOK((nc,nc,3), dtype=float32)
 
-   #self.CPB = np.zeros((nc,3))
+   self.CPB = np.zeros((nc,3))
    i = [];j = [];k = []
    data = []
-
    for ll in self.side_list['active'] :
      elems = self.get_elems_from_side(ll)
      kc1 = elems[0]
@@ -916,7 +906,7 @@ class Geometry(object):
        N[l2,l1] = -normal*area/vol2
        N_new[l1,l2] = normal
        N_new[l2,l1] = -normal
-     else: 
+     else:  
        s = np.where(np.array(self.elem_side_map[kc1])==ll)[0][0]
        CM[l1,s]  = normal*area/vol1
        CP[l1,s] = normal
@@ -1426,9 +1416,10 @@ class Geometry(object):
     self.applied_grad = self.state['applied_grad']
     self.CP = self.state['CP']
     #self.periodic_sides = self.state['periodic_sides']
-    #self.CPB = self.state['CPB']
+    self.CPB = self.state['CPB']
     self.B = self.state['B']
     #self.labels = self.state['labels']
+    self.B_with_area = self.state['B_with_area']
     self.B_with_area_old = self.state['B_with_area_old']
     self.side_periodic_value = self.state['side_periodic_value']
     self.kappa_factor = self.size[self.direction]/self.area_flux
@@ -2056,32 +2047,33 @@ class Geometry(object):
         
     side_periodic_value = np.zeros((nsides,2))
 
-    n_el = self.nle
+   
+    n_el = len(self.elems)
     B = sparse.DOK((n_el,n_el),dtype=float32)
-    #B_with_area = sparse.DOK((n_el,n_el,3),dtype=float32)
+    B_with_area = sparse.DOK((n_el,n_el,3),dtype=float32)
 
     B_with_area_old = sparse.DOK((n_el,n_el),dtype=float32)
+
      
     if len(self.side_list.setdefault('Periodic',[])) > 0:
      for side in self.pairs:
-
       side_periodic_value[side[0]][0] = side_value[side[0]]
       side_periodic_value[side[0]][1] = side_value[side[1]]
 
       elem1,elem2 = self.side_elem_map[side[0]]
-      i = self.g2l[elem1]
-      j = self.g2l[elem2]
-      B[i,j] = side_value[side[0]]
-      B[j,i] = side_value[side[1]]
+      B[elem1,elem2] = side_value[side[0]]
+      B[elem2,elem1] = side_value[side[1]]
+
 
       if np.linalg.norm(np.cross(self.get_side_normal(1,side[0]),self.applied_grad)) < 1e-5:
-       B_with_area_old[i,j] = abs(side_value[side[0]]*self.get_side_area(side[0]))
+       B_with_area[elem1,elem2] = abs(side_value[side[0]]*self.get_side_area(side[0]))*self.get_side_normal(0,side[0])
+       B_with_area_old[elem1,elem2] = abs(side_value[side[0]]*self.get_side_area(side[0]))
       
     self.area_flux = abs(np.dot(flux_dir,self.c_areas))
     self.flux_sides = flux_sides
     self.side_periodic_value = side_periodic_value
     self.B = B.to_coo()
-    #self.B_with_area = B_with_area.to_coo()
+    self.B_with_area = B_with_area.to_coo()
     self.B_with_area_old = B_with_area_old.to_coo()#.to_scipy_sparse()
 
 

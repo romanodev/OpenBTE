@@ -264,7 +264,7 @@ class Solver(object):
      if not os.path.exists(self.cache + '/Am_' + str(global_index) + '.p') :
       kdir  = self.kappa_directional[global_index]
       k_angle = sparse.COO([0,1,2],self.kappa_directional[global_index],shape=(3))
-
+      
       tmp = sparse.tensordot(self.mesh.CP,k_angle,axes=1)
       AP = tmp.clip(min=0)#.to_scipy_sparse().todok()
       AM = (tmp-AP)#.tocsc().todok() #preserve the sign of AM
@@ -308,7 +308,6 @@ class Solver(object):
         tmp = sparse.tensordot(self.mesh.CM,aa,axes=1).todense()
         HW_PLUS = tmp.clip(min=0)
         self.HW_MINUS = (HW_PLUS-tmp)
-
         BP = spdiags(np.sum(HW_PLUS,axis=1),0,self.mesh.nle,self.mesh.nle,format='csc')
         self.A =  AP + AM + BP
         if self.save_data: 
@@ -325,6 +324,7 @@ class Solver(object):
 
      lu = splu(F.tocsc())
      if (self.keep_lu) :self.lu[irr_angle] = lu
+
 
     boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1)
     RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]
@@ -439,7 +439,6 @@ class Solver(object):
       comm.Allreduce([TDIFFGradp,MPI.DOUBLE],[TDIFFGrad,MPI.DOUBLE],op=MPI.SUM)
 
     #Print diffusive Kappa---------
-    KBp,KB = np.zeros((2,self.mesh.nle,3,3))
     TL2p,TL2 = np.zeros((2,nT,self.mesh.nle))
     Tp,T = np.zeros((2,self.mesh.nle))
     Vp,V = np.zeros((2,self.mesh.nle,3))
@@ -511,20 +510,13 @@ class Solver(object):
         (Am,Ap) = self.get_boundary_matrices(global_index)
         TBp_minus += Am 
         TBp_plus  += np.einsum('es,e->es',Ap,temp)
+        print(temp)
         TL2p += np.outer(self.mat['B'][:,global_index],temp)    
         Tp+= temp*self.mat['TCOEFF'][global_index]
         kdir = self.mat['kappa_directional'][global_index]
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
         KAPPAp[index,n] = np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
         Jp += np.outer(temp,kdir)*1e9
-
-
-        #Experimental-----------------------------------------
-        aa = sparse.COO([0,1,2],self.control_angle[global_index],shape=(3)).todense()
-        mfp   = self.mat['mfp'][global_index]
-        KBp  += mfp*np.einsum('i,j,c->cij',aa,kdir,temp)
-        #-------------------------------------------------------
-
 
       #Ballistic component
       ballistic = False
@@ -566,24 +558,28 @@ class Solver(object):
     comm.Allreduce([nbalp,MPI.DOUBLE],[nbal,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([KAPPAp,MPI.DOUBLE],[KAPPA,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([eta_vecp,MPI.DOUBLE],[eta_vec,MPI.DOUBLE],op=MPI.SUM)
-    comm.Allreduce([KBp,MPI.DOUBLE],[KB,MPI.DOUBLE],op=MPI.SUM)
 
     kappa_vec.append(abs(K2[0] * self.kappa_factor))
     error_vec.append(abs(kappa_vec[-1]-kappa_vec[-2])/abs(max([kappa_vec[-1],kappa_vec[-2]])))
     #----------------
 
     TB_new = TB_plus.copy()
-    for i in range(np.shape(TB_new)[1]):
+    for i in range(3):
       for n in range(len(TB_plus.T[i])):
        if not (TB_plus[n,i] == 0):
          TB_new[n,i] /= TB_minus[n,i]
-    
+
     TB = self.alpha * TB_new + (1-self.alpha)*TB_old; TB_old = TB.copy()
 
     Tnew = T.copy()
     
     TL = self.alpha * TL2.copy() + (1-self.alpha)*self.TL_old; 
     self.TL_old = TL.copy()
+    #plt.plot(self.mat['mfp'][:100],eta_diff)
+    #plt.plot(self.mat['mfp'][:100],eta_plot)
+    #plt.xscale('log')
+    #plt.show()
+    #quit()
 
 
     n_iter +=1   
@@ -598,7 +594,7 @@ class Solver(object):
 
       if rank==0 and self.verbose:
        print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa_current,error_vec[-1],ndif,nbte,nbal))
-      data = {'kappa_vec':kappa_vec,'temperature':T,'pseudogradient':self.mesh.compute_grad(T),'flux':J,'temperature_fourier':temp_fourier,'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad,'kappa':kappa_vec[-1],'kappa_space':KB}
+      data = {'kappa_vec':kappa_vec,'temperature':T,'pseudogradient':self.mesh.compute_grad(T),'flux':J,'temperature_fourier':temp_fourier,'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad,'kappa':kappa_vec[-1]}
       data.update({'TB':TB,'TL':TL,'error_vec':error_vec,'ms_vec':ms_vec,'temp_fourier_grad':temp_fourier_grad,'eta':eta_vec})  
       self.state = data
       if self.save_state:

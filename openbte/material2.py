@@ -86,7 +86,8 @@ class Material(object):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
 
-   data = dd.io.load(argv['matfile'])
+   #data = dd.io.load(argv['matfile'])
+   data = pickle.load(open(argv['matfile'],'rb'))
    mfp = data['MFP']
    gmfp = data['GMFP']
    gmfp_b,gtheta_b,gphi_b = self.spherical(gmfp)
@@ -535,6 +536,14 @@ class Material(object):
 
    direction_int = np.einsum('ijl,ij->ijl',direction_ave,domega)
 
+
+  # final = np.zeros((3,3))
+  # for p in range(n_phi):
+  #  for t in range(n_theta):
+  #    a = direction_ave[t,p]*domega[t,p]  
+  #    final += 3*np.outer(direction_ave[t,p]*domega[t,p],a)
+
+
    #Import material-------------------------------------------------------------------
    if 'filename' in argv.keys():
     source = argv.setdefault('source',os.path.dirname(__file__) + '/materials/')
@@ -601,6 +610,7 @@ class Material(object):
    polar = np.array([np.repeat(polar[:,i],n_mfp) for i in range(3)]).T
    #---------------------------------
 
+
    return {'B':A,\
            'TCOEFF':TCOEFF,\
            'temp_vec':temp_vec,\
@@ -616,7 +626,7 @@ class Material(object):
            'direction_int':direction_int,\
            'factor':[np.sin(Dphi/2),np.cos(Dphi/2)/Dphi],\
            'mfp_bulk':mfp_bulk,\
-           'kappa_bulk':kappa_bulk,\
+           #'kappa_bulk':kappa_bulk,\
            'kappa_bulk_tot':np.sum(kappa_bulk)}
 
 

@@ -182,6 +182,10 @@ class Plot(object):
     if 'pseudogradient' in solver.keys():
      vw.add_variable('pseudogradient',label = r'''Pseudo gradient Temperature [K/nm]''')
 
+ 
+    if 'kappa_space' in solver.keys():
+     vw.add_variable('kappa_space',label = r'''Thermal Conductivity [W/m/K]''')
+
 
     if 'flux' in solver.keys():
      vw.add_variable('flux',label = r'''BTE Thermal Flux [W/m/m]''')
@@ -509,7 +513,6 @@ class Plot(object):
    ax = plt.axes([0,0,1.0,1.0])
 
    tmp = self.solver[argv['variable']]
-
 
    argv.setdefault('direction',None)  
    if argv['direction'] == 'x':
