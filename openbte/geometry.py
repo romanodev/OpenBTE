@@ -766,6 +766,7 @@ class Geometry(object):
     for side in self.elem_side_map[elem_1]:
      if side in self.side_list['Boundary']:
       return side
+    
     print('No boundary side')
     quit()
    else:

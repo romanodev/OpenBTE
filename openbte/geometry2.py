@@ -642,13 +642,91 @@ class Geometry(object):
     self.l2g = range(len(self.elems))
     self.g2l = range(len(self.elems))
     self.nle = len(self.l2g)
+    self.compute_elem_map()
 
     #---------------------
 
    
     #self.add_patterning(**argv)
 
+ def add_patterning_new(self,**argv):
 
+  if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
+
+    grid = argv['grid']
+    kappa = argv['kappa']
+    n = int(sqrt(len(self.nodes)))-1
+
+    #----Restore previous boundary connections---
+    for side in self.side_list['Boundary']:
+      (i,j) = self.side_elem_map[side]
+      for elem in self.elem_map[i]:
+          for s2 in self.elem_side_map[elem]:
+              if s2 == side:
+                self.side_elem_map[side][0] = elem
+                break
+     #-----------------       
+
+    #elem maps
+    self.nle = len(grid)
+    self.l2g = []
+    self.g2l = np.zeros(len(self.elems),dtype=int)
+    for i in grid:
+     self.l2g.append(i)
+     self.g2l[i] = len(self.l2g)-1
+    #----------------------------------         
+
+    #kappa maps--------
+    self.elem_kappa_map = {}
+    for i,n in enumerate(grid): #elem_kappa_map is defined on global
+     self.elem_kappa_map[n] = kappa[i] 
+    #------------------
+
+    #active side---
+    active_sides = set()
+    for i in grid:
+     for side in self.elem_side_map[i]:
+       active_sides.add(side)
+    self.side_list['active'] = list(active_sides)   
+
+    #boundary side---
+    boundary_side = []
+    self.restored_sides = {}
+    for side in self.side_list['active']:
+      elems = self.side_elem_map[side]
+      if not ((elems[0] in grid) and (elems[1] in grid)):
+        boundary_side.append(side)
+        if elems[0] in grid:
+           self.side_elem_map[side] = [elems[0],elems[0]]
+           self.restored_sides[side] = elems
+        elif elems[1] in grid:
+           self.side_elem_map[side] = [elems[1],elems[1]]
+           self.restored_sides[side] = elems
+        else:
+           print('error')
+    self.side_list['Boundary'] = boundary_side
+
+    self.compute_boundary_condition_data()
+    self.compute_connecting_matrix()
+    self.compute_connecting_matrix_new()
+    #print('gg')
+    #self.compute_elem_map()
+
+   
+    data = {'nle':self.nle,'g2l':self.g2l,'l2g':self.l2g,'side_elem_map':self.side_elem_map,'elem_side_map':self.elem_side_map,\
+            'side_list':self.side_list,'region_elem_map':self.region_elem_map,\
+            'elem_region_map':self.elem_region_map,'A':self.A,'CM':self.CM,\
+            'B':self.B,'B_with_area_old':self.B_with_area_old,'elem_kappa_map':self.elem_kappa_map,\
+            'CP':self.CP,'N':self.N,'N_new':self.N_new}
+
+
+  else: data = None
+
+
+  self.state.update(mpi4py.MPI.COMM_WORLD.bcast(data,root=0))
+     
+
+ '''
  def add_patterning(self,**argv):
 
   if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
@@ -656,10 +734,11 @@ class Geometry(object):
     n = int(sqrt(len(self.nodes)))-1
     inclusion = argv.setdefault('inclusion',False)
 
+    #--------
+
     self.elem_region_map = {}
     self.region_elem_map = {'Inclusion':[],'Matrix':[]}
-    for g in np.array(grid).T:
-     ne = g[1]*n + g[0]
+    for ne in grid:
      self.region_elem_map['Inclusion'].append(ne)
      self.elem_region_map[ne] = 'Inclusion'
       
@@ -675,7 +754,6 @@ class Geometry(object):
       for elem in elems:   
        if self.elem_region_map[elem] == 'Matrix':  #at least one element is connected with one side
         active_sides.add(side)
-
      self.side_list.update({'active':list(active_sides)})
      #self.elem_list = {'active':self.region_elem_map['Matrix']}
     #---------------------
@@ -684,8 +762,7 @@ class Geometry(object):
 
     #get boundary/interface sides---
     tmp = set()
-    for g in np.array(grid).T:
-      ne = g[1]*n + g[0]
+    for ne in grid:
       for side in self.elem_side_map[ne]:
         i,j = self.side_elem_map[side]
         if (self.elem_region_map[i] == 'Matrix' and self.elem_region_map[j] == 'Inclusion') or \
@@ -706,6 +783,7 @@ class Geometry(object):
       else:  
         self.side_elem_map[ll] = [i,i]
 
+    print(len(self.side_list['Boundary']))  
     #we need to change this--
     #make weigths smaller
     #--------------------------
@@ -723,10 +801,11 @@ class Geometry(object):
     self.compute_boundary_condition_data()
     self.compute_connecting_matrix()
     self.compute_connecting_matrix_new()
+    self.compute_elem_map()
 
     data = {'nle':self.nle,'g2l':self.g2l,'l2g':self.l2g,'side_elem_map':self.side_elem_map,'elem_side_map':self.elem_side_map,\
             'side_list':self.side_list,'region_elem_map':self.region_elem_map,\
-            'elem_region_map':self.elem_region_map,'A':self.A,'CM':self.CM,\
+            'elem_region_map':self.elem_region_map,'A':self.A,'CM':self.CM,'elem_map':elem_map,\
             'B':self.B,'B_with_area_old':self.B_with_area_old,\
             'CP':self.CP,'N':self.N,'N_new':self.N_new}
 
@@ -739,7 +818,7 @@ class Geometry(object):
   #if self.argv.setdefault('save',False):
   #  pickle.dump(self.state,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
 
-
+ '''
 
 
 
@@ -795,11 +874,12 @@ class Geometry(object):
 
     #self.import_mesh()
 
-    #self.compute_elem_map()
+
     #print(self.side_elem_map)
     #self.adjust_boundary_elements()
 
 
+    self.compute_elem_map()
     self.compute_elem_volumes()
     self.compute_side_areas()
     self.compute_side_normals()
@@ -824,7 +904,7 @@ class Geometry(object):
           'side_elem_map':self.side_elem_map,\
           'side_node_map':self.side_node_map,\
           'node_elem_map':self.node_elem_map,\
-          #'elem_map':self.elem_map,\
+          'elem_map':self.elem_map,\
           'nodes':self.nodes,\
           'N_new':self.N_new,\
           'N':self.N,\
@@ -929,13 +1009,13 @@ class Geometry(object):
 
 
 
- #def compute_elem_map(self):
+ def compute_elem_map(self):
 
- # self.elem_map = {}
- # for elem1 in self.elem_side_map:
- #   for side in self.elem_side_map[elem1]:
- #    elem2 = self.get_neighbor_elem(elem1,side)
- #    self.elem_map.setdefault(elem1,[]).append(elem2)
+  self.elem_map = {}
+  for elem1 in self.elem_side_map:
+    for side in self.elem_side_map[elem1]:
+     elem2 = self.get_neighbor_elem(elem1,side)
+     self.elem_map.setdefault(elem1,[]).append(elem2)
 
 
  def get_side_orthognal_direction(self,side):
@@ -1422,6 +1502,7 @@ class Geometry(object):
     self.polygons = self.state['polygons']
     self.N = self.state['N']
     self.N_new = self.state['N_new']
+    self.elem_map = self.state['elem_map']
     self.CM = self.state['CM']
     self.applied_grad = self.state['applied_grad']
     self.CP = self.state['CP']
@@ -1962,7 +2043,7 @@ class Geometry(object):
 
  def get_neighbor_elem(self,elem,ll) :
 
-    if not (elem in self.side_elem_map[ll]) : print('error')
+    if not (elem in self.side_elem_map[ll]) : print('error, no neighbor')
 
     for tmp in self.side_elem_map[ll] :
        if not (tmp == elem) :

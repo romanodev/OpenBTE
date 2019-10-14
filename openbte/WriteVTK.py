@@ -78,7 +78,7 @@ class WriteVtk(object):
    conn = np.zeros(n_nodes)
    for n in self.mesh.node_elem_map.keys():
     for elem in self.mesh.node_elem_map[n]:
-     node_data[n] += data[elem]
+     node_data[n] += data[self.mesh.g2l[elem]]
      conn[n] +=1
      C = self.mesh.compute_elem_centroid(elem)
 

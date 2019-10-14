@@ -327,7 +327,9 @@ class NewSolver(object):
      if (self.keep_lu) :self.lu[irr_angle] = lu
 
     boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1)
-    RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]
+    #RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]
+    #RHS = mfp * boundary + np.ones(self.mesh.nle)
+    RHS = mfp * np.ones(self.mesh.nle) + np.ones(self.mesh.nle)
 
     temp = lu.solve(RHS)
 
@@ -381,7 +383,8 @@ class NewSolver(object):
      #TL = np.tile(temp_fourier,(nT,1))
      TL = np.zeros((nT,self.mesh.nle))
      Tnew = temp_fourier.copy()
-     TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
+     #TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
+     TB = np.tile(np.ones(self.mesh.nle),(self.n_side_per_elem,1)).T
      #----------------------------------------------------------------
      kappa_vec = [float(kappa_fourier)]
      #kappa_vec = [0]

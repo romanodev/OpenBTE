@@ -125,7 +125,10 @@ class Solver(object):
      self.mat = pickle.load(open(argv.setdefault('matfile','material.p'),'rb'))
 
 
-   self.compute_kappa_map()
+   if argv.setdefault('kappa_from_patterning',False):
+    self.elem_kappa_map = self.mesh.elem_kappa_map
+   else :   
+    self.compute_kappa_map()
 
 
    self.control_angle =  self.rotate(np.array(self.mat['control_angle']),**argv)
@@ -175,15 +178,19 @@ class Solver(object):
   def compute_kappa_map(self):
 
    kappa_matrix = self.mat['kappa_bulk_tot']
-   kappa_inclusion = self.mat['kappa_inclusion']
-
    self.elem_kappa_map = {}
-   for elem in self.mesh.region_elem_map['Matrix']:
-     self.elem_kappa_map[elem] = kappa_matrix
+   for g in self.mesh.l2g:
+     self.elem_kappa_map[g] = kappa_matrix*np.eye(3)
 
-   if 'Inclusion' in self.mesh.region_elem_map.keys():   
-     for elem in self.mesh.region_elem_map['Inclusion']:
-      self.elem_kappa_map[elem] = kappa_inclusion
+   #kappa_inclusion = self.mat['kappa_inclusion']
+
+   #self.elem_kappa_map = {}
+   #for elem in self.mesh.region_elem_map['Matrix']:
+   #  self.elem_kappa_map[elem] = kappa_matrix*np.eye(3)
+
+   #if 'Inclusion' in self.mesh.region_elem_map.keys():   
+   #  for elem in self.mesh.region_elem_map['Inclusion']:
+   #   self.elem_kappa_map[elem] = kappa_inclusion*np.eye(3)
 
 
 
@@ -326,8 +333,16 @@ class Solver(object):
      lu = splu(F.tocsc())
      if (self.keep_lu) :self.lu[irr_angle] = lu
 
+    #TB = np.tile(Tnew,(self.n_side_per_elem,1)).T
+
     boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1)
-    RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]
+    if self.argv.setdefault('Experimental',False):
+     #RHS = mfp * np.ones(self.mesh.nle) + np.ones(self.mesh.nle)
+     RHS = mfp * boundary + np.ones(self.mesh.nle)
+     #RHS = np.ones(self.mesh.nle)
+    else:
+     RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]
+
 
     temp = lu.solve(RHS)
 
@@ -381,7 +396,11 @@ class Solver(object):
      #TL = np.tile(temp_fourier,(nT,1))
      TL = np.zeros((nT,self.mesh.nle))
      Tnew = temp_fourier.copy()
+
      TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
+     if self.argv.setdefault('Experimental',False):
+      TB = np.tile(np.zeros(self.mesh.nle),(self.n_side_per_elem,1)).T
+
      #----------------------------------------------------------------
      kappa_vec = [float(kappa_fourier)]
      #kappa_vec = [0]
@@ -500,8 +519,8 @@ class Solver(object):
          temp = self.get_bulk_data(global_index,TB,TL,Tnew)
       
          eta = self.mesh.B_with_area_old.dot(temp).sum()
-         if index == 11:
-             eta_plot.append(eta)
+         #if index == 11:
+         #    eta_plot.append(eta)
          #if self.multiscale:
          #  if abs(eta_diff[n] - eta)/abs(eta) < 1e-2:
          #   fourier = True  
@@ -520,9 +539,10 @@ class Solver(object):
 
 
         #Experimental-----------------------------------------
-        aa = sparse.COO([0,1,2],self.control_angle[global_index],shape=(3)).todense()
-        mfp   = self.mat['mfp'][global_index]
-        KBp  += mfp*np.einsum('i,j,c->cij',aa,kdir,temp)
+        if self.argv.setdefault('Experimental',False):
+         aa = sparse.COO([0,1,2],self.control_angle[global_index],shape=(3)).todense()
+         mfp   = self.mat['mfp'][global_index]
+         KBp  += mfp*np.einsum('i,j,c->cij',aa,kdir,temp)
         #-------------------------------------------------------
 
 
@@ -598,7 +618,11 @@ class Solver(object):
 
       if rank==0 and self.verbose:
        print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa_current,error_vec[-1],ndif,nbte,nbal))
-      data = {'kappa_vec':kappa_vec,'temperature':T,'pseudogradient':self.mesh.compute_grad(T),'flux':J,'temperature_fourier':temp_fourier,'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad,'kappa':kappa_vec[-1],'kappa_space':KB}
+      data = {'kappa_vec':kappa_vec,'temperature':T,'pseudogradient':self.mesh.compute_grad(T),'flux':J,'temperature_fourier':temp_fourier,'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad,'kappa':kappa_vec[-1]}
+
+      if self.argv.setdefault('Experimental',False):
+         data.update({'kappa_space':KB}) 
+
       data.update({'TB':TB,'TL':TL,'error_vec':error_vec,'ms_vec':ms_vec,'temp_fourier_grad':temp_fourier_grad,'eta':eta_vec})  
       self.state = data
       if self.save_state:
@@ -625,17 +649,19 @@ class Solver(object):
       vi = self.mesh.get_elem_volume(i)
       vj = self.mesh.get_elem_volume(j)
       kappa = self.get_kappa(i,j)
-      (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j)
-      li = self.mesh.g2l[i]; lj = self.mesh.g2l[j]
+      (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=kappa)
+      if not i == j:
+
+       li = self.mesh.g2l[i]; lj = self.mesh.g2l[j]
     
-      F[li,li] += v_orth/vi*kappa
-      F[li,lj] -= v_orth/vi*kappa
+       F[li,li] += v_orth/vi#*kappa
+       F[li,lj] -= v_orth/vi#*kappa
 
-      F[lj,lj] += v_orth/vj*kappa
-      F[lj,li] -= v_orth/vj*kappa
+       F[lj,lj] += v_orth/vj#*kappa
+       F[lj,li] -= v_orth/vj#*kappa
 
-      B[li] += self.mesh.get_side_periodic_value(j,i)*v_orth/vi*kappa
-      B[lj] += self.mesh.get_side_periodic_value(i,j)*v_orth/vj*kappa
+       B[li] += self.mesh.get_side_periodic_value(j,i)*v_orth/vi#*kappa
+       B[lj] += self.mesh.get_side_periodic_value(i,j)*v_orth/vj#*kappa
       
 
     data = {'F':F.tocsc(),'B':B}
@@ -662,12 +688,19 @@ class Solver(object):
 
   def get_kappa(self,i,j):
 
-
    side = self.mesh.get_side_between_two_elements(i,j)
    w = self.mesh.get_interpolation_weigths(side,i)
+   normal = self.mesh.get_normal_between_elems(i,j)
+
    kappa_i = self.elem_kappa_map[i]
    kappa_j = self.elem_kappa_map[j]
-   kappa = kappa_i * kappa_j/(kappa_j*w + (1-w)*kappa_i)
+
+   ki = np.dot(normal,np.dot(kappa_i,normal))
+   kj = np.dot(normal,np.dot(kappa_j,normal))
+
+   kappa = kj*kappa_i/(ki*(1-w) + kj*w)
+
+   #kappa = kappa_i * kappa_j/(kappa_j*w + (1-w)*kappa_i)
  
    return kappa
 
@@ -1072,7 +1105,8 @@ class Solver(object):
 
       w = self.mesh.get_interpolation_weigths(side,gi)
       #grad_ave = w*gradT[i] + (1.0-w)*gradT[j]
-      F_ave = w*gradT[i]*self.elem_kappa_map[gi] + (1.0-w)*gradT[j]*self.elem_kappa_map[gj]
+      #F_ave = w*gradT[i]*self.elem_kappa_map[gi] + (1.0-w)*gradT[j]*self.elem_kappa_map[gj]
+      F_ave = w*np.dot(gradT[i],self.elem_kappa_map[gi]) + (1.0-w)*np.dot(gradT[j],self.elem_kappa_map[gj])
       #------------------------
       (dumm,v_non_orth) = self.mesh.get_decomposed_directions(gi,gj)
 
@@ -1109,10 +1143,15 @@ class Solver(object):
     gi = self.mesh.l2g[i]   
     gj = self.mesh.l2g[j]   
 
-    (v_orth,dummy) = self.mesh.get_decomposed_directions(gi,gj,rot=mat)
+    k = self.get_kappa(gi,gj)
+    (v_orth,dummy) = self.mesh.get_decomposed_directions(gi,gj,rot=k)
     
     if kappa_bulk == -1:
-     kappa += v_orth * (temp[j]+1.0-temp[i])*self.get_kappa(gi,gj)
+     
+     #normal = self.mesh.get_normal_between_elems(i,j)
+     #k = np.dot(normal,np.dot(self.get_kappa(gi,gj),normal))
+
+     kappa += v_orth * (temp[j]+1.0-temp[i])
     else: 
      kappa += v_orth * (temp[j]+1.0-temp[i])*kappa_bulk
      

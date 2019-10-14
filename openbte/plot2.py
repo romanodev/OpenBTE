@@ -513,21 +513,37 @@ class Plot(object):
    ax = plt.axes([0,0,1.0,1.0])
 
    tmp = self.solver[argv['variable']]
+   ndim = len(np.shape(tmp))
 
-   argv.setdefault('direction',None)  
-   if argv['direction'] == 'x':
-     data = np.array(tmp).T[0]
-   elif argv['direction'] == 'y':
-     data = np.array(tmp).T[1]
-   elif argv['direction'] == 'z':
-     data = np.array(tmp).T[2]
-   elif argv['direction'] == 'magnitude':
+   if ndim == 3:
+    d1 = argv.setdefault('direction_1',0)  
+    d2 = argv.setdefault('direction_2',0)  
+    data = np.array(tmp)[:,d1,d2]
+    print(min(data),max(data))
+   elif ndim == 2:
+    d = argv.setdefault('direction',-1)  
+    if d == -1: #"Magnitude"
       data = []
       for d in tmp:
        data.append(np.linalg.norm(d))
       data = np.array(data)
+    else: 
+     data = np.array(tmp)[:,d]
    else:
     data = tmp
+
+
+   #if argv['direction'] == 'x':
+   #  data = np.array(tmp).T[0]
+   #elif argv['direction'] == 'y':
+   #  data = np.array(tmp).T[1]
+   #elif argv['direction'] == 'z':
+   #  data = np.array(tmp).T[2]
+   #elif argv['direction'] == 'magnitude':
+   #   data = []
+   #   for d in tmp:
+   #    data.append(np.linalg.norm(d))
+   #   data = np.array(data)
 
    minv = min(data)
    maxv = max(data)
