@@ -324,6 +324,8 @@ def GenerateRandomPoresOverlap(argv):
     argv.update({'area':Lx*Ly*argv['porosity']/Np,'pbc':pbc})
     argv.update(options)
     pores,centers,mind = generate_non_overlapping_pores(make_pore,argv)
+    if argv.setdefault('save_configuration',False) and not argv['load_configuration']:
+     np.array(centers).dump(argv.setdefault('configuration_file','conf.dat'))
 
     return frame_tmp,pores,centers,mind
 
