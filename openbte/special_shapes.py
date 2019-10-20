@@ -1,9 +1,11 @@
 import numpy as np
 import math
 
-def get_smoothed_square(cx,cy,area,**argv):
+def get_smoothed_square(cx,cy,**argv):
 
+     
      smooth = argv['smooth']
+     area = argv['area']
      Na = argv['Na']
      L = np.sqrt(area+smooth*smooth*(4-np.pi))
 
@@ -37,4 +39,10 @@ def get_smoothed_square(cx,cy,area,**argv):
       p.append([px,py])
 
      return p
+
+
+
+
+
+
 

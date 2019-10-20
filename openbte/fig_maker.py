@@ -3,7 +3,6 @@ from matplotlib.pylab import *
 
 import os,sys
 
-
 LARGE = 26
 c1 = '#1f77b4'
 c2 = '#f77f0e'
@@ -24,18 +23,14 @@ def finalize_plotting(fonts):
        for child in gca().get_children(): 
         x = isinstance(child, matplotlib.text.Text)
         if x:
-
          child.set_font_propertie = fonts['regular']
-
        for child in gcf().get_children(): 
         x = isinstance(child, matplotlib.text.Text)
         if x:
-         
          child.set_font_properties = fonts['regular']
 
        for label in gca().get_xticklabels():
         label.set_fontproperties(fonts['regular'])
-
        for label in gca().get_yticklabels():
         label.set_fontproperties(fonts['regular'])
     #-------------------

@@ -24,7 +24,6 @@ be = matplotlib.get_backend()
 if not be=='nbAgg' and not be=='module://ipykernel.pylab.backend_inline':
  if not be == 'Qt5Agg': matplotlib.use('Qt5Agg')
 
-
 import matplotlib.patches as patches
 from .fig_maker import *
 from matplotlib.path import Path
@@ -211,7 +210,7 @@ class Geometry(object):
      #Create mesh---
      subprocess.check_output(['gmsh','-format','msh2','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
      self.import_mesh()
-
+     
     state = self.compute_mesh_data()
     if self.argv.setdefault('save',True):
      pickle.dump(state,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
@@ -255,7 +254,243 @@ class Geometry(object):
        plot([p1[0],p2[0]],[p1[1],p2[1]],color='w',ls='--',zorder=1)
 
 
+ def compute_general_centroid_and_side(self,i):
 
+   
+   pm2 = self.elems[i][0]
+   pm1 = self.elems[i][1]
+   l = [pm2,pm1]
+   for n in range(len(self.elems[i])-2):
+     p = self.elems[i][(n+2)%len(self.elems[i])]
+     
+     if np.linalg.norm(np.cross(self.nodes[p]-self.nodes[pm1],self.nodes[pm1]-self.nodes[pm2])) < 1e-3:
+      l[-1] = p
+     else: 
+      l.append(p)
+     pm2 = pm1
+     pm1 = p
+ 
+   ave = [0,0,0]
+   for r in l:
+     ave +=self.nodes[r]
+   ave /=4  
+   side = np.linalg.norm(self.nodes[l[1]]-self.nodes[l[2]])
+   #print(l)
+   #for n in range(len(self.elems[i])):
+   #  node = self.nodes[self.elems[i][n]]
+   #  scatter(node[0],node[1])
+   #show()  
+
+   return ave,side
+
+
+ def refine(self,i):
+
+   #add node------------------
+   c,l = self.compute_general_centroid_and_side(i)
+
+   self.nodes = np.append(self.nodes,np.array([c]),axis=0)
+
+   nc = len(self.nodes)-1
+   #---------------------------
+
+   #compute new sides----
+   new_sides = {}
+   internal_sides = []
+   total_new_sides = []
+   tmp = {}
+
+   #remove node association---
+   for node in self.elems[i]:
+     self.node_elem_map[node].remove(i)  
+   #------
+
+   p0 = [c[0],    c[1]+l/2,0]
+   p1 = [c[0]+l/2,c[1]+l/2,0]
+   p2 = [c[0]+l/2,c[1]    ,0]
+   p3 = [c[0]+l/2,c[1]-l/2,0]
+   p4 = [c[0],    c[1]-l/2,0]
+   p5 = [c[0]-l/2,c[1]-l/2,0]
+   p6 = [c[0]-l/2,c[1]    ,0]
+   p7 = [c[0]-l/2,c[1]+l/2,0]
+
+   I = {}
+   pp = [[p7,p0,p1],[p1,p2,p3],[p3,p4,p5],[p5,p6,p7]]
+   for n,lp in enumerate(pp):
+    u1 = self.point_exist(i,lp[0])
+    u2 = self.point_exist(i,lp[2])
+    u = self.point_exist(i,lp[1])
+    if u == -1:
+     self.nodes = np.append(self.nodes,np.array([lp[1]]),axis=0)
+     u = len(self.nodes)-1
+     self.sides.append([u1,u])
+     s1 = len(self.sides)-1
+
+     self.sides.append([u,u2])
+     s2 = len(self.sides)-1
+     ll = self.line_exist(i,u1,u2)
+
+     #update maps-
+     nn = self.get_neighbor_elem(i,ll)
+     self.side_elem_map.setdefault(s1,[]).append(nn)
+     self.side_elem_map.setdefault(s2,[]).append(nn)
+     self.elem_side_map.setdefault(nn,[]).append(s2)
+     self.elem_side_map.setdefault(nn,[]).append(s1)
+
+     #reorder map--
+     self.elem_side_map[nn].remove(ll)
+     self.elems[nn].append(u)
+     self.elems[nn] = self.reorder(self.elems[nn])
+     #-----
+
+     self.node_elem_map.setdefault(u,[]).append(nn)
+     #-------------
+
+     self.side_list['active'].remove(ll)
+     self.side_list['active_global'].remove(ll)
+     self.side_list['active'].append(s1)
+     self.side_list['active_global'].append(s1)
+     self.side_list['active'].append(s2)
+     self.side_list['active_global'].append(s2)
+     self.sides.append([nc,u])
+     s3 = len(self.sides)-1
+     self.side_list['active'].append(s3)
+     self.side_list['active_global'].append(s3)
+     I.setdefault(n,[]).append(s1)
+     I[n].append(s3)
+     I.setdefault((n+1)%4,[]).append(s2)
+     I[(n+1)%4].append(s3)
+    else:
+     self.sides.append([nc,u])
+     s3 = len(self.sides)-1
+     ss = self.retrieve_sides(i,u1,u)
+     for s in ss:
+       self.side_elem_map[s].remove(i)  
+
+     I.setdefault(n,[]).append(s3)
+     I[n] += ss
+     ss = self.retrieve_sides(i,u2,u) 
+     for s in ss:
+       self.side_elem_map[s].remove(i) 
+       
+
+     I.setdefault((n+1)%4,[]).append(s3)
+     I[(n+1)%4] +=ss
+     self.side_list['active'].append(s3)
+     self.side_list['active_global'].append(s3)
+
+   #create elements----
+   for tmp in I.keys():
+    p = set()
+    for s in I[tmp]:
+     p.add(self.sides[s][0])
+     p.add(self.sides[s][1])
+     self.side_elem_map.setdefault(s,[]).append(len(self.elems))
+    node_ordered = self.reorder(list(p))
+    self.elems.append(node_ordered) 
+    self.elem_side_map.update({len(self.elems)-1:I[tmp]})
+    for n in node_ordered:
+      if not n in self.node_elem_map.keys(): 
+        self.node_elem_map.update({n:[]}) 
+      self.node_elem_map[n].append(len(self.elems)-1)
+
+   #update lists
+   self.l2g.remove(i)
+   self.g2l[i] = -1
+   for n in range(i+1,len(self.g2l)):
+    self.g2l[n] -=1
+
+   for i in range(4):
+    self.l2g.append(len(self.g2l))
+    self.g2l.append(len(self.l2g)-1)
+   #--------------------
+
+   self.nle = len(self.l2g)
+
+   #self.compute_mesh_data()
+  
+ def retrieve_sides(self,i,n1,n2):
+
+   a = self.nodes[n1][0:2] 
+   b = self.nodes[n2][0:2]
+   ll = []
+   for n in self.elems[i]:
+     c = self.nodes[n][0:2]  
+     if self.isBetween(a,b,c):
+      ll.append(n)
+     
+   ss = []  
+   for s in self.elem_side_map[i]:
+     if self.sides[s][0] in ll and self.sides[s][1] in ll:  
+       ss.append(s)
+
+   return ss
+
+ def isBetween(self,a, b, c):
+    epsilon=1e-3 
+    crossproduct = (c[1] - a[1]) * (b[0] - a[0]) - (c[0] - a[0]) * (b[1] - a[1])
+
+    # compare versus epsilon for floating point values, or != 0 if using integers
+    if abs(crossproduct) > epsilon:
+        return False
+
+    dotproduct = (c[0] - a[0]) * (b[0] - a[0]) + (c[1] - a[1])*(b[1] - a[1])
+    if dotproduct < 0:
+        return False
+
+    squaredlengthba = (b[0] - a[0])*(b[0] - a[0]) + (b[1] - a[1])*(b[1] - a[1])
+    if dotproduct > squaredlengthba:
+        return False
+
+    return True
+
+
+ def reorder(self,pp):
+  #for n in range(len(pp)):
+  #   node = self.nodes[pp[n]]
+  #   scatter(node[0],node[1])
+  #show()  
+  p_old = self.nodes[pp[0]]
+  l = [pp[0]]
+  n_old = [0]
+  while len(l) < len(pp):
+   mint = 1e4
+   for n,p in enumerate(pp):
+    if not n in n_old:   
+     if self.nodes[p][0] == p_old[0] or self.nodes[p][1] == p_old[1]:
+       tt =  np.linalg.norm(self.nodes[p]-p_old) 
+       if tt < mint:
+         mint = tt
+         p_trial = p
+         n_trial = n
+            
+   n_old.append(n_trial)
+   p_old = self.nodes[p_trial]
+   l.append(p_trial)
+   #print(len(l))
+   
+  return l
+
+
+ def line_exist(self,i,s1,s2):
+
+    for side in self.elem_side_map[i]:
+      tmp = self.sides[side]  
+      if (tmp[0] == s1 and tmp[1] == s2) or (tmp[0] == s2 and tmp[1] == s1) :
+         return side
+
+    return -1
+
+
+ def point_exist(self,i,c):
+
+    for n in self.elems[i]:
+     if np.linalg.norm(c-self.nodes[n]) < 1e-3:
+       return n
+
+    return -1
+          
+            
 
  def plot_polygons(self,**argv):
 
@@ -632,16 +867,24 @@ class Geometry(object):
       self.side_periodicity[len(self.sides)-1,1] = [0,-l,0] 
       self.exlude.append(len(self.sides)-1)
     #--------------------------
-    self.side_list.update({'active':range(len(self.sides)-2*n)})
-    self.side_list.update({'active_global':range(len(self.sides)-2*n)})
+    self.side_list.update({'active':list(range(len(self.sides)-2*n))})
+    self.side_list.update({'active_global':list(range(len(self.sides)-2*n))})
     #self.elem_list = {'active':range(len(self.elems))}
 
     #select active sides and active nodes---
     #We substract 2*n because we don't want to include the inactive periodic sides
     #create local_global_map
-    self.l2g = range(len(self.elems))
-    self.g2l = range(len(self.elems))
+
+    self.l2g = list(range(len(self.elems)))
+    self.g2l = list(range(len(self.elems)))
     self.nle = len(self.l2g)
+
+    #self.l2g = { i:i for i in range(len(self.elems)) }
+    #self.g2l = { i:i for i in range(len(self.elems)) }
+
+
+
+    self.elem_kappa_map = {}
     self.compute_elem_map()
 
     #---------------------
@@ -709,8 +952,6 @@ class Geometry(object):
     self.compute_boundary_condition_data()
     self.compute_connecting_matrix()
     self.compute_connecting_matrix_new()
-    #print('gg')
-    #self.compute_elem_map()
 
    
     data = {'nle':self.nle,'g2l':self.g2l,'l2g':self.l2g,'side_elem_map':self.side_elem_map,'elem_side_map':self.elem_side_map,\
@@ -832,13 +1073,15 @@ class Geometry(object):
 
      axis('equal')
      axis('off')
-     for node in self.nodes:
-       scatter(node[0],node[1],color='r')
- 
-     for y in range(n+1):
-      for x in range(n+1):
+     for n,node in enumerate(self.nodes):
+       #scatter(node[0],node[1],color='r')
        if ptext:
-        text(-l/2 + delta*x,l/2 - delta*y+0.15,str(y*(n+1)+x),color='r',ha='center')
+        text(node[0],node[1],n,color='r',ha='center')
+ 
+     #for y in range(n+1):
+     # for x in range(n+1):
+     #  if ptext:
+     #   text(-l/2 + delta*x,l/2 - delta*y+0.15,str(y*(n+1)+x),color='r',ha='center')
 
 
      for n_side,side in enumerate(self.sides):
@@ -849,9 +1092,9 @@ class Geometry(object):
       if ptext:
        text(m[0],m[1],str(n_side),color='b')
 
-     for ne in range(self.nle):
+     for ne in self.l2g:
          
-      ave = self.plot_elem(self.l2g[ne],color='gray')
+      ave = self.plot_elem(ne,color='gray')
 
       if ptext:
        text(ave[0],ave[1],str(ne),color='black')
@@ -915,6 +1158,7 @@ class Geometry(object):
           'dim':self.dim,\
           'weigths':self.weigths,\
           'region_elem_map':self.region_elem_map,\
+          'elem_kappa_map':self.elem_kappa_map,\
           'size':self.size,\
           'c_areas':self.c_areas,\
           'interp_weigths':self.interp_weigths,\
@@ -956,7 +1200,6 @@ class Geometry(object):
    for ll in self.side_list['active'] :
     if not ll in self.side_list['Hot'] and\
      not ll in self.side_list['Cold'] and not ll in self.side_list['Boundary']:
-         
      elems = self.get_elems_from_side(ll)
      kc1 = self.g2l[elems[0]]
      kc2 = self.g2l[elems[1]]
@@ -1012,7 +1255,8 @@ class Geometry(object):
  def compute_elem_map(self):
 
   self.elem_map = {}
-  for elem1 in self.elem_side_map:
+  for elem1 in self.elem_side_map: 
+   if elem1 == 35:
     for side in self.elem_side_map[elem1]:
      elem2 = self.get_neighbor_elem(elem1,side)
      self.elem_map.setdefault(elem1,[]).append(elem2)
@@ -1462,6 +1706,7 @@ class Geometry(object):
     self.nodes = self.state['nodes']
     #self.elem_list = self.state['elem_list']
     self.dim = self.state['dim']
+    self.elem_kappa_map = self.state['elem_kappa_map']
     self.n_elems = self.state['n_elems']
     self.A = self.state['A']
     self.sides = self.state['sides']
@@ -1767,6 +2012,7 @@ class Geometry(object):
   self.side_list.update({'active_global':self.side_list['active']})
   self.adjust_boundary_elements()
 
+  self.elem_kappa_map = {}
   self.l2g=range(len(self.elems))
   self.g2l=range(len(self.elems))
   self.nle = len(self.elems)
@@ -2170,7 +2416,8 @@ class Geometry(object):
  def compute_least_square_weigths(self):
 
    nd = len(self.elems[0])
-   diff_dist = np.zeros((len(self.elems),nd,self.dim))
+   #diff_dist = np.zeros((len(self.elems),nd,self.dim))
+   diff_dist = {}
 
    for ll in self.side_list['active_global'] :
     elems = self.side_elem_map[ll]
@@ -2185,12 +2432,15 @@ class Geometry(object):
      dist = c2-c1
 
      for i in range(self.dim):
-      diff_dist[kc1][ind1][i] = dist[i]
-      diff_dist[kc2][ind2][i] = -dist[i]
+      diff_dist.setdefault(kc1,np.zeros((len(self.elem_side_map[kc1]),self.dim)))[ind1][i] = dist[i]   
+      diff_dist.setdefault(kc2,np.zeros((len(self.elem_side_map[kc2]),self.dim)))[ind2][i] = -dist[i]   
+      #diff_dist[kc1][ind1][i] = dist[i]
+      #diff_dist[kc2][ind2][i] = -dist[i]
     else :
      dist = self.compute_side_centroid(ll) - c1
      for i in range(self.dim):
-      diff_dist[kc1][ind1][i] = dist[i]
+      #diff_dist[kc1][ind1][i] = dist[i]
+      diff_dist.setdefault(kc1,np.zeros((len(self.elem_side_map[kc1]),self.dim)))[ind1][i] = dist[i]   
       
      if ll in self.side_list['Interface']:# or self.side_list['Boundary']:
       kc2 = elems[1]
@@ -2198,14 +2448,22 @@ class Geometry(object):
       dist = self.compute_side_centroid(ll) - c2
       ind2 = self.elem_side_map[kc2].index(ll)
       for i in range(self.dim):
-        diff_dist[kc2][ind2][i] = dist[i]
-
+        #diff_dist[kc2][ind2][i] = dist[i]
+        diff_dist.setdefault(np.zeros((len(self.elem_side_map[kc2]),self.dim)))[ind2][i] = dist[i]   
 
 
    #Compute weights
-   self.weigths = []
-   for tmp in diff_dist :
-    self.weigths.append(np.dot(np.linalg.inv(np.dot(np.transpose(tmp),tmp)),np.transpose(tmp)  ))
+   self.weigths = {}
+   for h in diff_dist.keys() :
+    tmp = diff_dist[h]   
+    self.weigths[h] = np.dot(np.linalg.inv(np.dot(np.transpose(tmp),tmp)),np.transpose(tmp)  )
+
+
+
+   #self.weigths = []
+   #for tmp in diff_dist :
+   # print(tmp)   
+   # self.weigths.append(np.dot(np.linalg.inv(np.dot(np.transpose(tmp),tmp)),np.transpose(tmp)  ))
 
 
  def compute_interfacial_node_temperature(self,temp,kappa):

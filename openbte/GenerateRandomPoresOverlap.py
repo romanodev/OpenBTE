@@ -103,9 +103,7 @@ def adjust_position(x,y,r,Na,Lx,Ly,d_min):
  if d < d_min and d>0:
   dx += 2*d_min
 
-
  return dx,dy
-
 
 
 def consolidate(polys,argv):
@@ -181,9 +179,10 @@ def consolidate(polys,argv):
   return new_p3,n_coll
 
 
-def make_polygon(x,y,A,**options):
-
+def make_polygon(x,y,**options):
+ 
    Na = options['Na']
+   A = options['area']
    dphi = 2.0*math.pi/Na;
    r = math.sqrt(2.0*A/Na/math.sin(2.0 * math.pi/Na))
    poly_clip = []
@@ -197,17 +196,53 @@ def make_polygon(x,y,A,**options):
 
 
 
+def generate_non_overlapping_pores(make_pore,argv):
+
+  frame = argv['frame'] 
+  pores = []   
+  Np = argv['Np']
+  pbc = argv['pbc']
+  n = 0
+  centers_tmp = []
+  mind = 1e4
+  while len(pores) < Np*9:
+
+   x = np.random.uniform(-0.5,0.5)*argv['lx']
+   y = np.random.uniform(-0.5,0.5)*argv['ly']
+
+   poly = Polygon(make_pore(x,y,**argv))
+   intersect = False
+   for p in pores:
+       if p.distance(poly) < argv['dmin']:
+           intersect = True
+           break
+
+   if not intersect:  
+    for kp in range(len(pbc)):   
+     poly_clip = Polygon(make_pore(x + pbc[kp][0],y+pbc[kp][1],**argv))
+     pores.append(poly_clip)
+     centers_tmp.append([x + pbc[kp][0],y+pbc[kp][1]])
+    
+   #checking intersection with frame---
+   polys_cut = []
+   centers = []
+   for n,p in enumerate(pores):
+    if p.intersects(frame):
+     new = list(p.exterior.coords)[:-1]   
+     polys_cut.append(new)
+     centers.append(centers_tmp[n])
+ 
+  return polys_cut,centers,0
+
+
 
 def GenerateRandomPoresOverlap(argv):
+
 
   d_min =  argv['step']/20.0
   delta_pore = argv.setdefault('pore_distance',0.2)
 
-  #argv.setdefault('load_configuration',False)
-  #argv.setdefault('save_configuration',False)
   argv.setdefault('shape','square')
-
-
   if argv['shape'] == 'smoothed_square':
     make_pore = get_smoothed_square  
     options = {'smooth':argv.setdefault('smooth',3),'Na':6}
@@ -222,15 +257,12 @@ def GenerateRandomPoresOverlap(argv):
 
     if argv['shape'] == 'triangle':
         options = {'Na': 3}
-    
 
 
   Np = argv['Np']
 
   random_phi =  argv.setdefault('random_angle',True)
 
-  #Lxp =  argv['lx']*argv.setdefault('repeat_x',1)
-  #Lyp =  argv['ly']*argv.setdefault('repeat_y',1)
   Lxp =  argv['lx']
   Lyp =  argv['ly']
   Nx = 1
@@ -245,12 +277,11 @@ def GenerateRandomPoresOverlap(argv):
   frame_tmp.append([float(Lxp * Nx)/2,float(-Lyp * Ny)/2])
   frame_tmp.append([float(-Lxp * Nx)/2,float(-Lyp * Ny)/2])
   frame = Polygon(frame_tmp)
-
+  options.update({'frame':frame})
 
   Lx = Lxp
   Ly = Lyp
   area_tot = Lx*Ly
-
 
 
   #f1 = 1.5
@@ -289,7 +320,14 @@ def GenerateRandomPoresOverlap(argv):
   nn = 0
   confs = []
 
-  #Na = Na_p[0]
+  if not argv.setdefault('overlap',False):
+    argv.update({'area':Lx*Ly*argv['porosity']/Np,'pbc':pbc})
+    argv.update(options)
+    pores,centers,mind = generate_non_overlapping_pores(make_pore,argv)
+
+    return frame_tmp,pores,centers,mind
+
+
 
   if argv.setdefault('load_configuration',False):
    centers = np.load(argv.setdefault('configuration_file','conf.dat'),allow_pickle=True)
@@ -315,15 +353,8 @@ def GenerateRandomPoresOverlap(argv):
    area = Lx*Ly*phi/float(Np)
 
 
-   poly_clip = make_pore(x,y,area,**options)
+   poly_clip = make_pore(x,y,**options)
 
-   #r = math.sqrt(2.0*area/Na/math.sin(2.0 * math.pi/Na))
-   #poly_clip = []
-   #for ka in range(Na):
-   #  ph =  dphi/2 + (ka-1) * dphi
-   #  px  = x + r * math.cos(ph) 
-   #  py  = y + r * math.sin(ph) 
-   #  poly_clip.append([px,py])
 
    p = Polygon(poly_clip)
    a = p.intersection(frame).area == p.area
@@ -386,9 +417,7 @@ def GenerateRandomPoresOverlap(argv):
   eps = argv['step']/2.0
   polys_cut = []
   for p in polys:
-
    if p.intersects(frame):
-    
     new = list(p.exterior.coords)[:-1]   
     polys_cut.append(new)
     area += p.area

@@ -85,11 +85,11 @@ class Solver(object):
 
   def __init__(self,**argv):
 
-   if 'geometry' in argv.keys():   
+   if 'geometry' in argv.keys():  
      self.mesh = argv['geometry']
      self.mesh._update_data()
+    
    else:  
-    #self.mesh = Geometry(model='load',filename = argv.setdefault('geometry_filename','geometry.p'))
     self.mesh = Geometry(model='load',filename = argv.setdefault('geometry_filename','geometry.p'))
    if len(self.mesh.elems[0]) == 4:
          self.structured=True
@@ -333,12 +333,12 @@ class Solver(object):
      lu = splu(F.tocsc())
      if (self.keep_lu) :self.lu[irr_angle] = lu
 
-    #TB = np.tile(Tnew,(self.n_side_per_elem,1)).T
 
     boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1)
     if self.argv.setdefault('Experimental',False):
      #RHS = mfp * np.ones(self.mesh.nle) + np.ones(self.mesh.nle)
      RHS = mfp * boundary + np.ones(self.mesh.nle)
+     #RHS = np.ones(self.mesh.nle)
      #RHS = np.ones(self.mesh.nle)
     else:
      RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]

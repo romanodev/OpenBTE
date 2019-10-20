@@ -352,13 +352,17 @@ class Plot(object):
   argv.update({'variable':data})
   (triangulation,tmp,nodes) = vw.get_node_data(**argv)
 
-  argv.setdefault('direction',None)  
+  argv.setdefault('direction',None) 
+
+
   if argv['direction'] == 'x':
      data = np.array(tmp).T[0]
   elif argv['direction'] == 'y':
      data = np.array(tmp).T[1]
   elif argv['direction'] == 'z':
      data = np.array(tmp).T[2]
+  elif argv['direction'] == -1: 
+     data = tmp 
   elif argv['direction'] == 'magnitude':
       data = []
       for d in tmp:
@@ -581,6 +585,7 @@ class Plot(object):
 
  def plot_map(self,argv):
 
+   #fonts = init_plotting(square=True)    
    (Lx,Ly) = self.geo.get_repeated_size(argv)
    Sx = argv.setdefault('fig_size',5)
    Sy = Sx*Ly/Lx
@@ -592,36 +597,57 @@ class Plot(object):
    #plt.set_cmap(Colormap('winter'))
    (data,nodes,triangulation) =  self.get_data(**argv)
 
+
    vmin = argv.setdefault('vmin',min(data))
    vmax = argv.setdefault('vmax',max(data))
 
-   plt.tripcolor(triangulation,np.array(data),cmap='jet',shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),zorder=1)
+   if argv.setdefault('normalize',False):
+    data -=vmin
+    data /= (vmax-vmin)
+    vmin = 0
+    vmax = 1
+   
+   cc= 'winter'
+   plt.tripcolor(triangulation,np.array(data),cmap=cc,shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),zorder=1)
    if argv.setdefault('colorbar',False):
-    colorbar(norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax))
+
+    filename = os.path.dirname(__file__) + '/fonts/cmunrm.ttf'
+    prop = fm.FontProperties(fname=filename,family='serif')
+    fonts = {'regular':prop}
+    h = colorbar(norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),orientation='horizontal',shrink=0.75)
+    finalize_plotting(fonts)
+    h.ax.tick_params(labelsize=16)
 
     #Contour-----
    if argv.setdefault('iso_values',False):
     t = tricontour(triangulation,data,levels=np.linspace(vmin,vmax,10),colors='black',linewidths=1.5)
     clabel(t, fontsize=14, inline=True)
+ 
 
    if argv.setdefault('streamlines',False):# and (variable == 'fourier_flux' or variable == 'flux' ):
 
        argv['direction'] = -1
-       (data,nodes,triangulation) =  self.get_data(argv)
+       (data,nodes,triangulation) =  self.get_data(**argv)
+
+       #argv['direction'] = None
+       #(mod,nodes,triangulation) =  self.get_data(**argv)
+       
 
        n_lines = argv.setdefault('n_lines',10)*self.Ny #assuming transport across x
        xi = np.linspace(-Lx*0.5,Lx*0.5,300*self.Nx)
        yi = np.linspace(-Ly*0.5,Ly*0.5,300*self.Ny)
        x = np.array(nodes)[:,0]
        y = np.array(nodes)[:,1]
-       z = np.array(data).T
+       z = np.array(data).T[0]
        Fx = griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
        z = np.array(data).T[1]
        Fy = griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
 
        seed_points = np.array([-Lx*0.5*0.99*np.ones(n_lines),np.linspace(-Ly*0.5*0.98,Ly*0.5*0.98,n_lines)])
-       ss = streamplot(xi, yi, Fx, Fy,maxlength = 1e8,start_points=seed_points.T,integration_direction='both',color='r',minlength=0.95,linewidth=1)
 
+       ss = streamplot(xi, yi, Fx, Fy,maxlength = 100,start_points=seed_points.T,integration_direction='both',color='r',minlength=0.95)
+
+       #plot(seed_points[0], seed_points[1], 'bo')
 
    if argv.setdefault('plot_interfaces',False):
     pp = self.geo.get_interface_point_couples(argv)
@@ -642,6 +668,7 @@ class Plot(object):
    plt.ylim([-Ly*0.5,Ly*0.5])
    plt.gca().margins(x=0,y=0)
 
+   #finalize_plotting(fonts)
    plt.axis('tight')
    plt.axis('equal')
    if argv.setdefault('save',True):
