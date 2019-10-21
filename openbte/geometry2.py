@@ -212,7 +212,7 @@ class Geometry(object):
      
     state = self.compute_mesh_data()
     if self.argv.setdefault('save',True):
-     pickle.dump(state,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
+     pickle.dump(state,open(argv.setdefault('filename_geometry','geometry.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
 
 
 

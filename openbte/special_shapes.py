@@ -3,7 +3,7 @@ import math
 
 
 
-def make_polygon(x,y,**options):
+def make_polygon(**options):
  
    Na = options['Na']
    A = options['area']
@@ -12,15 +12,15 @@ def make_polygon(x,y,**options):
    poly_clip = []
    for ka in range(Na):
      ph =  dphi/2 + (ka-1) * dphi
-     px  = x + r * math.cos(ph) 
-     py  = y + r * math.sin(ph) 
+     px  = r * math.cos(ph) 
+     py  = r * math.sin(ph) 
      poly_clip.append([px,py])
 
    return poly_clip  
 
 
 
-def get_smoothed_square(cx,cy,**argv):
+def get_smoothed_square(**argv):
 
      
      smooth = argv['smooth']
@@ -32,29 +32,29 @@ def get_smoothed_square(cx,cy,**argv):
      dphi = math.pi/Na/2;
      for ka in range(Na+1):
       ph =  dphi * ka
-      px  = cx + L/2 - smooth + smooth * math.cos(ph)
-      py  = cy + L/2 - smooth + smooth * math.sin(ph)
+      px  = L/2 - smooth + smooth * math.cos(ph)
+      py  = L/2 - smooth + smooth * math.sin(ph)
       p.append([px,py])
 
      dphi = math.pi/Na/2;
      for ka in range(Na+1):
       ph = np.pi/2 +  dphi * ka
-      px  = cx - L/2 + smooth + smooth * math.cos(ph)
-      py  = cy + L/2 - smooth + smooth * math.sin(ph)
+      px  = - L/2 + smooth + smooth * math.cos(ph)
+      py  = + L/2 - smooth + smooth * math.sin(ph)
       p.append([px,py])
 
      dphi = math.pi/Na/2;
      for ka in range(Na+1):
       ph = np.pi +  dphi * ka
-      px  = cx - L/2 + smooth + smooth * math.cos(ph)
-      py  = cy - L/2 + smooth + smooth * math.sin(ph)
+      px  = - L/2 + smooth + smooth * math.cos(ph)
+      py  = - L/2 + smooth + smooth * math.sin(ph)
       p.append([px,py])
 
      dphi = math.pi/Na/2;
      for ka in range(Na+1):
       ph = 1.5*np.pi +  dphi * ka
-      px  = cx + L/2 - smooth + smooth * math.cos(ph)
-      py  = cy - L/2 + smooth + smooth * math.sin(ph)
+      px  = + L/2 - smooth + smooth * math.cos(ph)
+      py  = - L/2 + smooth + smooth * math.sin(ph)
       p.append([px,py])
 
      return p
