@@ -10,7 +10,12 @@ from .special_shapes import *
 def GenerateSquareLatticePores(argv):
 
   argv.setdefault('shape','square')
-  if argv['shape'] == 'smoothed_square':
+
+  if argv['shape'] == 'custom':
+     make_pore = argv['shape_function']
+     options = argv.setdefault('shape_options',{})
+
+  elif argv['shape'] == 'smoothed_square':
     make_pore = get_smoothed_square  
     options = {'smooth':argv.setdefault('smooth',3),'Na':6}
   else:  
