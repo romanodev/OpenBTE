@@ -1,6 +1,25 @@
 import numpy as np
 import math
 
+
+
+def make_polygon(x,y,**options):
+ 
+   Na = options['Na']
+   A = options['area']
+   dphi = 2.0*math.pi/Na;
+   r = math.sqrt(2.0*A/Na/math.sin(2.0 * math.pi/Na))
+   poly_clip = []
+   for ka in range(Na):
+     ph =  dphi/2 + (ka-1) * dphi
+     px  = x + r * math.cos(ph) 
+     py  = y + r * math.sin(ph) 
+     poly_clip.append([px,py])
+
+   return poly_clip  
+
+
+
 def get_smoothed_square(cx,cy,**argv):
 
      

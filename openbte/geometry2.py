@@ -5,7 +5,6 @@ import numpy as np
 import subprocess
 import mpi4py
 from pyvtk import *
-from .GenerateSquareLatticePoresSmooth import *
 from .GenerateSquareLatticePores import *
 from .ComputeStructuredMesh import *
 from .GenerateHexagonalLatticePores import *

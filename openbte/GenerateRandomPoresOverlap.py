@@ -258,7 +258,6 @@ def GenerateRandomPoresOverlap(argv):
     if argv['shape'] == 'triangle':
         options = {'Na': 3}
 
-
   Np = argv['Np']
 
   random_phi =  argv.setdefault('random_angle',True)
