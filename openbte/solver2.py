@@ -417,7 +417,7 @@ class Solver(object):
    self.state = data_save
    if self.argv.setdefault('only_fourier',False) or self.argv.setdefault('bte_max_iter',True) == 1:
     if self.save_state:
-      pickle.dump(self.state,open(argv.setdefault('filename','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
+      pickle.dump(self.state,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
    
    #Initialize data-----
    n_iter = len(kappa_vec)
