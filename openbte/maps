@@ -17,8 +17,6 @@ from . import GenerateMesh2D
 from . import GenerateBulk2D
 from . import GenerateBulk3D
 from . import porous
-import networkx as nx
-
 
 import matplotlib
 be = matplotlib.get_backend()
@@ -212,16 +210,13 @@ class Geometry(object):
      subprocess.check_output(['gmsh','-format','msh2','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
      self.import_mesh()
      
-    self.compute_mesh_data()
+    state = self.compute_mesh_data()
     if self.argv.setdefault('save',True):
-     self.save(**argv)   
-     #pickle.dump(state,open(argv.setdefault('filename_geometry','geometry.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
+     pickle.dump(state,open(argv.setdefault('filename_geometry','geometry.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
 
 
-    return self.state
 
- def save(self,**argv):
-     pickle.dump(self.state,open(argv.setdefault('filename_geometry','geometry.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
+     return state
 
 
  # MPI.COMM_WORLD.Barrier()
@@ -258,119 +253,39 @@ class Geometry(object):
        plot([p1[0],p2[0]],[p1[1],p2[1]],color='w',ls='--',zorder=1)
 
 
- def compute_general_centroid_and_side(self,i,verbose=False):
+ def compute_general_centroid_and_side(self,i):
 
-
-  xmax = -1e4
-  xmin = 1e4
-  ymax = -1e4
-  ymin = 1e4
-  #print(' ')
-  #plot([-2.5,-2.5,2.5,2.5,-2.5],[-2.5,2.5,2.5,-2.5,-2.5])
-  #axis('equal')
-  #axis('off')
-  #print(len(self.elems[i]))
-
-  for n in self.elems[i]:
-    p = self.nodes[n]  
-    xmin = min([xmin,p[0]])  
-    xmax = max([xmax,p[0]])  
-    ymin = min([ymin,p[1]])  
-    ymax = max([ymax,p[1]]) 
-  #  scatter(p[0],p[1])
-  p0 = [xmin,ymin]
-  p1 = [xmin,ymax]
-  p2 = [xmax,ymax]
-  p3 = [xmax,ymin]
- 
-
-  pp_final = -np.ones(4,dtype=int)
-  for n in self.elems[i]:
-      p = self.nodes[n][0:2] 
-      if np.linalg.norm(p-p0) < 1e-4:
-         pp_final[0] = n
-      if np.linalg.norm(p-p1) < 1e-4:
-         pp_final[1] = n
-      if np.linalg.norm(p-p2) < 1e-4:
-         pp_final[2] = n
-      if np.linalg.norm(p-p3) < 1e-4:
-         pp_final[3] = n 
- 
-  l = list(pp_final)
-  
-  ave = np.zeros(3)
-  for p in l:
-    ave +=self.nodes[p]
-  ave = ave/4
-
-  #text(ave[0],ave[1],str(i),color='black',va='center',ha='center')
-  #show()
-
-  l = np.linalg.norm(self.nodes[pp_final[1]]-self.nodes[pp_final[0]])
-
-  return ave,l
-
-  '''
+   
    pm2 = self.elems[i][0]
    pm1 = self.elems[i][1]
    l = [pm2,pm1]
-   delta = 1e-6
    for n in range(len(self.elems[i])-2):
      p = self.elems[i][(n+2)%len(self.elems[i])]
      
-     if np.linalg.norm(np.cross(self.nodes[p]-self.nodes[pm1],self.nodes[pm1]-self.nodes[pm2])) < np.linalg.norm(self.nodes[pm1]-self.nodes[pm2])/100:
+     if np.linalg.norm(np.cross(self.nodes[p]-self.nodes[pm1],self.nodes[pm1]-self.nodes[pm2])) < 1e-3:
       l[-1] = p
      else: 
       l.append(p)
      pm2 = pm1
      pm1 = p
-  
-   #if len(l) == 2:
-   # print(self.elems[i],l)
-   # self.reorder(i,self.elems[i],verbose=verbose)
-   # for u in self.elems[i]:
-   #   scatter(self.nodes[u][0],self.nodes[u][1],color='g') 
-   #   text(self.nodes[u][0],self.nodes[u][1],str(u))
-   # show() 
-   # quit()
-
-   #check the last point---
-   if np.linalg.norm(np.cross(self.nodes[l[0]]-self.nodes[l[-1]],self.nodes[l[-1]]-self.nodes[l[-2]])) < np.linalg.norm(self.nodes[l[-1]]-self.nodes[l[-2]])/100:
-
-    del l[len(l)-1]
-
-   #check the first point---
-   #if not len(l) == 4:
-   # print(self.elems[i])
-   # quit()
-
-   
-   if np.linalg.norm(np.cross(self.nodes[l[0]]-self.nodes[l[-1]],self.nodes[l[1]]-self.nodes[l[0]])) < np.linalg.norm(self.nodes[l[1]]-self.nodes[l[0]])/100:
-    del l[0]
-
-
-   #----------------------- 
-   #if i == 27:
-   # print(self.elems[i],l)   
-   # for u in self.elems[i]:
-   #   scatter(self.nodes[u][0],self.nodes[u][1]) 
-   #   text(self.nodes[u][0],self.nodes[u][1],str(u))
-   # show()  
-  
+ 
    ave = [0,0,0]
    for r in l:
      ave +=self.nodes[r]
    ave /=4  
-   
    side = np.linalg.norm(self.nodes[l[1]]-self.nodes[l[2]])
+   #print(l)
+   #for n in range(len(self.elems[i])):
+   #  node = self.nodes[self.elems[i][n]]
+   #  scatter(node[0],node[1])
+   #show()  
 
    return ave,side
-  '''
 
  def add_periodic_nodes(self,u,up):
 
-     self.periodic_nodes.setdefault(u,[]).append(up)
-     self.periodic_nodes.setdefault(up,[]).append(u)
+     self.periodic_nodes.update({up:u})
+     self.periodic_nodes.update({u:up})
 
  def update_elem_side_map(self,elems,sides): #first elements, then sides
   for elem in elems:
@@ -382,68 +297,53 @@ class Geometry(object):
  def remove_elem_side_map(self,elems,sides): #first elements, then sides
   for elem in elems:
    for side in sides:
-       if side in self.elem_side_map[elem]:   
-        self.elem_side_map[elem].remove(side)
-       if elem in self.side_elem_map[side]:   
-        self.side_elem_map[side].remove(elem)
+    self.elem_side_map[elem].remove(side)
+    self.side_elem_map[side].remove(elem)
 
 
  def update_elem_node_map(self,elems,nodes): #first elements, then sides
 
    for elem in elems:
-    c =  self.compute_elem_centroid(elem)
     for node in nodes:
+        if not node in self.elems[elem]:   
+          self.elems[elem].append(node)
+        if not elem in self.node_elem_map.setdefault(node,[]):   
+          self.node_elem_map[node].append(elem)
 
-        #check is the are periodic versions, which are more appropriate 
-        n_current = node
-        if node in self.periodic_nodes.keys():
-          dd = np.linalg.norm(c-self.nodes[node])
-          for n2 in self.periodic_nodes[node]:
-              if np.linalg.norm(c-self.nodes[n2]) < dd:
-               dd = np.linalg.norm(c-self.nodes[n2])
-               if n_current in self.elems[elem]:
-                self.elems[elem].remove(n_current)
-               n_current = n2
-               if not n_current in self.elems[elem]:  
-                self.elems[elem].append(n_current)
-              else:  
-               if n2 in self.elems[elem]:  
-                self.elems[elem].remove(n2)
-                
-        #-------------------------------------------
-        if not n_current in self.elems[elem]:  
-            self.elems[elem].append(n_current)
-        if not elem in self.node_elem_map.setdefault(n_current,[]):   
-          self.node_elem_map[n_current].append(elem)
 
-    self.elems[elem] = self.reorder(self.elems[elem])
-          
+ def break_line(self,ll,i,p,u1,u2):
 
- def break_line(self,ll):
-
-    p =  self.compute_side_centroid(ll)
 
     #add node ---
     self.nodes = np.append(self.nodes,[np.array(p)],axis=0)
-
     u = len(self.nodes)-1
 
     #create the two lines---
-    u1 = self.sides[ll][0]
-    u2 = self.sides[ll][1]
     self.sides.append([u1,u])
     s1 = len(self.sides)-1
     self.sides.append([u,u2])
     s2 = len(self.sides)-1
 
-    #add to placeholders
-    self.side_periodicity = np.append(self.side_periodicity,np.zeros((1,2,3)),axis=0)
-    self.side_periodicity = np.append(self.side_periodicity,np.zeros((1,2,3)),axis=0)
+    #look for the neighbor elements---
+    nn = self.get_neighbor_elem(i,ll)
 
+    pp = self.side_periodicity[ll]
+    ind = self.side_elem_map[ll].index(nn)
+    if ind == 0:
+      j1 = 0
+      j2 = 1
+    else:  
+      j2 = 0
+      j1 = 1
+    newp = [self.side_periodicity[ll][j1],self.side_periodicity[ll][j2]]
+    self.side_periodicity = np.append(self.side_periodicity,[newp],axis=0)
+    self.side_periodicity = np.append(self.side_periodicity,[newp],axis=0)
+
+    #update side list
     if ll in self.side_list['Periodic']:
        self.side_list['Periodic'].append(s1) 
        self.side_list['Periodic'].append(s2) 
-       self.side_list['Periodic'].remove(ll) 
+       self.side_list['Periodic'].append(ll) 
 
        #update pairs-----------------------
        for n,pp in enumerate(self.pairs):
@@ -461,7 +361,6 @@ class Geometry(object):
           break
        #-----------------------------------
 
-    #update maps
     if ll in self.side_list['active']:
      self.side_list['active'].remove(ll)
      self.side_list['active'].append(s1)
@@ -472,33 +371,10 @@ class Geometry(object):
      self.side_list['active_global'].append(s1)
      self.side_list['active_global'].append(s2)
 
-    if ll in self.exlude:
-      self.exlude.append(s1)
-      self.exlude.append(s2)
+
 
     return [s1],[s2],u
 
-
- def refine_region(self,**argv):
-
-   xmin = argv.setdefault('xmin',-self.size[0]/2)  
-   xmax = argv.setdefault('xmax',self.size[0]/2)  
-   ymin = argv.setdefault('ymin',-self.size[1]/2)  
-   ymax = argv.setdefault('ymax',self.size[1]/2)  
-
-   frame = Polygon([[xmin,ymin],[xmin,ymax],[xmax,ymax],[xmax,ymin]])
-   rr = []
-   for i in self.elem_list['active']:  
-    c,l = self.compute_general_centroid_and_side(i)
-    if frame.contains(Point(c[0],c[1])):
-      rr.append(i)  
-
-   #print(rr)
-   for i in rr:
-     self.refine(i)
-
-
- 
  def refine(self,i):
 
    #add node------------------
@@ -515,9 +391,9 @@ class Geometry(object):
    tmp = {}
    p_conn = {}
    #remove node association---
-   #for node in self.elems[i]:
-   #    if i in self.node_elem_map[node]:  
-   #      self.node_elem_map[node].remove(i)  
+   print(self.elems[i])
+   for node in self.elems[i]:
+     self.node_elem_map[node].remove(i)  
    #------
 
    p0 = [c[0],    c[1]+l/2,0]
@@ -530,82 +406,27 @@ class Geometry(object):
    p7 = [c[0]-l/2,c[1]+l/2,0]
 
    I = {}
-   I_not_active = {}
    pp = [[p7,p0,p1],[p1,p2,p3],[p3,p4,p5],[p5,p6,p7]]
    for n,lp in enumerate(pp):
     u1 = self.point_exist(i,lp[0])
     u2 = self.point_exist(i,lp[2])
-      
+
     #External Line
     u = self.point_exist(i,lp[1])
-
     if u == -1:
-     ll1,ll2,nn,u1,u2 = self.line_exist(i,u1,u2)
+     #new external line   
+     ll,per = self.line_exist(i,u1,u2)
+     s1,s2,u = self.break_line(ll,i,lp[1],u1,u2)
+     if not per == -1:
+      cc = -self.side_periodicity[ll][1-self.side_elem_map[ll].index(i)]
 
-
-     #--------------------------------------------
-     if ll1 == ll2: #no periodic
-      s1,s2,u = self.break_line(ll1) #this one is always active----
-
-      #update only the current element--------------------
-      self.update_elem_node_map([nn],[u])
-      self.update_elem_side_map([nn],s1+s2)
-      #----------------------------------------------------
-     else:  
-        s1,s2,u = self.break_line(ll1) #this one is always active----
-        s1p,s2p,up = self.break_line(ll2)
-        self.pairs.append([s1[0],s1p[0]]) 
-        self.pairs.append([s2[0],s2p[0]]) 
-
-        #update maps-------------------------------
-        self.add_periodic_nodes(u,up)
-        self.update_elem_side_map([nn],s1 + s2) 
-        self.update_elem_node_map([nn],[u,up])
-        for s in s1p:
-         self.side_elem_map.setdefault(s,[]).append(nn)
-         if not s in self.exlude:
-          self.exlude.append(s) 
-        for s in s2p:
-         self.side_elem_map.setdefault(s,[]).append(nn)
-         if not s in self.exlude:
-          self.exlude.append(s)
-         #------------------------------------- 
-
-
-      #Update not active sides------------
-        if not n in I_not_active.keys():
-           I_not_active.update({n:s1p})
-        else:   
-           I_not_active[n] += s1p
-
-        if not (n+1)%4 in I_not_active.keys():
-           I_not_active.update({(n+1)%4:s2p})
-        else:   
-           I_not_active[(n+1)%4] += s2p
-        #-------------------------------------    
-        if np.linalg.norm(self.nodes[nc]-self.nodes[up]) < np.linalg.norm(self.nodes[nc]-self.nodes[u]):
-         u = up
-
-    else:
-
-     s1,s1p = self.retrieve_sides(i,u1,u)
-     
-     if not n in I_not_active.keys():
-      I_not_active.update({n:s1p})
-     else:   
-      I_not_active[n] += s1p
-
-     s2,s2p = self.retrieve_sides(i,u2,u)
-
-     if not (n+1)%4 in I_not_active.keys():
-      I_not_active.update({(n+1)%4:s2p})
-     else: 
-      I_not_active[(n+1)%4] += s2p
-
+      s1,s2,dummy = self.break_line(per,i,np.array(lp[1])+np.array(cc),self.periodic_nodes[u1],self.periodic_nodes[u2])
+    else: 
+     s1 = self.retrieve_sides(i,u1,u)
+     s2 = self.retrieve_sides(i,u2,u)
      self.remove_elem_side_map([i],s1+s2)
-     self.remove_elem_side_map([i],s1p+s2p)
 
-
+    #Internal Line----------------------------
     self.sides.append([nc,u])
     s3 = len(self.sides)-1
     self.side_periodicity = np.append(self.side_periodicity,np.zeros((1,2,3)),axis=0)
@@ -619,77 +440,52 @@ class Geometry(object):
     I.setdefault((n+1)%4,[]).append(s3)
     I[(n+1)%4] +=s2
     #--------------------
+
+   #create elements----
    for tmp in I.keys():
     p = set()
    
+    #print(len(I.keys()))
+    real_sides = []
     for s in I[tmp]:
-      p.add(self.sides[s][0])
-      p.add(self.sides[s][1])
-
-    node_ordered = self.reorder(list(p))
+     p.add(self.sides[s][0])
+     p.add(self.sides[s][1])
+    node_ordered = self.reorder(i,list(p))
 
     self.elems.append(node_ordered)
-
     self.update_elem_side_map([len(self.elems)-1],I[tmp]) #first elements, then sides
     self.update_elem_node_map([len(self.elems)-1],node_ordered) #first elements, then sides
-    
-   #Add in-active side connections----
-   for n,tmp in enumerate(I_not_active.keys()):
-    for s in I_not_active[tmp]:
-      self.side_elem_map[s].append(len(self.elems)-4+tmp)
-
-   #------------------------------
 
    #Now we swap the index in the side elem map because the first one should always be the non periodic one
-   for side in self.side_list['Periodic']:
-    cs = self.compute_side_centroid(side)
-    (l,k) = self.side_elem_map[side]
-    cl = self.compute_elem_centroid(l)
-    ck = self.compute_elem_centroid(k)
-    if np.linalg.norm(ck-cs) < np.linalg.norm(cl-cs):
-      self.side_elem_map[side] = [k,l]
-
-    for s in self.pairs:
-     if s[0] == side:
-      ind = s[1]
-      break
-    
-    #This can be done in one line probably - filtering skew values
-    d = self.compute_side_centroid(side)-self.compute_side_centroid(ind)
-    a = sorted(d, key=lambda row: np.abs(row))[-1]
-    maxi =  list(d).index(a)
-    dd = np.zeros(3)
-    dd[maxi] = d[maxi]
-    #------------------------------
-
-    self.side_periodicity[side][1] = dd
-    self.side_periodicity[ind][1] = -dd
-
-
+   old = []
+   for tmp in I.keys():
+    for s in I[tmp]:
+        if not s in old:  
+         self.side_elem_map[s] = [self.side_elem_map[s][1],self.side_elem_map[s][0]]  
+         a = self.side_periodicity[s].copy()    
+         self.side_periodicity[s] = [a[1],a[0]]
+         old.append(s)
+   #----------------------------------------------         
+ 
    #update lists
    self.l2g.remove(i)
    self.g2l[i] = -1
    for n in range(i+1,len(self.g2l)):
     self.g2l[n] -=1
 
-   for n in range(4):
+   for i in range(4):
     self.l2g.append(len(self.g2l))
     self.g2l.append(len(self.l2g)-1)
    #--------------------
 
-   self.elem_list['active'].remove(i)
-   self.elem_list['active'].append(len(self.elems)-4)
-   self.elem_list['active'].append(len(self.elems)-3)
-   self.elem_list['active'].append(len(self.elems)-2)
-   self.elem_list['active'].append(len(self.elems)-1)
    self.nle = len(self.l2g)
   
  def retrieve_sides(self,i,n1,n2):
 
+   #This retrieve periodic active side, too.
+   #---------------------------------------------------------
 
    #regular--------
-   #self.elems[i] = self.reorder(self.elems[i])
-
    a = self.nodes[n1][0:2] 
    b = self.nodes[n2][0:2]
    ll = []
@@ -697,36 +493,15 @@ class Geometry(object):
      c = self.nodes[n][0:2]  
      if self.isBetween(a,b,c):
       ll.append(n)
-      if n in self.periodic_nodes.keys():
-        for np in self.periodic_nodes[n]:
-          ll.append(np)
-
-   #active----
-   ss = [] 
+   ss = []  
    for s in self.elem_side_map[i]:
      if self.sides[s][0] in ll and self.sides[s][1] in ll:  
        ss.append(s)
-
-   #inactive----
-   #rint('',ll)
-   ssp = [] 
-   for s in self.exlude:
-     if self.sides[s][0] in ll and self.sides[s][1] in ll:  
-       ssp.append(s)
-
-   return ss,ssp
-
-
-   '''
    #Check if periodic---
    if n1 in self.periodic_nodes and n2 in self.periodic_nodes:
     
     n1p = self.periodic_nodes[n1]
     n2p = self.periodic_nodes[n2]
-
-    #identify n1p and n2p
-
-
     a = self.nodes[n1p][0:2] 
     b = self.nodes[n2p][0:2]
     ll = []
@@ -745,10 +520,11 @@ class Geometry(object):
        ssp.append(s)
     if ssp[0] in self.side_list['Periodic']:
       return  ssp
-'''
+
+   return ss
 
  def isBetween(self,a, b, c):
-    epsilon=1e-8 
+    epsilon=1e-3 
     crossproduct = (c[1] - a[1]) * (b[0] - a[0]) - (c[0] - a[0]) * (b[1] - a[1])
 
     # compare versus epsilon for floating point values, or != 0 if using integers
@@ -766,122 +542,77 @@ class Geometry(object):
     return True
 
 
- def reorder(self,pp,verbose=False):
+ def reorder(self,i,pp_old):
 
+  #for n in range(len(pp)):
+  #   node = self.nodes[pp[n]]
+  #   scatter(node[0],node[1])
+  #show()  
 
+  #get the closest points---
+  c,l = self.compute_general_centroid_and_side(i)
+  pp = []
+  for p1 in pp_old:
+   n1 = self.nodes[p1]
+   if p1 in self.periodic_nodes.keys():
+     p2 = self.periodic_nodes[p1]  
+     n2 = self.nodes[p2]
+     if np.linalg.norm(c-n2) < np.linalg.norm(c-n1):
+       pp.append(p2)
+     else:  
+       pp.append(p1)
+   else:   
+    pp.append(p1)   
+  #-------
 
-  #eliminate duplicates---
-  #n = len(pp_old)
-  #c,l = self.compute_general_centroid_and_side(i)
-  c=(sum([self.nodes[p][0] for p in pp])/len(pp),sum([self.nodes[p][1] for p in pp])/len(pp),0)
-  #print('ff',c)
-  #quit()
-
- 
-  #pp = []
-  #for p in pp_old:
-  #  if not p in pp:
-  #    pt = p
-  #    if p in self.periodic_nodes.keys():
-  #     dref = np.linalg.norm(c-self.nodes[p])
-  #     for p2 in self.periodic_nodes[p]:
-  #        d = np.linalg.norm(c-self.nodes[p2]) 
-  #        pt = p2
-  #        dref = d
-  #    if not pt in pp:
-  #     pp.append(pt)     
- 
-  
-
-  #cent=(sum([self.nodes[p][0] for p in pp])/len(pp),sum([self.nodes[p][1] for p in pp])/len(pp))
-  # sort by polar angle
-  pp.sort(key=lambda p: math.atan2(self.nodes[p][1]-c[1],self.nodes[p][0]-c[0]))
-
-
-  return pp
-
-  '''
-  for p in pp_old:
-  
-   node = self.nodes[p]
-   scatter(node[0],node[1])
-   text(node[0],node[1],str(p))
-  print(pp_old) 
-  show()  
-
+  #pp = pp_old
+  p_old = self.nodes[pp[0]]
   l = [pp[0]]
+  n_old = [0]
   while len(l) < len(pp):
    mint = 1e4
-   found = False
-   p_old = self.nodes[l[-1]]
-   for p in pp :
-    if not p in l:   
-     if abs(self.nodes[p][0] - p_old[0])<1e-6 or abs(self.nodes[p][1] - p_old[1])<1e-6:
+   for n,p in enumerate(pp):
+    if not n in n_old: 
+     if self.nodes[p][0] == p_old[0] or self.nodes[p][1] == p_old[1]:
        tt =  np.linalg.norm(self.nodes[p]-p_old)
        if tt < mint:
          mint = tt
          p_trial = p
-         found = True
-   if found == False and len(l)<len(pp):
-      print('error finding closed path')
-      quit()
-   else:   
-    l.append(p_trial)
-
-  '''
+         n_trial = n
+   n_old.append(n_trial)
+   p_old = self.nodes[p_trial]
+   l.append(p_trial)
+  return l
 
 
  def line_exist(self,i,s1,s2):
+
     #Check is there is periodicity
     per = -1 
-    active_2 = -1 
-
-    g1 = s1; g2=s2
-    if s1 in self.periodic_nodes.keys() and s2 in self.periodic_nodes.keys():
-     for side in self.elem_side_map[i] + self.exlude:
-       tmp = self.sides[side]  
-       if (tmp[0] in self.periodic_nodes[s1] and tmp[1] in self.periodic_nodes[s2]) or \
-         (tmp[0] in self.periodic_nodes[s2] and tmp[1] in self.periodic_nodes[s1]) :
-         per = side
-         if tmp[1] in self.periodic_nodes[s1]:
-          g2 = tmp[0]; g1=tmp[1]
-          self.sides[side] = [g1,g2]
-         else: 
-          g1 = tmp[0]; g2=tmp[1]
-          
-         active_2 = per in self.side_list['active']
-         break
-
-    #print(i,self.elem_side_map[i])
     for side in self.elem_side_map[i] + self.exlude:
       tmp = self.sides[side]  
+      if s1 in self.periodic_nodes.keys() and s2 in self.periodic_nodes.keys():
+
+       if (tmp[0] == self.periodic_nodes[s1] and tmp[1] == self.periodic_nodes[s2]) or \
+         (tmp[0] == self.periodic_nodes[s2] and tmp[1] == self.periodic_nodes[s1]) :
+         per = side
+         break
+
+
+    for side in self.elem_side_map[i] + self.exlude:
+        
+      tmp = self.sides[side]  
       if (tmp[0] == s1 and tmp[1] == s2) or (tmp[0] == s2 and tmp[1] == s1) :
+         return side,per
 
-         active_1 = side in self.side_list['active']
 
-         #swaping order for convenience---
-         if not s1 == self.sides[side][0]:
-           self.sides[side] = [s1,s2]  
-         #----  
-
-         if per == -1: per = side
-          
-         if active_1:
-            return side,per,self.get_neighbor_elem(i,side),g1,g2
-         else:
-            if per == side:
-             return per,side,self.get_neighbor_elem(i,side),g1,g2
-            else:
-             return per,side,self.get_neighbor_elem(i,per),g1,g2
-
-    #print('g')
     return -1
 
 
  def point_exist(self,i,c):
 
     for n in self.elems[i]:
-     if np.linalg.norm(c-self.nodes[n]) < 1e-6:
+     if np.linalg.norm(c-self.nodes[n]) < 1e-3:
        return n
 
     return -1
@@ -1075,9 +806,10 @@ class Geometry(object):
      for e in elem:
       pp.append(self.nodes[e][:2])
      path = create_path(pp)
-     patch = patches.PathPatch(path,linestyle=None,linewidth=0.0,color=color,zorder=1,joinstyle='miter',alpha=0.7)
+     patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=1,joinstyle='miter',alpha=0.7)
      gca().add_patch(patch);
      ave = np.sum(np.array(pp),axis=0)/4
+
      ave,dummy = self.compute_general_centroid_and_side(ne)
 
      return ave
@@ -1104,24 +836,13 @@ class Geometry(object):
     #Build Periodic Nodes----
     self.periodic_nodes = {}
     for x in range(n+1):
-        #self.periodic_nodes.update({x:n*(n+1) + x})
-        #self.periodic_nodes.update({n*(n+1) + x:x})
-        self.periodic_nodes.setdefault(x,[]).append(n*(n+1) + x)
-        self.periodic_nodes.setdefault(n*(n+1)+x,[]).append(x)
-
+        self.periodic_nodes.update({x:n*(n+1) + x})
+        self.periodic_nodes.update({n*(n+1) + x:x})
     #-----------------------
 
     for y in range(n+1):
-        #self.periodic_nodes.update({y*(n+1):y*(n+1) + n})
-        #self.periodic_nodes.update({y*(n+1) + n:y*(n+1)})
-        self.periodic_nodes.setdefault(y*(n+1),[]).append(y*(n+1) + n)
-        self.periodic_nodes.setdefault(y*(n+1)+n,[]).append(y*(n+1))
-
-    #add corners--
-    self.periodic_nodes.setdefault(0,[]).append((n+1)*(n+1)-1)
-    self.periodic_nodes.setdefault((n+1)*(n+1)-1,[]).append(0)
-    self.periodic_nodes.setdefault(n,[]).append((n+1)*n)
-    self.periodic_nodes.setdefault((n+1)*n,[]).append(n)
+        self.periodic_nodes.update({y*(n+1):y*(n+1) + n})
+        self.periodic_nodes.update({y*(n+1) + n:y*(n+1)})
     #-----------------------
 
     #generate sides---
@@ -1281,7 +1002,7 @@ class Geometry(object):
     #--------------------------
     self.side_list.update({'active':list(range(len(self.sides)-2*n))})
     self.side_list.update({'active_global':list(range(len(self.sides)-2*n))})
-    self.elem_list = {'active':list(range(len(self.elems)))}
+    #self.elem_list = {'active':range(len(self.elems))}
 
     #select active sides and active nodes---
     #We substract 2*n because we don't want to include the inactive periodic sides
@@ -1291,7 +1012,9 @@ class Geometry(object):
     self.g2l = list(range(len(self.elems)))
     self.nle = len(self.l2g)
 
-    self.elem_list = {'active':list(range(len(self.elems)))}
+    #self.l2g = { i:i for i in range(len(self.elems)) }
+    #self.g2l = { i:i for i in range(len(self.elems)) }
+
 
     self.elem_kappa_map = {}
     self.compute_elem_map()
@@ -1301,7 +1024,7 @@ class Geometry(object):
    
     #self.add_patterning(**argv)
 
- def add_patterning(self,**argv):
+ def add_patterning_new(self,**argv):
 
   if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
 
@@ -1362,7 +1085,6 @@ class Geometry(object):
     self.compute_connecting_matrix()
     self.compute_connecting_matrix_new()
 
-   
    
     data = {'nle':self.nle,'g2l':self.g2l,'l2g':self.l2g,'side_elem_map':self.side_elem_map,'elem_side_map':self.elem_side_map,\
             'side_list':self.side_list,'region_elem_map':self.region_elem_map,\
@@ -1473,8 +1195,7 @@ class Geometry(object):
 
 
  def plot_structured_mesh(self,**argv):
- 
-      
+     
      n = int(sqrt(self.nle))
      l = self.size[0]
      delta = l/n
@@ -1482,9 +1203,10 @@ class Geometry(object):
 
      axis('equal')
      axis('off')
-     #for n,node in enumerate(self.nodes):
-     #   scatter(node[0],node[1],color='r')
-     #   text(node[0],node[1],n,color='r')
+     for n,node in enumerate(self.nodes):
+       scatter(node[0],node[1],color='r')
+       if ptext:
+        text(node[0],node[1],n,color='r',ha='center')
  
      #for y in range(n+1):
      # for x in range(n+1):
@@ -1492,54 +1214,23 @@ class Geometry(object):
      #   text(-l/2 + delta*x,l/2 - delta*y+0.15,str(y*(n+1)+x),color='r',ha='center')
 
 
-     if argv.setdefault('plot_material',False) == False:
-      for n_side,side in enumerate(self.side_list['active'] + self.exlude):
-       ss = self.sides[side]   
-     #for n_side,side in enumerate(self.sides):
-
-       p0 = self.nodes[ss[0]]
-       p1 = self.nodes[ss[1]]
-       m = (np.array(p0) + np.array(p1))/2
      
-      #if ptext:
-      ##if n_side == 186 :
-      #text(m[0],m[1],str(n_side),color='b')
-      # cc = 'r'
-      # lll=3
-      #else: 
-     # cc = 'b'
-      # lll=1
- 
-       if side in self.side_list['Periodic'] and argv.setdefault('show_periodic',False):
-        plot([p0[0],p1[0]],[p0[1],p1[1]],color='r',lw=1)
-       else: 
-        plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=1)
+     #for s in self.side_list['active']:
+     # side = self.sides[s]   
+     for n_side,side in enumerate(self.sides):
+      p0 = self.nodes[side[0]]
+      p1 = self.nodes[side[1]]
+      m = (np.array(p0) + np.array(p1))/2
+      plot([p0[0],p1[0]],[p0[1],p1[1]],color='b')
+      if ptext:
+       text(m[0],m[1],str(n_side),color='b')
 
      #for ne in self.l2g:
-     for ne in self.elem_list['active']:
          
-     # if ne == 26:
       #ave = self.plot_elem(ne,color='gray')
-      ave,dummy = self.compute_general_centroid_and_side(ne)
-
-      if argv.setdefault('plot_material',False):
-
-       cc =  self.elem_kappa_map[ne]
-       if cc[0][0] == 1:
-          color = 'green'
-       else:   
-          color = 'red'
-
-       self.plot_elem(ne,color=color)
-
-      #print(ave)
-      #scatter(ave[0],ave[1],color='r')
       #print(ave)
       #if ptext:
-
-       #print(ne)
-       #if ne==84 :
-      #text(ave[0],ave[1],str(ne),color='black',va='center',ha='center')
+      # text(ave[0],ave[1],str(ne),color='black')
      
      #for g in np.array(grid).T:
      # ne = g[1]*n + g[0]
@@ -1551,10 +1242,6 @@ class Geometry(object):
      #p = 15
      #for elem in self.node_elem_map[p]:    
      # self.plot_elem(elem,color='red')
-     x = self.size[0]/2
-     y = self.size[1]/2
-     xlim([-x,x])
-     ylim([-y,y])
 
      show()
 
@@ -1564,7 +1251,8 @@ class Geometry(object):
     #self.import_mesh()
 
 
-    #self.adjust_boundary_elements()e
+    #self.adjust_boundary_elements()
+
     self.compute_elem_map()
     self.compute_elem_volumes()
     self.compute_side_areas()
@@ -1582,7 +1270,7 @@ class Geometry(object):
 
     data = {'side_list':self.side_list,\
           'node_list':self.node_list,\
-          'elem_list':self.elem_list,\
+          #'elem_list':self.elem_list,\
           'exlude':self.exlude,\
           'n_elems':self.n_elems,\
           'elem_side_map':self.elem_side_map,\
@@ -1630,13 +1318,11 @@ class Geometry(object):
           #'labels':self.blabels,\
           'frame':self.frame,\
           'polygons':self.polygons,\
-          'elem_list':self.elem_list,\
           'applied_grad':self.applied_grad,\
           'argv':self.argv,\
           'side_periodic_value':self.side_periodic_value}
 
-    self.state = data
-    #return data
+    return data
 
 
  def compute_connecting_matrix(self):
@@ -2180,7 +1866,6 @@ class Geometry(object):
     self.side_areas = self.state['side_areas']
     self.exlude = self.state['exlude']
     self.pairs = self.state['pairs']
-    self.elem_list = self.state['elem_list']
     self.direction = self.state['grad_direction']
     self.area_flux = self.state['area_flux']
     self.node_list = self.state['node_list']
@@ -2717,7 +2402,7 @@ class Geometry(object):
 
  def get_neighbor_elem(self,elem,ll) :
 
-    if not (elem in self.side_elem_map[ll]) : print('error, no neighbor',ll,elem)
+    if not (elem in self.side_elem_map[ll]) : print('error, no neighbor')
 
     for tmp in self.side_elem_map[ll] :
        if not (tmp == elem) :
@@ -2731,7 +2416,6 @@ class Geometry(object):
    if not (ll in (self.side_list['Boundary'] + self.side_list['Hot'] + self.side_list['Cold'])) :
     e0 = self.side_elem_map[ll][0]
     e1 = self.side_elem_map[ll][1]
-    
     P0 = self.get_elem_centroid(e0)
     P1 = self.get_next_elem_centroid(e0,ll)
     #---------------------------------------------------------------

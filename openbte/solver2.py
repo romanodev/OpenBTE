@@ -90,7 +90,7 @@ class Solver(object):
      self.mesh._update_data()
     
    else:  
-    self.mesh = Geometry(model='load',filename = argv.setdefault('filename_geometry','geometry.p'))
+    self.mesh = Geometry(model='load',filename_geometry = argv.setdefault('filename_geometry','geometry.p'))
    if len(self.mesh.elems[0]) == 4:
          self.structured=True
    else:    
