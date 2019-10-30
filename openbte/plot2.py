@@ -523,7 +523,6 @@ class Plot(object):
     d1 = argv.setdefault('direction_1',0)  
     d2 = argv.setdefault('direction_2',0)  
     data = np.array(tmp)[:,d1,d2]
-    print(min(data),max(data))
    elif ndim == 2:
     d = argv.setdefault('direction',-1)  
     if d == -1: #"Magnitude"
