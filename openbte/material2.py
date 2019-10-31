@@ -19,8 +19,8 @@ class Material(object):
    if model == 'full_2D':
      data = self.compute_full_2D(**argv)
 
-   if model == 'full_2D_new':
-     data = self.compute_full_2D_new(**argv)
+   #if model == 'full_2D_new':
+   #  data = self.compute_full_2D_new(**argv)
 
    if model == 'isotropic_2DSym' or model == 'nongray':
      data = self.compute_isotropic_2DSym(**argv)
@@ -43,7 +43,7 @@ class Material(object):
   self.state = MPI.COMM_WORLD.bcast(data,root=0)
     
 
- def compute_full_2D_new(self,**argv):
+ def compute_full_2D(self,**argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
 
@@ -81,7 +81,7 @@ class Material(object):
 
 
 
-
+ '''
  def compute_full_2D(self,**argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
@@ -136,7 +136,7 @@ class Material(object):
            'control_angle':versors,\
            'gcontrol_angle':gversors,\
            'kappa_bulk_tot':kbulk}
-
+ '''
 
 
  def get_linear_indexes(self,mfp,value,scale,extent):

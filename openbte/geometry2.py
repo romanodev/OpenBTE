@@ -12,6 +12,7 @@ from .GenerateStaggeredLatticePores import *
 from .GenerateCustomPores import *
 from .Generate2DInterface import *
 from .GenerateRandomPoresOverlap import *
+from .GenerateCorrelatedPores import *
 from .GenerateRandomPoresGrid import *
 from . import GenerateMesh2D
 from . import GenerateBulk2D
@@ -74,7 +75,6 @@ class Geometry(object):
      self.applied_grad = [0,0,1]
   
   self.argv = argv.copy()
-  #argv.setdefault('shape','square')
   geo_type = argv.setdefault('model','porous/square_lattice')
 
   if geo_type == 'geo':
@@ -99,7 +99,6 @@ class Geometry(object):
   else:
    if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
     #porous-----
-    #if geo_type == 'porous/random' or \
     polygons = []
 
     self.porous = False
@@ -190,7 +189,19 @@ class Geometry(object):
      GenerateBulk3D.mesh(argv)
      #-----------------------------------
 
-   
+  
+   if argv['model'] == 'porous/random_correlated':
+
+       self.compute_structured_mesh(**argv)   
+       self.compute_mesh_data()
+
+       grid = argv.setdefault('grid',generate_correlated_pores(**argv))
+       self.add_patterning(grid=grid)
+
+       if argv.setdefault('save',False):
+         self.save()
+
+
    if argv['model'] == '2DInterface':
        Generate2DInterface(argv)
        Lx = float(argv['lx'])
@@ -202,6 +213,7 @@ class Geometry(object):
        self.frame.append([-Lx/2,-Ly/2])
        self.polygons = []
 
+   return self.state
 
 
    if not argv.setdefault('only_geo',False):
@@ -213,12 +225,10 @@ class Geometry(object):
      self.import_mesh()
      
     self.compute_mesh_data()
-    if self.argv.setdefault('save',True):
+   if self.argv.setdefault('save',True):
      self.save(**argv)   
-     #pickle.dump(state,open(argv.setdefault('filename_geometry','geometry.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
 
-
-    return self.state
+   return self.state
 
  def save(self,**argv):
      pickle.dump(self.state,open(argv.setdefault('filename_geometry','geometry.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
@@ -1306,7 +1316,12 @@ class Geometry(object):
   if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
 
     grid = argv['grid']
-    kappa = argv['kappa']
+    #change active elements---
+    self.elem_list['active']=grid
+
+
+
+    kappa = argv.setdefault('kappa',np.tile([[[1,0,0],[0,1,0],[0,0,0]]],(len(grid),1,1)))
     n = int(sqrt(len(self.nodes)))-1
 
     #----Restore previous boundary connections---
@@ -1362,7 +1377,6 @@ class Geometry(object):
     self.compute_connecting_matrix()
     self.compute_connecting_matrix_new()
 
-   
    
     data = {'nle':self.nle,'g2l':self.g2l,'l2g':self.l2g,'side_elem_map':self.side_elem_map,'elem_side_map':self.elem_side_map,\
             'side_list':self.side_list,'region_elem_map':self.region_elem_map,\
@@ -1477,6 +1491,12 @@ class Geometry(object):
       
      n = int(sqrt(self.nle))
      l = self.size[0]
+
+     #plot_frame----
+     plot([-l/2,-l/2,l/2,l/2],[-l/2,l/2,l/2,-l/2],color='k')
+
+     #--------------
+
      delta = l/n
      ptext = argv.setdefault('text',False)
 
@@ -1493,7 +1513,7 @@ class Geometry(object):
 
 
      if argv.setdefault('plot_material',False) == False:
-      for n_side,side in enumerate(self.side_list['active'] + self.exlude):
+      for n_side,side in enumerate(self.side_list['active']):# + self.exlude):
        ss = self.sides[side]   
      #for n_side,side in enumerate(self.sides):
 
@@ -1510,10 +1530,10 @@ class Geometry(object):
      # cc = 'b'
       # lll=1
  
-       if side in self.side_list['Periodic'] and argv.setdefault('show_periodic',False):
-        plot([p0[0],p1[0]],[p0[1],p1[1]],color='r',lw=1)
-       else: 
-        plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=1)
+     #  if side in self.side_list['Periodic'] and argv.setdefault('show_periodic',False):
+     #   plot([p0[0],p1[0]],[p0[1],p1[1]],color='r',lw=1)
+     #  else: 
+     #   plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=1)
 
      #for ne in self.l2g:
      for ne in self.elem_list['active']:
@@ -1522,15 +1542,15 @@ class Geometry(object):
       #ave = self.plot_elem(ne,color='gray')
       ave,dummy = self.compute_general_centroid_and_side(ne)
 
-      if argv.setdefault('plot_material',False):
+      #if argv.setdefault('plot_material',False):
 
-       cc =  self.elem_kappa_map[ne]
-       if cc[0][0] == 1:
-          color = 'green'
-       else:   
-          color = 'red'
+      # cc =  self.elem_kappa_map[ne]
+      # if cc[0][0] == 1:
+      #    color = 'green'
+      # else:   
+      #    color = 'red'
 
-       self.plot_elem(ne,color=color)
+      self.plot_elem(ne,color='k')
 
       #print(ave)
       #scatter(ave[0],ave[1],color='r')
