@@ -1391,100 +1391,6 @@ class Geometry(object):
   self.state.update(mpi4py.MPI.COMM_WORLD.bcast(data,root=0))
      
 
- '''
- def add_patterning(self,**argv):
-
-  if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
-    grid = argv['grid']
-    n = int(sqrt(len(self.nodes)))-1
-    inclusion = argv.setdefault('inclusion',False)
-
-    #--------
-
-    self.elem_region_map = {}
-    self.region_elem_map = {'Inclusion':[],'Matrix':[]}
-    for ne in grid:
-     self.region_elem_map['Inclusion'].append(ne)
-     self.elem_region_map[ne] = 'Inclusion'
-      
-    for elem in range(len(self.elems)):
-     if not elem in self.elem_region_map.keys():
-      self.elem_region_map[elem] = 'Matrix'
-      self.region_elem_map['Matrix'].append(elem)
-   
-    if not inclusion:
-     active_sides = set()
-     for side in self.side_list['active_global']:
-      elems = self.side_elem_map[side]
-      for elem in elems:   
-       if self.elem_region_map[elem] == 'Matrix':  #at least one element is connected with one side
-        active_sides.add(side)
-     self.side_list.update({'active':list(active_sides)})
-     #self.elem_list = {'active':self.region_elem_map['Matrix']}
-    #---------------------
-
-    #Interfacial sides---------------------------
-
-    #get boundary/interface sides---
-    tmp = set()
-    for ne in grid:
-      for side in self.elem_side_map[ne]:
-        i,j = self.side_elem_map[side]
-        if (self.elem_region_map[i] == 'Matrix' and self.elem_region_map[j] == 'Inclusion') or \
-           (self.elem_region_map[i] == 'Inclusion' and self.elem_region_map[j] == 'Matrix'):
-            tmp.add(side)
-    if inclusion:
-     self.side_list.update({'Interface':list(tmp)})
-    else: 
-     self.side_list.update({'Boundary':list(tmp)})
-    #----------------------------
-
-     
-    #adjust side_elem_map to make it sure Matrix comes first
-    for ll in self.side_list['Boundary'] :
-      i,j  = self.side_elem_map[ll]
-      if i in self.region_elem_map['Inclusion']:
-        self.side_elem_map[ll] = [j,j]
-      else:  
-        self.side_elem_map[ll] = [i,i]
-
-    print(len(self.side_list['Boundary']))  
-    #we need to change this--
-    #make weigths smaller
-    #--------------------------
-
-    if not inclusion:
-     self.l2g = []
-     self.g2l = np.zeros(len(self.elems),dtype=int)
-     for i in range(len(self.elems)):
-       if i in self.region_elem_map['Matrix']:
-         self.l2g.append(i)
-         self.g2l[i] = len(self.l2g)-1
-
-
-    self.nle = len(self.l2g)
-    self.compute_boundary_condition_data()
-    self.compute_connecting_matrix()
-    self.compute_connecting_matrix_new()
-    self.compute_elem_map()
-
-    data = {'nle':self.nle,'g2l':self.g2l,'l2g':self.l2g,'side_elem_map':self.side_elem_map,'elem_side_map':self.elem_side_map,\
-            'side_list':self.side_list,'region_elem_map':self.region_elem_map,\
-            'elem_region_map':self.elem_region_map,'A':self.A,'CM':self.CM,'elem_map':elem_map,\
-            'B':self.B,'B_with_area_old':self.B_with_area_old,\
-            'CP':self.CP,'N':self.N,'N_new':self.N_new}
-
-
-
-  else: data = None
-
-
-  self.state.update(mpi4py.MPI.COMM_WORLD.bcast(data,root=0))
-  #if self.argv.setdefault('save',False):
-  #  pickle.dump(self.state,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
-
- '''
-
 
  def plot_structured_mesh(self,**argv):
  
@@ -1493,7 +1399,7 @@ class Geometry(object):
      l = self.size[0]
 
      #plot_frame----
-     plot([-l/2,-l/2,l/2,l/2],[-l/2,l/2,l/2,-l/2],color='k')
+     plot([-l/2,-l/2,l/2,l/2,-l/2],[-l/2,l/2,l/2,-l/2,-l/2],color='k')
 
      #--------------
 
