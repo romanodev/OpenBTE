@@ -201,6 +201,7 @@ class Geometry(object):
        if argv.setdefault('save',False):
          self.save()
 
+       return self.state
 
    if argv['model'] == '2DInterface':
        Generate2DInterface(argv)
@@ -212,8 +213,6 @@ class Geometry(object):
        self.frame.append([Lx/2,-Ly/2])
        self.frame.append([-Lx/2,-Ly/2])
        self.polygons = []
-
-   return self.state
 
 
    if not argv.setdefault('only_geo',False):
@@ -1301,7 +1300,6 @@ class Geometry(object):
     self.g2l = list(range(len(self.elems)))
     self.nle = len(self.l2g)
 
-    self.elem_list = {'active':list(range(len(self.elems)))}
 
     self.elem_kappa_map = {}
     self.compute_elem_map()
@@ -1632,6 +1630,7 @@ class Geometry(object):
      elem2 = self.get_neighbor_elem(elem1,side)
      self.elem_map.setdefault(elem1,[]).append(elem2)
 
+  self.elem_list = {'active':list(range(len(self.elems)))}
 
  def get_side_orthognal_direction(self,side):
 
