@@ -1371,6 +1371,17 @@ class Geometry(object):
            print('error')
     self.side_list['Boundary'] = boundary_side
 
+    #------------------------------------
+    ll = []
+    for side in self.side_list['active']:
+     elems = self.side_elem_map[side]
+     k1 = self.elem_kappa_map[elems[0]]       
+     k2 = self.elem_kappa_map[elems[1]]      
+     if not k1[0][0] == k2[0][0]:
+      ll.append(side)
+    self.side_list['Interface'] = ll
+    #----------------------------
+
     self.compute_boundary_condition_data()
     self.compute_connecting_matrix()
     self.compute_connecting_matrix_new()
@@ -1397,7 +1408,7 @@ class Geometry(object):
      l = self.size[0]
 
      #plot_frame----
-     plot([-l/2,-l/2,l/2,l/2,-l/2],[-l/2,l/2,l/2,-l/2,-l/2],color='k')
+     #plot([-l/2,-l/2,l/2,l/2,-l/2],[-l/2,l/2,l/2,-l/2,-l/2],color='k')
 
      #--------------
 
@@ -1414,6 +1425,14 @@ class Geometry(object):
      # for x in range(n+1):
      #  if ptext:
      #   text(-l/2 + delta*x,l/2 - delta*y+0.15,str(y*(n+1)+x),color='r',ha='center')
+
+
+     if argv.setdefault('plot_interface',False) :
+      for n_side,side in enumerate(self.side_list['Interface']):# + self.exlude):
+       ss = self.sides[side]   
+       p0 = self.nodes[ss[0]]
+       p1 = self.nodes[ss[1]]
+       plot([p0[0],p1[0]],[p0[1],p1[1]],color='r',lw=3)
 
 
      if argv.setdefault('plot_material',False) == False:

@@ -14,7 +14,7 @@ def savefigure(prefix = './'):
 
  namefile =  prefix + sys.argv[0].split('.')[0]+'.png'
 
- savefig(namefile,dpi=300)
+ savefig(namefile,dpi=500)
 
 
 def finalize_plotting(fonts):
@@ -82,7 +82,7 @@ def init_plotting(extra_x_padding = 0.0,extra_y_padding=0.0,extra_bottom_padding
  #-----------------------------------
 
  rcParams['figure.dpi'] = 80
- rcParams['savefig.dpi'] = 300
+ rcParams['savefig.dpi'] = 400
  rcParams['xtick.major.size'] = 3
  rcParams['xtick.minor.size'] = 3
  rcParams['figure.edgecolor'] = 'k'
