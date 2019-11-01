@@ -626,7 +626,7 @@ class Solver(object):
       data.update({'TB':TB,'TL':TL,'error_vec':error_vec,'ms_vec':ms_vec,'temp_fourier_grad':temp_fourier_grad,'eta':eta_vec})  
       self.state = data
       if self.save_state:
-       pickle.dump(self.state,open(argv.setdefault('filename','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
+       pickle.dump(self.state,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
     else: data = None
     self.state =  MPI.COMM_WORLD.bcast(data,root=0)
     #print(time.time()-a)
