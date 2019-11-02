@@ -1318,7 +1318,6 @@ class Geometry(object):
     self.elem_list['active']=grid
 
 
-
     kappa = argv.setdefault('kappa',np.tile([[[1,0,0],[0,1,0],[0,0,0]]],(len(grid),1,1)))
     n = int(sqrt(len(self.nodes)))-1
 
@@ -1435,8 +1434,8 @@ class Geometry(object):
        plot([p0[0],p1[0]],[p0[1],p1[1]],color='r',lw=3)
 
 
-     if argv.setdefault('plot_material',False) == False:
-      for n_side,side in enumerate(self.side_list['active']):# + self.exlude):
+     #if argv.setdefault('plot_material',False) == False:
+     for n_side,side in enumerate(self.side_list['active']+ self.exlude):
        ss = self.sides[side]   
      #for n_side,side in enumerate(self.sides):
 
@@ -1454,11 +1453,12 @@ class Geometry(object):
       # lll=1
  
      #  if side in self.side_list['Periodic'] and argv.setdefault('show_periodic',False):
-     #   plot([p0[0],p1[0]],[p0[1],p1[1]],color='r',lw=1)
+    #   plot([p0[0],p1[0]],[p0[1],p1[1]],color='b',lw=1)
      #  else: 
      #   plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=1)
 
      #for ne in self.l2g:
+     print(len(self.elem_list['active']))
      for ne in self.elem_list['active']:
          
      # if ne == 26:
@@ -1467,13 +1467,13 @@ class Geometry(object):
 
       #if argv.setdefault('plot_material',False):
 
-      # cc =  self.elem_kappa_map[ne]
-      # if cc[0][0] == 1:
-      #    color = 'green'
-      # else:   
-      #    color = 'red'
+      cc =  self.elem_kappa_map[ne]
+      if cc[0][0] == 1:
+         color = 'green'
+      else:   
+         color = 'red'
 
-      self.plot_elem(ne,color='k')
+      self.plot_elem(ne,color=color)
 
       #print(ave)
       #scatter(ave[0],ave[1],color='r')
@@ -1649,7 +1649,7 @@ class Geometry(object):
      elem2 = self.get_neighbor_elem(elem1,side)
      self.elem_map.setdefault(elem1,[]).append(elem2)
 
-  self.elem_list = {'active':list(range(len(self.elems)))}
+  #self.elem_list = {'active':list(range(len(self.elems)))}
 
  def get_side_orthognal_direction(self,side):
 
@@ -2390,6 +2390,7 @@ class Geometry(object):
   self.l2g=range(len(self.elems))
   self.g2l=range(len(self.elems))
   self.nle = len(self.elems)
+  self.elem_list = {'active':list(range(len(self.elems)))}
 
   #print(self.node_list['Interface'])
   #delete MESH-----

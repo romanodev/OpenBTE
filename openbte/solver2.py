@@ -64,6 +64,9 @@ def unique_versors(list_arrays):
     return sum([ int(np.allclose(elem,myarr,rtol=1e-5)) for elem in list_arrays])
 
 
+#def get_specular_direction(self,i):
+
+
 
 def log_interp1d(xx, y, kind='linear'):
 
@@ -117,7 +120,7 @@ class Solver(object):
     
    self.argv = argv
    self.multiscale = argv.setdefault('multiscale',False)
-   
+  
 
    if 'material' in argv.keys():
      self.mat = argv['material'].state
@@ -152,6 +155,7 @@ class Solver(object):
     self.print_logo()
     self.print_dof()
 
+   #self.compute_transmission_coefficients() 
 
    self.build_kappa_mask()
    if self.verbose: self.print_bulk_kappa()
@@ -191,6 +195,25 @@ class Solver(object):
    #if 'Inclusion' in self.mesh.region_elem_map.keys():   
    #  for elem in self.mesh.region_elem_map['Inclusion']:
    #   self.elem_kappa_map[elem] = kappa_inclusion*np.eye(3)
+
+  #def compute_transmission_coefficients(self):
+
+  # transmission = {}
+
+  # for side in self.mesh.side_list['Interface']:
+  #  (i,j) = self.mesh.side_elem_map[side]
+  #  for a in range(self.mat['n_serial']):
+  #   index = a * self.n_serial
+  #   angle = self.control_angle[index]
+  #   angle /= np.linalg.norm(angle)
+  #   side = self.mesh.get_side_between_two_elements(i,j)
+  #   s = self.get_specular_index(index)
+  #   r = self.get_refracted_index(index)
+     #tij = 
+  #   transmission.update('side')
+    
+
+     
 
 
 
@@ -342,13 +365,10 @@ class Solver(object):
      #RHS = np.ones(self.mesh.nle)
     else:
      RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]
-
-
+     
     temp = lu.solve(RHS)
-
  
     return temp
-
 
       
   def solve_bte(self,**argv):
@@ -692,12 +712,13 @@ class Solver(object):
    w = self.mesh.get_interpolation_weigths(side,i)
    normal = self.mesh.get_normal_between_elems(i,j)
 
-   kappa_i = self.elem_kappa_map[i]
-   kappa_j = self.elem_kappa_map[j]
+   kappa_i = np.array(self.elem_kappa_map[i])
+   kappa_j = np.array(self.elem_kappa_map[j])
 
    ki = np.dot(normal,np.dot(kappa_i,normal))
    kj = np.dot(normal,np.dot(kappa_j,normal))
 
+   
    kappa = kj*kappa_i/(ki*(1-w) + kj*w)
 
    #kappa = kappa_i * kappa_j/(kappa_j*w + (1-w)*kappa_i)
@@ -928,9 +949,15 @@ class Solver(object):
        w = self.mesh.get_interpolation_weigths(ll,i)
        Ti = temp[i]
        Tj = temp[j]
-       ki = self.elem_kappa_map[i]
-       kj = self.elem_kappa_map[j]
+
+       normal = self.mesh.get_normal_between_elems(i,j)
+       kappa_i = np.array(self.elem_kappa_map[i])
+       kappa_j = np.array(self.elem_kappa_map[j])
+       ki = np.dot(normal,np.dot(kappa_i,normal))
+       kj = np.dot(normal,np.dot(kappa_j,normal))
+
        Tb = (kj*w*Tj + ki*(1-w)*Ti)/(kj*w + ki*(1-w))
+      
 
        int_temp[ll] = [Tb,Tb]
 
