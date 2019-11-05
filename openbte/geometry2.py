@@ -217,7 +217,7 @@ class Geometry(object):
 
    if not argv.setdefault('only_geo',False):
     if argv['model'] == 'structured':
-     self.compute_structured_mesh(**argv)   
+     self.compute_structured_mesh_new(**argv)   
     else:
      #Create mesh---
      subprocess.check_output(['gmsh','-format','msh2','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
@@ -1069,6 +1069,30 @@ class Geometry(object):
     quit()
 
 
+ def update_all_maps_from_side(self):
+    
+    #update_maps
+    self.elem_side_map = {}
+    for side in self.side_elem_map.keys():
+     for elem in self.side_elem_map[side]:   
+      self.elem_side_map.setdefault(elem,[]).append(side)
+       
+    #------------------------------------------------------
+    self.node_side_map = {}
+    for ns,side in enumerate(self.sides):
+     for node in side:   
+      self.node_side_map.setdefault(node,[]).append(ns)
+    #------------------------------------------------------
+
+    #-------------------
+    self.node_elem_map = {}
+    for node in self.node_side_map.keys():
+      for side in self.node_side_map[node]:
+        for elem in self.side_elem_map[side]:
+          self.node_elem_map.setdefault(node,set()).add(elem)
+
+    self.side_node_map = self.sides
+
 
  def adjust_boundary_elements(self):
 
@@ -1092,9 +1116,153 @@ class Geometry(object):
      return ave
 
 
+ def compute_structured_mesh_new(self,**argv):
+
+    #Initialization-----------------
+    l = argv['l'];n = argv['n'];d = l/n; 
+    self.frame = [[-l/2,-l/2],[-l/2,l/2],[l/2,l/2],[l/2,-l/2]]
+    self.size = [l,l,0]
+    self.polygons = []
+    self.periodic_nodes = {}
+    per = argv.setdefault('Periodic',[True,True,True])
+    #--------------------------------
+
+    #generate nodes-----------------
+    self.nodes = np.array([[-l/2 + d*x,l/2 -d*y,0] for y in range(n+1) for x in range(n+1)] )
+    #--------------------------------
+
+    #horizontal side----
+    self.sides = [[y*(n+1)+x,y*(n+1)+x+1] for y in range(n) for x in range(n)]     
+
+    #vertical side----
+    self.sides += [[x*(n+1)+y,(x+1)*(n+1)+y]  for y in range(n) for x in range(n)]
+
+    active = list(range(len(self.sides)))
+
+    #elements---
+    self.elems = [[y*(n+1)+x,y*(n+1)+x+1,(y+1)*(n+1)+x+1,(y+1)*(n+1)+x] for y in range(n) for x in range(n)]
+
+    #build side elem map---------------------------------------------------------------------------------
+    #lower elements 
+    self.side_elem_map = {y*n+x : [y*n+x] for x in range(n) for y in range(n) }
+    #upper elements   
+    [self.side_elem_map[y*n+x].append((y-1)*n+x) for x in range(n) for y in range(1,n)]
+    #right elements   
+    [self.side_elem_map.setdefault(n*n + n*(x+1) + y,[]).append(y*n+x) for x in range(n-1) for y in range(n)]
+    #left elements   
+    [self.side_elem_map.setdefault(n*n + n*x + y,[]).append(y*n+x) for x in range(n) for y in range(n)]
+    #----------------------------------------------------------------------------------------------------
+
+    self.node_elem_map = {n:set() for n in range(len(self.nodes)) }
+    #border sides----
+
+    self.update_all_maps_from_side() 
+
+    self.side_list = {'Boundary':[],'Interface':[],'Periodic':[],'Hot':[],'Cold':[]}
+    p_sides = []
+    self.side_periodicity = np.zeros((len(self.sides)+2*n,2,3))
+    self.pairs = []
+    self.exlude = []
+
+    dire = argv['direction']
+    #Add Periodicity---
+
+    if per[0]:
+       [self.add_periodic_nodes(y*(n+1)+n,y*(n+1)) for y in range(n+1)]
+       self.node_elem_map[n].add(0)
+       self.node_elem_map.setdefault((n+1)*(n+1)-1,set()).add(n*n-1)
+       self.node_elem_map[(n+1)*(n+1)-1].add(n*(n-1))
+       [self.node_elem_map[(y+1)*(n+1)+n].add(y*n) for y in range(n-1)]
+       [self.node_elem_map[(y+1)*(n+1)+n].add((y+1)*n) for y in range(n-1)]
+
+       for y in range(n):
+        self.update_elem_side_map([n*y+n-1],[n*n+y]) #first elements, then sides
+        #This is the exlude sides---
+        self.sides.append([y*(n+1)+n,(y+1)*(n+1)+n])
+        self.side_elem_map[len(self.sides)-1]= [n*y+n-1,n*y]
+        self.pairs.append([n*n+y,len(self.sides)-1])
+        self.side_periodicity[len(self.sides)-1,1] = [l,0,0] 
+        self.exlude.append(len(self.sides)-1)
+        [p_sides.append(n*n+x) for x in range(n)]
+    else:
+       for y in range(n):
+        self.sides.append([y*(n+1)+n,(y+1)*(n+1)+n])
+        self.update_elem_side_map([n*y+n-1],[len(self.sides)-1]) #first elements, then sides
+        active.append(len(self.sides)-1)
+       if  dire == 'x':
+        self.side_list['Hot'] = [n*n+y for y in range(n)]
+        self.side_list['Cold'] = list(range(len(self.sides)-n,len(self.sides)))
+       else: 
+        self.side_list['Boundary'] = [n*n+x for y in range(n)]
+        self.side_list['Boundary'] += list(range(len(self.sides)-n,len(self.sides)))
+
+
+    if per[1]:
+       [self.add_periodic_nodes(x,n*(n+1) + x) for x in range(n+1)]
+       #This is the exlude sides---
+       self.node_elem_map[(n+1)*n].add(n-1)
+       self.node_elem_map.setdefault((n+1)*(n+1)-1,set()).add(n-1)
+       [self.node_elem_map[(n+1)*n+x+1].add(x) for x in range(n-1)]
+       [self.node_elem_map[(n+1)*n+x+1].add(x+1) for x in range(n-1)]
+       [p_sides.append(x) for x in range(n)]
+       self.side_periodicity[list(range(n)),1] = [0,l,0] 
+
+       for x in range(n):
+        self.update_elem_side_map([n*n-n+x],[x]) #first elements, then sides
+        self.sides.append([(n+1)*n+x,(n+1)*n +x +1])
+        self.side_elem_map[len(self.sides)-1]=[n*n-n+x,x] 
+        self.pairs.append([x,len(self.sides)-1])
+        self.side_periodicity[len(self.sides)-1,1] = [0,-l,0] 
+        self.exlude.append(len(self.sides)-1)
+    else:
+       for x in range(n):
+        self.sides.append([(n+1)*n+x,(n+1)*n +x +1])
+        active.append(len(self.sides)-1)
+        self.update_elem_side_map([n*n-n+x],[len(self.sides)-1]) #first elements, then sides
+       if  dire == 'y':
+        self.side_list['Hot'] = [n*n+x for x in range(n)]
+        self.side_list['Cold'] = list(range(len(self.sides)-n,len(self.sides)))
+       else: 
+        self.side_list['Boundary'] = [n*n+x for x in range(n)]
+        self.side_list['Boundary'] += list(range(len(self.sides)-n,len(self.sides)))
+
+
+    if per[0] and per[1]: #corner points----
+       self.add_periodic_nodes(0,(n+1)*(n+1)-1)
+       self.add_periodic_nodes(n,(n+1)*n)
+       self.node_elem_map[0].add(n*n-1)
+       self.node_elem_map[n].add(n*n-n)
+       self.node_elem_map[(n+1)*n].add(0)
+       self.node_elem_map[(n+1)*(n+1)-1].add(0)
+       self.side_periodicity[n*n+np.arange(n),1] = [-l,0,0] 
+
+
+
+    #Restore boundary values----
+    for side in self.side_list['Hot'] + self.side_list['Cold'] + self.side_list['Boundary']:
+     self.side_elem_map[side].append(self.side_elem_map[side][0]) 
+    #----------------
+
+    #Set regular variables------- 
+    self.side_list.update({'Periodic':p_sides})
+    self.node_list = {'Interface':[]}
+    self.region_elem_map = {'Matrix':range(len(self.elems))}
+    self.elem_region_map = {i:'Matrix' for i in range(len(self.elems)) }
+    #self.side_list.update({'active':list(range(len(self.sides)-2*n))})
+    self.side_list.update({'active':active})
+    #self.side_list.update({'active_global':list(range(len(self.sides)-2*n))})
+    self.side_list.update({'active_global':active})
+    self.elem_list = {'active':list(range(len(self.elems)))} 
+    self.elem_kappa_map = {ne:[[1,0,0],[0,1,0],[0,0,1]] for ne in range(len(self.elems))}
+    self.l2g = list(range(len(self.elems)))
+    self.g2l = list(range(len(self.elems)))
+    self.nle = len(self.l2g)
+    self.compute_elem_map()
+
+
+
  def compute_structured_mesh(self,**argv):
 
-    #self.structured = True 
     l = argv['l']
     self.frame = [[-l/2,-l/2],[-l/2,l/2],[l/2,l/2],[l/2,-l/2]]
     self.polygons = []
@@ -1113,16 +1281,12 @@ class Geometry(object):
     #Build Periodic Nodes----
     self.periodic_nodes = {}
     for x in range(n+1):
-        #self.periodic_nodes.update({x:n*(n+1) + x})
-        #self.periodic_nodes.update({n*(n+1) + x:x})
         self.periodic_nodes.setdefault(x,[]).append(n*(n+1) + x)
         self.periodic_nodes.setdefault(n*(n+1)+x,[]).append(x)
 
     #-----------------------
 
     for y in range(n+1):
-        #self.periodic_nodes.update({y*(n+1):y*(n+1) + n})
-        #self.periodic_nodes.update({y*(n+1) + n:y*(n+1)})
         self.periodic_nodes.setdefault(y*(n+1),[]).append(y*(n+1) + n)
         self.periodic_nodes.setdefault(y*(n+1)+n,[]).append(y*(n+1))
 
@@ -1292,6 +1456,12 @@ class Geometry(object):
     self.side_list.update({'active_global':list(range(len(self.sides)-2*n))})
     self.elem_list = {'active':list(range(len(self.elems)))}
 
+
+    
+    
+    self.elem_kappa_map = {ne:[[1,0,0],[0,1,0],[0,0,1]] for ne in range(len(self.elems))}
+    
+
     #select active sides and active nodes---
     #We substract 2*n because we don't want to include the inactive periodic sides
     #create local_global_map
@@ -1301,12 +1471,9 @@ class Geometry(object):
     self.nle = len(self.l2g)
 
 
-    self.elem_kappa_map = {}
     self.compute_elem_map()
 
     #---------------------
-
-   
     #self.add_patterning(**argv)
 
  def add_patterning(self,**argv):
@@ -1408,7 +1575,6 @@ class Geometry(object):
 
      #plot_frame----
      #plot([-l/2,-l/2,l/2,l/2,-l/2],[-l/2,l/2,l/2,-l/2,-l/2],color='k')
-
      #--------------
 
      delta = l/n
@@ -1452,14 +1618,22 @@ class Geometry(object):
      # cc = 'b'
       # lll=1
  
-     #  if side in self.side_list['Periodic'] and argv.setdefault('show_periodic',False):
-    #   plot([p0[0],p1[0]],[p0[1],p1[1]],color='b',lw=1)
+       
+       if side in self.side_list['Periodic'] :
+        plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=2)
+
+       if side in self.side_list['Hot'] :
+        plot([p0[0],p1[0]],[p0[1],p1[1]],color='r',lw=2)
+
+       if side in self.side_list['Cold'] :
+        plot([p0[0],p1[0]],[p0[1],p1[1]],color='b',lw=2)
+
      #  else: 
      #   plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=1)
 
      #for ne in self.l2g:
-     print(len(self.elem_list['active']))
      for ne in self.elem_list['active']:
+     #for ne in self.elem_list['active']:
          
      # if ne == 26:
       #ave = self.plot_elem(ne,color='gray')
@@ -1467,6 +1641,7 @@ class Geometry(object):
 
       #if argv.setdefault('plot_material',False):
 
+      
       cc =  self.elem_kappa_map[ne]
       if cc[0][0] == 1:
          color = 'green'
@@ -1639,12 +1814,10 @@ class Geometry(object):
 
 
 
-
  def compute_elem_map(self):
 
   self.elem_map = {}
   for elem1 in self.elem_side_map: 
-   if elem1 == 35:
     for side in self.elem_side_map[elem1]:
      elem2 = self.get_neighbor_elem(elem1,side)
      self.elem_map.setdefault(elem1,[]).append(elem2)
