@@ -143,7 +143,7 @@ class Solver(object):
 
    self.n_parallel = self.mat['n_parallel'] #total indexes
    self.n_serial = self.mat['n_serial'] #total indexes
- 
+    
 
 
    self.lu = {}
@@ -449,7 +449,6 @@ class Solver(object):
    #-------------------------------
    while n_iter < argv.setdefault('max_bte_iter',10) and \
           error_vec[-1] > argv.setdefault('max_bte_error',1e-2):
-
     a = time.time() 
     self.n_iter = n_iter
     #Compute diffusive approximation---------------------------          
@@ -670,10 +669,9 @@ class Solver(object):
       vj = self.mesh.get_elem_volume(j)
       kappa = self.get_kappa(i,j)
       (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=kappa)
-      if not i == j:
+      li = self.mesh.g2l[i]; lj = self.mesh.g2l[j]
 
-       li = self.mesh.g2l[i]; lj = self.mesh.g2l[j]
-    
+      if not i == j:
        F[li,li] += v_orth/vi#*kappa
        F[li,lj] -= v_orth/vi#*kappa
 
@@ -682,7 +680,14 @@ class Solver(object):
 
        B[li] += self.mesh.get_side_periodic_value(j,i)*v_orth/vi#*kappa
        B[lj] += self.mesh.get_side_periodic_value(i,j)*v_orth/vj#*kappa
-      
+      else:
+       F[li,li] += v_orth/vi
+       if ll in self.mesh.side_list['Hot']:
+        B[li] += v_orth/vi*0.5#*kappa
+
+       if ll in self.mesh.side_list['Cold']:
+        B[li] -= v_orth/vi*0.5#*kappa
+        
 
     data = {'F':F.tocsc(),'B':B}
    else: data = None
@@ -708,6 +713,9 @@ class Solver(object):
 
   def get_kappa(self,i,j):
 
+   if i ==j:
+    return np.array(self.elem_kappa_map[i])
+
    side = self.mesh.get_side_between_two_elements(i,j)
    w = self.mesh.get_interpolation_weigths(side,i)
    normal = self.mesh.get_normal_between_elems(i,j)
@@ -732,6 +740,12 @@ class Solver(object):
       tt = self.mesh.get_side_periodic_value(self.mesh.l2g[kc2],self.mesh.l2g[kc1])
       if tt == 1.0:
        self.kappa_mask.append([kc1,kc2])
+
+      ll = self.mesh.get_side_between_two_elements(kc1,kc2)
+
+    for ll in self.mesh.side_list['Cold']:
+       self.kappa_mask.append(self.mesh.side_elem_map[ll])
+        
     
 
   def assemble_fourier(self) :
@@ -868,11 +882,10 @@ class Solver(object):
         RHS = B + C
 
         temp = SU.solve(RHS)
-
+        
         temp = temp - (max(temp)+min(temp))/2.0
 
         temp_int = self.compute_interfacial_temperature(temp)
-      
         
         (C,grad) = self.compute_non_orth_contribution(temp,**{'temp_interface':temp_int})
 
@@ -1163,7 +1176,6 @@ class Solver(object):
 
   def compute_diffusive_thermal_conductivity(self,temp,mat=np.eye(3),kappa_bulk = -1):
 
-  
       
    kappa = 0
    for (i,j) in self.kappa_mask:
@@ -1174,13 +1186,24 @@ class Solver(object):
     (v_orth,dummy) = self.mesh.get_decomposed_directions(gi,gj,rot=k)
     
     if kappa_bulk == -1:
-     
+     kk = 1
+    else:
+     kk = kappa_bulk 
      #normal = self.mesh.get_normal_between_elems(i,j)
      #k = np.dot(normal,np.dot(self.get_kappa(gi,gj),normal))
-
-     kappa += v_orth * (temp[j]+1.0-temp[i])
-    else: 
-     kappa += v_orth * (temp[j]+1.0-temp[i])*kappa_bulk
+    
+    if not i == j:
+      Ti = temp[i]
+      Tj = temp[j] + 1
+    else:
+      Ti = -temp[i]   
+      side = self.mesh.get_side_between_two_elements(i,j)
+      if side in self.mesh.side_list['Cold']:
+         Tj = +0.5 #we do the opposite
+      else:
+         print('error in mask')
+         quit()
+    kappa += v_orth * (Tj-Ti)*kk
      
    return kappa*self.kappa_factor
 

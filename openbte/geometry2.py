@@ -1849,9 +1849,7 @@ class Geometry(object):
 
  def get_decomposed_directions(self,elem_1,elem_2,rot = np.eye(3)):
 
-   #if elem_1 == elem_2:
-   # return 0.0,0.0
-   #else:
+   
     side = self.get_side_between_two_elements(elem_1,elem_2)
     normal = self.compute_side_normal(elem_1,side)
     area = self.compute_side_area(side)
@@ -2084,7 +2082,7 @@ class Geometry(object):
 
    if elem_1 == elem_2: #Boundary side
     for side in self.elem_side_map[elem_1]:
-     if side in self.side_list['Boundary']:
+     if side in self.side_list['Boundary'] + self.side_list['Hot'] + self.side_list['Cold']:
       return side
     print('No boundary side')
     quit()
