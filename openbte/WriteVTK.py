@@ -111,9 +111,14 @@ class WriteVtk(object):
    # periodic_nodes.add(self.mesh.sides[side][1])
    #periodic_nodes = list(periodic_nodes)
 
-   periodic_nodes = np.array(self.mesh.periodic_nodes)
-   periodic_1 = [i[0] for i in periodic_nodes]
-   periodic_2 = [i[1] for i in periodic_nodes]
+   #periodic_nodes = np.array(self.mesh.periodic_nodes)
+   periodic_1 = []
+   periodic_2 = []
+   for i in self.mesh.periodic_nodes.keys():
+    periodic_1.append(i)
+    periodic_1.append(self.mesh.periodic_nodes[i])
+   #periodic_1 = [self.mesh.periodic_nodes[i][0] for i in self.mesh.periodic_nodes.keys()]
+   #periodic_2 = [self.mesh.periodic_nodes[i][1] for i in self.mesh.periodic_nodes.keys()]
 
    #----------------------------------------------
    nodes_uc = self.mesh.nodes

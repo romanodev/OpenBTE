@@ -213,7 +213,7 @@ def generate_non_overlapping_pores(make_pore,argv):
    poly = Polygon(make_pore(x,y,**argv))
    intersect = False
    for p in pores:
-       if p.distance(poly) < argv.setdefault('dmin',0):
+       if p.distance(poly) < argv['dmin']:
            intersect = True
            break
 
@@ -337,7 +337,6 @@ def GenerateRandomPoresOverlap(argv):
     return frame_tmp,pores,centers,mind,argv['porosity']
 
    #if not overlap
-
    centers = []
    for nn in range(Np):
     x = np.random.uniform(0,1)
