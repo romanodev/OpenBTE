@@ -623,7 +623,7 @@ class Material(object):
            'direction_int':direction_int,\
            'factor':[np.sin(Dphi/2),np.cos(Dphi/2)/Dphi],\
            'mfp_bulk':mfp_bulk,\
-           #'kappa_bulk':kappa_bulk,\
+           'kappa_bulk':kappa_bulk,\
            'kappa_bulk_tot':np.sum(kappa_bulk)}
 
 
