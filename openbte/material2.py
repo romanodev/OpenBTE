@@ -561,7 +561,6 @@ class Material(object):
    mfp = np.logspace(-1,3,n_mfp)#min MFP = 1e-2 
    #mfp = np.logspace(np.log10(min(mfp_bulk)*0.99),np.log10(max(mfp_bulk)*1.01),n_mfp) 
 
-
    n_mfp = len(mfp)
    temp_coeff = np.zeros(n_mfp*n_phi) 
    kappa_directional = np.zeros((n_mfp*n_phi,3)) 
@@ -604,8 +603,6 @@ class Material(object):
    #repeat angle---
 
    kappa_directional[:,2] = 0 #Enforce zeroflux on z (for visualization purposed)
-
-
    polar_ave = np.array([np.repeat(polar_ave[:,i],n_mfp) for i in range(3)]).T
    polar = np.array([np.repeat(polar[:,i],n_mfp) for i in range(3)]).T
    #---------------------------------

@@ -560,8 +560,8 @@ class Plot(object):
    # plt.ylim([0,N])
    #else:
 
-   #if argv.setdefault('plot_interfaces',False):
-   #  pp = self.geo.get_interface_point_couples(argv)
+  # if argv.setdefault('plot_interfaces',False):
+  #   pp = self.geo.get_interface_point_couples(argv)
 
    for n in range(self.geo.nle):
      

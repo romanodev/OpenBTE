@@ -127,9 +127,10 @@ class Geometry(object):
       self.frame,self.polygons = GenerateCustomPores(argv)
 
      if geo_type == 'porous/random':
-      self.frame,self.polygons,tt,mind = GenerateRandomPoresOverlap(argv)
+      self.frame,self.polygons,tt,mind,area = GenerateRandomPoresOverlap(argv)
       self.tt = tt
       self.mind = mind
+      self.porosity = area/argv['lx']/argv['ly']
 
      if geo_type == 'porous/random_over_grid':
       x,polygons = GenerateRandomPoresGrid(**argv)
@@ -198,7 +199,7 @@ class Geometry(object):
        grid = argv.setdefault('grid',generate_correlated_pores(**argv))
        self.add_patterning(grid=grid)
 
-       if argv.setdefault('save',False):
+       if argv.setdefault('save',False) and not argv.setdefault('only_geo',False):
          self.save()
 
        return self.state
@@ -1254,6 +1255,9 @@ class Geometry(object):
     self.side_list.update({'active_global':active})
     self.elem_list = {'active':list(range(len(self.elems)))} 
     self.elem_kappa_map = {ne:[[1,0,0],[0,1,0],[0,0,1]] for ne in range(len(self.elems))}
+    self.elem_rho_map = {ne:1 for ne in range(len(self.elems))}
+    self.elem_v_map = {ne:1 for ne in range(len(self.elems))}
+    self.elem_mfp_map = {ne:1 for ne in range(len(self.elems))}
     self.l2g = list(range(len(self.elems)))
     self.g2l = list(range(len(self.elems)))
     self.nle = len(self.l2g)
@@ -1484,8 +1488,11 @@ class Geometry(object):
     #change active elements---
     self.elem_list['active']=grid
 
-
     kappa = argv.setdefault('kappa',np.tile([[[1,0,0],[0,1,0],[0,0,0]]],(len(grid),1,1)))
+    rho = argv.setdefault('rho',np.ones(len(grid)))
+    v = argv.setdefault('v',np.ones(len(grid)))
+    mfp = argv.setdefault('mfp',np.ones(len(grid)))
+
     n = int(sqrt(len(self.nodes)))-1
 
     #----Restore previous boundary connections---
@@ -1509,8 +1516,14 @@ class Geometry(object):
 
     #kappa maps--------
     self.elem_kappa_map = {}
+    self.elem_v_map = {}
+    self.elem_rho_map = {}
+    self.elem_mfp_map = {}
     for i,n in enumerate(grid): #elem_kappa_map is defined on global
      self.elem_kappa_map[n] = kappa[i] 
+     self.elem_rho_map[n] = rho[i] 
+     self.elem_v_map[n] = v[i] 
+     self.elem_mfp_map[n] = mfp[i] 
     #------------------
 
     #active side---
@@ -1542,7 +1555,7 @@ class Geometry(object):
     for side in self.side_list['active']:
      elems = self.side_elem_map[side]
      k1 = self.elem_kappa_map[elems[0]]       
-     k2 = self.elem_kappa_map[elems[1]]      
+     k2 = self.elem_kappa_map[elems[1]]     
      if not k1[0][0] == k2[0][0]:
       ll.append(side)
     self.side_list['Interface'] = ll
@@ -1556,8 +1569,8 @@ class Geometry(object):
     data = {'nle':self.nle,'g2l':self.g2l,'l2g':self.l2g,'side_elem_map':self.side_elem_map,'elem_side_map':self.elem_side_map,\
             'side_list':self.side_list,'region_elem_map':self.region_elem_map,\
             'elem_region_map':self.elem_region_map,'A':self.A,'CM':self.CM,\
-            'B':self.B,'B_with_area_old':self.B_with_area_old,'elem_kappa_map':self.elem_kappa_map,\
-            'CP':self.CP,'N':self.N,'N_new':self.N_new}
+            'B':self.B,'B_with_area_old':self.B_with_area_old,'elem_kappa_map':self.elem_kappa_map,'B_area':self.B_area,\
+            'CP':self.CP,'N':self.N,'N_new':self.N_new,'elem_v_map':self.elem_v_map,'elem_mfp_map':self.elem_mfp_map,'elem_rho_map':self.elem_rho_map}
 
 
   else: data = None
@@ -1707,6 +1720,8 @@ class Geometry(object):
           'elem_region_map':self.elem_region_map,\
           'side_elem_map':self.side_elem_map,\
           'side_node_map':self.side_node_map,\
+          'IB':self.IB,\
+          'BN':self.BN,\
           'node_elem_map':self.node_elem_map,\
           'elem_map':self.elem_map,\
           'nodes':self.nodes,\
@@ -1720,6 +1735,9 @@ class Geometry(object):
           'weigths':self.weigths,\
           'region_elem_map':self.region_elem_map,\
           'elem_kappa_map':self.elem_kappa_map,\
+          #'elem_rho_map':self.elem_rho_map,\
+          #'elem_v_map':self.elem_v_map,\
+          #'elem_mfp_map':self.elem_mfp_map,\
           'size':self.size,\
           'c_areas':self.c_areas,\
           'interp_weigths':self.interp_weigths,\
@@ -1732,6 +1750,7 @@ class Geometry(object):
           'B':self.B,\
           'node_side_map':self.node_side_map,\
           'B_with_area_old':self.B_with_area_old,\
+          'B_area':self.B_area,\
           'CM':self.CM,\
           'CP':self.CP,\
           #'CPB':self.CPB,\
@@ -2267,6 +2286,9 @@ class Geometry(object):
     #self.elem_list = self.state['elem_list']
     self.dim = self.state['dim']
     self.elem_kappa_map = self.state['elem_kappa_map']
+    #self.elem_rho_map = self.state['elem_rho_map']
+    #self.elem_v_map = self.state['elem_v_map']
+    #self.elem_mfp_map = self.state['elem_mfp_map']
     self.n_elems = self.state['n_elems']
     self.A = self.state['A']
     self.sides = self.state['sides']
@@ -2308,6 +2330,8 @@ class Geometry(object):
     self.polygons = self.state['polygons']
     self.N = self.state['N']
     self.N_new = self.state['N_new']
+    self.IB = self.state['IB']
+    self.BN = self.state['BN']
     self.elem_map = self.state['elem_map']
     self.CM = self.state['CM']
     self.applied_grad = self.state['applied_grad']
@@ -2317,6 +2341,7 @@ class Geometry(object):
     self.B = self.state['B']
     #self.labels = self.state['labels']
     self.B_with_area_old = self.state['B_with_area_old']
+    self.B_area = self.state['B_area']
     self.side_periodic_value = self.state['side_periodic_value']
     self.kappa_factor = self.size[self.direction]/self.area_flux
 
@@ -2918,7 +2943,8 @@ class Geometry(object):
     flux_sides = [] #where flux goes
     side_value = np.zeros(nsides)
 
-    tmp = self.side_list.setdefault('Periodic',[]) + self.exlude
+    tmp = self.side_list.setdefault('Periodic',[]) + self.exlude + \
+          self.side_list.setdefault('Hot',[]) + self.side_list.setdefault('Cold',[])
 
     for kl,ll in enumerate(tmp) :
      normal = self.compute_side_normal(self.side_elem_map[ll][0],ll)
@@ -2931,6 +2957,13 @@ class Geometry(object):
      if tmp > delta :
         side_value[ll] = +1.0
      
+     if ll in self.side_list['Hot']:
+       side_value[ll] = 0.5
+
+     if ll in self.side_list['Cold']:
+       side_value[ll] = -0.5
+
+
     side_periodic_value = np.zeros((nsides,2))
 
     n_el = self.nle
@@ -2938,6 +2971,7 @@ class Geometry(object):
     #B_with_area = sparse.DOK((n_el,n_el,3),dtype=float32)
 
     B_with_area_old = sparse.DOK((n_el,n_el),dtype=float32)
+    self.B_area = np.zeros(n_el,dtype=float32)
      
     if len(self.side_list.setdefault('Periodic',[])) > 0:
      for side in self.pairs:
@@ -2953,13 +2987,27 @@ class Geometry(object):
 
       if np.linalg.norm(np.cross(self.get_side_normal(1,side[0]),self.applied_grad)) < 1e-5:
        B_with_area_old[i,j] = abs(side_value[side[0]]*self.get_side_area(side[0]))
-      
+    
+    #In case of fixed temperature----
+    self.BN = np.zeros((len(self.elems),len(self.elems[0]),3))
+    self.IB = np.zeros((len(self.elems),len(self.elems[0])))
+    for ll in self.side_list['Hot'] + self.side_list['Cold']:
+      elems = self.side_elem_map[ll]
+      normal = self.get_side_normal(0,ll)
+      ind = self.elem_side_map[elems[0]].index(ll)
+      self.BN[elems[0],ind] = normal * self.get_side_area(ll)
+      if ll in self.side_list['Hot']:
+        self.IB[elems[0],ind] =  0.5
+      else :
+        self.IB[elems[0],ind] = -0.5
+        self.B_area[elems[0]] = self.get_side_area(ll)
+        
+    #----------------------------------------------------------------
     self.area_flux = abs(np.dot(flux_dir,self.c_areas))
     self.flux_sides = flux_sides
     self.side_periodic_value = side_periodic_value
     self.B = B.to_coo()
-    #self.B_with_area = B_with_area.to_coo()
-    self.B_with_area_old = B_with_area_old.to_coo()#.to_scipy_sparse()
+    self.B_with_area_old = B_with_area_old.to_coo()
 
 
 

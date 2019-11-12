@@ -64,7 +64,7 @@ def GenerateSquareLatticePores(argv):
   pbc.append([-Lx,Ly])
   pbc.append([Lx,-Ly])
 
-  base = argv.setdefault('base',[[0,0]]) 
+  base = argv.setdefault('base',[[0.5,0.5]]) 
   area = Lx * Ly * porosity/len(base)
 
   options.update({'area':area})

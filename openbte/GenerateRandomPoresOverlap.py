@@ -213,7 +213,7 @@ def generate_non_overlapping_pores(make_pore,argv):
    poly = Polygon(make_pore(x,y,**argv))
    intersect = False
    for p in pores:
-       if p.distance(poly) < argv['dmin']:
+       if p.distance(poly) < argv.setdefault('dmin',0):
            intersect = True
            break
 
@@ -257,8 +257,8 @@ def GenerateRandomPoresOverlap(argv):
 
     if argv['shape'] == 'triangle':
         options = {'Na': 3}
-
-  Np = argv['Np']
+  if not argv.setdefault('load_configuration',False):
+   Np = argv['Np']
 
   random_phi =  argv.setdefault('random_angle',True)
 
@@ -319,22 +319,25 @@ def GenerateRandomPoresOverlap(argv):
   nn = 0
   confs = []
 
-  if not argv.setdefault('overlap',False):
+
+  if argv.setdefault('load_configuration',False):
+   centers = np.load(argv.setdefault('configuration_file','conf.dat'),allow_pickle=True)
+   Np = len(centers)
+  elif argv.setdefault('manual',False):
+   centers = argv['centers']
+  else:
+
+   #overlap--
+   if not argv.setdefault('overlap',False):
     argv.update({'area':Lx*Ly*argv['porosity']/Np,'pbc':pbc})
     argv.update(options)
     pores,centers,mind = generate_non_overlapping_pores(make_pore,argv)
     if argv.setdefault('save_configuration',False) and not argv['load_configuration']:
      np.array(centers).dump(argv.setdefault('configuration_file','conf.dat'))
-
     return frame_tmp,pores,centers,mind
 
+   #if not overlap
 
-
-  if argv.setdefault('load_configuration',False):
-   centers = np.load(argv.setdefault('configuration_file','conf.dat'),allow_pickle=True)
-  elif argv.setdefault('manual',False):
-   centers = argv['centers']
-  else:
    centers = []
    for nn in range(Np):
     x = np.random.uniform(0,1)
@@ -352,7 +355,7 @@ def GenerateRandomPoresOverlap(argv):
    y = Ly*(center[1]-0.5)
    phi = np.random.uniform(phi_mean - spread, phi_mean + spread)
    area = Lx*Ly*phi/float(Np)
-
+   options.update({'area':area})
 
    poly_clip = make_pore(x,y,**options)
 
@@ -386,7 +389,7 @@ def GenerateRandomPoresOverlap(argv):
    tt.append([x,y])
 
    for kp in range(len(pbc)):
-    poly_clip = make_pore(x + pbc[kp][0],y+pbc[kp][1],area,**options)
+    poly_clip = make_pore(x + pbc[kp][0],y+pbc[kp][1],**options)
     polys.append(Polygon(poly_clip))
 
 
@@ -421,11 +424,10 @@ def GenerateRandomPoresOverlap(argv):
    if p.intersects(frame):
     new = list(p.exterior.coords)[:-1]   
     polys_cut.append(new)
-    area += p.area
-
+    area += p.intersection(frame).area
 
   if argv.setdefault('save_configuration',False) and not argv['load_configuration']:
    np.array(centers).dump(argv.setdefault('configuration_file','conf.dat'))
 
-  return frame_tmp,polys_cut,np.array(centers),mind
+  return frame_tmp,polys_cut,np.array(centers),mind,area
 

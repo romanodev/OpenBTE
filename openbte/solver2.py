@@ -60,7 +60,6 @@ def unique_versors(list_arrays):
        versors_irr.append(v)
 
 
-
     return sum([ int(np.allclose(elem,myarr,rtol=1e-5)) for elem in list_arrays])
 
 
@@ -155,7 +154,7 @@ class Solver(object):
     self.print_logo()
     self.print_dof()
 
-   #self.compute_transmission_coefficients() 
+   self.compute_transmission_coefficients() 
 
    self.build_kappa_mask()
    if self.verbose: self.print_bulk_kappa()
@@ -196,25 +195,100 @@ class Solver(object):
    #  for elem in self.mesh.region_elem_map['Inclusion']:
    #   self.elem_kappa_map[elem] = kappa_inclusion*np.eye(3)
 
-  #def compute_transmission_coefficients(self):
+  def rotate2D(self,theta):
 
-  # transmission = {}
+   rotMatrix = np.array([[np.cos(theta), -np.sin(theta), 0], 
+                         [np.sin(theta),  np.cos(theta),0],[0,0,0]])
 
-  # for side in self.mesh.side_list['Interface']:
-  #  (i,j) = self.mesh.side_elem_map[side]
-  #  for a in range(self.mat['n_serial']):
-  #   index = a * self.n_serial
-  #   angle = self.control_angle[index]
-  #   angle /= np.linalg.norm(angle)
-  #   side = self.mesh.get_side_between_two_elements(i,j)
-  #   s = self.get_specular_index(index)
-  #   r = self.get_refracted_index(index)
-     #tij = 
-  #   transmission.update('side')
+   return rotMatrix
+
+  #def get_reflected_index(self,normal,rangle)):
+
+
+
+    #P = np.eye(3)-2*np.outer(normal,normal)
+    #direction_specular = np.dot(P,angle)
+    #print(direction,direction_specular,normal)
+    #quit()
+
+
+  def compute_transmission_coefficients(self):
+
+   #compute all angles
+   dirs = []
+   for index in range(self.n_parallel):
+     direction = self.control_angle[index*self.n_serial]
+     direction /= np.linalg.norm(direction)
+     dirs.append(direction)
+
+   self.transmission = {  side:np.zeros((len(dirs),len(dirs)))  for side in self.mesh.side_list['Interface']}
+   self.reflection = {  side:np.zeros((len(dirs),len(dirs)))  for side in self.mesh.side_list['Interface']}
+
+
+   #-------
+   for side in self.mesh.side_list['Interface']:
+    (i,j) = self.mesh.side_elem_map[side]
+    normal = self.mesh.get_normal_between_elems(i,j)
+    vi = self.mesh.elem_v_map[i]
+    vj = self.mesh.elem_v_map[j]
+    rhoi = self.mesh.elem_rho_map[i]
+    rhoj = self.mesh.elem_rho_map[j]
+    zi = rhoi*vi
+    zj = rhoj*vj
+
+    if vi < vj:
+     theta_c = np.arcsin(vi/vj)
+    else:
+     theta_c = np.pi/2
     
+    for index,direction in enumerate(dirs):
 
+     if np.dot(direction,normal) > 0:    
+
+      angle = self.get_angle(normal,direction)
+
+      #get reflective index
+      rdir = np.dot(self.rotate2D(2*angle + np.pi),direction) #specular direction---
+      ir = np.argmax([np.dot(rdir,d) for d in dirs])
+
+      if angle < theta_c:
+        angle_i = np.arcsin(vi/vj*np.sin(angle))        
+        idir = np.dot(self.rotate2D(angle_i + np.pi),normal) #specular direction---
+        it = np.argmax([np.dot(idir,d) for d in dirs])
+        self.transmission[side][it,index] = 4*zi*zj*np.cos(angle_i)*np.cos(angle)/(pow(zi*np.cos(angle_i)+zj*np.cos(angle),2))
+      else:
+        self.reflection[side][ir,index] = 1
+     
+     else:
+
+      normal -=normal
+      angle = self.get_angle(normal,direction)
+
+      #get reflective index
+      rdir = np.dot(self.rotate2D(2*angle + np.pi),direction) #specular direction---
+      ir = np.argmax([np.dot(rdir,d) for d in dirs])
+
+      if angle < theta_c:
+        angle_i = np.arcsin(vj/vi*np.sin(angle))        
+        idir = np.dot(self.rotate2D(angle_i + np.pi),normal) #specular direction---
+        it = np.argmax([np.dot(idir,d) for d in dirs])
+        self.transmission[side][index,it] = 4*zi*zj*np.cos(angle_i)*np.cos(angle)/(pow(zi*np.cos(angle_i)+zj*np.cos(angle),2))
+      else:
+        self.reflection[side][index,ir] = 1
      
 
+  def get_angle(self,normal,direction):     
+
+      angle_1 = np.arctan2(normal[1], normal[0])
+      angle_2 = np.arctan2(direction[1], direction[0])
+
+      angle = np.arctan2(normal[1], normal[0]) - np.arctan2(direction[1], direction[0])
+
+      if (angle > np.pi) :
+       angle -= 2 * np.pi
+      elif angle <= -np.pi :
+       angle += 2 * np.pi
+      return angle
 
 
   def get_material_from_element(self,elem):
@@ -304,14 +378,26 @@ class Solver(object):
       AP = AP.todense()
       AM = -AM.todense()
 
+      #Compute matrices for the fixed-temperature boundaries---- To compute thermal conductivities
+      #tmp = sparse.tensordot(self.mesh.BN,k_angle,axes=1)
+      #BNP = tmp.clip(min=0)
+      #BNM = BNP-tmp
+      #BNP = BNP.todense()
+      #BNM = -BNM.todense()
+      #---------------------------------------------------------
+
       if self.save_data:
        AM.dump(open(self.cache + '/Am_' + str(global_index) + '.p','wb'))
        AP.dump(open(self.cache + '/Ap_' + str(global_index) + '.p','wb'))
+       #BNP.dump(open(self.cache + '/BNP_' + str(global_index) + '.p','wb'))
+       #BNM.dump(open(self.cache + '/BNM_' + str(global_index) + '.p','wb'))
      else :
       AM = np.load(open(self.cache +'/Am_' + str(global_index) +'.p','rb'),allow_pickle=True)
       AP = np.load(open(self.cache +'/Ap_' + str(global_index) +'.p','rb'),allow_pickle=True)
+     # BNM = np.load(open(self.cache +'/BNM_' + str(global_index) +'.p','rb'),allow_pickle=True)
+     # BNP = np.load(open(self.cache +'/BNP_' + str(global_index) +'.p','rb'),allow_pickle=True)
 
-     return AM,AP
+     return AM,AP#,BNM,BNP
 
   def get_bulk_data(self,global_index,TB,TL,Tnew):
 
@@ -319,6 +405,8 @@ class Solver(object):
     aa = sparse.COO([0,1,2],self.control_angle[global_index],shape=(3))
     mfp   = self.mat['mfp'][global_index]
     irr_angle = self.mat['angle_map'][global_index]
+    #kdir = sparse.COO([0,1,2],self.mat['kappa_directional'][global_index],shape=(3))
+    
 
     if (self.keep_lu) and (global_index in self.lu.keys()) :
      lu = self.lu[irr_angle]    
@@ -338,9 +426,11 @@ class Solver(object):
         tmp = sparse.tensordot(self.mesh.CM,aa,axes=1).todense()
         HW_PLUS = tmp.clip(min=0)
         self.HW_MINUS = (HW_PLUS-tmp)
-
         BP = spdiags(np.sum(HW_PLUS,axis=1),0,self.mesh.nle,self.mesh.nle,format='csc')
         self.A =  AP + AM + BP
+
+        #------------------------------------
+
         if self.save_data: 
          self.P.dump(self.cache + '/P_' + str(irr_angle) + '.p')
          sio.save_npz(self.cache + '/A_' + str(irr_angle) + '.npz',self.A)
@@ -358,13 +448,13 @@ class Solver(object):
 
 
     boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1)
+
+    fixed_temperature = np.sum(np.multiply(self.mesh.IB,self.HW_MINUS),axis=1)
+
     if self.argv.setdefault('Experimental',False):
-     #RHS = mfp * np.ones(self.mesh.nle) + np.ones(self.mesh.nle)
      RHS = mfp * boundary + np.ones(self.mesh.nle)
-     #RHS = np.ones(self.mesh.nle)
-     #RHS = np.ones(self.mesh.nle)
     else:
-     RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]
+     RHS = mfp * (self.P + boundary + fixed_temperature) + Tnew + TL[index_irr]
      
     temp = lu.solve(RHS)
  
@@ -508,7 +598,7 @@ class Solver(object):
        #Compute ballistic regime---
        a = time.time()
        temp_bal = self.get_bulk_data(index * self.n_serial + self.n_serial -1,TB,TL,Tnew)
-       self.mesh.B_with_area_old.dot(temp_bal).sum()
+       #self.mesh.B_with_area_old.dot(temp_bal).sum()
        eta_bal = np.ones(self.n_serial) * self.mesh.B_with_area_old.dot(temp_bal).sum()
        #-------------------------------------
 
@@ -530,29 +620,38 @@ class Solver(object):
       eta_plot = []
       for n in range(self.n_serial)[idx[0]::-1]:
         global_index = index * self.n_serial + n 
+        (Am,Ap) = self.get_boundary_matrices(global_index)
+        kdir = self.mat['kappa_directional'][global_index]
+        
         if fourier == True:
          ndifp[0] += 1   
          temp = TDIFF[n]
          eta = eta_diff[n]
         else:
          temp = self.get_bulk_data(global_index,TB,TL,Tnew)
-      
-         eta = self.mesh.B_with_area_old.dot(temp).sum()
-         #if index == 11:
-         #    eta_plot.append(eta)
-         #if self.multiscale:
-         #  if abs(eta_diff[n] - eta)/abs(eta) < 1e-2:
-         #   fourier = True  
 
+         #heat coming from periodic boundary conditions----
+         eta = self.mesh.B_with_area_old.dot(temp).sum()
+
+         #heat coming from constant boundary
+         if np.dot(self.control_angle[global_index],self.mesh.applied_grad) > 0:
+          eta += self.mesh.B_area.dot(temp)
+         else:
+          eta -= 0.5*self.mesh.B_area.sum()
+
+
+         #----------------------------------------------------------
+  
         #test---
         eta_vecp[global_index] = eta 
-        (Am,Ap) = self.get_boundary_matrices(global_index)
         TBp_minus += Am 
         TBp_plus  += np.einsum('es,e->es',Ap,temp)
         TL2p += np.outer(self.mat['B'][:,global_index],temp)    
         Tp+= temp*self.mat['TCOEFF'][global_index]
-        kdir = self.mat['kappa_directional'][global_index]
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
+        #K2p += np.array([self.control_angle[global_index][0]*np.dot(kdir,self.mesh.applied_grad)])*self.mat['mfp'][global_index]
+
+        #K2p += np.array([eta])
         KAPPAp[index,n] = np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
         Jp += np.outer(temp,kdir)*1e9
 
@@ -576,7 +675,6 @@ class Solver(object):
          eta = eta_bal[n]
         else:
          temp = self.get_bulk_data(global_index,TB,TL,Tnew)
-
 
          #self.temp[global_index] = temp
          eta = self.mesh.B_with_area_old.dot(temp).sum()
@@ -620,10 +718,8 @@ class Solver(object):
     TB = self.alpha * TB_new + (1-self.alpha)*TB_old; TB_old = TB.copy()
 
     Tnew = T.copy()
-    
     TL = self.alpha * TL2.copy() + (1-self.alpha)*self.TL_old; 
     self.TL_old = TL.copy()
-
 
     n_iter +=1   
    
@@ -681,11 +777,12 @@ class Solver(object):
        B[li] += self.mesh.get_side_periodic_value(j,i)*v_orth/vi#*kappa
        B[lj] += self.mesh.get_side_periodic_value(i,j)*v_orth/vj#*kappa
       else:
-       F[li,li] += v_orth/vi
        if ll in self.mesh.side_list['Hot']:
+        F[li,li] += v_orth/vi
         B[li] += v_orth/vi*0.5#*kappa
 
        if ll in self.mesh.side_list['Cold']:
+        F[li,li] += v_orth/vi
         B[li] -= v_orth/vi*0.5#*kappa
         
 
@@ -1176,7 +1273,7 @@ class Solver(object):
 
   def compute_diffusive_thermal_conductivity(self,temp,mat=np.eye(3),kappa_bulk = -1):
 
-      
+    
    kappa = 0
    for (i,j) in self.kappa_mask:
     gi = self.mesh.l2g[i]   
