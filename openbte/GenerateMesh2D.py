@@ -553,7 +553,6 @@ def mesh(polygons,frame,argv):
    boundary_surfaces = pore_wall + additional_boundary
    interface_surfaces = []
 
-
   #Interface surface
   if len(boundary_surfaces)> 0:
    strc = r'''Physical Line('Boundary') = {'''
@@ -589,41 +588,5 @@ def mesh(polygons,frame,argv):
 
 #-------------------------------------------------------
   store.close()
-#for p in pp:
-# points.append(p)
-# store.write( 'Point('+str(len(points)-1) +') = {' + str(p[0]) +','+ str(p[1])+',0,'+ str(mesh_ext) +'};\n')
 
-#Lines--------
-#for n in range(len(pp)):
-# p1 = len(points) + n - len(pp)
-# p2 = len(points) + (n+1)%len(pp) - len(pp)
-# lines.append([p1,p2])
-# store.write( 'Line('+str(len(lines)-1) +') = {' + str(p1) +','+ str(p2)+'};\n')
 
-#Line loops
-#loops += 1
-#strc = 'Line Loop(' + str(loops-1)+ ') = {'
-#for n in range(len(pp)):
-# strc +=str(len(lines)-len(pp)+n)
-# if n == len(pp)-1:
-#  strc += '};\n'
-# else:
-#  strc += ','
-#store.write(strc)
-
-#Pores surfaces--
-#ss +=1
-#strc = 'Plane Surface(' + str(ss-1)+ ') = {' + str(loops-1) + '};\n'
-#store.write(strc)
-
-#plot_region(points)
-
-#show()
-#strc = r'''Physical Surface('Pores') = {'''
-#for n in range(ss):
-# strc += str(n)
-# if n == ss-1:
-#   strc += '};\n'
-# else:
-#   strc += ','
-#store.write(strc)

@@ -82,7 +82,7 @@ def create_structured_bulk(argv):
 
 def create_unstructured_bulk(argv):
 
-  res = argv.setdefault('reservoirs',False)
+  #res = argv.setdefault('reservoirs',False)
   direction = argv['direction']
 
   Lx = float(argv['lx'])
@@ -129,35 +129,34 @@ def create_unstructured_bulk(argv):
 
   bs = []
   if argv.setdefault('Periodic',[True,True,True])[1] :
-
-   if res and direction=='y':
-    strc = r'''Physical Line('Cold') = {2};''' + '\n'
-    store.write(strc)
-    strc = r'''Physical Line('Hot') = {4};''' +'\n'
-   else:
     strc = r'''Physical Line('Periodic_1') = {1};''' + '\n'
     store.write(strc)
     strc = r'''Physical Line('Periodic_2') = {3};''' + '\n'
     store.write(strc)
   else:
-   bs.append(1)
-   bs.append(3)
-
-  if argv.setdefault('Periodic',[True,True,True])[0] :
-
-   if res and direction=='x':
+   if direction=='y':
     strc = r'''Physical Line('Cold') = {2};''' + '\n'
     store.write(strc)
     strc = r'''Physical Line('Hot') = {4};''' +'\n'
     store.write(strc)
    else:
+    bs.append(1)
+    bs.append(3)
+
+  if argv.setdefault('Periodic',[True,True,True])[0] :
     strc = r'''Physical Line('Periodic_3') = {2};''' + '\n'
     store.write(strc)
     strc = r'''Physical Line('Periodic_4') = {4};''' +'\n'
     store.write(strc)
   else:
-   bs.append(2)
-   bs.append(4)
+   if direction=='x':
+    strc = r'''Physical Line('Cold') = {2};''' + '\n'
+    store.write(strc)
+    strc = r'''Physical Line('Hot') = {4};''' +'\n'
+    store.write(strc)
+   else:
+    bs.append(2)
+    bs.append(4)
 
 
   if len(bs) > 0:

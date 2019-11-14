@@ -153,8 +153,9 @@ class Solver(object):
    if self.verbose: 
     self.print_logo()
     self.print_dof()
-
-   self.compute_transmission_coefficients() 
+   
+   if len(self.mesh.side_list['Interface']) > 0:
+    self.compute_transmission_coefficients() 
 
    self.build_kappa_mask()
    if self.verbose: self.print_bulk_kappa()

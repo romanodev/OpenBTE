@@ -1097,7 +1097,7 @@ class Geometry(object):
 
  def adjust_boundary_elements(self):
 
-  for side in self.side_list['Boundary']:
+  for side in self.side_list['Boundary'] + self.side_list['Hot'] + self.side_list['Cold']:
    self.side_elem_map[side].append(self.side_elem_map[side][0])
 
 
