@@ -579,7 +579,7 @@ class Solver(object):
     ndif = np.zeros(1)
     nbal = np.zeros(1)
     nbalp = np.zeros(1)
-    (KAPPA,KAPPAp) = np.zeros((2,self.n_parallel,self.n_serial))
+    (KAPPA,KAPPAp) = np.zeros((2,self.n_parallel*self.n_serial))
 
     eta_vec = np.zeros(self.n_parallel*self.n_serial)
     eta_vecp = np.zeros(self.n_parallel*self.n_serial)
@@ -653,7 +653,7 @@ class Solver(object):
         #K2p += np.array([self.control_angle[global_index][0]*np.dot(kdir,self.mesh.applied_grad)])*self.mat['mfp'][global_index]
 
         #K2p += np.array([eta])
-        KAPPAp[index,n] = np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
+        KAPPAp[globa_index] = np.array([eta*np.dot(kdir,self.mesh.applied_grad)])*self.kappa_factor
         Jp += np.outer(temp,kdir)*1e9
 
 
@@ -690,7 +690,7 @@ class Solver(object):
         Tp+= temp*self.mat['TCOEFF'][global_index]
         kdir = self.mat['kappa_directional'][global_index]
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
-        KAPPAp[index,n] = np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
+        KAPPAp[global_index] = np.array([eta*np.dot(kdir,self.mesh.applied_grad)])*self.kappa_factor
         Jp += np.outer(temp,kdir)*1e9
         eta_vecp[global_index] = eta 
 
@@ -706,6 +706,7 @@ class Solver(object):
     comm.Allreduce([eta_vecp,MPI.DOUBLE],[eta_vec,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([KBp,MPI.DOUBLE],[KB,MPI.DOUBLE],op=MPI.SUM)
 
+    print(np.sum(KAPPA))
     kappa_vec.append(abs(K2[0] * self.kappa_factor))
     error_vec.append(abs(kappa_vec[-1]-kappa_vec[-2])/abs(max([kappa_vec[-1],kappa_vec[-2]])))
     #----------------
