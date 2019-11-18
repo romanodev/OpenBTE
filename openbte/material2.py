@@ -48,7 +48,13 @@ class Material(object):
   if MPI.COMM_WORLD.Get_rank() == 0:
 
    data = pickle.load(open(argv['matfile'],'rb'))
-   mfp = data['MFP']
+   if argv.setdefault('synt',False):
+    mfp = data['FBTE']
+    nm = len(mfp)
+    B = np.zeros((nm,nm))
+   else:
+    mfp = data['MFP']
+    B = data['B']
 
    mfp_b,theta_b,phi_b = self.spherical(mfp)
    nm = len(mfp_b)
@@ -68,7 +74,8 @@ class Material(object):
    k_coeff = np.array(data['KCOEFF'])*1e-9
    k_coeff[:,2] = 0 #Enforce zeroflux on z (for visualization purposed)
 
-   return {'B': data['B'],\
+
+   return {'B': B,\
            'TCOEFF':Tcoeff,\
            'angle_map':np.arange(nm),\
            'temp_vec':range(nm),\
@@ -76,6 +83,8 @@ class Material(object):
            'n_serial':1,
            'n_parallel':nm,
            'mfp':mfp_b,
+           'mfp_rta':data['MFP']*1e9,
+           'mfp_bte':data['FBTE']*1e9,
            'control_angle':versors,\
            'kappa_bulk_tot':kbulk}
 

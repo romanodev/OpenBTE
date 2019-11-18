@@ -568,6 +568,7 @@ class Solver(object):
       comm.Allreduce([TDIFFGradp,MPI.DOUBLE],[TDIFFGrad,MPI.DOUBLE],op=MPI.SUM)
 
     #Print diffusive Kappa---------
+    #Addp,Add = np.zeros((2,nt,self.mesh.nle))
     KBp,KB = np.zeros((2,self.mesh.nle,3,3))
     TL2p,TL2 = np.zeros((2,nT,self.mesh.nle))
     Tp,T = np.zeros((2,self.mesh.nle))
@@ -632,28 +633,34 @@ class Solver(object):
          temp = self.get_bulk_data(global_index,TB,TL,Tnew)
 
          #heat coming from periodic boundary conditions----
-         eta = self.mesh.B_with_area_old.dot(temp).sum()
+         eta = self.mesh.B_with_area_old.dot(temp-Tnew).sum()
 
          #heat coming from constant boundary
          if np.dot(self.control_angle[global_index],self.mesh.applied_grad) > 0:
           eta += self.mesh.B_area.dot(temp)
          else:
           eta -= 0.5*self.mesh.B_area.sum()
-
-
          #----------------------------------------------------------
   
         #test---
         eta_vecp[global_index] = eta 
         TBp_minus += Am 
         TBp_plus  += np.einsum('es,e->es',Ap,temp)
-        TL2p += np.outer(self.mat['B'][:,global_index],temp)    
+        TL2p += np.outer(self.mat['B'][:,global_index],temp)   
+
+        #------------------
+        if self.argv.setdefault('synt',False):
+         gradT = self.mesh.compute_grad(temp)
+         TL2p[global_index] += np.einsum('k,ck->c',self.mat['mfp_bte'][global_index],gradT)
+         TL2p -=    np.einsum('i,k,ck->ic',self.mat['S'][:,global_index],self.mat['mfp_rta'][global_index],gradT)
+        #-------------------
+ 
         Tp+= temp*self.mat['TCOEFF'][global_index]
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
         #K2p += np.array([self.control_angle[global_index][0]*np.dot(kdir,self.mesh.applied_grad)])*self.mat['mfp'][global_index]
 
         #K2p += np.array([eta])
-        KAPPAp[globa_index] = np.array([eta*np.dot(kdir,self.mesh.applied_grad)])*self.kappa_factor
+        KAPPAp[global_index] = np.array([eta*np.dot(kdir,self.mesh.applied_grad)])*self.kappa_factor
         Jp += np.outer(temp,kdir)*1e9
 
 
@@ -686,7 +693,9 @@ class Solver(object):
         (Am,Ap) = self.get_boundary_matrices(global_index)
         TBp_minus += Am 
         TBp_plus  += np.einsum('es,e->es',Ap,temp)
-        TL2p += np.outer(self.mat['B'][:,global_index],temp)    
+        TL2p += np.outer(self.mat['B'][:,global_index],temp)   
+
+ 
         Tp+= temp*self.mat['TCOEFF'][global_index]
         kdir = self.mat['kappa_directional'][global_index]
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
@@ -705,8 +714,8 @@ class Solver(object):
     comm.Allreduce([KAPPAp,MPI.DOUBLE],[KAPPA,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([eta_vecp,MPI.DOUBLE],[eta_vec,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([KBp,MPI.DOUBLE],[KB,MPI.DOUBLE],op=MPI.SUM)
+    #comm.Allreduce([Addp,MPI.DOUBLE],[Add,MPI.DOUBLE],op=MPI.SUM)
 
-    print(np.sum(KAPPA))
     kappa_vec.append(abs(K2[0] * self.kappa_factor))
     error_vec.append(abs(kappa_vec[-1]-kappa_vec[-2])/abs(max([kappa_vec[-1],kappa_vec[-2]])))
     #----------------
@@ -720,7 +729,8 @@ class Solver(object):
     TB = self.alpha * TB_new + (1-self.alpha)*TB_old; TB_old = TB.copy()
 
     Tnew = T.copy()
-    TL = self.alpha * TL2.copy() + (1-self.alpha)*self.TL_old; 
+    TL = self.alpha * TL2.copy() + (1-self.alpha)*self.TL_old;
+    #print(np.min(np.min(TL)),np.max(np.max(TL)),np.min(np.min(Tnew)),np.max(np.max(Tnew))) 
     self.TL_old = TL.copy()
 
     n_iter +=1   
