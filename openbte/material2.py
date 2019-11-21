@@ -51,11 +51,10 @@ class Material(object):
    if argv.setdefault('synt',False):
     mfp = data['FBTE']
     nm = len(mfp)
-    B = np.zeros((nm,nm))
    else:
     mfp = data['MFP']
-    B = data['B']
 
+   B = data['B']
    mfp_b,theta_b,phi_b = self.spherical(mfp)
    nm = len(mfp_b)
    versors = np.zeros((nm,3))

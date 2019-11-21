@@ -456,7 +456,10 @@ class Solver(object):
      RHS = mfp * boundary + np.ones(self.mesh.nle)
     else:
      RHS = mfp * (self.P + boundary + fixed_temperature) + Tnew + TL[index_irr]
-     
+     if self.argv.setdefault('synt',False):
+      RHS -= TL[index_irr]
+
+  
     temp = lu.solve(RHS)
  
     return temp
@@ -476,19 +479,37 @@ class Solver(object):
    nT = np.shape(self.mat['B'])[0]
    kdir = self.kappa_directional
 
-   if self.argv.setdefault('load_state',False):
-     #data  = dd.io.load(self.argv.setdefault('filename','solver.hdf5'))
-     data = pickle.load(open(argv.setdefault('filename','solver.p'),'rb'))
-     error_vec = data['error_vec']
-     kappa_vec = data['kappa_vec']
-     ms_vec = data['ms_vec']
+   if 'load_state' in self.argv.keys():
+     if rank == 0: 
+      ddd = pickle.load(open(argv['load_state'],'rb'))
+      error_vec = ddd['error_vec']
+      kappa_vec = ddd['kappa_vec']
+      kappa_fourier = kappa_vec[-1]
+      ms_vec = ddd['ms_vec']
+      TL = ddd['TL']
+      TB = ddd['TB']
+      TL_old = ddd['TL_old']
+      TB_old = ddd['TB_old']
+      Tnew = ddd['T']
+      temp_fourier = ddd['temperature_fourier']
+      flux_fourier = ddd['flux_fourier']
+      temp_fourier_grad = ddd['temp_fourier_grad']
+      for n in range(len(ms_vec)):
+        print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n+1,kappa_vec[n],error_vec[n],ms_vec[n][0],ms_vec[n][1],ms_vec[n][2]))
+      data = {'TL_old':TL_old,'TB_old':TB_old,'Tnew':Tnew,'error_vec':error_vec,'kappa_vec':kappa_vec,'TL':TL,'TB':TB,'kappa_fourier':kappa_fourier,'temp_fourier':temp_fourier,'temp_fourier_grad':temp_fourier_grad}
+     else: data = None   
+     data = comm.bcast(data,root=0)
+     temp_fourier = data['temp_fourier']
+     kappa_fourier = data['kappa_fourier']
+     temp_fourier_grad = data['temp_fourier_grad']
      TL = data['TL']
      TB = data['TB']
-     temp_fourier = data['temp_fourier']
-     temp_fourier_grad = data['temp_fourier_grad']
-     if rank == 0: 
-      for n in range(len(ms_vec)):
-       print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n+1,kappa_vec[n],error_vec[n],ms_vec[n][0],ms_vec[n][1],ms_vec[n][2]))
+     self.TL_old = data['TL_old']
+     TB_old = data['TB_old']
+     Tnew = data['Tnew']
+     #TB = np.tile(Tnew,(self.n_side_per_elem,1)).T
+     kappa_vec = data['kappa_vec']
+     error_vec = data['error_vec']
 
    else:          
      #fourier first guess----
@@ -500,11 +521,10 @@ class Solver(object):
      data = comm.bcast(data,root=0)
      comm.Barrier()
      temp_fourier = data['temp_fourier']
-     temp_fourier_int = data['temp_fourier_int']
-     flux_fourier_int = data['flux_fourier_int']
+     #temp_fourier_int = data['temp_fourier_int']
+     #flux_fourier_int = data['flux_fourier_int']
      temp_fourier_grad = data['temp_fourier_grad']
      kappa_fourier = data['kappa_fourier']
-     #TL = np.tile(temp_fourier,(nT,1))
      TL = np.zeros((nT,self.mesh.nle))
      Tnew = temp_fourier.copy()
 
@@ -512,6 +532,8 @@ class Solver(object):
      if self.argv.setdefault('Experimental',False):
       TB = np.tile(np.zeros(self.mesh.nle),(self.n_side_per_elem,1)).T
 
+     TB_old = TB.copy()
+     self.TL_old = TL.copy()
      #----------------------------------------------------------------
      kappa_vec = [float(kappa_fourier)]
      #kappa_vec = [0]
@@ -524,19 +546,21 @@ class Solver(object):
    #Save if only Fourier---
    flux_fourier = [-temp_fourier_grad[i]*self.elem_kappa_map[self.mesh.l2g[i]] for i in range(self.mesh.nle)]
 
-   data_save = {'flux_fourier':flux_fourier,'temperature_fourier':temp_fourier,'kappa_fourier':kappa_fourier,'kappa_map':self.elem_kappa_map,'temperature_fourier_int':temp_fourier_int,'flux_fourier_int':flux_fourier_int}
+   #data_save = {'flux_fourier':flux_fourier,'temperature_fourier':temp_fourier,'kappa_fourier':kappa_fourier,'kappa_map':self.elem_kappa_map,'temperature_fourier_int':temp_fourier_int,'flux_fourier_int':flux_fourier_int}
+   data_save = {'flux_fourier':flux_fourier,'temperature_fourier':temp_fourier,'kappa_fourier':kappa_fourier,'kappa_map':self.elem_kappa_map}
    self.state = data_save
-   if self.argv.setdefault('only_fourier',False) or self.argv.setdefault('bte_max_iter',True) == 1:
-    if self.save_state:
-      pickle.dump(self.state,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
-   
+   #if self.argv.setdefault('only_fourier',False) or self.argv.setdefault('bte_max_iter',True) == 1:
+   # if self.save_state:
+   #   pickle.dump(self.state,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
+  
    #Initialize data-----
    n_iter = len(kappa_vec)
-   self.TL_old = TL.copy()
-   self.delta_old = np.zeros_like(TL)
-   TB_old = TB.copy()
+   #self.TL_old = TL.copy()
+   #self.TL_old = np.zeros_like(TL)
 
-   self.temp_old = self.TL_old.copy()
+   #self.delta_old = np.zeros_like(TL)
+   error_vec[-1] = 1
+   #self.temp_old = self.TL_old.copy()
    #-------------------------------
    while n_iter < argv.setdefault('max_bte_iter',10) and \
           error_vec[-1] > argv.setdefault('max_bte_error',1e-2):
@@ -649,10 +673,10 @@ class Solver(object):
         TL2p += np.outer(self.mat['B'][:,global_index],temp)   
 
         #------------------
-        if self.argv.setdefault('synt',False):
-         gradT = self.mesh.compute_grad(temp)
-         TL2p[global_index] += np.einsum('k,ck->c',self.mat['mfp_bte'][global_index],gradT)
-         TL2p -=    np.einsum('i,k,ck->ic',self.mat['S'][:,global_index],self.mat['mfp_rta'][global_index],gradT)
+        #if self.argv.setdefault('synt',False):
+        # gradT = self.mesh.compute_grad(temp)
+        # TL2p[global_index] += np.einsum('k,ck->c',self.mat['mfp_bte'][global_index],gradT)
+        # TL2p -=    np.einsum('i,k,ck->ic',self.mat['S'][:,global_index],self.mat['mfp_rta'][global_index],gradT)
         #-------------------
  
         Tp+= temp*self.mat['TCOEFF'][global_index]
@@ -726,7 +750,8 @@ class Solver(object):
        if not (TB_plus[n,i] == 0):
          TB_new[n,i] /= TB_minus[n,i]
     
-    TB = self.alpha * TB_new + (1-self.alpha)*TB_old; TB_old = TB.copy()
+    TB = self.alpha * TB_new + (1-self.alpha)*TB_old; i
+    TB_old = TB.copy()
 
     Tnew = T.copy()
     TL = self.alpha * TL2.copy() + (1-self.alpha)*self.TL_old;
@@ -750,7 +775,7 @@ class Solver(object):
       if self.argv.setdefault('Experimental',False):
          data.update({'kappa_space':KB}) 
 
-      data.update({'TB':TB,'TL':TL,'error_vec':error_vec,'ms_vec':ms_vec,'temp_fourier_grad':temp_fourier_grad,'eta':eta_vec})  
+      data.update({'TL_old':self.TL_old,'TB_old':TB_old,'T':Tnew,'TB':TB,'TL':TL,'error_vec':error_vec,'ms_vec':ms_vec,'temp_fourier_grad':temp_fourier_grad,'eta':eta_vec})  
       self.state = data
       if self.save_state:
        pickle.dump(self.state,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
