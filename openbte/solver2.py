@@ -89,7 +89,7 @@ class Solver(object):
 
    if 'geometry' in argv.keys():  
      self.mesh = argv['geometry']
-     self.mesh._update_data()
+     #self.mesh._update_data()
     
    else:  
     self.mesh = Geometry(model='load',filename_geometry = argv.setdefault('filename_geometry','geometry.p'))
@@ -123,27 +123,40 @@ class Solver(object):
 
    if 'material' in argv.keys():
      self.mat = argv['material'].state
-   else:  
-     self.mat = pickle.load(open(argv.setdefault('matfile','material.p'),'rb'))
+   else: 
+
+    self.mat = []
+    if 'matfiles' in argv.keys():
+     for mm in argv['matfiles']:
+       self.mat.append(pickle.load(open(mm,'rb')))
+    else:     
+      self.mat = [pickle.load(open('material.p','rb'))]
 
 
-   if argv.setdefault('kappa_from_patterning',False):
-    self.elem_kappa_map = self.mesh.elem_kappa_map
-   else :   
-    self.compute_kappa_map()
+   #compute elem kappa map
+   self.elem_mat_map = self.mesh.elem_mat_map
+
+   #create_elem_kappa_map
+   self.elem_kappa_map = {}
+   for e in self.elem_mat_map.keys():
+     self.elem_kappa_map.update({e:self.mat[self.mesh.elem_mat_map[e]]['kappa_bulk_tot']})
+
+   #if argv.setdefault('kappa_from_patterning',False):
+   # self.elem_kappa_map = self.mesh.elem_kappa_map
+   #else :   
+   # self.compute_kappa_map()
 
 
-   self.control_angle =  self.rotate(np.array(self.mat['control_angle']),**argv)
-   self.kappa_directional =  self.rotate(np.array(self.mat['kappa_directional']),**argv)
+   self.control_angle =  self.rotate(np.array(self.mat[0]['control_angle']),**argv)
+   self.kappa_directional =  self.rotate(np.array(self.mat[0]['kappa_directional']),**argv)
    
    self.lu = {} #keep li
    self.multiscale = argv.setdefault('multiscale',False)
    self.keep_lu = argv.setdefault('keep_lu',False)
 
-   self.n_parallel = self.mat['n_parallel'] #total indexes
-   self.n_serial = self.mat['n_serial'] #total indexes
+   self.n_parallel = self.mat[0]['n_parallel'] #total indexes
+   self.n_serial = self.mat[0]['n_serial'] #total indexes
     
-
 
    self.lu = {}
    self.lu_fourier = {}
@@ -154,8 +167,8 @@ class Solver(object):
     self.print_logo()
     self.print_dof()
    
-   if len(self.mesh.side_list['Interface']) > 0:
-    self.compute_transmission_coefficients() 
+   #if len(self.mesh.side_list['Interface']) > 0:
+   # self.compute_transmission_coefficients() 
 
    self.build_kappa_mask()
    if self.verbose: self.print_bulk_kappa()
@@ -221,62 +234,42 @@ class Solver(object):
      direction = self.control_angle[index*self.n_serial]
      direction /= np.linalg.norm(direction)
      dirs.append(direction)
-
+  
    self.transmission = {  side:np.zeros((len(dirs),len(dirs)))  for side in self.mesh.side_list['Interface']}
    self.reflection = {  side:np.zeros((len(dirs),len(dirs)))  for side in self.mesh.side_list['Interface']}
-
 
    #-------
    for side in self.mesh.side_list['Interface']:
     (i,j) = self.mesh.side_elem_map[side]
-    normal = self.mesh.get_normal_between_elems(i,j)
-    vi = self.mesh.elem_v_map[i]
-    vj = self.mesh.elem_v_map[j]
-    rhoi = self.mesh.elem_rho_map[i]
-    rhoj = self.mesh.elem_rho_map[j]
+    nij = self.mesh.get_normal_between_elems(i,j)
+    vi = self.mat[self.elem_mat_map[i]]['other_properties']['v']
+    vj = self.mat[self.elem_mat_map[j]]['other_properties']['v']
+    rhoi = self.mat[self.elem_mat_map[i]]['other_properties']['rho']
+    rhoj = self.mat[self.elem_mat_map[j]]['other_properties']['rho']
     zi = rhoi*vi
     zj = rhoj*vj
 
-    if vi < vj:
-     theta_c = np.arcsin(vi/vj)
-    else:
-     theta_c = np.pi/2
-    
-    for index,direction in enumerate(dirs):
+    for index_1,dir_1 in enumerate(dirs):
 
-     if np.dot(direction,normal) > 0:    
+     if np.dot(dir_1,nij) > 0:    
 
-      angle = self.get_angle(normal,direction)
+      theta_c = np.arcsin(min([vj,vi])/vi)
+      theta_1 = self.get_angle(nij,dir_1) #refracted angle
+      dir_2 = np.dot(self.rotate2D(2*theta_1 + np.pi),dir_1) #specular direction---
+      index_2 = np.argmax([np.dot(dir_2,d) for d in dirs])
+      if theta_1 > theta_c: #reflective index
+        self.reflection[side][index_2,index_1] = 1
+      else: #refracted index
+        theta_3 = np.arcsin(vi/vj*np.sin(theta_1))        
+        dir_3 = np.dot(self.rotate2D(-theta_1+np.pi+theta_3),dir_1) #specular direction---
+        index_3 = np.argmax([np.dot(dir_3,d) for d in dirs])
+        tij = 4*zi*zj*np.cos(theta_1)*np.cos(theta_3)/(pow(zi*np.cos(theta_3)+zj*np.cos(theta_1),2))
+        self.transmission[side][index_3,index_1] = tij
+        
+        #this is the component partially reflected back 
+        self.reflection[side][index_2,index_1] = 1-tij
 
-      #get reflective index
-      rdir = np.dot(self.rotate2D(2*angle + np.pi),direction) #specular direction---
-      ir = np.argmax([np.dot(rdir,d) for d in dirs])
 
-      if angle < theta_c:
-        angle_i = np.arcsin(vi/vj*np.sin(angle))        
-        idir = np.dot(self.rotate2D(angle_i + np.pi),normal) #specular direction---
-        it = np.argmax([np.dot(idir,d) for d in dirs])
-        self.transmission[side][it,index] = 4*zi*zj*np.cos(angle_i)*np.cos(angle)/(pow(zi*np.cos(angle_i)+zj*np.cos(angle),2))
-      else:
-        self.reflection[side][ir,index] = 1
-     
-     else:
-
-      normal -=normal
-      angle = self.get_angle(normal,direction)
-
-      #get reflective index
-      rdir = np.dot(self.rotate2D(2*angle + np.pi),direction) #specular direction---
-      ir = np.argmax([np.dot(rdir,d) for d in dirs])
-
-      if angle < theta_c:
-        angle_i = np.arcsin(vj/vi*np.sin(angle))        
-        idir = np.dot(self.rotate2D(angle_i + np.pi),normal) #specular direction---
-        it = np.argmax([np.dot(idir,d) for d in dirs])
-        self.transmission[side][index,it] = 4*zi*zj*np.cos(angle_i)*np.cos(angle)/(pow(zi*np.cos(angle_i)+zj*np.cos(angle),2))
-      else:
-        self.reflection[side][index,ir] = 1
-     
 
   def get_angle(self,normal,direction):     
 
@@ -400,12 +393,12 @@ class Solver(object):
 
      return AM,AP#,BNM,BNP
 
-  def get_bulk_data(self,global_index,TB,TL,Tnew):
+  def get_bulk_data(self,global_index,TB,TL,Tnew,IT):
 
-    index_irr = self.mat['temp_vec'][global_index]
+    index_irr = self.mat[0]['temp_vec'][global_index]
     aa = sparse.COO([0,1,2],self.control_angle[global_index],shape=(3))
-    mfp   = self.mat['mfp'][global_index]
-    irr_angle = self.mat['angle_map'][global_index]
+    mfp   = self.mat[0]['mfp'][global_index]
+    irr_angle = self.mat[0]['angle_map'][global_index]
     #kdir = sparse.COO([0,1,2],self.mat['kappa_directional'][global_index],shape=(3))
     
 
@@ -447,8 +440,7 @@ class Solver(object):
      lu = splu(F.tocsc())
      if (self.keep_lu) :self.lu[irr_angle] = lu
 
-
-    boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1)
+    boundary = np.sum(np.multiply(TB + IT,self.HW_MINUS),axis=1)
 
     fixed_temperature = np.sum(np.multiply(self.mesh.IB,self.HW_MINUS),axis=1)
 
@@ -456,9 +448,6 @@ class Solver(object):
      RHS = mfp * boundary + np.ones(self.mesh.nle)
     else:
      RHS = mfp * (self.P + boundary + fixed_temperature) + Tnew + TL[index_irr]
-     if self.argv.setdefault('synt',False):
-      RHS -= TL[index_irr]
-
   
     temp = lu.solve(RHS)
  
@@ -474,9 +463,9 @@ class Solver(object):
      print('    Iter    Thermal Conductivity [W/m/K]      Error        Diffusive  -  BTE  -  Ballistic')
      print('   ---------------------------------------------------------------------------------------')
 
-   n_mfp = self.mat['n_serial']
-   temp_vec = self.mat['temp_vec']
-   nT = np.shape(self.mat['B'])[0]
+   n_mfp = self.n_serial
+   temp_vec = self.mat[0]['temp_vec']
+   nT = np.shape(self.mat[0]['B'])[0]
    kdir = self.kappa_directional
 
    if 'load_state' in self.argv.keys():
@@ -514,7 +503,7 @@ class Solver(object):
    else:          
      #fourier first guess----
      if rank == 0: 
-      kappa_fourier,temp_fourier,temp_fourier_grad,temp_fourier_int,flux_fourier_int = self.get_diffusive_suppression_function(self.mat['kappa_bulk_tot'])
+      kappa_fourier,temp_fourier,temp_fourier_grad,temp_fourier_int,flux_fourier_int = self.get_diffusive_suppression_function()
       kappa_fourier = np.array([kappa_fourier])
       data = {'kappa_fourier':kappa_fourier,'temp_fourier':temp_fourier,'temp_fourier_grad':temp_fourier_grad,'temp_fourier_int':temp_fourier_int,'flux_fourier_int':flux_fourier_int}
      else: data = None   
@@ -529,6 +518,7 @@ class Solver(object):
      Tnew = temp_fourier.copy()
 
      TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
+     IT = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
      if self.argv.setdefault('Experimental',False):
       TB = np.tile(np.zeros(self.mesh.nle),(self.n_side_per_elem,1)).T
 
@@ -549,9 +539,9 @@ class Solver(object):
    #data_save = {'flux_fourier':flux_fourier,'temperature_fourier':temp_fourier,'kappa_fourier':kappa_fourier,'kappa_map':self.elem_kappa_map,'temperature_fourier_int':temp_fourier_int,'flux_fourier_int':flux_fourier_int}
    data_save = {'flux_fourier':flux_fourier,'temperature_fourier':temp_fourier,'kappa_fourier':kappa_fourier,'kappa_map':self.elem_kappa_map}
    self.state = data_save
-   #if self.argv.setdefault('only_fourier',False) or self.argv.setdefault('bte_max_iter',True) == 1:
-   # if self.save_state:
-   #   pickle.dump(self.state,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
+   if self.argv.setdefault('only_fourier',False) or self.argv.setdefault('bte_max_iter',True) == 1:
+    #if self.save_state:
+      pickle.dump(self.state,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
   
    #Initialize data-----
    n_iter = len(kappa_vec)
@@ -566,7 +556,7 @@ class Solver(object):
           error_vec[-1] > argv.setdefault('max_bte_error',1e-2):
     a = time.time() 
     self.n_iter = n_iter
-    #Compute diffusive approximation---------------------------          
+    ##Compute diffusive approximation---------------------------          
     if self.multiscale:
 
       TDIFF,TDIFFp = np.zeros((2,n_mfp,self.mesh.nle))          
@@ -600,6 +590,8 @@ class Solver(object):
     Jp,J = np.zeros((2,self.mesh.nle,3))
     TBp_minus,TB_minus = np.zeros((2,self.mesh.nle,self.n_side_per_elem))
     TBp_plus,TB_plus = np.zeros((2,self.mesh.nle,self.n_side_per_elem))
+    ITp,IT = np.zeros((2,self.mesh.nle,self.n_side_per_elem))
+
     ndifp = np.zeros(1)
     ndif = np.zeros(1)
     nbal = np.zeros(1)
@@ -623,7 +615,7 @@ class Solver(object):
           
        #Compute ballistic regime---
        a = time.time()
-       temp_bal = self.get_bulk_data(index * self.n_serial + self.n_serial -1,TB,TL,Tnew)
+       temp_bal = self.get_bulk_data(index * self.n_serial + self.n_serial -1,TB,TL,Tnew,IT)
        #self.mesh.B_with_area_old.dot(temp_bal).sum()
        eta_bal = np.ones(self.n_serial) * self.mesh.B_with_area_old.dot(temp_bal).sum()
        #-------------------------------------
@@ -647,14 +639,14 @@ class Solver(object):
       for n in range(self.n_serial)[idx[0]::-1]:
         global_index = index * self.n_serial + n 
         (Am,Ap) = self.get_boundary_matrices(global_index)
-        kdir = self.mat['kappa_directional'][global_index]
+        kdir = self.mat[0]['kappa_directional'][global_index]
         
         if fourier == True:
          ndifp[0] += 1   
          temp = TDIFF[n]
          eta = eta_diff[n]
         else:
-         temp = self.get_bulk_data(global_index,TB,TL,Tnew)
+         temp = self.get_bulk_data(global_index,TB,TL,Tnew,IT)
 
          #heat coming from periodic boundary conditions----
          eta = self.mesh.B_with_area_old.dot(temp-Tnew).sum()
@@ -670,7 +662,16 @@ class Solver(object):
         eta_vecp[global_index] = eta 
         TBp_minus += Am 
         TBp_plus  += np.einsum('es,e->es',Ap,temp)
-        TL2p += np.outer(self.mat['B'][:,global_index],temp)   
+        TL2p += np.outer(self.mat[0]['B'][:,global_index],temp)   
+
+        #for s in self.mesh.side_list['Interface']:
+        # aa =  self.transmission[s][index].nonzero()[0]
+        # (i,j) = self.mesh.side_elem_map[s]
+        # for a in aa:
+        #  IT[a][i] += temp[i]
+        #  IT[a][j] += temp[j]
+
+
 
         #------------------
         #if self.argv.setdefault('synt',False):
@@ -679,8 +680,10 @@ class Solver(object):
         # TL2p -=    np.einsum('i,k,ck->ic',self.mat['S'][:,global_index],self.mat['mfp_rta'][global_index],gradT)
         #-------------------
  
-        Tp+= temp*self.mat['TCOEFF'][global_index]
+        Tp+= temp*self.mat[0]['TCOEFF'][global_index]
+        #eta = self.mat[0]['mfp'][global_index]*self.control_angle[global_index][0]
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
+
         #K2p += np.array([self.control_angle[global_index][0]*np.dot(kdir,self.mesh.applied_grad)])*self.mat['mfp'][global_index]
 
         #K2p += np.array([eta])
@@ -738,6 +741,7 @@ class Solver(object):
     comm.Allreduce([KAPPAp,MPI.DOUBLE],[KAPPA,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([eta_vecp,MPI.DOUBLE],[eta_vec,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([KBp,MPI.DOUBLE],[KB,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([ITp,MPI.DOUBLE],[IT,MPI.DOUBLE],op=MPI.SUM)
     #comm.Allreduce([Addp,MPI.DOUBLE],[Add,MPI.DOUBLE],op=MPI.SUM)
 
     kappa_vec.append(abs(K2[0] * self.kappa_factor))
@@ -770,7 +774,7 @@ class Solver(object):
 
       if rank==0 and self.verbose:
        print(' {0:7d} {1:20.4E} {2:25.4E} {3:10.2F} {4:10.2F} {5:10.2F}'.format(n_iter,kappa_current,error_vec[-1],ndif,nbte,nbal))
-      data = {'kappa_vec':kappa_vec,'temperature':T,'pseudogradient':self.mesh.compute_grad(T),'flux':J,'temperature_fourier':temp_fourier,'flux_fourier':-self.mat['kappa_bulk_tot']*temp_fourier_grad,'kappa':kappa_vec[-1]}
+      data = {'kappa_vec':kappa_vec,'temperature':T,'pseudogradient':self.mesh.compute_grad(T),'flux':J,'temperature_fourier':temp_fourier,'flux_fourier':-self.mat[0]['kappa_bulk_tot']*temp_fourier_grad,'kappa':kappa_vec[-1]}
 
       if self.argv.setdefault('Experimental',False):
          data.update({'kappa_space':KB}) 
@@ -792,7 +796,6 @@ class Solver(object):
 
 
    if  MPI.COMM_WORLD.Get_rank() == 0:
-    #g2l = self.mesh.g2l   
     F = dok_matrix((self.mesh.nle,self.mesh.nle))
     B = np.zeros(self.mesh.nle)
 
@@ -821,7 +824,6 @@ class Solver(object):
        if ll in self.mesh.side_list['Cold']:
         F[li,li] += v_orth/vi
         B[li] -= v_orth/vi*0.5#*kappa
-        
 
     data = {'F':F.tocsc(),'B':B}
    else: data = None
@@ -837,25 +839,26 @@ class Solver(object):
       #print('  ')
       #for region in self.region_kappa_map.keys():
        print('Kappa bulk: ')
-       print('{:8.2f}'.format(self.mat['kappa_bulk_tot'])+ ' W/m/K')   
-       print(' ')
-       if 'Inclusion' in self.mesh.region_elem_map.keys():
-        print('Kappa inclusion: ')
-        print('{:8.2f}'.format(self.mat['kappa_inclusion'])+ ' W/m/K')   
-        print(' ')
+       for mat in self.mat:
+           print('{:8.2f}'.format(mat['kappa_bulk_tot'])+ ' W/m/K')   
+           print(' ')
+       #if 'Inclusion' in self.mesh.region_elem_map.keys():
+       # print('Kappa inclusion: ')
+       # print('{:8.2f}'.format(self.mat['kappa_inclusion'])+ ' W/m/K')   
+       # print(' ')
        #print(region.ljust(15) +  '{:8.2f}'.format(self.region_kappa_map[region])+ ' W/m/K')    
 
   def get_kappa(self,i,j):
 
    if i ==j:
-    return np.array(self.elem_kappa_map[i])
+    return np.array(self.elem_kappa_map[i])*np.eye(3)
 
    side = self.mesh.get_side_between_two_elements(i,j)
    w = self.mesh.get_interpolation_weigths(side,i)
    normal = self.mesh.get_normal_between_elems(i,j)
 
-   kappa_i = np.array(self.elem_kappa_map[i])
-   kappa_j = np.array(self.elem_kappa_map[j])
+   kappa_i = np.array(self.elem_kappa_map[i])*np.eye(3)
+   kappa_j = np.array(self.elem_kappa_map[j])*np.eye(3)
 
    ki = np.dot(normal,np.dot(kappa_i,normal))
    kj = np.dot(normal,np.dot(kappa_j,normal))
@@ -863,7 +866,6 @@ class Solver(object):
    
    kappa = kj*kappa_i/(ki*(1-w) + kj*w)
 
-   #kappa = kappa_i * kappa_j/(kappa_j*w + (1-w)*kappa_i)
  
    return kappa
 
@@ -875,7 +877,7 @@ class Solver(object):
       if tt == 1.0:
        self.kappa_mask.append([kc1,kc2])
 
-      ll = self.mesh.get_side_between_two_elements(kc1,kc2)
+      ll = self.mesh.get_side_between_two_elements(self.mesh.l2g[kc1],self.mesh.l2g[kc2])
 
     for ll in self.mesh.side_list['Cold']:
        self.kappa_mask.append(self.mesh.side_elem_map[ll])
@@ -988,7 +990,7 @@ class Solver(object):
 
 
 
-  def get_diffusive_suppression_function(self,kappa,**argv):
+  def get_diffusive_suppression_function(self,**argv):
 
     A  = self.F
     #A.todense().dump('test.np')
@@ -1001,10 +1003,18 @@ class Solver(object):
      for elem in self.mesh.region_elem_map['Inclusion']: 
       B[elem] += self.argv['heat_source']
 
+
+    #scaling
+    #ss = []
+    #for i in range(np.shape(A)[0]):
+    #    ss.append(A[i,:])
+    #    A[i,:] /= max(A[i,:])
+        
     SU = splu(A)
 
     C = np.zeros(self.mesh.nle)
-    
+   
+
     n_iter = 0
     kappa_old = 0
     error = 1  
@@ -1014,6 +1024,8 @@ class Solver(object):
                   n_iter < self.argv.setdefault('max_fourier_iter',10) :
     
         RHS = B + C
+        #for i in range(len(RHS)):
+        # RHS[i] /= ss[i]
 
         temp = SU.solve(RHS)
         
@@ -1032,7 +1044,6 @@ class Solver(object):
         n_iter +=1
 
     s = kappa_eff#/kappa
-
 
     flux_int = self.compute_interfacial_flux(grad,temp,temp_int)
 
@@ -1333,12 +1344,12 @@ class Solver(object):
       Ti = -temp[i]   
       side = self.mesh.get_side_between_two_elements(i,j)
       if side in self.mesh.side_list['Cold']:
-         Tj = +0.5 #we do the opposite
+         Tj = 0.5 #we do the opposite
       else:
          print('error in mask')
          quit()
     kappa += v_orth * (Tj-Ti)*kk
-     
+   
    return kappa*self.kappa_factor
 
   def print_logo(self):
@@ -1363,7 +1374,7 @@ class Solver(object):
      print('Space DOFs:      ' + str(len(self.mesh.l2g)))
      #print('Azimuthal angles:  ' + str(self.mat['n_theta']))
      #print('Polar angles:      ' + str(self.mat['n_phi']))
-     print('Momentum DOFs:   ' + str(self.mat['n_serial']*self.mat['n_parallel']))
+     print('Momentum DOFs:   ' + str(self.n_serial*self.n_parallel))
      #print('Bulk Thermal Conductivity:   ' + str(round(self.mat['kappa_bulk_tot'],4)) +' W/m/K')
      print(' ')
    

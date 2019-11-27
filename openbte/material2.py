@@ -48,13 +48,12 @@ class Material(object):
   if MPI.COMM_WORLD.Get_rank() == 0:
 
    data = pickle.load(open(argv['matfile'],'rb'))
-   if argv.setdefault('synt',False):
-    mfp = data['FBTE']
-    nm = len(mfp)
-   else:
-    mfp = data['MFP']
+   #if argv.setdefault('synt',False):
+   # mfp = data['FBTE']
+   # nm = len(mfp)
+   #else:
+   mfp = data['MFP']
 
-   B = data['B']
    mfp_b,theta_b,phi_b = self.spherical(mfp)
    nm = len(mfp_b)
    versors = np.zeros((nm,3))
@@ -74,7 +73,7 @@ class Material(object):
    k_coeff[:,2] = 0 #Enforce zeroflux on z (for visualization purposed)
 
 
-   return {'B': B,\
+   return {'B': data['B'],\
            'TCOEFF':Tcoeff,\
            'angle_map':np.arange(nm),\
            'temp_vec':range(nm),\
@@ -82,8 +81,7 @@ class Material(object):
            'n_serial':1,
            'n_parallel':nm,
            'mfp':mfp_b,
-           'mfp_rta':data['MFP']*1e9,
-           'mfp_bte':data['FBTE']*1e9,
+           #'mfp_rta':data['MFP']*1e9,
            'control_angle':versors,\
            'kappa_bulk_tot':kbulk}
 
@@ -631,6 +629,7 @@ class Material(object):
            'direction_int':direction_int,\
            'factor':[np.sin(Dphi/2),np.cos(Dphi/2)/Dphi],\
            'mfp_bulk':mfp_bulk,\
+           'other_properties':argv.setdefault('other_properties',{}), 
            'kappa_bulk':kappa_bulk,\
            'kappa_bulk_tot':np.sum(kappa_bulk)}
 

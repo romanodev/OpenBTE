@@ -175,17 +175,19 @@ class Geometry(object):
       self.frame.append([-Lx/2,-Ly/2])
 
     if argv.setdefault('mesh',True):
-     self.mesh(**argv)
-     data = {'state':self.state}
+     state = self.mesh(**argv)
+     data = {'state':state}
+
    else:
-     data = None
+       data = None
 
-   data = mpi4py.MPI.COMM_WORLD.bcast(data,root=0)
+   data= mpi4py.MPI.COMM_WORLD.bcast(data,root=0)
 
-   self.state = data['state']
+   self.state.update(data['state'])
 
    mpi4py.MPI.COMM_WORLD.Barrier()
 
+   print(self.state.keys())
    self._update_data()
 
   if argv.setdefault('savefig',False) or argv.setdefault('show',False) or argv.setdefault('store_rgb',False) :
@@ -216,30 +218,6 @@ class Geometry(object):
      GenerateBulk3D.mesh(argv)
      #-----------------------------------
 
-
-
-   if argv['model'] == 'porous/square_structured':
-
-       self.compute_structured_mesh_new(**argv)   
-       self.compute_mesh_data()
-
-       #define delta--
-       phi = argv['porosity']
-       l = argv['l']
-       delta = np.sqrt(phi)*l/2
-       #-------------
-
-       elem_mat_map = {}
-       for ne in self.elem_list['active']:
-        c,dummy = self.compute_general_centroid_and_side(ne)
-        if not  ((c[0] > -delta and c[0] < delta) and (c[1] > -delta and c[1] < delta)):
-         elem_mat_map.update({ne:0})
-
-       data = self.add_patterning(elem_mat_map)
-       self.state.update(data)
-
-       return
-
   
    if argv['model'] == 'porous/random_correlated':
 
@@ -257,9 +235,12 @@ class Geometry(object):
            elem_mat_map.update({ne:0})
 
        data = self.add_patterning(elem_mat_map)
-       self.state.update(data)
+       #state = {'state':data}
 
-       return
+       #if argv.setdefault('save',False) and not argv.setdefault('only_geo',False):
+       #  self.save()
+
+       return data
 
    if argv['model'] == '2DInterface':
        Generate2DInterface(argv)
@@ -1655,7 +1636,6 @@ class Geometry(object):
 
  def plot_structured_mesh(self,**argv):
  
-   if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
       
      n = int(sqrt(self.nle))
      l = self.size[0]

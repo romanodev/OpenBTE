@@ -88,12 +88,12 @@ def create_unstructured_bulk(argv):
   Lx = float(argv['lx'])
   Ly = float(argv['ly'])
   frame = []
-
   frame.append([-Lx/2,Ly/2])
   frame.append([Lx/2,Ly/2])
   frame.append([Lx/2,-Ly/2])
   frame.append([-Lx/2,-Ly/2])
 
+  refine = argv.setdefault('refine',False)
 
   mesh_ext = argv['step']
   points = []
@@ -104,6 +104,17 @@ def create_unstructured_bulk(argv):
 
   for k,p in enumerate(frame) :
    store.write( 'Point('+str(k) +') = {' + str(p[0]) +','+ str(p[1])+',0,h};\n')
+
+  if refine:
+   delta = argv.setdefault('delta',Lx/10)  
+   frame_small = []
+   frame_small.append([-Lx/2+delta,Ly/2])
+   frame_small.append([Lx/2-delta,Ly/2])
+   frame_small.append([Lx/2-delta,-Ly/2])
+   frame_small.append([-Lx/2+delta,-Ly/2])
+   for k,p in enumerate(frame_small) :
+    store.write( 'Point('+str(k+4) +') = {' + str(p[0]) +','+ str(p[1])+',0,h};\n')
+
 
   ll = 0
   for k,p in enumerate(frame) :
@@ -178,12 +189,116 @@ def create_unstructured_bulk(argv):
 #-------------------------------------------------------
   store.close()
 
+def create_unstructured_bulk_refine(argv):
+
+  #res = argv.setdefault('reservoirs',False)
+  direction = argv['direction']
+
+  Lx = float(argv['lx'])
+  Ly = float(argv['ly'])
+  frame = []
+  frame.append([-Lx/2,Ly/2])
+  frame.append([Lx/2,Ly/2])
+  frame.append([Lx/2,-Ly/2])
+  frame.append([-Lx/2,-Ly/2])
+
+  refine = argv.setdefault('refine',False)
+
+  mesh_ext = argv['step']
+  points = []
+  lines = []
+
+  store = open("mesh.geo", 'w+')
+  store.write('h='+str(mesh_ext) + ';\n')
+  store.write('h2='+str(argv['step2']) + ';\n')
+
+  for k,p in enumerate(frame) :
+   store.write( 'Point('+str(k) +') = {' + str(p[0]) +','+ str(p[1])+',0,h2};\n')
+
+  delta = argv.setdefault('delta',Lx/10)  
+  frame_small = []
+  frame_small.append([-Lx/2+delta,Ly/2])
+  frame_small.append([Lx/2-delta,Ly/2])
+  frame_small.append([Lx/2-delta,-Ly/2])
+  frame_small.append([-Lx/2+delta,-Ly/2]) 
+  for k,p in enumerate(frame_small) :
+    store.write( 'Point('+str(k+4) +') = {' + str(p[0]) +','+ str(p[1])+',0,h};\n')
+  ll = 1
+
+
+  store.write( 'Line('+str(ll) +') = {' + str(4) +','+ str(5)+'};\n'); ll+=1
+  store.write( 'Line('+str(ll) +') = {' + str(5) +','+ str(6)+'};\n'); ll+=1
+  store.write( 'Line('+str(ll) +') = {' + str(6) +','+ str(7)+'};\n'); ll+=1
+  store.write( 'Line('+str(ll) +') = {' + str(7) +','+ str(4)+'};\n'); ll+=1
+  store.write( 'Line('+str(ll) +') = {' + str(5) +','+ str(1)+'};\n'); ll+=1
+  store.write( 'Line('+str(ll) +') = {' + str(1) +','+ str(2)+'};\n'); ll+=1
+  store.write( 'Line('+str(ll) +') = {' + str(2) +','+ str(6)+'};\n'); ll+=1
+  store.write( 'Line('+str(ll) +') = {' + str(7) +','+ str(3)+'};\n'); ll+=1
+  store.write( 'Line('+str(ll) +') = {' + str(3) +','+ str(0)+'};\n'); ll+=1
+  store.write( 'Line('+str(ll) +') = {' + str(0) +','+ str(4)+'};\n'); ll+=1
+  store.write( 'Line Loop('+str(ll) +') = {1,2,3,4};'); ll+=1
+  store.write( 'Line Loop('+str(ll) +') = {5,6,7,-2};'); ll+=1
+  store.write( 'Line Loop('+str(ll) +') = {4,-10,-9,-8};'); ll+=1
+  store.write('Plane Surface(10) = {11};\n')
+  store.write('Plane Surface(11) = {12};\n')
+  store.write('Plane Surface(12) = {13};\n')
+  strc = r'''Physical Surface('Matrix') = {10};'''+'\n'
+  store.write(r'''Physical Surface('Matrix') = {10,11,12};''')
+
+
+  bs = []
+  if argv.setdefault('Periodic',[True,True,True])[1] :
+    strc = r'''Physical Line('Periodic_1') = {10,1,5};''' + '\n'
+    store.write(strc)
+    strc = r'''Physical Line('Periodic_2') = {7,3,8};''' + '\n'
+    store.write(strc)
+  else:
+   if direction=='y':
+    strc = r'''Physical Line('Cold') = {7,3,8};''' + '\n'
+    store.write(strc)
+    strc = r'''Physical Line('Hot') = {10,1,5};''' +'\n'
+    store.write(strc)
+   else:
+    bs +=  [10,1,5,7,3,8]
+  
+  if argv.setdefault('Periodic',[True,True,True])[0] :
+    strc = r'''Physical Line('Periodic_1') = {9};''' + '\n'
+    store.write(strc)
+    strc = r'''Physical Line('Periodic_2') = {6};''' + '\n'
+    store.write(strc)
+  else:
+   if direction=='x':
+    strc = r'''Physical Line('Cold') = {6};''' + '\n'
+    store.write(strc)
+    strc = r'''Physical Line('Hot') = {9};''' +'\n'
+    store.write(strc)
+   else:
+    bs +=  [9,6]
+  
+
+  strc = 'Periodic Line{1}={-3};\n'
+  store.write(strc)
+  strc = 'Periodic Line{5}={-7};\n'
+  store.write(strc)
+  strc = 'Periodic Line{10}={-8};\n'
+  store.write(strc)
+  strc = 'Periodic Line{9}={-6};\n'
+  store.write(strc)
+
+
+  store.close()
 
 
 
 def mesh(argv):
 
-  if argv.setdefault('unstructured',True):
-   create_unstructured_bulk(argv)
-  else:
-   create_structured_bulk(argv)
+
+  if argv.setdefault('refine',False):
+    create_unstructured_bulk_refine(argv)
+  else :  
+   if argv.setdefault('unstructured',True):
+    create_unstructured_bulk(argv)
+   else:
+    create_structured_bulk(argv)
+
+
