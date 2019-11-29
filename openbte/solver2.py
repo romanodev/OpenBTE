@@ -536,6 +536,7 @@ class Solver(object):
    #Save if only Fourier---
    flux_fourier = [-temp_fourier_grad[i]*self.elem_kappa_map[self.mesh.l2g[i]] for i in range(self.mesh.nle)]
 
+
    #data_save = {'flux_fourier':flux_fourier,'temperature_fourier':temp_fourier,'kappa_fourier':kappa_fourier,'kappa_map':self.elem_kappa_map,'temperature_fourier_int':temp_fourier_int,'flux_fourier_int':flux_fourier_int}
    data_save = {'flux_fourier':flux_fourier,'temperature_fourier':temp_fourier,'kappa_fourier':kappa_fourier,'kappa_map':self.elem_kappa_map}
    self.state = data_save

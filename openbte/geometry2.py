@@ -179,7 +179,6 @@ class Geometry(object):
      data = {'state':self.state}
    else:
      data = None
-
    data = mpi4py.MPI.COMM_WORLD.bcast(data,root=0)
 
    self.state = data['state']
@@ -217,7 +216,6 @@ class Geometry(object):
      #-----------------------------------
 
 
-
    if argv['model'] == 'porous/square_structured':
 
        self.compute_structured_mesh_new(**argv)   
@@ -246,18 +244,27 @@ class Geometry(object):
        self.compute_structured_mesh_new(**argv)   
        self.compute_mesh_data()
 
-       if 'filename' in argv.keys():
-        grid = np.loadtxt(argv['filename'],delimiter=',',dtype=int)
+       if argv.setdefault('load_conf',False):
+        #grid = np.loadtxt(argv['filename'],delimiter=',',dtype=int)
+        #grid = np.loadtxt(argv['filename'],delimiter=',',dtype=int)
+        grid = np.load(open('conf.dat','rb'),allow_pickle=True)   
+
        else:
         grid = generate_correlated_pores(**argv)
+        if argv.setdefault('save_conf',False):
+         grid.dump(open('conf.dat','wb'))   
 
        #Get elem mat map
        elem_mat_map = {}
        for ne in grid:
            elem_mat_map.update({ne:0})
 
+       #----------------
        data = self.add_patterning(elem_mat_map)
+        
        self.state.update(data)
+
+       #self.eliminate_lone_pores() 
 
        return
 
@@ -289,6 +296,70 @@ class Geometry(object):
 
  def save(self,**argv):
      pickle.dump(self.state,open(argv.setdefault('filename_geometry','geometry.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
+
+
+ def pattern(self,grid):
+
+   if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
+
+     elem_mat_map = {}
+     for ne in grid:
+      elem_mat_map.update({ne:0})
+
+     data = self.add_patterning(elem_mat_map)
+     data = {'state':data}
+   else:
+     data = None
+   data = mpi4py.MPI.COMM_WORLD.bcast(data,root=0)
+   self.state.update(data['state'])
+
+   mpi4py.MPI.COMM_WORLD.Barrier()
+   self._update_data()
+
+
+ def update_island(self,covered):
+   
+     for j in self.elem_map[covered[-1]]:
+         if j in self.elem_list['active'] and not j in covered: 
+            covered.append(j)
+            self.update_island(covered)
+     return       
+
+ def eliminate_lone_pores(self):
+
+    islands = []
+    for i in self.elem_list['active']:
+      already = False  
+      for s in islands:  
+          if i in s:
+            already = True
+      if not already:
+       islands.append([])  
+       islands[-1].append(i) 
+       self.update_island(islands[-1]) 
+     
+    #---------------------- 
+    eliminated = []
+    for island in islands:
+      legit = False  
+      for i in island:
+          for ll in self.elem_side_map[i] :
+           if ll in self.side_list['Periodic'] + self.side_list['Cold'] + self.side_list['Hot']:
+              legit = True
+              break
+      #ELiminate region
+      if not legit:
+       for i in island:
+         for side in self.elem_side_map[i]:
+             if side in self.side_list['active']: 
+              self.side_list['active'].remove(side) 
+         self.elem_list['active'].remove(i)
+         eliminated.append(i)
+      #---------------------------------------
+    return eliminated  
+   
+
+
 
 
  # MPI.COMM_WORLD.Barrier()
@@ -1577,6 +1648,9 @@ class Geometry(object):
 
     self.elem_list['active']= grid
 
+    #eliminate lone pores---
+    self.eliminate_lone_pores()
+    #-------------------
 
     n = int(sqrt(len(self.nodes)))-1
 
@@ -1591,10 +1665,10 @@ class Geometry(object):
      #-----------------       
 
     #elem maps
-    self.nle = len(grid)
+    self.nle = len(self.elem_list['active'])
     self.l2g = []
     self.g2l = np.zeros(len(self.elems),dtype=int)
-    for i in grid:
+    for i in self.elem_list['active']:
      self.l2g.append(i)
      self.g2l[i] = len(self.l2g)-1
     #----------------------------------         
@@ -1602,7 +1676,7 @@ class Geometry(object):
 
     #active side---
     active_sides = set()
-    for i in grid:
+    for i in self.elem_list['active']:
      for side in self.elem_side_map[i]:
        active_sides.add(side)
     self.side_list['active'] = list(active_sides)   
@@ -1611,12 +1685,12 @@ class Geometry(object):
     self.restored_sides = {}
     for side in self.side_list['active']:
       elems = self.side_elem_map[side]
-      if not ((elems[0] in grid) and (elems[1] in grid)):
+      if not ((elems[0] in self.elem_list['active']) and (elems[1] in self.elem_list['active'])):
         boundary_side.append(side)
-        if elems[0] in grid:
+        if elems[0] in self.elem_list['active']:
            self.side_elem_map[side] = [elems[0],elems[0]]
            self.restored_sides[side] = elems
-        elif elems[1] in grid:
+        elif elems[1] in self.elem_list['active']:
            self.side_elem_map[side] = [elems[1],elems[1]]
            self.restored_sides[side] = elems
         else:
@@ -1634,6 +1708,12 @@ class Geometry(object):
     self.side_list['Interface'] = ll
     #----------------------------
 
+    #remove boundary in periodic----
+    for ll in self.side_list['Boundary']:
+        if ll in self.side_list['Periodic']:
+          self.side_list['Periodic'].remove(ll)
+    #-------------------------------
+
     self.compute_boundary_condition_data()
     self.compute_connecting_matrix()
     self.compute_connecting_matrix_new()
@@ -1643,13 +1723,13 @@ class Geometry(object):
             'side_list':self.side_list,'region_elem_map':self.region_elem_map,\
             'elem_region_map':self.elem_region_map,'A':self.A,'CM':self.CM,\
             'B':self.B,'B_with_area_old':self.B_with_area_old,'B_area':self.B_area,\
-            'CP':self.CP,'N':self.N,'N_new':self.N_new,'IB':self.IB,'BN':self.BN}
+            'CP':self.CP,'N':self.N,'elem_map':self.elem_map,'N_new':self.N_new,'IB':self.IB,'BN':self.BN}
 
+   # self._update_data()
 
   else: data = None
 
   return data
-  #self.state.update(mpi4py.MPI.COMM_WORLD.bcast(data,root=0))
 
 
 
@@ -1707,7 +1787,7 @@ class Geometry(object):
  
        
        if side in self.side_list['Periodic'] :
-        plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=2)
+        plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=2,ls='--')
 
        if side in self.side_list['Hot'] :
         plot([p0[0],p1[0]],[p0[1],p1[1]],color='r',lw=2)
@@ -1715,6 +1795,8 @@ class Geometry(object):
        if side in self.side_list['Cold'] :
         plot([p0[0],p1[0]],[p0[1],p1[1]],color='b',lw=2)
 
+       if side in self.side_list['Boundary'] :
+        plot([p0[0],p1[0]],[p0[1],p1[1]],color='g',lw=2)
      #  else: 
      #   plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=1)
 
@@ -1924,7 +2006,7 @@ class Geometry(object):
  def compute_elem_map(self):
 
   self.elem_map = {}
-  for elem1 in self.elem_side_map: 
+  for elem1 in self.elem_side_map:
     for side in self.elem_side_map[elem1]:
      elem2 = self.get_neighbor_elem(elem1,side)
      self.elem_map.setdefault(elem1,[]).append(elem2)
