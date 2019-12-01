@@ -83,6 +83,7 @@ class Material(object):
            'mfp':mfp_b,
            #'mfp_rta':data['MFP']*1e9,
            'control_angle':versors,\
+           #'GMFP':data['GMFP'],\
            'kappa_bulk_tot':kbulk}
 
 

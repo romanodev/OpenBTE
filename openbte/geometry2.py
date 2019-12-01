@@ -298,7 +298,7 @@ class Geometry(object):
      pickle.dump(self.state,open(argv.setdefault('filename_geometry','geometry.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
 
 
- def pattern(self,grid):
+ def pattern(self,grid,lone=True):
 
    if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
 
@@ -306,10 +306,11 @@ class Geometry(object):
      for ne in grid:
       elem_mat_map.update({ne:0})
 
-     data = self.add_patterning(elem_mat_map)
+     data = self.add_patterning(elem_mat_map,lone=lone)
      data = {'state':data}
    else:
      data = None
+
    data = mpi4py.MPI.COMM_WORLD.bcast(data,root=0)
    self.state.update(data['state'])
 
@@ -1295,7 +1296,6 @@ class Geometry(object):
 
     dire = argv['direction']
     #Add Periodicity---
-
     if per[0]:
        [self.add_periodic_nodes(y*(n+1)+n,y*(n+1)) for y in range(n+1)]
        self.node_elem_map[n].add(0)
@@ -1303,6 +1303,8 @@ class Geometry(object):
        self.node_elem_map[(n+1)*(n+1)-1].add(n*(n-1))
        [self.node_elem_map[(y+1)*(n+1)+n].add(y*n) for y in range(n-1)]
        [self.node_elem_map[(y+1)*(n+1)+n].add((y+1)*n) for y in range(n-1)]
+
+       [p_sides.append(n*n+y) for y in range(n)]
 
        for y in range(n):
         self.update_elem_side_map([n*y+n-1],[n*n+y]) #first elements, then sides
@@ -1312,7 +1314,7 @@ class Geometry(object):
         self.pairs.append([n*n+y,len(self.sides)-1])
         self.side_periodicity[len(self.sides)-1,1] = [l,0,0] 
         self.exlude.append(len(self.sides)-1)
-        [p_sides.append(n*n+x) for x in range(n)]
+        #p_sides.append(n*n+y)
     else:
        for y in range(n):
         self.sides.append([y*(n+1)+n,(y+1)*(n+1)+n])
@@ -1374,6 +1376,7 @@ class Geometry(object):
 
     #Set regular variables------- 
     self.side_list.update({'Periodic':p_sides})
+    self.side_list.update({'Periodic_global':p_sides})
     self.node_list = {'Interface':[]}
     self.region_elem_map = {'Matrix':range(len(self.elems))}
     self.elem_region_map = {i:'Matrix' for i in range(len(self.elems)) }
@@ -1382,15 +1385,16 @@ class Geometry(object):
     #self.side_list.update({'active_global':list(range(len(self.sides)-2*n))})
     self.side_list.update({'active_global':active})
     self.elem_list = {'active':list(range(len(self.elems)))} 
-    self.elem_kappa_map = {ne:[[1,0,0],[0,1,0],[0,0,1]] for ne in range(len(self.elems))}
-    self.elem_rho_map = {ne:1 for ne in range(len(self.elems))}
-    self.elem_v_map = {ne:1 for ne in range(len(self.elems))}
-    self.elem_mfp_map = {ne:1 for ne in range(len(self.elems))}
+    #self.elem_kappa_map = {ne:[[1,0,0],[0,1,0],[0,0,1]] for ne in range(len(self.elems))}
+    #self.elem_rho_map = {ne:1 for ne in range(len(self.elems))}
+    #self.elem_v_map = {ne:1 for ne in range(len(self.elems))}
+    #self.elem_mfp_map = {ne:1 for ne in range(len(self.elems))}
     self.l2g = list(range(len(self.elems)))
     self.g2l = list(range(len(self.elems)))
     self.nle = len(self.l2g)
     self.compute_elem_map()
     self.elem_mat_map = {ne:0 for ne in range(len(self.elems))}  
+    self.side_elem_map_global = self.side_elem_map.copy()
 
 
 
@@ -1636,33 +1640,38 @@ class Geometry(object):
 
 
 
- def add_patterning(self,elem_mat_map):
+ def add_patterning(self,elem_mat_map,lone=True):
 
   if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
  
     self.elem_mat_map = elem_mat_map  
-
     
     #change active elements---
     grid = list(elem_mat_map.keys())
 
-    self.elem_list['active']= grid
+    self.elem_list['active']= grid.copy()
+
+    #----Restore previous boundary connections---
+    self.side_elem_map = self.side_elem_map_global.copy()
+    #for side in self.side_list['Boundary']:
+    #  (i,dummy) = self.side_elem_map[side]
+    #  for elem in self.elem_map[i]:
+    #      for s2 in self.elem_side_map[elem]:
+    #          if s2 == side:
+    #            self.side_elem_map[side][1] = elem
+    #            break
+    self.side_list['Boundary'] = []       
+    self.side_list['active'] = self.side_list['active_global'].copy()
+    self.side_list['Periodic'] = self.side_list['Periodic_global'].copy()
+    #------------------------------------------ 
+
 
     #eliminate lone pores---
-    self.eliminate_lone_pores()
+    if lone:
+     self.eliminate_lone_pores()
     #-------------------
 
     n = int(sqrt(len(self.nodes)))-1
-
-    #----Restore previous boundary connections---
-    for side in self.side_list['Boundary']:
-      (i,j) = self.side_elem_map[side]
-      for elem in self.elem_map[i]:
-          for s2 in self.elem_side_map[elem]:
-              if s2 == side:
-                self.side_elem_map[side][0] = elem
-                break
-     #-----------------       
 
     #elem maps
     self.nle = len(self.elem_list['active'])
@@ -1673,7 +1682,6 @@ class Geometry(object):
      self.g2l[i] = len(self.l2g)-1
     #----------------------------------         
 
-
     #active side---
     active_sides = set()
     for i in self.elem_list['active']:
@@ -1682,17 +1690,14 @@ class Geometry(object):
     self.side_list['active'] = list(active_sides)   
     #boundary side---
     boundary_side = []
-    self.restored_sides = {}
     for side in self.side_list['active']:
       elems = self.side_elem_map[side]
       if not ((elems[0] in self.elem_list['active']) and (elems[1] in self.elem_list['active'])):
         boundary_side.append(side)
         if elems[0] in self.elem_list['active']:
            self.side_elem_map[side] = [elems[0],elems[0]]
-           self.restored_sides[side] = elems
         elif elems[1] in self.elem_list['active']:
            self.side_elem_map[side] = [elems[1],elems[1]]
-           self.restored_sides[side] = elems
         else:
            print('error')
     self.side_list['Boundary'] = boundary_side
@@ -1717,13 +1722,12 @@ class Geometry(object):
     self.compute_boundary_condition_data()
     self.compute_connecting_matrix()
     self.compute_connecting_matrix_new()
-
    
     data = {'nle':self.nle,'g2l':self.g2l,'l2g':self.l2g,'side_elem_map':self.side_elem_map,'elem_side_map':self.elem_side_map,\
             'side_list':self.side_list,'region_elem_map':self.region_elem_map,\
             'elem_region_map':self.elem_region_map,'A':self.A,'CM':self.CM,\
             'B':self.B,'B_with_area_old':self.B_with_area_old,'B_area':self.B_area,\
-            'CP':self.CP,'N':self.N,'elem_map':self.elem_map,'N_new':self.N_new,'IB':self.IB,'BN':self.BN}
+            'CP':self.CP,'N':self.N,'N_new':self.N_new,'IB':self.IB,'BN':self.BN}
 
    # self._update_data()
 
@@ -1768,12 +1772,21 @@ class Geometry(object):
 
 
      #if argv.setdefault('plot_material',False) == False:
+
+     for side in self.side_list['Periodic']:
+        ss = self.sides[side]   
+        p0 = self.nodes[ss[0]]
+        p1 = self.nodes[ss[1]]
+        plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=2)
+  
+
      for n_side,side in enumerate(self.side_list['active']+ self.exlude):
        ss = self.sides[side]   
      #for n_side,side in enumerate(self.sides):
 
        p0 = self.nodes[ss[0]]
        p1 = self.nodes[ss[1]]
+       
        m = (np.array(p0) + np.array(p1))/2
      
       #if ptext:
@@ -1785,9 +1798,9 @@ class Geometry(object):
      # cc = 'b'
       # lll=1
  
-       
-       if side in self.side_list['Periodic'] :
-        plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=2,ls='--')
+         
+       #if side in self.side_list['Periodic'] :
+       # plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=2,ls='--')
 
        if side in self.side_list['Hot'] :
         plot([p0[0],p1[0]],[p0[1],p1[1]],color='r',lw=2)
@@ -1873,6 +1886,7 @@ class Geometry(object):
           'exlude':self.exlude,\
           'n_elems':self.n_elems,\
           'elem_side_map':self.elem_side_map,\
+          'side_elem_map_global':self.side_elem_map.copy(),\
           'elem_region_map':self.elem_region_map,\
           'side_elem_map':self.side_elem_map,\
           'side_node_map':self.side_node_map,\
@@ -2470,6 +2484,7 @@ class Geometry(object):
     self.weigths = self.state['weigths']
     self.elem_region_map = self.state['elem_region_map']
     self.elem_side_map = self.state['elem_side_map']
+    self.side_elem_map_global = self.state['side_elem_map_global']
     self.side_node_map = self.state['side_node_map']
     self.node_elem_map = self.state['node_elem_map']
     self.node_side_map = self.state['node_side_map']

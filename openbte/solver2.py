@@ -601,6 +601,7 @@ class Solver(object):
 
     eta_vec = np.zeros(self.n_parallel*self.n_serial)
     eta_vecp = np.zeros(self.n_parallel*self.n_serial)
+    eta_diffp,eta_diff = np.zeros((2,self.n_parallel*self.n_serial))
 
     K2p = np.zeros(1)
     K2 = np.zeros(1)
@@ -661,6 +662,19 @@ class Solver(object):
   
         #test---
         eta_vecp[global_index] = eta 
+ 
+        #aa = self.control_angle[global_index]
+        #mfp = self.mat[0]['mfp'][global_index]
+        #index_irr = self.mat[0]['temp_vec'][global_index]
+        #tapp = Tnew + TL[index_irr] - self.mat[0][GMFPfp*np.dot(aa,self.mesh.compute_grad(Tnew+TL[index_irr]).T)
+        #tapp = Tnew - np.dot(self.mat[0]['GMFP'][global_index],self.mesh.compute_grad(Tnew).T)
+        #tapp = Tnew  - mfp*np.dot(aa,self.mesh.compute_grad(Tnew+TL[index_irr]).T)
+        #eta = self.mesh.B_with_area_old.dot(tapp-Tnew).sum()
+        #eta_diffp[global_index] = eta 
+        #---------------------------------
+
+
+
         TBp_minus += Am 
         TBp_plus  += np.einsum('es,e->es',Ap,temp)
         TL2p += np.outer(self.mat[0]['B'][:,global_index],temp)   
@@ -741,6 +755,7 @@ class Solver(object):
     comm.Allreduce([nbalp,MPI.DOUBLE],[nbal,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([KAPPAp,MPI.DOUBLE],[KAPPA,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([eta_vecp,MPI.DOUBLE],[eta_vec,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([eta_diffp,MPI.DOUBLE],[eta_diff,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([KBp,MPI.DOUBLE],[KB,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([ITp,MPI.DOUBLE],[IT,MPI.DOUBLE],op=MPI.SUM)
     #comm.Allreduce([Addp,MPI.DOUBLE],[Add,MPI.DOUBLE],op=MPI.SUM)
@@ -780,7 +795,7 @@ class Solver(object):
       if self.argv.setdefault('Experimental',False):
          data.update({'kappa_space':KB}) 
 
-      data.update({'TL_old':self.TL_old,'TB_old':TB_old,'T':Tnew,'TB':TB,'TL':TL,'error_vec':error_vec,'ms_vec':ms_vec,'temp_fourier_grad':temp_fourier_grad,'eta':eta_vec})  
+      data.update({'TL_old':self.TL_old,'TB_old':TB_old,'T':Tnew,'TB':TB,'TL':TL,'error_vec':error_vec,'ms_vec':ms_vec,'temp_fourier_grad':temp_fourier_grad,'eta':eta_vec,'eta_diff':eta_diff})  
       self.state = data
       if self.save_state:
        pickle.dump(self.state,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
@@ -1006,10 +1021,9 @@ class Solver(object):
 
 
     #scaling
-    #ss = []
-    #for i in range(np.shape(A)[0]):
-    #    ss.append(A[i,:])
-    #    A[i,:] /= max(A[i,:])
+    ss = np.array(A.max(axis=1).todense().T)[0]
+    for i in range(np.shape(A)[0]):
+        A[i,:] /= ss[i]
         
     SU = splu(A)
 
@@ -1025,8 +1039,9 @@ class Solver(object):
                   n_iter < self.argv.setdefault('max_fourier_iter',10) :
     
         RHS = B + C
-        #for i in range(len(RHS)):
-        # RHS[i] /= ss[i]
+
+        #scaling---
+        RHS = np.array([ RHS[i]/ss[i]  for i in range(len(RHS))])
 
         temp = SU.solve(RHS)
         
