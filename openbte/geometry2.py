@@ -1069,8 +1069,8 @@ class Geometry(object):
       p2 = self.sides[side][1]
       n1 = self.nodes[p1]
       n2 = self.nodes[p2]
-      #plot([n1[0],n2[0]],[n1[1],n2[1]],color='#f77f0e',lw=12)
-      plot([n1[0],n2[0]],[n1[1],n2[1]],color='k',lw=1)
+      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#f77f0e',lw=12)
+      #plot([n1[0],n2[0]],[n1[1],n2[1]],color='k',lw=1)
      
      
       #plot Periodic Conditions-----
@@ -1080,7 +1080,7 @@ class Geometry(object):
       p2 = self.sides[side][1]
       n1 = self.nodes[p1]
       n2 = self.nodes[p2]
-      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=12,zorder=3)
+      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=12,zorder=1)
        
     
     #----------------------------

@@ -74,7 +74,7 @@ def GenerateSquareLatticePores(argv):
     for kx in range(int(Nx)):
      for ky in range(int(Ny)):
       cx = -Lx*Nx*0.5 + (kx+b[0])*Lx + ppp[0]
-      cy = -Ly*Ny*0.5 + (ky+b[0])*Ly + ppp[1]
+      cy = -Ly*Ny*0.5 + (ky+b[1])*Ly + ppp[1]
     
       tmp = make_pore(**options)
       poly = [[t[0]+cx,t[1]+cy]   for t in tmp]
