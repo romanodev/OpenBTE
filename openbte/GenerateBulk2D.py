@@ -93,7 +93,6 @@ def create_unstructured_bulk(argv):
   frame.append([Lx/2,-Ly/2])
   frame.append([-Lx/2,-Ly/2])
 
-  refine = argv.setdefault('refine',False)
 
   mesh_ext = argv['step']
   points = []
@@ -275,6 +274,18 @@ def create_unstructured_bulk_refine(argv):
    else:
     bs +=  [9,6]
   
+  if len(bs) > 0:
+   strc = r'''Physical Line('Boundary') = {'''
+   for p,side in enumerate(bs) :
+    strc +=str(side)
+    if p == len(bs)-1:
+     strc += '};\n'
+    else :
+     strc += ','
+   store.write(strc)
+
+
+  strc = 'Periodic Line{1}={-3};\n'
 
   strc = 'Periodic Line{1}={-3};\n'
   store.write(strc)

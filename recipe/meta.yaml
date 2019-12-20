@@ -1,10 +1,10 @@
 
 package:
   name: "openbte"
-  version: "0.9.84"
+  version: "0.9.85"
 
 source:
-  url: ../dist/openbte-0.9.84.tar.gz
+  url: ../dist/openbte-0.9.85.tar.gz
 
 build:
         
@@ -23,7 +23,7 @@ requirements:
     - networkx
     - numpy
     - pip
-    - python
+    - python >=3.6
     - pyvtk
     - scipy
     - shapely
@@ -40,7 +40,7 @@ requirements:
     - mpi4py==2.0.0
     - networkx
     - numpy
-    - python
+    - python >=3.6
     - pyvtk
     - scipy
     - twisted  

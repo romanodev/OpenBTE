@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 from mpi4py import MPI
-from .solver2 import Solver
+from .solver import Solver
 from pyvtk import *
 import numpy as np
 import deepdish as dd

@@ -23,6 +23,7 @@ import networkx as nx
 
 import matplotlib
 be = matplotlib.get_backend()
+
 if not be=='nbAgg' and not be=='module://ipykernel.pylab.backend_inline':
  if not be == 'Qt5Agg': matplotlib.use('Qt5Agg')
 
@@ -1029,6 +1030,7 @@ class Geometry(object):
 
  def plot_polygons(self,**argv):
 
+   self.argv = argv   
    if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
 
     lx = abs(self.frame[0][0])*2
@@ -1046,7 +1048,7 @@ class Geometry(object):
     ylim([-ly/2.0,ly/2.0])
 
     path = create_path(self.frame)
-    patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color='gray',zorder=1,joinstyle='miter')
+    patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color='#D4D4D4',zorder=1,joinstyle='miter')
     gca().add_patch(patch);
 
     if self.argv.setdefault('inclusion',False):
@@ -1067,11 +1069,12 @@ class Geometry(object):
       p2 = self.sides[side][1]
       n1 = self.nodes[p1]
       n2 = self.nodes[p2]
-      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#f77f0e',lw=6)
+      #plot([n1[0],n2[0]],[n1[1],n2[1]],color='#f77f0e',lw=12)
+      plot([n1[0],n2[0]],[n1[1],n2[1]],color='k',lw=1)
      
      
       #plot Periodic Conditions-----
-    if argv.setdefault('plot_boundary',False):
+    if argv.setdefault('plot_Periodic',False):
      for side in self.side_list['Periodic'] + self.side_list['Inactive']  :
       p1 = self.sides[side][0]
       p2 = self.sides[side][1]
@@ -1732,6 +1735,9 @@ class Geometry(object):
    # self._update_data()
 
   else: data = None
+  
+  #data = mpi4py.MPI.COMM_WORLD.bcast(data,root=0)
+
 
   return data
 
@@ -1773,7 +1779,7 @@ class Geometry(object):
 
      #if argv.setdefault('plot_material',False) == False:
 
-     for side in self.side_list['Periodic']:
+     for side in self.side_list['Periodic'] + self.exlude:
         ss = self.sides[side]   
         p0 = self.nodes[ss[0]]
         p1 = self.nodes[ss[1]]
@@ -1799,8 +1805,8 @@ class Geometry(object):
       # lll=1
  
          
-       #if side in self.side_list['Periodic'] :
-       # plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=2,ls='--')
+      # if side in self.side_list['Periodic'] + self.exlude:
+      #  plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=2)
 
        if side in self.side_list['Hot'] :
         plot([p0[0],p1[0]],[p0[1],p1[1]],color='r',lw=2)
@@ -1830,7 +1836,7 @@ class Geometry(object):
       #else:   
       #   color = 'red'
 
-      self.plot_elem(ne,color='r')
+      self.plot_elem(ne,color='g')
 
       #print(ave)
       #scatter(ave[0],ave[1],color='r')
@@ -1840,6 +1846,7 @@ class Geometry(object):
        #print(ne)
        #if ne==84 :
       #text(ave[0],ave[1],str(ne),color='black',va='center',ha='center')
+
      
      #for g in np.array(grid).T:
      # ne = g[1]*n + g[0]
@@ -1995,21 +2002,25 @@ class Geometry(object):
        N[l2,l1] = -normal*area/vol2
 
        #modify in case of interfaces---
-       #if ll in self.side_list['Interface']:
-       # s1 = np.where(np.array(self.elem_side_map[kc1])==ll)[0][0]
-       # s2 = np.where(np.array(self.elem_side_map[kc2])==ll)[0][0]
-       # CM[l1,s1]  = normal*area/vol1
-       # CM[l2,s2]  = -normal*area/vol1
+       if ll in self.side_list['Interface']:
+        s1 = np.where(np.array(self.elem_side_map[kc1])==ll)[0][0]
+        s2 = np.where(np.array(self.elem_side_map[kc2])==ll)[0][0]
+        CM[l1,s1]  = normal*area/vol1
+        CM[l2,s2]  = -normal*area/vol1
        #else: 
        # N[l1,l2] = normal*area/vol1
        # N[l2,l1] = -normal*area/vol2
        #--------------------------------
 
-     else: 
+     else:
        s = np.where(np.array(self.elem_side_map[kc1])==ll)[0][0]
        CM[l1,s]  = normal*area/vol1
        CP[l1,s] = normal
+       a = self.get_elem_centroid(l1)
+       #if ll in self.side_list['Boundary']:
+       # scatter(a[0],a[1])
 
+   #show()
    self.CP = CP.to_coo()
    self.CM = CM.to_coo()
    self.N = N.to_coo()

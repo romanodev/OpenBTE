@@ -63,8 +63,9 @@ class Material(object):
      versors[i] = [0,0,0]
     else: 
      versors[i] = mfp[i]/mfp_b[i]
-
    versors = np.array(versors)
+
+
    mfp_b *= 1e9   #from m to nm
    kbulk = data['KBULK']
    Tcoeff = data['TCOEFF']
@@ -558,7 +559,7 @@ class Material(object):
     mfp_bulk = tmp[:,0]*1e9; 
     kappa_bulk = tmp[:,1]
    else:
-    mfp_bulk = argv['mfp_bulk']
+    mfp_bulk = argv.setdefault('mfp_bulk',[1])
     kappa_bulk = argv['kappa_bulk']
    #------------------------------------------------------
 

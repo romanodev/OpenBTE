@@ -1,5 +1,5 @@
 {% set name = "openbte" %}
-{% set version = "0.9.82" %}
+{% set version = "0.9.89" %}
 
 package:
   name: "{{ name|lower }}"
@@ -7,10 +7,10 @@ package:
 
 source:
   url: "https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz"
-  sha256: "156c2204e56df62ce1673ba91a1a0c614a863c22747d2476892688da59464371"
+  #sha256: "aeb654c0cdb1709d3f059d0449551f952f258acc54cf411813b3015297711ff9"
 
 build:
-  number: 0
+  number: 4
   entry_points:
     - openbte=openbte.__main__:main
     - shengbte2openbte=openbte.shengbte2openbte:main
@@ -25,7 +25,7 @@ requirements:
     - matplotlib
     - mpi4py ==3.0.0
     - networkx
-    - numpy
+    - numpy  x.x
     - pip
     - python
     - pyvtk
@@ -42,7 +42,7 @@ requirements:
     - matplotlib
     - mpi4py ==3.0.0
     - networkx
-    - numpy
+    - numpy x.x
     - python
     - pyvtk
     - scipy
@@ -54,9 +54,6 @@ requirements:
 test:
   imports:
     - openbte
-  commands:
-    - openbte --help
-    - shengbte2openbte --help
 
 about:
   home: "The package home page"

@@ -231,7 +231,7 @@ def generate_non_overlapping_pores(make_pore,argv):
      new = list(p.exterior.coords)[:-1]   
      polys_cut.append(new)
      centers.append(centers_tmp[n])
- 
+
   return polys_cut,centers,0
 
 
@@ -322,7 +322,7 @@ def GenerateRandomPoresOverlap(argv):
 
   if argv.setdefault('load_configuration',False):
    centers = np.load(argv.setdefault('configuration_file','conf.dat'),allow_pickle=True)
-   Np = len(centers)
+   Np = argv.setdefault('Np',len(centers))
   elif argv.setdefault('manual',False):
    centers = argv['centers']
   else:
@@ -341,23 +341,29 @@ def GenerateRandomPoresOverlap(argv):
    for nn in range(Np):
     x = np.random.uniform(0,1)
     y = np.random.uniform(0,1)
+    x = Lx*(x-0.5)
+    y = Ly*(y-0.5)
     centers.append([x,y])
 
   #dphi = 2.0*math.pi/Na;
   #Fill polys-----
-  polys = []
 
   tt= []
   dmin=1e-1
+  polys = []
+
   for center in centers:
-   x = Lx*(center[0]-0.5)
-   y = Ly*(center[1]-0.5)
+   #x = Lx*(center[0]-0.5)
+   #y = Ly*(center[1]-0.5)
+
+   x = center[0]
+   y = center[1]
+
    phi = np.random.uniform(phi_mean - spread, phi_mean + spread)
    area = Lx*Ly*phi/float(Np)
    options.update({'area':area})
 
    poly_clip = make_pore(x,y,**options)
-
 
    p = Polygon(poly_clip)
    a = p.intersection(frame).area == p.area
@@ -365,7 +371,7 @@ def GenerateRandomPoresOverlap(argv):
    dy = 0
 
    #move pores if they are too close to the boundaries
-   if argv.setdefault('adjust',True):
+   if argv.setdefault('adjust',False):
     p1 = copy.deepcopy(translate(p,xoff=dmin))
     b = p1.intersection(frame).area == p1.area
     if a != b:
@@ -387,17 +393,20 @@ def GenerateRandomPoresOverlap(argv):
    y += dy
    tt.append([x,y])
 
-   for kp in range(len(pbc)):
-    poly_clip = make_pore(x + pbc[kp][0],y+pbc[kp][1],**options)
-    polys.append(Polygon(poly_clip))
+   if argv.setdefault('add_periodic',False):
+    for kp in range(len(pbc)):
+      poly_clip = make_pore(x + pbc[kp][0],y+pbc[kp][1],**options)
+      polys.append(Polygon(poly_clip))
+   else:  
+      poly_clip = make_pore(x,y,**options)
+      polys.append(Polygon(poly_clip))
 
 
   #Consolidate pores that are very close---
 
   #self.frame_consolidate(argv,polys,frame_tmp):
       
-
-  if argv.setdefault('consolidate',True) :
+  if argv.setdefault('consolidate',False) :
    n_coll = 1
   else:
    n_coll = 0  
@@ -415,7 +424,6 @@ def GenerateRandomPoresOverlap(argv):
      poly2 = polys[p2]
      mind = min([mind,poly1.distance(poly2)])
   #--------------------------------
-
   area = 0.0
   eps = argv['step']/2.0
   polys_cut = []
