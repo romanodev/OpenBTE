@@ -149,7 +149,14 @@ class Solver(object):
 
    self.control_angle =  self.rotate(np.array(self.mat[0]['control_angle']),**argv)
    self.kappa_directional =  self.rotate(np.array(self.mat[0]['kappa_directional']),**argv)
-   
+  
+   #(a,b) = np.shape(self.kappa_directional)
+   #kappa = 0
+   #for i in range(a):
+   #  kappa += self.kappa_directional[i,0] * self.control_angle[i,0] * self.mat[0]['mfp'][i]
+   #print(kappa)
+   #quit()
+
    self.lu = {} #keep li
 
    #self.MATRIX = {} #keep MATRIX
@@ -609,8 +616,8 @@ class Solver(object):
     nbalp = np.zeros(1)
     (KAPPA,KAPPAp) = np.zeros((2,self.n_parallel*self.n_serial))
 
-    eta_vec = np.zeros(self.n_parallel*self.n_serial)
-    eta_vecp = np.zeros(self.n_parallel*self.n_serial)
+    eta_vec = np.zeros((self.n_parallel*self.n_serial))
+    eta_vecp = np.zeros((self.n_parallel*self.n_serial))
     eta_diffp,eta_diff = np.zeros((2,self.n_parallel*self.n_serial))
 
     K2p = np.zeros(1)
@@ -651,7 +658,7 @@ class Solver(object):
       for n in range(self.n_serial)[idx[0]::-1]:
         global_index = index * self.n_serial + n 
         (Am,Ap) = self.get_boundary_matrices(global_index)
-        kdir = self.mat[0]['kappa_directional'][global_index]
+        kdir = self.kappa_directional[global_index]
         
         if fourier == True:
          ndifp[0] += 1   
@@ -671,8 +678,20 @@ class Solver(object):
          #----------------------------------------------------------
   
         #test---
-        eta_vecp[global_index] = eta 
- 
+        eta2 = self.mesh.B_with_area_old.dot(temp-Tnew-TL[global_index]).sum()
+        #eta2 = self.mesh.B_with_area_old.dot(temp-TL[global_index]).sum()
+        #a = self.mesh.B_with_area_old.dot(temp-Tnew).sum()
+        #b = self.mesh.B_with_area_old.dot(TL[global_index]).sum()
+        #eta2 = np.array([a,b])
+        #mm = self.control_angle[global_index]*self.mat[0]['mfp'][global_index]
+        #if not mm[0] == 0:
+
+        #aa = self.control_angle[global_index]
+        #eta2 = self.compute_diffusive_thermal_conductivity(temp,kappa_bulk = 1)*self.mat[0]['mfp'][global_index]*self.control_angle[global_index][0]
+        #--------------------
+        eta_vecp[global_index] = eta2*self.kappa_factor*1e-9
+        
+
         #aa = self.control_angle[global_index]
         #mfp = self.mat[0]['mfp'][global_index]
         #index_irr = self.mat[0]['temp_vec'][global_index]
@@ -690,22 +709,20 @@ class Solver(object):
 
         #update interfacial information--------------------
 
-        for s in self.mesh.side_list['Interface']:  
-         (i,j) = self.mesh.side_elem_map[s]
-         indi = self.mesh.elem_side_map[i].index(s)
-         indj = self.mesh.elem_side_map[j].index(s)
+        #for s in self.mesh.side_list['Interface']:  
+        # (i,j) = self.mesh.side_elem_map[s]
+        # indi = self.mesh.elem_side_map[i].index(s)
+        # indj = self.mesh.elem_side_map[j].index(s)
 
          #transmission from j to i
-         for index_i in range(self.n_parallel):
-          ITp[index_i][i][indi] += self.transmission[s][index,index_i]*temp[j]
-          ITp[index_i][i][indi] += self.reflection[s][index,index_i]*temp[i]
-
+         #for index_i in range(self.n_parallel):
+         # ITp[index_i][i][indi] += self.transmission[s][index,index_i]*temp[j]
+         # ITp[index_i][i][indi] += self.reflection[s][index,index_i]*temp[i]
 
          #transmission from i to j
-         for index_j in range(self.n_parallel):
-             
-          ITp[index_j][j][indj] += self.transmission[s][index,index_j]*temp[i]
-          ITp[index_j][j][indj] += self.reflection[s][index,index_j]*temp[j]
+         #for index_j in range(self.n_parallel):
+         # ITp[index_j][j][indj] += self.transmission[s][index,index_j]*temp[i]
+         # ITp[index_j][j][indj] += self.reflection[s][index,index_j]*temp[j]
         #---------------------------------------------------  
 
         #------------------
@@ -757,9 +774,8 @@ class Solver(object):
         TBp_plus  += np.einsum('es,e->es',Ap,temp)
         TL2p += np.outer(self.mat['B'][:,global_index],temp)   
 
- 
         Tp+= temp*self.mat['TCOEFF'][global_index]
-        kdir = self.mat['kappa_directional'][global_index]
+        kdir = self.kappa_directional[global_index]
         K2p += np.array([eta*np.dot(kdir,self.mesh.applied_grad)])
         KAPPAp[global_index] = np.array([eta*np.dot(kdir,self.mesh.applied_grad)])*self.kappa_factor
         Jp += np.outer(temp,kdir)*1e9

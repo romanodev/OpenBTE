@@ -104,15 +104,15 @@ def create_unstructured_bulk(argv):
   for k,p in enumerate(frame) :
    store.write( 'Point('+str(k) +') = {' + str(p[0]) +','+ str(p[1])+',0,h};\n')
 
-  if refine:
-   delta = argv.setdefault('delta',Lx/10)  
-   frame_small = []
-   frame_small.append([-Lx/2+delta,Ly/2])
-   frame_small.append([Lx/2-delta,Ly/2])
-   frame_small.append([Lx/2-delta,-Ly/2])
-   frame_small.append([-Lx/2+delta,-Ly/2])
-   for k,p in enumerate(frame_small) :
-    store.write( 'Point('+str(k+4) +') = {' + str(p[0]) +','+ str(p[1])+',0,h};\n')
+  #if refine:
+  # delta = argv.setdefault('delta',Lx/10)  
+  # frame_small = []
+  # frame_small.append([-Lx/2+delta,Ly/2])
+  # frame_small.append([Lx/2-delta,Ly/2])
+   #frame_small.append([Lx/2-delta,-Ly/2])
+   #frame_small.append([-Lx/2+delta,-Ly/2])
+   #for k,p in enumerate(frame_small) :
+   # store.write( 'Point('+str(k+4) +') = {' + str(p[0]) +','+ str(p[1])+',0,h};\n')
 
 
   ll = 0
