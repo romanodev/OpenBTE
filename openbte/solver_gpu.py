@@ -429,7 +429,7 @@ class SolverGPU(object):
           error_vec[-1] > argv.setdefault('max_bte_error',1e-2):
 
          yyy = time.time()
-         for global_index in range(10):#self.n_index):
+         for global_index in range(self.n_index):
 
            index_irr = self.mat[0]['temp_vec'][global_index]
            mfp   = self.mat[0]['mfp'][global_index]
