@@ -448,29 +448,33 @@ class SolverGPU(object):
            RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]
 
            #create a list-----------------
-           master_data += list(F.data)
+           #master_data += list(F.data)
+           master_data = list(F.data)
            a = F.nonzero()
            nn = len(a[0])
-           g = [[global_index] * nn]
+           #g = [[global_index] * nn]
+           g = []
            g.append(list(a[0]))
            g.append(list(a[1]))
            g = list(map(list, zip(*g)))
-           master_A += g
-           master_b.append(RHS)
+           #master_A += g
+           master_A = g
+           #master_b.append(RHS)
+           master_b = [RHS]
            #-------------------------------
 
+           i = torch.LongTensor(master_A)
+           v = torch.FloatTensor(master_data)
+           #A = torch.sparse.FloatTensor(i.t(), v, torch.Size([self.n_index,self.mesh.nle,self.mesh.nle])).to_dense() 
+           A = torch.sparse.FloatTensor(i.t(), v, torch.Size([self.mesh.nle,self.mesh.nle])).cuda().to_dense() 
+           b = torch.tensor(list(map(list, zip(*master_b)))).cuda()
 
-         i = torch.LongTensor(master_A)
-         v = torch.FloatTensor(master_data)
-         A = torch.sparse.FloatTensor(i.t(), v, torch.Size([self.n_index,self.mesh.nle,self.mesh.nle])).cuda().to_dense() 
-         b = torch.tensor(list(map(list, zip(*master_b)))).cuda()
-
-         t1 = time.time()
-         print(t1-yyy)
-         A_LU = A.lu()
-         x = torch.lu_solve(b,*A_LU)
-         t2 = time.time()
-         print(t2-t1)
+           t1 = time.time()
+           #print(t1-yyy)
+           A_LU = A.lu()
+           x = torch.lu_solve(b,*A_LU)
+           t2 = time.time()
+           print(t2-t1)
 
 
          quit()
