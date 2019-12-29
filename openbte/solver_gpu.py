@@ -455,7 +455,8 @@ class SolverGPU(object):
 
            S.add_csr_matrix(F,RHS)
 
-           s = sp.linalg.spsolve(F,RHS)
+           #s = sp.linalg.spsolve(F,RHS)
+           #print(time.time()-t1)
          t2 = time.time()
          print(t2-yyy)
          T = S.solve() 
@@ -491,7 +492,6 @@ class SolverGPU(object):
            #print(t2-t1)
 
 
-         quit()
 
 
 
