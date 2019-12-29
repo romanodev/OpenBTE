@@ -450,7 +450,7 @@ class SolverGPU(object):
            AD = spdiags(G,0,self.mesh.nle,self.mesh.nle,format='csr')
            F = AM.tocsr() * mfp + AD
            self.P = np.sum(np.multiply(AM,self.mesh.B),axis=1).todense()
-           boundary = np.sum(np.multiply(TB,HW_MINUS),axis=1).todense()
+           boundary = np.sum(np.multiply(TB,HW_MINUS.todense()),axis=1)
            RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]
 
            S.add_csr_matrix(F,RHS)
