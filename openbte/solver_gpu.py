@@ -1,7 +1,9 @@
 from __future__ import absolute_import
 #import os
 import numpy as np
-from scipy.sparse import *
+#from scipy.sparse import *
+import scipy.sparse as sp
+from GBQsparse import MSparse
 from scipy import *
 #import scipy.sparse
 from scipy.sparse import csc_matrix
@@ -146,7 +148,6 @@ class SolverGPU(object):
    # self.elem_kappa_map = self.mesh.elem_kappa_map
    #else :   
    # self.compute_kappa_map()
-
 
    self.control_angle =  self.rotate(np.array(self.mat[0]['control_angle']),**argv)
    self.kappa_directional =  self.rotate(np.array(self.mat[0]['kappa_directional']),**argv)
@@ -428,53 +429,66 @@ class SolverGPU(object):
      while n_iter < argv.setdefault('max_bte_iter',10) and \
           error_vec[-1] > argv.setdefault('max_bte_error',1e-2):
 
-         yyy = time.time()
-         for global_index in range(self.n_index):
 
-           index_irr = self.mat[0]['temp_vec'][global_index]
-           mfp   = self.mat[0]['mfp'][global_index]
-           irr_angle = self.mat[0]['angle_map'][global_index]
+         S = MSparse()
+         yyy = time.time()
+         for global_index in  range(self.n_index):
+          index_irr = self.mat[0]['temp_vec'][global_index]
+          mfp   = self.mat[0]['mfp'][global_index]
+          irr_angle = self.mat[0]['angle_map'][global_index]
+          if np.linalg.norm(self.control_angle[global_index]) > 0.9:
+           t1 = time.time()
            aa = sparse.COO([0,1,2],self.control_angle[global_index],shape=(3))
            test2  = sparse.tensordot(self.mesh.N,aa,axes=1)
-           AP = test2.clip(min=0)
-           AM = (test2 - AP)
-           AP = spdiags(np.sum(AP,axis=1).todense(),0,self.mesh.nle,self.mesh.nle,format='csc')
+           AP = test2.clip(min=-1e-9)
+           AM = test2.clip(max=1e-9)
+           #-------------
            tmp = sparse.tensordot(self.mesh.CM,aa,axes=1)
-           HW_PLUS = tmp.clip(min=0)
-           BP = spdiags(HW_PLUS.sum(axis=1).todense(),0,self.mesh.nle,self.mesh.nle,format='csc')
-           F = scipy.sparse.eye(self.mesh.nle,format='csc') + (AP + AM + BP) * mfp
+           HW_PLUS  = tmp.clip(min=-1e-9)
+           HW_MINUS  = tmp.clip(max=1e-9)
+           G = mfp*AP.sum(axis=1).todense() + mfp*HW_PLUS.sum(axis=1).todense() + np.ones(self.mesh.nle)
+           AD = spdiags(G,0,self.mesh.nle,self.mesh.nle,format='csr')
+           F = AM.tocsr() * mfp + AD
            self.P = np.sum(np.multiply(AM,self.mesh.B),axis=1).todense()
-           boundary = np.sum(np.multiply(TB,HW_PLUS-tmp),axis=1)
+           boundary = np.sum(np.multiply(TB,HW_MINUS),axis=1).todense()
            RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]
 
+           S.add_csr_matrix(F,RHS)
+
+           s = sp.linalg.spsolve(F,RHS)
+         t2 = time.time()
+         print(t2-yyy)
+         T = S.solve() 
+         t3 = time.time()
+         print(t3-t2)
            #create a list-----------------
            #master_data += list(F.data)
-           master_data = list(F.data)
-           a = F.nonzero()
-           nn = len(a[0])
+           #master_data = list(F.data)
+           #a = F.nonzero()
+           #nn = len(a[0])
            #g = [[global_index] * nn]
-           g = []
-           g.append(list(a[0]))
-           g.append(list(a[1]))
-           g = list(map(list, zip(*g)))
+           #g = []
+           #g.append(list(a[0]))
+           #g.append(list(a[1]))
+           #g = list(map(list, zip(*g)))
            #master_A += g
-           master_A = g
+           #master_A = g
            #master_b.append(RHS)
-           master_b = [RHS]
+           #master_b = [RHS]
            #-------------------------------
 
-           i = torch.LongTensor(master_A)
-           v = torch.FloatTensor(master_data)
+           #i = torch.LongTensor(master_A)
+           #v = torch.FloatTensor(master_data)
            #A = torch.sparse.FloatTensor(i.t(), v, torch.Size([self.n_index,self.mesh.nle,self.mesh.nle])).to_dense() 
-           A = torch.sparse.FloatTensor(i.t(), v, torch.Size([self.mesh.nle,self.mesh.nle])).cuda().to_dense() 
-           b = torch.tensor(list(map(list, zip(*master_b)))).cuda()
+           #A = torch.sparse.FloatTensor(i.t(), v, torch.Size([self.mesh.nle,self.mesh.nle])).cuda().to_dense() 
+           #b = torch.tensor(list(map(list, zip(*master_b)))).cuda()
 
-           t1 = time.time()
+           #t1 = time.time()
            #print(t1-yyy)
-           A_LU = A.lu()
-           x = torch.lu_solve(b,*A_LU)
-           t2 = time.time()
-           print(t2-t1)
+           #A_LU = A.lu()
+           #x = torch.lu_solve(b,*A_LU)
+           #t2 = time.time()
+           #print(t2-t1)
 
 
          quit()
@@ -486,7 +500,7 @@ class SolverGPU(object):
 
 
    if  MPI.COMM_WORLD.Get_rank() == 0:
-    F = dok_matrix((self.mesh.nle,self.mesh.nle))
+    F = sp.dok_matrix((self.mesh.nle,self.mesh.nle))
     B = np.zeros(self.mesh.nle)
 
     for ll in self.mesh.side_list['active']:
