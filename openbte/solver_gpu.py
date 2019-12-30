@@ -492,10 +492,11 @@ class SolverGPU(object):
      S = MSparse() 
      S.add_coo(rows,cols,self.mesh.nle,self.mesh.nle)
      S.add_data(F,RHS)
+     t1b = time.time()
      x,m,h1,h2 = S.solve() 
      #print(m/1024/1024)
      t2 = time.time()
-     print(t2-t1)
+     print(t2-t1b)
      quit()
      '''
      while n_iter < argv.setdefault('max_bte_iter',10) and \
