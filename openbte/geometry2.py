@@ -1948,6 +1948,9 @@ class Geometry(object):
           'elem_list':self.elem_list,\
           'applied_grad':self.applied_grad,\
           'argv':self.argv,\
+          'i':self.i,\
+          'j':self.j,\
+          'k':self.k,\
           'side_periodic_value':self.side_periodic_value}
 
     self.state = data
@@ -1981,7 +1984,8 @@ class Geometry(object):
    N_new = sparse.DOK((nc,nc,3), dtype=float32)
 
    #self.CPB = np.zeros((nc,3))
-   i = [];j = [];k = []
+   self.i = [];self.j = [];self.k = []
+
    data = []
 
    
@@ -2000,6 +2004,16 @@ class Geometry(object):
        N_new[l2,l1] = -normal
        N[l1,l2] = normal*area/vol1
        N[l2,l1] = -normal*area/vol2
+       
+       #New development-----------------
+       self.i.append(l1)
+       self.j.append(l2)
+       self.k.append(normal*area/vol1)
+       self.j.append(l1)
+       self.i.append(l2)
+       self.k.append(-normal*area/vol1)
+       #---------------------------------
+
 
        #modify in case of interfaces---
        if ll in self.side_list['Interface']:
@@ -2025,6 +2039,7 @@ class Geometry(object):
    self.CM = CM.to_coo()
    self.N = N.to_coo()
    self.N_new = N_new.to_coo()
+   self.k = np.array(self.k).T
 
 
 
@@ -2541,6 +2556,9 @@ class Geometry(object):
     self.elem_mat_map = self.state['elem_mat_map']
     self.side_periodic_value = self.state['side_periodic_value']
     self.kappa_factor = self.size[self.direction]/self.area_flux
+    self.i = self.state['i']
+    self.j = self.state['j']
+    self.k = self.state['k']
 
 
 

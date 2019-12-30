@@ -1948,6 +1948,16 @@ class GeometryGPU(object):
           'elem_list':self.elem_list,\
           'applied_grad':self.applied_grad,\
           'argv':self.argv,\
+          'i':self.i,\
+          'j':self.j,\
+          'k':self.k,\
+          'ip':self.ip,\
+          'jp':self.jp,\
+          'dp':self.dp,\
+          'eb':self.eb,\
+          'sb':self.sb,\
+          'db':self.db,\
+          'pv':self.pv,\
           'side_periodic_value':self.side_periodic_value}
 
     self.state = data
@@ -1981,7 +1991,9 @@ class GeometryGPU(object):
    N_new = sparse.DOK((nc,nc,3), dtype=float32)
 
    #self.CPB = np.zeros((nc,3))
-   i = [];j = [];k = []
+   self.i = [];self.j = [];self.k = []
+   self.eb = [];self.sb = []; self.db = []
+
    data = []
 
    
@@ -2000,6 +2012,16 @@ class GeometryGPU(object):
        N_new[l2,l1] = -normal
        N[l1,l2] = normal*area/vol1
        N[l2,l1] = -normal*area/vol2
+       
+       #New development-----------------
+       self.i.append(l1)
+       self.j.append(l2)
+       self.k.append(normal*area/vol1)
+       self.j.append(l1)
+       self.i.append(l2)
+       self.k.append(-normal*area/vol1)
+       #---------------------------------
+
 
        #modify in case of interfaces---
        if ll in self.side_list['Interface']:
@@ -2007,6 +2029,16 @@ class GeometryGPU(object):
         s2 = np.where(np.array(self.elem_side_map[kc2])==ll)[0][0]
         CM[l1,s1]  = normal*area/vol1
         CM[l2,s2]  = -normal*area/vol1
+
+        #new development---
+        self.eb.append(l1)
+        self.sb.append(s1)
+        self.db.append(normal*area/vol1)
+        self.eb.append(l2)
+        self.sb.append(s2)
+        self.db.append(-normal*area/vol1) #CHECK THIS
+        #----------------------------
+
        #else: 
        # N[l1,l2] = normal*area/vol1
        # N[l2,l1] = -normal*area/vol2
@@ -2015,6 +2047,10 @@ class GeometryGPU(object):
      else:
        s = np.where(np.array(self.elem_side_map[kc1])==ll)[0][0]
        CM[l1,s]  = normal*area/vol1
+       self.eb.append(l1)
+       self.sb.append(s)
+       self.db.append(normal*area/vol1)
+
        CP[l1,s] = normal
        a = self.get_elem_centroid(l1)
        #if ll in self.side_list['Boundary']:
@@ -2023,9 +2059,10 @@ class GeometryGPU(object):
    #show()
    self.CP = CP.to_coo()
    self.CM = CM.to_coo()
-   #self.N = N.to_coo()
-   self.N = N
+   self.N = N.to_coo()
    self.N_new = N_new.to_coo()
+   self.k = np.array(self.k).T
+   self.db = np.array(self.db).T
 
 
 
@@ -2542,6 +2579,16 @@ class GeometryGPU(object):
     self.elem_mat_map = self.state['elem_mat_map']
     self.side_periodic_value = self.state['side_periodic_value']
     self.kappa_factor = self.size[self.direction]/self.area_flux
+    self.i = self.state['i']
+    self.j = self.state['j']
+    self.k = self.state['k']
+    self.eb = self.state['eb']
+    self.sb = self.state['sb']
+    self.db = self.state['db']
+    self.ip = self.state['ip']
+    self.jp = self.state['jp']
+    self.dp = self.state['dp']
+    self.pv = self.state['pv']
 
 
 
@@ -3170,21 +3217,34 @@ class GeometryGPU(object):
 
     B_with_area_old = sparse.DOK((n_el,n_el),dtype=float32)
     self.B_area = np.zeros(n_el,dtype=float32)
-     
+    
+    self.ip = []; self.jp = []; self.dp = []; self.pv = [] 
     if len(self.side_list.setdefault('Periodic',[])) > 0:
      for side in self.pairs:
 
+      area = self.get_side_area(side[0])
+      
       side_periodic_value[side[0]][0] = side_value[side[0]]
       side_periodic_value[side[0]][1] = side_value[side[1]]
 
       elem1,elem2 = self.side_elem_map[side[0]]
       i = self.g2l[elem1]
       j = self.g2l[elem2]
+
+      normal = self.compute_side_normal(i,side[0])
+      
+      voli = self.get_elem_volume(i)       
+      volj = self.get_elem_volume(j)       
+ 
+
+
       B[i,j] = side_value[side[0]]
       B[j,i] = side_value[side[1]]
+      self.ip.append(i); self.jp.append(j); self.dp.append(side_value[side[0]]); self.pv.append(normal*area/voli)
+      self.ip.append(j); self.jp.append(i); self.dp.append(side_value[side[1]]); self.pv.append(-normal*area/volj)
 
       if np.linalg.norm(np.cross(self.get_side_normal(1,side[0]),self.applied_grad)) < 1e-5:
-       B_with_area_old[i,j] = abs(side_value[side[0]]*self.get_side_area(side[0]))
+       B_with_area_old[i,j] = abs(side_value[side[0]]*area)
     
     #In case of fixed temperature----
     self.BN = np.zeros((n_el,len(self.elems[0]),3))
@@ -3206,6 +3266,8 @@ class GeometryGPU(object):
     self.side_periodic_value = side_periodic_value
     self.B = B.to_coo()
     self.B_with_area_old = B_with_area_old.to_coo()
+    self.pv = np.array(self.pv).T
+  
 
 
 

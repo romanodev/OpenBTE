@@ -19,7 +19,7 @@ from scipy.sparse import spdiags
 import sparse
 import scipy.io
 import deepdish as dd
-from .geometry2 import Geometry
+from .geometry_gpu import GeometryGPU as Geometry
 from scipy import interpolate
 import scipy
 from scipy.sparse import coo_matrix
@@ -151,7 +151,18 @@ class SolverGPU(object):
 
    self.control_angle =  self.rotate(np.array(self.mat[0]['control_angle']),**argv)
    self.kappa_directional =  self.rotate(np.array(self.mat[0]['kappa_directional']),**argv)
-  
+   self.i = self.mesh.i
+   self.j = self.mesh.j
+   self.k = self.mesh.k
+   self.ip = self.mesh.ip
+   self.jp = self.mesh.jp
+   self.dp = self.mesh.dp
+   self.pv = self.mesh.pv
+   self.eb = self.mesh.eb
+   self.sb = self.mesh.sb
+   self.db = self.mesh.db
+   self.mfp  = self.mat[0]['mfp']
+ 
    #(a,b) = np.shape(self.kappa_directional)
    #kappa = 0
    #for i in range(a):
@@ -426,19 +437,82 @@ class SolverGPU(object):
 
      n_iter = 0
      error_vec = [1]
+
+     #this can be done in geometry--
+     delta = 1e-16
+     #Bulk----
+     t1 = time.time()
+     G = np.dot(self.control_angle,self.k)
+     G = np.einsum('i,ij->ij',self.mfp,G)
+     nconn = np.shape(G)[0]
+     Gp = G.clip(min=-delta)
+     Am = G.clip(max=delta)
+
+     D = np.zeros((self.n_index,self.mesh.nle))
+     for n,i in enumerate(self.i): 
+       D[:,i] += Gp[:,n]
+ 
+     #Boundary--
+     G = np.dot(self.control_angle,self.db)
+     G = np.einsum('i,ij->ij',self.mfp,G)
+     Gp  = G.clip(min=-delta)
+     Hm = G.clip(max=delta)
+     DB = np.zeros((self.n_index,self.mesh.nle))
+     
+     for n,eb in enumerate(self.eb): 
+       DB[:,eb] += G[:,n]
+     #------------------------------
+
+     #Build main diagonal---
+     Dtot = np.ones((self.n_index,self.mesh.nle)) + D+DB
+
+     #concatenate----------------------------------------
+     F = np.concatenate((Am,Dtot),axis=1)
+     rows = np.append(self.i,np.arange(self.mesh.nle))
+     cols = np.append(self.j,np.arange(self.mesh.nle))
+     #---------------------------------------------------
+
+     #Periodic boundaries-------------------------------
+     G = np.dot(self.control_angle,self.pv)
+     Gm = G.clip(max=delta)
+     P2 = np.einsum('ij,j->ij',Gm,self.dp)  
+     P = np.zeros((self.n_index,self.mesh.nle))
+     for n,i in enumerate(self.ip): 
+       P[:,i] += P2[:,n]
+     #--------------------------------------------------
+
+     #Hard Walls-------------------------------
+     B = np.zeros((self.n_index,self.mesh.nle))
+     for n,(i,j) in enumerate(zip(self.eb,self.sb)):
+      B[:,i] += TB[i,j]*Hm[:,n]
+     #------------------------------------------
+      
+     RHS = P + B + np.tile(Tnew,(self.n_index,1)) + TL
+
+     S = MSparse() 
+     S.add_coo(rows,cols,self.mesh.nle,self.mesh.nle)
+     S.add_data(F,RHS)
+     x,m,h1,h2 = S.solve() 
+     #print(m/1024/1024)
+     t2 = time.time()
+     print(t2-t1)
+     quit()
+     '''
      while n_iter < argv.setdefault('max_bte_iter',10) and \
           error_vec[-1] > argv.setdefault('max_bte_error',1e-2):
 
 
-         S = MSparse()
+         #S = MSparse()
          yyy = time.time()
-         for global_index in  range(self.n_index):
+         for global_index in range(self.n_index):
           index_irr = self.mat[0]['temp_vec'][global_index]
           mfp   = self.mat[0]['mfp'][global_index]
           irr_angle = self.mat[0]['angle_map'][global_index]
           if np.linalg.norm(self.control_angle[global_index]) > 0.9:
            t1 = time.time()
            aa = sparse.COO([0,1,2],self.control_angle[global_index],shape=(3))
+
+           #this has to be accellerated------
            test2  = sparse.tensordot(self.mesh.N,aa,axes=1)
            AP = test2.clip(min=-1e-9)
            AM = test2.clip(max=1e-9)
@@ -449,19 +523,24 @@ class SolverGPU(object):
            G = mfp*AP.sum(axis=1).todense() + mfp*HW_PLUS.sum(axis=1).todense() + np.ones(self.mesh.nle)
            AD = spdiags(G,0,self.mesh.nle,self.mesh.nle,format='csr')
            F = AM.tocsr() * mfp + AD
-           self.P = np.sum(np.multiply(AM,self.mesh.B),axis=1).todense()
-           boundary = np.sum(np.multiply(TB,HW_MINUS.todense()),axis=1)
-           RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]
+           #self.P = np.sum(np.multiply(AM,self.mesh.B),axis=1).todense()
+           #boundary = np.sum(np.multiply(TB,HW_MINUS.todense()),axis=1)
+           #RHS = mfp * (self.P + boundary) + Tnew + TL[index_irr]
+           #-----------------------------------------------------
 
-           S.add_csr_matrix(F,RHS)
+           #S.add_csr_matrix(F,RHS)
 
            #s = sp.linalg.spsolve(F,RHS)
-           #print(time.time()-t1)
          t2 = time.time()
-         print(t2-yyy)
-         T = S.solve() 
-         t3 = time.time()
-         print(t3-t2)
+         print('assembly:',t2-yyy)
+         #T = S.solve() 
+         #t3 = time.time()
+         #print('Solving',t3-t2)
+         quit()
+         
+
+
+
            #create a list-----------------
            #master_data += list(F.data)
            #master_data = list(F.data)
@@ -491,7 +570,7 @@ class SolverGPU(object):
            #t2 = time.time()
            #print(t2-t1)
 
-
+'''
 
 
 
