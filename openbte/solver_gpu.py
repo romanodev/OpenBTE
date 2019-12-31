@@ -440,6 +440,7 @@ class SolverGPU(object):
 
      #this can be done in geometry--
      delta = 1e-16
+     #delta = 0
      #Bulk----
      t1 = time.time()
      G = np.dot(self.control_angle,self.k)
@@ -489,15 +490,23 @@ class SolverGPU(object):
       
      RHS = P + B + np.tile(Tnew,(self.n_index,1)) + TL
 
-     S = MSparse() 
-     S.add_coo(rows,cols,self.mesh.nle,self.mesh.nle)
-     S.add_data(F,RHS)
+
+     #Initalization---
+     S = MSparse(rows,cols,self.mesh.nle,self.mesh.nle)
+     F = F[3:]
+     B = RHS[3:]
+     S.add_LHS(F)
      t1b = time.time()
-     x,m,h1,h2 = S.solve() 
-     #print(m/1024/1024)
+     S.add_RHS(B)
+     x = S.solve() 
+     #print('Memory [Mbytes]: ',m1/1024/1024,m2/1024/1024)
      t2 = time.time()
      print(t2-t1b)
+     S.free_memory()
      quit()
+     #for n in np.arange(3,self.n_index):
+     # A = sp.csr_matrix( (F[n],(rows,cols)), shape=(self.mesh.nle,self.mesh.nle) )
+     # S.add_csr_matrix(A,RHS[n])
      '''
      while n_iter < argv.setdefault('max_bte_iter',10) and \
           error_vec[-1] > argv.setdefault('max_bte_error',1e-2):
