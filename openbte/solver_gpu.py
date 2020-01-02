@@ -492,13 +492,12 @@ class SolverGPU(object):
 
 
      #Initalization---
-     S = MSparse(rows,cols,self.mesh.nle,self.mesh.nle)
+     S = MSparse(rows,cols,self.mesh.nle,self.n_index-3,reordering=True)
      F = F[3:]
      B = RHS[3:]
      S.add_LHS(F)
      t1b = time.time()
-     S.add_RHS(B)
-     x = S.solve() 
+     x = S.solve(B) 
      #print('Memory [Mbytes]: ',m1/1024/1024,m2/1024/1024)
      t2 = time.time()
      print(t2-t1b)
