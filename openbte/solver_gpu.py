@@ -38,7 +38,6 @@ import matplotlib.pylab as plt
 import torch
 import skcuda.linalg as skla
 import skcuda.misc as misc
-import pygpu
 import cupy as cp
 
 
