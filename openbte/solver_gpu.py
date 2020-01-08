@@ -7,8 +7,13 @@ from GBQsparse import MSparse
 from scipy import *
 #import scipy.sparse
 from scipy.sparse import csc_matrix
+import sparseqr
 from mpi4py import MPI
 from scipy.sparse.linalg import splu
+import pycuda.gpuarray as gpuarray
+import pycuda.driver as cuda
+from itertools import permutations
+import pycuda.autoinit
 from os import listdir
 #from scipy.sparse import *
 from os.path import isfile, join
@@ -31,6 +36,11 @@ import os
 import shutil
 import matplotlib.pylab as plt
 import torch
+import skcuda.linalg as skla
+import skcuda.misc as misc
+import pygpu
+import cupy as cp
+
 
 
 #levi civita
@@ -201,7 +211,6 @@ class SolverGPU(object):
    if self.multiscale:
     self.assemble_modified_fourier()
 
-   
    #---------------------------
   
  
@@ -429,6 +438,10 @@ class SolverGPU(object):
      kappa_fourier = np.array([kappa_fourier])
      Tnew = temp_fourier.copy()
      TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
+     #TB_new = np.zeros(len(self.eb))
+     #for n,(i,j) in enumerate(zip(self.eb,self.sb)):
+     TB_new = np.array([temp_fourier[i] for n,(i,j) in enumerate(zip(self.eb,self.sb))])
+
      TL = np.zeros((nT,self.mesh.nle))
      
      master_data = []
@@ -442,65 +455,258 @@ class SolverGPU(object):
      delta = 1e-16
      #delta = 0
      #Bulk----
+     skla.init()
+     BB = np.zeros((len(self.i),self.mesh.nle))
+
+     for n,i in enumerate(self.i):
+      BB[n,i] = 1 
+
+     C = np.zeros((len(self.eb),self.mesh.nle))
+     for n,eb in enumerate(self.eb):
+      C[n,eb] = 1 
+
+     CC = np.zeros((len(self.ip),self.mesh.nle))
+     for n,ip in enumerate(self.ip):
+      CC[n,ip] = 1 
+
+     DD = np.zeros((len(self.eb),self.mesh.nle))
+     for n,eb in enumerate(self.eb):
+      DD[n,eb] = 1 
+
+     #Get permutation matrix---
+     rows = np.append(self.i,np.arange(self.mesh.nle))
+     cols = np.append(self.j,np.arange(self.mesh.nle))
+
+
+     new = False
+     if new:
+      #New---
+      A = sp.coo_matrix((np.arange(len(rows)),(rows,cols)),dtype=np.int32)
+      
+      #A = A*np.eye(self.mesh.nle)    
+
+
+      #A = sp.csr_matrix((np.arange(len(rows)),(rows,cols)),dtype=np.int32) 
+      _, _, E, rank = sparseqr.qr(A)
+       
+      #E = np.arange(self.mesh.nle)
+      #E = E.astype(np.int32)
+      #pp = []
+      #E = list(E)
+      #for i in range(self.mesh.nle):
+      # pp.append(E.index(i))        
+
+      #colsp = np.array([pp[c] for c in cols])
+      colsp = cols
+      A = sp.csr_matrix((np.arange(len(rows)),(rows,colsp)),dtype=np.int32).tocsr() 
+
+
+      #E = np.arange(self.mesh.nle)
+      #P = sparseqr.permutation_vector_to_matrix(E).tocsr().sorted_indices()
+      #A = sp.csr_matrix(A,dtype=np.int32)
+      #A = A.tocsr()#.sorted_indices()
+     else:
+      A = sp.csr_matrix((np.arange(len(rows)),(rows,cols)),dtype=np.int32) 
+     #-----------------------------
+
+
+     #A = A.tocsr().sorted_indices()
+     #create new matrix
+     #cols = [int(E[k]) for k in cols]
+     #print(cols) 
+     #quit()
+     #A = sp.csr_matrix((np.arange(len(rows)),(rows,cols)),dtype=np.int32) 
+     indices = A.indices.copy()
+     indptr  = A.indptr.copy()
+     rot = np.asarray(A.data,dtype=np.int)
+     #-------------------------------------
+
+
+     #-----------------------
      t1 = time.time()
+     #CPU
+     self.control_angle = np.asarray(self.control_angle,dtype=float32)
+     self.k = np.asarray(self.k,dtype=float32)
+     self.mfp = np.asarray(self.mfp,dtype=float32)
      G = np.dot(self.control_angle,self.k)
      G = np.einsum('i,ij->ij',self.mfp,G)
-     nconn = np.shape(G)[0]
      Gp = G.clip(min=-delta)
      Am = G.clip(max=delta)
-
-     D = np.zeros((self.n_index,self.mesh.nle))
+     D = np.zeros((self.n_index,self.mesh.nle),dtype=float32)
      for n,i in enumerate(self.i): 
        D[:,i] += Gp[:,n]
- 
-     #Boundary--
      G = np.dot(self.control_angle,self.db)
      G = np.einsum('i,ij->ij',self.mfp,G)
      Gp  = G.clip(min=-delta)
      Hm = G.clip(max=delta)
      DB = np.zeros((self.n_index,self.mesh.nle))
-     
      for n,eb in enumerate(self.eb): 
        DB[:,eb] += G[:,n]
-     #------------------------------
-
-     #Build main diagonal---
-     Dtot = np.ones((self.n_index,self.mesh.nle)) + D+DB
-
-     #concatenate----------------------------------------
+     Dtot = np.ones((self.n_index,self.mesh.nle),dtype=np.float32) + D + DB
      F = np.concatenate((Am,Dtot),axis=1)
-     rows = np.append(self.i,np.arange(self.mesh.nle))
-     cols = np.append(self.j,np.arange(self.mesh.nle))
-     #---------------------------------------------------
 
-     #Periodic boundaries-------------------------------
      G = np.dot(self.control_angle,self.pv)
      Gm = G.clip(max=delta)
      P2 = np.einsum('ij,j->ij',Gm,self.dp)  
      P = np.zeros((self.n_index,self.mesh.nle))
      for n,i in enumerate(self.ip): 
        P[:,i] += P2[:,n]
-     #--------------------------------------------------
-
-     #Hard Walls-------------------------------
      B = np.zeros((self.n_index,self.mesh.nle))
      for n,(i,j) in enumerate(zip(self.eb,self.sb)):
       B[:,i] += TB[i,j]*Hm[:,n]
-     #------------------------------------------
-      
-     RHS = P + B + np.tile(Tnew,(self.n_index,1)) + TL
+     RHS = P + B + TL + np.tile(Tnew,(self.n_index,1))
 
+     #method 1
+     #t1 = time.time()
+     #S = MSparse(rows,cols,self.mesh.nle,self.n_index-3,reordering=False)
+     #S.add_LHS(F[3:])
+     #x1 = S.solve(RHS[3:])
+     #quit()
+     #S.free_memory()
+     #t2 = time.time()
+     #print(t2-t1)
 
-     #Initalization---
-     S = MSparse(rows,cols,self.mesh.nle,self.n_index-3,reordering=True)
-     F = F[3:]
-     B = RHS[3:]
-     S.add_LHS(F)
-     t1b = time.time()
-     x = S.solve(B) 
-     #print('Memory [Mbytes]: ',m1/1024/1024,m2/1024/1024)
+     '''
+     #Method 2
+     t1 = time.time()
+     S = MSparse(rows,colsp,self.mesh.nle,self.n_index-3,reordering=False)
+     S.add_LHS(F[3:])
+     x2 = S.solve(B[3:])
+     x2 = np.array([x[E] for x in x2])
+     S.free_memory()
      t2 = time.time()
-     print(t2-t1b)
+     print(t2-t1)
+     '''
+     #Method 3
+     #t1 = time.time()
+     #F2 = np.array([ F[:,rot[n]] for n in range(len(rot))]).T #from coo to csr
+     #F = F2[3:].copy()
+ 
+     data = np.zeros_like(F[3:])   
+     for n in np.arange(3,self.n_index):
+      Acsr = sp.csr_matrix((F[n],(rows,colsp)),dtype=np.float64).sorted_indices()
+      #if new:
+      # Acsr = Acsr*sparseqr.permutation_vector_to_matrix(E).tocsr().sorted_indices()
+      data[n-3] = Acsr.data
+
+     F = data.copy()
+     F = F.astype(np.float64)
+      
+     B = B[3:].astype(np.float64) 
+     #print(np.allclose(F3,F))
+     #quit()
+  
+     NN = 6138
+     S = MSparse(indptr,indices,self.mesh.nle,NN,new=True)
+     #data = np.tile(A.data,(1,1))
+     #print(np.shape(data))
+     #print(np.shape(B[3:]))
+     #data /= np.max(data)
+     #B /= np.max(data)
+     #S.add_LHS(F[3:])
+     S.add_LHS(F[:NN])
+     tt = time.time()
+     S.solve(B[0:NN])
+     print(time.time()-tt)
+     S.free_memory()
+     quit()    
+ 
+     xs = np.array([x[E] for x in x3])
+     t2 = time.time()
+     quit()
+     print(t2-t1)
+     #print(np.allclose(x2,x3))
+     #GPU------------------------------------
+     t1 = time.time() 
+     a1 = gpuarray.to_gpu(np.ascontiguousarray(self.control_angle,dtype=np.float32))
+
+     #self.k = self.k[:,rot]
+     a2 = gpuarray.to_gpu(np.ascontiguousarray(self.k,dtype=np.float32))
+     #E = gpuarray.to_gpu(np.ascontiguousarray(E,dtype=np.int32))
+
+     G = skla.dot(a1,a2)
+                  
+     skla.dot_diag(gpuarray.to_gpu(np.ascontiguousarray(self.mfp,dtype=np.float32)),G,overwrite=True)
+     t4 = time.time()
+     Gp = 0.5 * (G + (1.0-delta)*pycuda.cumath.fabs(G)) #get only the positive part
+     #Gf = G.ravel()
+     #Gf = gpuarray.if_positive(Gf,Gf,gpuarray.zeros(len(Gf),dtype=np.float32))
+     #Gp = Gf.reshape(np.shape(G))
+
+     Am2 = G - Gp
+
+     D = skla.dot(Gp,gpuarray.to_gpu(np.ascontiguousarray(BB,dtype=np.float32)))
+
+     #Coll = gpuarray.to_gpu(np.ascontiguousarray(self.mat[0]['B'],dtype=np.float32))
+     #----------------------------------------------------
+     
+     #Boundary--
+     control_angle = gpuarray.to_gpu(np.ascontiguousarray(self.control_angle,dtype=np.float32))
+     G = skla.dot(control_angle,gpuarray.to_gpu(np.ascontiguousarray(self.db,dtype=np.float32)))
+
+     skla.dot_diag(gpuarray.to_gpu(np.ascontiguousarray(self.mfp,dtype=np.float32)),G,overwrite=True)
+
+     Gp = 0.5 * (G + (1.0-delta)*pycuda.cumath.fabs(G)) #get only the positive part
+
+     #Hm = G - Gp
+     
+     DB = skla.dot(G,gpuarray.to_gpu(np.ascontiguousarray(C,dtype=np.float32)))
+     #final steps--
+
+     D0 = misc.ones((self.n_index,self.mesh.nle),dtype=np.float32)
+     Dtot = D0 + D + DB
+
+     #building final arrays---
+     F2 = gpuarray.zeros((np.shape(Am2)[0],np.shape(Am2)[1]+np.shape(Dtot)[1]),dtype=np.float32)
+     F2[:,0:np.shape(Am2)[1]] = Am2
+     F2[:,np.shape(Am2)[1]:] = Dtot
+     Sparse = F2.copy()
+
+     rows = gpuarray.zeros(len(self.i) + self.mesh.nle,dtype=np.int32)
+     rows[0:len(self.i)] = gpuarray.to_gpu(np.ascontiguousarray(self.i,dtype=np.int32))
+     rows[len(self.i):]  = gpuarray.arange(0,self.mesh.nle,dtype=np.int32)
+
+     cols = gpuarray.zeros(len(self.j) + self.mesh.nle,dtype=np.int32)
+     cols[0:len(self.j)] = gpuarray.to_gpu(np.ascontiguousarray(self.j,dtype=np.int32))
+     cols[len(self.j):]  = gpuarray.arange(0,self.mesh.nle,dtype=np.int32)
+     #---------------------------------------------------
+
+     #Periodic boundary conditions
+     Gb = skla.dot(control_angle,gpuarray.to_gpu(np.ascontiguousarray(self.pv,dtype=np.float32)))
+     Gbm = 0.5 * (Gb - (1.0-delta)*pycuda.cumath.fabs(Gb)) #get only the negative part
+
+     skla.dot_diag(gpuarray.to_gpu(np.ascontiguousarray(self.dp,dtype=np.float32)),Gbm,trans='T',overwrite=True)
+
+     P = skla.dot(Gbm,gpuarray.to_gpu(np.ascontiguousarray(CC,dtype=np.float32)))
+
+     #Boundary-----------
+     TB_gpu = gpuarray.to_gpu(np.ascontiguousarray(TB_new,dtype=np.float32))
+     Tnew_gpu = gpuarray.to_gpu(np.ascontiguousarray(Tnew,dtype=np.float32))
+     DD = gpuarray.to_gpu(np.ascontiguousarray(DD,dtype=np.float32))
+     skla.dot_diag(TB_gpu,DD,overwrite=True)
+     B2 = skla.dot(G-Gp,DD)
+
+     #------------------
+     TNEW = gpuarray.zeros((self.n_index,self.mesh.nle),dtype=np.float32)
+     for n in range(self.n_index):
+       TNEW[n] = Tnew_gpu
+     #--------------------
+
+     TL_gpu = gpuarray.to_gpu(np.ascontiguousarray(TL,dtype=np.float32))
+     RHS2 = B2 + TL_gpu + P + TNEW
+
+     F3 = gpuarray.zeros_like(F2)
+     for k in range(self.mesh.nle):   
+       F3[:,k] = F2[:,int(rot[k])]
+
+     S = MSparse(indptr,indices,self.mesh.nle,self.n_index-3,new=True)
+     S.add_LHS(F2[3:])
+     dx = S.solve(RHS2[3:]).get()
+     t2 = time.time()
+
+     xf = np.array([x2[E] for x2 in dx])
+     print(np.allclose(xs,xf))
+ 
      S.free_memory()
      quit()
      #for n in np.arange(3,self.n_index):
