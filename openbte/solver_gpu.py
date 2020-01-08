@@ -7,7 +7,7 @@ from GBQsparse import MSparse
 from scipy import *
 #import scipy.sparse
 from scipy.sparse import csc_matrix
-import sparseqr
+#import sparseqr
 from mpi4py import MPI
 from scipy.sparse.linalg import splu
 import pycuda.gpuarray as gpuarray
