@@ -584,7 +584,7 @@ class SolverGPU(object):
  
      data = np.zeros_like(F[3:])   
      for n in np.arange(3,self.n_index):
-      Acsr = sp.csr_matrix((F[n],(rows,colsp)),dtype=np.float64).sorted_indices()
+      Acsr = sp.csr_matrix((F[n],(rows,cols)),dtype=np.float64).sorted_indices()
       #if new:
       # Acsr = Acsr*sparseqr.permutation_vector_to_matrix(E).tocsr().sorted_indices()
       data[n-3] = Acsr.data
