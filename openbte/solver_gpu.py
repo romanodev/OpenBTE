@@ -8,13 +8,13 @@ from .GPUSolver import *
 from scipy import *
 #import scipy.sparse
 from scipy.sparse import csc_matrix
-import sparseqr
+#import sparseqr
 from mpi4py import MPI
 from scipy.sparse.linalg import splu
-import pycuda.gpuarray as gpuarray
-import pycuda.driver as cuda
+#import pycuda.gpuarray as gpuarray
+#import pycuda.driver as cuda
 from itertools import permutations
-import pycuda.autoinit
+#import pycuda.autoinit
 from os import listdir
 #from scipy.sparse import *
 from os.path import isfile, join
@@ -37,9 +37,9 @@ import os
 import shutil
 import matplotlib.pylab as plt
 import torch
-import skcuda.linalg as skla
-import skcuda.misc as misc
-import cupy as cp
+#import skcuda.linalg as skla
+#import skcuda.misc as misc
+#import cupy as cp
 
 
 
@@ -455,7 +455,8 @@ class SolverGPU(object):
      delta = 1e-16
      #delta = 0
      #Bulk----
-     skla.init()
+     #skla.init()
+     '''
      BB = np.zeros((len(self.i),self.mesh.nle))
 
      for n,i in enumerate(self.i):
@@ -478,7 +479,7 @@ class SolverGPU(object):
      #cols = np.append(self.j,np.arange(self.mesh.nle))
      rows = self.i
      cols = self.j
-
+     '''
 
      #A = sp.coo_matrix((np.arange(len(rows)),(rows,cols)),dtype=np.int32)
      #_, _, E, rank = sparseqr.qr(A)
@@ -503,6 +504,20 @@ class SolverGPU(object):
      #rot = np.asarray(A.data,dtype=np.int)
      #-------------------------------------
 
+
+     W = np.load('W.dat.npy')
+     g = np.diag(W)
+     Wod = W-np.diag(g)
+
+     quit()
+
+     
+
+     quit()
+     b = np.load(open('sigma.dat','rb'),allow_pickle=True)
+     c = np.diag(A)
+     sigma = (b.T/c).T*1e9
+
      delta = 0
      #-----------------------
      t1 = time.time()
@@ -511,13 +526,16 @@ class SolverGPU(object):
 
      #CPU
      t1 = time.time() 
-     G = np.einsum('q,qj,jn->qn',self.mfp,self.control_angle,self.k,optimize=True)
+     #G = np.einsum('q,qj,jn->qn',self.mfp,self.control_angle,self.k,optimize=True)
+     G = np.einsum('qj,jn->qn',sigma,self.k,optimize=True)
      Gp = G.clip(min=-delta)
      Gm = G.clip(max=delta)
      D = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
      for n,i in enumerate(self.i): 
        D[:,i] += Gp[:,n]
-     
+
+     D += np.ones_like(D)
+
      P = np.zeros((self.n_index,self.mesh.nle))
      for n,(i,j) in enumerate(zip(self.i,self.j)):
        P[:,i] += Gm[:,n]*self.mesh.B[i,j]
@@ -525,13 +543,10 @@ class SolverGPU(object):
      lu = get_lu(self.i,self.j,Gm,D,self.mesh.nle)    
      for kk in range(1):
       X = solve_from_lu(lu,P+TL,Tnew)
-
-      
-     
-
       TL = np.matmul(self.Coll,X)
       #TL = skla.dot(gpuarray.to_gpu(self.Coll),gpuarray.to_gpu(X)).get()
-      kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,self.kappa_directional[:,0],optimize=True)*self.kappa_factor
+      #kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,self.kappa_directional[:,0],optimize=True)*self.kappa_factor
+      kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,b[:,0],optimize=True)*self.kappa_factor*1e-9
       print(kappa)
      print(time.time()-t1)
      quit()

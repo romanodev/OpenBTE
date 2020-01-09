@@ -1,24 +1,25 @@
 # ### Interface cuSOLVER PyCUDA
 
 from __future__ import print_function
-import pycuda.gpuarray as gpuarray
-import pycuda.driver as cuda
-import pycuda.autoinit
+#import pycuda.gpuarray as gpuarray
+#import pycuda.driver as cuda
+#import pycuda.autoinit
 import numpy as np
 import scipy.sparse as sp
 import ctypes
 from scipy.sparse import rand
-from scipy.sparse.linalg import spsolve
+#from scipy.sparse.linalg import spsolve
 from scipy.sparse import coo_matrix
 import time
 import numpy.linalg as la
 import scipy.sparse.linalg as sla
 import sys
 #import sparseqr
-import scikits.umfpack as um
+#import scikits.umfpack as um
 
 
 # cuSparse
+'''
 _libcusparse = ctypes.cdll.LoadLibrary('libcusparse.so')
 _libcusparse.cusparseCreate.restype = int
 _libcusparse.cusparseCreate.argtypes = [ctypes.c_void_p]
@@ -93,7 +94,7 @@ _cuso_handle = ctypes.c_void_p()
 status = _libcusolver.cusolverSpCreate(ctypes.byref(_cuso_handle))
 assert(status == 0)
 cuso_handle = _cuso_handle.value
-
+'''
 tt = np.float64
 
 def SolveCPU(row,col,A,B,A0,B0):
@@ -124,7 +125,7 @@ def get_lu(row,col,A,A0,d):
     lu = {}
     for i in range(nbatch):
       S1 = sp.csc_matrix((A[i],(row,col)),shape=(d,d),dtype=np.float64)
-      S = S1 + sp.diags(A0[i],format='csc') + sp.eye(d,format='csc') 
+      S = S1 + sp.diags(A0[i],format='csc') #+ sp.eye(d,format='csc') 
       lu.update({i:sp.linalg.splu(S)})
 
     return lu
