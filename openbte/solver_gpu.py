@@ -550,6 +550,7 @@ class SolverGPU(object):
      r = TL
      p = -r
      for kk in range(1000):
+         
 
 
      #r_k_norm = np.einsum('uc,vc->c',r,r)
