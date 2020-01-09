@@ -683,7 +683,7 @@ class Solver(object):
          #----------------------------------------------------------
   
         #test---
-        eta2 = self.mesh.B_with_area_old.dot(temp-Tnew-TL[global_index]).sum()
+        eta2 = self.mesh.B_with_area_old.dot(temp-Tnew).sum()
         #eta2 = self.mesh.B_with_area_old.dot(temp-TL[global_index]).sum()
         #a = self.mesh.B_with_area_old.dot(temp-Tnew).sum()
         #b = self.mesh.B_with_area_old.dot(TL[global_index]).sum()

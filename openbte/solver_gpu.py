@@ -506,19 +506,16 @@ class SolverGPU(object):
 
 
      W = np.load('W.dat.npy')
-     g = np.diag(W)
-     Wod = W-np.diag(g)
+     a = np.diag(W)
+     Wod = W-np.diag(a)
+     g  = W.sum(axis=0)
+     tc = g/np.sum(g)
+     S = np.outer(g,g)/np.sum(g) - Wod
+     sigma = np.load(open('sigma.dat','rb'),allow_pickle=True)*1e9
 
-     quit()
+     #c = np.diag(A)
+     #sigma = (b.T/c).T*1e9
 
-     
-
-     quit()
-     b = np.load(open('sigma.dat','rb'),allow_pickle=True)
-     c = np.diag(A)
-     sigma = (b.T/c).T*1e9
-
-     delta = 0
      #-----------------------
      t1 = time.time()
      self.Coll =self.mat[0]['B']
@@ -528,26 +525,57 @@ class SolverGPU(object):
      t1 = time.time() 
      #G = np.einsum('q,qj,jn->qn',self.mfp,self.control_angle,self.k,optimize=True)
      G = np.einsum('qj,jn->qn',sigma,self.k,optimize=True)
-     Gp = G.clip(min=-delta)
-     Gm = G.clip(max=delta)
+     Gp = G.clip(min=0)
+     Gm = G.clip(max=0)
      D = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
      for n,i in enumerate(self.i): 
        D[:,i] += Gp[:,n]
 
-     D += np.ones_like(D)
+  
+     #D += np.ones_like(D)
+
+     D += np.tile(a,(self.mesh.nle,1)).T
 
      P = np.zeros((self.n_index,self.mesh.nle))
      for n,(i,j) in enumerate(zip(self.i,self.j)):
        P[:,i] += Gm[:,n]*self.mesh.B[i,j]
 
-     lu = get_lu(self.i,self.j,Gm,D,self.mesh.nle)    
-     for kk in range(1):
-      X = solve_from_lu(lu,P+TL,Tnew)
-      TL = np.matmul(self.Coll,X)
+     lu = get_lu(self.i,self.j,Gm,D,self.mesh.nle)   
+  
+     
+
+     #Conjugate gradient------------
+     TL = np.einsum('q,c->qc',a,Tnew)
+     X = solve_from_lu(lu,P+TL)
+     r = TL
+     p = -r
+     for kk in range(1000):
+
+
+     #r_k_norm = np.einsum('uc,vc->c',r,r)
+
+
+
+
+     #----------------------------------
+     quit()
+
+     #r = TL
+
+     alpha = 0.75
+     TL_old = TL.copy()
+     for kk in range(1000):
+      X = solve_from_lu(lu,P+TL)
+      #TL = np.matmul(self.Coll,X)
+      TL = np.matmul(S,X)
+      TL = alpha*TL + (1-alpha)*TL_old
+      r = np.linalg.norm(TL - TL_old)
+       
+      TL_old = TL.copy() 
       #TL = skla.dot(gpuarray.to_gpu(self.Coll),gpuarray.to_gpu(X)).get()
       #kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,self.kappa_directional[:,0],optimize=True)*self.kappa_factor
-      kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,b[:,0],optimize=True)*self.kappa_factor*1e-9
-      print(kappa)
+      kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,sigma[:,0],optimize=True)*self.kappa_factor*1e-18
+      print(kappa,r)
      print(time.time()-t1)
      quit()
      #Delta = X - np.tile(Tnew,(self.n_index,1))

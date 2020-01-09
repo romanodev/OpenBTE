@@ -130,11 +130,11 @@ def get_lu(row,col,A,A0,d):
 
     return lu
 
-def solve_from_lu(lu,B,B0):
+def solve_from_lu(lu,B):
 
   x = np.zeros_like(B) 
   for i in lu.keys():
-   x[i] = lu[i].solve(B[i]+B0)
+   x[i] = lu[i].solve(B[i])
 
   return x
 
