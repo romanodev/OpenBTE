@@ -424,8 +424,13 @@ class Solver(object):
         AP = test2.clip(min=0)
         AM = (test2 - AP)
         AP = spdiags(np.sum(AP,axis=1).todense(),0,self.mesh.nle,self.mesh.nle,format='csc')
+
+
         self.mesh.B = self.mesh.B.tocsc()
         self.P = np.sum(np.multiply(AM,self.mesh.B),axis=1).todense()
+        #if global_index == 12:
+        #  print(mfp*self.P[895])
+        #  quit()
 
         tmp = sparse.tensordot(self.mesh.CM,aa,axes=1).todense()
         HW_PLUS = tmp.clip(min=0)
@@ -842,7 +847,8 @@ class Solver(object):
        pickle.dump(self.state,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
     else: data = None
     self.state =  MPI.COMM_WORLD.bcast(data,root=0)
-    #print(time.time()-a)
+    print(time.time()-a)
+    #KAPPA.dump(open('kappa_old.dat','wb'))    
 
 
    if rank==0 and self.verbose:

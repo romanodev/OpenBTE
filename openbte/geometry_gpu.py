@@ -2019,7 +2019,7 @@ class GeometryGPU(object):
        self.k.append(normal*area/vol1)
        self.j.append(l1)
        self.i.append(l2)
-       self.k.append(-normal*area/vol1)
+       self.k.append(-normal*area/vol2)
        #---------------------------------
 
 
