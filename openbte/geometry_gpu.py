@@ -1957,6 +1957,7 @@ class GeometryGPU(object):
           'eb':self.eb,\
           'sb':self.sb,\
           'db':self.db,\
+          'dbp':self.dbp,\
           'pv':self.pv,\
           'side_periodic_value':self.side_periodic_value}
 
@@ -1992,7 +1993,7 @@ class GeometryGPU(object):
 
    #self.CPB = np.zeros((nc,3))
    self.i = [];self.j = [];self.k = []
-   self.eb = [];self.sb = []; self.db = []
+   self.eb = [];self.sb = []; self.db = []; self.dbp = []
 
    data = []
 
@@ -2051,6 +2052,8 @@ class GeometryGPU(object):
        self.sb.append(s)
        self.db.append(normal*area/vol1)
 
+       self.dbp.append(normal)
+
        CP[l1,s] = normal
        a = self.get_elem_centroid(l1)
        #if ll in self.side_list['Boundary']:
@@ -2063,6 +2066,7 @@ class GeometryGPU(object):
    self.N_new = N_new.to_coo()
    self.k = np.array(self.k).T
    self.db = np.array(self.db).T
+   self.dbp = np.array(self.dbp).T
 
 
 
@@ -2585,6 +2589,7 @@ class GeometryGPU(object):
     self.eb = self.state['eb']
     self.sb = self.state['sb']
     self.db = self.state['db']
+    self.dbp = self.state['dbp']
     self.ip = self.state['ip']
     self.jp = self.state['jp']
     self.dp = self.state['dp']
@@ -3199,15 +3204,15 @@ class GeometryGPU(object):
       flux_sides.append(ll)
 
      if tmp < - delta :
-        side_value[ll] = -1.0
-     if tmp > delta :
         side_value[ll] = +1.0
+     if tmp > delta :
+        side_value[ll] = -1.0
      
      if ll in self.side_list['Hot']:
-       side_value[ll] = 0.5
+       side_value[ll] = -0.5
 
      if ll in self.side_list['Cold']:
-       side_value[ll] = -0.5
+       side_value[ll] = +0.5
 
 
     side_periodic_value = np.zeros((nsides,2))
@@ -3237,7 +3242,6 @@ class GeometryGPU(object):
       volj = self.get_elem_volume(j)       
  
 
-
       B[i,j] = side_value[side[0]]
       B[j,i] = side_value[side[1]]
       self.ip.append(i); self.jp.append(j); self.dp.append(side_value[side[0]]); self.pv.append(normal*area/voli)
@@ -3245,6 +3249,7 @@ class GeometryGPU(object):
 
       if np.linalg.norm(np.cross(self.get_side_normal(1,side[0]),self.applied_grad)) < 1e-5:
        B_with_area_old[i,j] = abs(side_value[side[0]]*area)
+       
     
     #In case of fixed temperature----
     self.BN = np.zeros((n_el,len(self.elems[0]),3))

@@ -36,11 +36,11 @@ import pickle
 import os
 import shutil
 import matplotlib.pylab as plt
-import torch
+#import torch
 #import skcuda.linalg as skla
 #import skcuda.misc as misc
 #import cupy as cp
-
+from numba import jit
 
 
 #levi civita
@@ -78,6 +78,47 @@ def unique_versors(list_arrays):
 #def get_specular_direction(self,i):
 
 
+@jit
+def matmul_jit(A, B):
+    """Perform square matrix multiplication of out = A * B
+    """
+    out = np.empty((A.shape[0],B.shape[1]), A.dtype)
+    for i in range(out.shape[0]):
+        for j in range(out.shape[1]):
+            tmp = 0.
+            for k in range(A.shape[1]):
+                tmp += A[i, k] * B[k, j]
+            out[i, j] = tmp
+    return out
+
+'''
+@jit(nopython=True)
+def get_next_data(X,S,Sx,BB,Gbm,Gtbp,Gtbm,eb,sb):
+
+      kappa = np.sum(np.multiply(BB,X))
+
+      #TL = np.matmul(S,X)#*alpha + (1-alpha)*TL_old
+
+      #matrix multiplication---
+      TL = np.empty((S.shape[0],X.shape[1]), S.dtype)
+      Bm = np.zeros_like(TL)
+      for i in range(TL.shape[0]):
+        for n,(l,_) in enumerate(zip(eb,sb)):
+         Bm[i,l]  += Gbm[i,n] * X[i,l] * Gtbp[i,n] / Gtbm[n] #the sum is for each side
+         for j in range(TL.shape[1]):
+            tmp = 0.
+            for k in range(S.shape[1]):
+                tmp += S[i, k] * X[k, j]
+            TL[i, j] = tmp
+
+
+      #TL_old = TL.copy()
+      #Compute TB----
+      #for n,(i,j) in enumerate(zip(eb,sb)):
+      #  Bm[:,i]  += Gbm[:,n] * np.dot(X[:,i],Gtbp[:,n])/Gtbm[n] #the sum is for each side
+      return TL,Bm,kappa
+
+'''
 
 def log_interp1d(xx, y, kind='linear'):
 
@@ -171,6 +212,7 @@ class SolverGPU(object):
    self.eb = self.mesh.eb
    self.sb = self.mesh.sb
    self.db = self.mesh.db
+   self.dbp = self.mesh.dbp
    self.mfp  = self.mat[0]['mfp']
  
    #(a,b) = np.shape(self.kappa_directional)
@@ -215,7 +257,10 @@ class SolverGPU(object):
   
  
    #solve the BTE
-   self.solve_bte(**argv)
+   #self.solve_bte(**argv)
+   #self.solve_bte_cg(**argv)
+   self.solve_bte_working(**argv)
+   #self.solve_bte_working2(**argv)
 
    if MPI.COMM_WORLD.Get_rank() == 0:
     if os.path.isdir(self.cache):
@@ -400,7 +445,6 @@ class SolverGPU(object):
       AM = (tmp-AP)#.tocsc().todok() #preserve the sign of AM
       #if self.argv.setdefault('antialiasing',False):
       # self.get_antialiasing(self.mesh.CP,self.kappa_directional_not_int[global_index],AM,AP)
-
       AP = AP.todense()
       AM = -AM.todense()
 
@@ -426,7 +470,453 @@ class SolverGPU(object):
      return AM,AP#,BNM,BNP
 
 
+
+  def solve_bte_working2(self,**argv):
+
+     nT = np.shape(self.mat[0]['B'])[0]
+     kappa_fourier,temp_fourier,temp_fourier_grad,temp_fourier_int,flux_fourier_int = self.get_diffusive_suppression_function()
+     kappa_fourier = np.array([kappa_fourier])
+     Tnew = temp_fourier.copy()
+     TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
+     TB_new = np.array([temp_fourier[i] for n,(i,j) in enumerate(zip(self.eb,self.sb))])
+
+     TL = np.zeros((nT,self.mesh.nle))
+
+     W = np.load('W.dat.npy')
+     a = np.diag(W)
+     s = np.sqrt(a)
+     Wod = W-np.diag(a)
+     g  = W.sum(axis=0)
+     S = np.outer(g,g)/np.sum(g) - Wod
+
+     A = np.outer(g,g)/np.sum(g) - W
+
+     sigma = np.load(open('sigma.dat','rb'),allow_pickle=True)*1e9
+     F = (sigma.T/a).T
+     Sx = sigma[:,0]
+
+     #Solve Bulk
+     G = np.einsum('qj,jn->qn',sigma,self.k,optimize=True)
+     Gp = G.clip(min=0)
+     Gm = G.clip(max=0)
+     D = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
+     for n,i in enumerate(self.i): 
+       D[:,i] += Gp[:,n]
+  
+     D += np.tile(a,(self.mesh.nle,1)).T
+
+     #Compute boundary---
+     if len(self.eb) > 0:
+      Gb = np.einsum('qj,jn->qn',sigma,self.db,optimize=True)
+      Gbp = Gb.clip(min=0)
+      Gbm = Gb.clip(max=0)
+      Bp = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
+      for n,i in enumerate(self.eb): 
+        Bp[:,i] += Gbp[:,n]
+      D += Bp
+
+     scale = np.max(D)
+     #Compute super lu---
+     lu = get_lu(self.i,self.j,Gm/scale,D/scale,self.mesh.nle)   
+
+     #Boundary----------
+     Bm = np.zeros((self.n_index,self.mesh.nle))
+     if len(self.eb) > 0:
+      for n,(i,j) in enumerate(zip(self.eb,self.sb)):
+       Bm[:,i] -= TB[i,j]*Gbm[:,n]
+
+     #Periodic------------------
+     P = np.zeros((self.n_index,self.mesh.nle))
+     for n,(i,j) in enumerate(zip(self.i,self.j)):
+       P[:,i] += Gm[:,n]*self.mesh.B[i,j]
+
+     #Initial lattice temperature----
+     TL = np.einsum('q,c->qc',a,Tnew)
+     #TL = np.zeros_like(Tnew)
+
+     #TB--------------------------------
+     if len(self.eb) > 0:
+      Gtb  = np.einsum('qj,jn->qn',sigma,self.dbp,optimize=True)
+      Gtbp = Gtb.clip(min=0)
+      Gtbm = Gtb.clip(max=0).sum(axis=0)
+
+     As = np.einsum('ij,i,j->ij',A,1/s,1/s)
+     Ss = np.einsum('ij,i,j->ij',S,1/s,1/s)
+
+     #---------------------------------------------
+     DeltaTot = np.zeros_like(TL)
+     for kk in range(5):
+      #Sub CG loop-
+      if kk > 0:
+       X1 = X0 + (DeltaTot.T/a).T
+       kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X1,sigma[:,0],optimize=True)*self.kappa_factor*1e-18
+       print('Ana:', kappa)
+
+      X = solve_from_lu(lu, (P + TL + Bm + DeltaTot)/scale)
+      if kk == 0:
+       X0 = X.copy()
+
+      kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,sigma[:,0],optimize=True)*self.kappa_factor*1e-18
+      print('num', kappa)
+      Xs = (X.T*s).T
+      TLs = ((Bm.T + TL.copy().T + DeltaTot.T)/s).T
+
+      if kk == 0:
+       #scaling
+       r = np.dot(Ss,Xs)-TLs
+       p = -r
+       r_k_norm = np.array([ np.dot(r[:,i],r[:,i]) for i in range(self.mesh.nle)])
+      else:
+       p = p_restart
+       r_k_norm = r_k_norm_restart
+
+      print(' ')
+      print('Entering CG loop')
+      kappa_old = 0
+      DeltaT = np.zeros_like(TL)
+      for i in range(6):
+       Ap = np.array([np.dot(As,p[:,i]) for i in range(self.mesh.nle)]).T
+       pAp =np.array([ np.dot(p[:,i],Ap[:,i]) for i in range(self.mesh.nle)])
+       alpha = r_k_norm / pAp
+       DeltaT += alpha*p
+       Xs += alpha * p
+       kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),((Xs.T)/s).T,sigma[:,0],optimize=True)*self.kappa_factor*1e-18
+       error = abs((kappa-kappa_old))/abs(kappa)
+       print(kappa,error)
+       kappa_old = kappa
+       #if error < 0.01:
+         #X = ((Xs.T)/s).T 
+         #DeltaT = ((DeltaT.T)*s).T 
+         #DeltaT = ((DeltaT.T)*a).T 
+       #  break  
+       r += alpha * Ap
+       r_kplus1_norm = np.array([ np.dot(r[:,i],r[:,i])           for i in range(self.mesh.nle)])
+       beta = r_kplus1_norm / r_k_norm
+       r_k_norm = r_kplus1_norm
+       p = beta * p - r
+      print('Exit CG loop')
+      print(' ')
+      #-----------
+
+      #kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,sigma[:,0],optimize=True)*self.kappa_factor*1e-18
+      #TL = np.matmul(S,X)
+      TL = np.matmul(S,X)
+     
+      #DeltaTot += ((DeltaT.T)*s).T 
+      DeltaTot += ((DeltaT.T)*s).T 
+      #DeltaT = ((DeltaT.T)*a).T 
+      #X = ((Xs.T)/s).T
+      #TL = np.dot(S,X)
+      #kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,sigma[:,0],optimize=True)*self.kappa_factor*1e-18
+      #print(kappa)
+      #error = abs((kappa-kappa_old))/abs(kappa)
+      r_k_norm_restart = r_k_norm
+      p_restart = p
+      #X1 = X0  + (DeltaTot.T/a).T
+      #kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X1,sigma[:,0],optimize=True)*self.kappa_factor*1e-18
+      #print(kappa)
+
+
+      if len(self.eb) > 0:
+       #Compute TB----
+       Bm = np.zeros((self.n_index,self.mesh.nle))
+       for n,(i,j) in enumerate(zip(self.eb,self.sb)):
+         Bm[:,i]  += Gbm[:,n] * np.dot(X[:,i],Gtbp[:,n])/Gtbm[n] #the sum is for each side
+
+
+  def solve_bte_working(self,**argv):
+
+     nT = np.shape(self.mat[0]['B'])[0]
+     kappa_fourier,temp_fourier,temp_fourier_grad,temp_fourier_int,flux_fourier_int = self.get_diffusive_suppression_function()
+     kappa_fourier = np.array([kappa_fourier])
+     Tnew = temp_fourier.copy()
+     TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
+     #TB_new = np.array([temp_fourier[i] for n,(i,j) in enumerate(zip(self.eb,self.sb))])
+
+     TL = np.zeros((nT,self.mesh.nle))
+
+     W = np.load('W.dat.npy')
+     Winv = np.linalg.inv(W)
+     a = np.diag(W)
+     Wod = W-np.diag(a)
+     g  = W.sum(axis=0)
+     #S = - Wod
+     S = np.outer(g,g)/np.sum(g) - Wod
+     sigma = np.load(open('sigma.dat','rb'),allow_pickle=True)*1e9
+     F = (sigma.T/a).T
+     Sx = sigma[:,0]
+     #------------------
+
+     #Solve Bulk
+     G = np.einsum('qj,jn->qn',sigma,self.k,optimize=True)
+     Gp = G.clip(min=0)
+     Gm = G.clip(max=0)
+     D = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
+     for n,i in enumerate(self.i): 
+       D[:,i] += Gp[:,n]
+
+     D2 = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
+     D2[:,self.i] = Gp
+
+     D += np.tile(a,(self.mesh.nle,1)).T
+
+     #Compute boundary---
+     if len(self.db) > 0:
+      Gb = np.einsum('qj,jn->qn',sigma,self.db,optimize=True)
+      Gbp = Gb.clip(min=0)
+      Gbm = Gb.clip(max=0)
+      Bp = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
+      for n,i in enumerate(self.eb): 
+        Bp[:,i] += Gbp[:,n]
+
+      D += Bp
+
+     #Compute super lu---
+     lu = get_lu(self.i,self.j,Gm,D,self.mesh.nle)   
+
+     #Periodic------------------
+     P = np.zeros((self.n_index,self.mesh.nle))
+     for n,(i,j) in enumerate(zip(self.i,self.j)): 
+      P[:,i] += Gm[:,n]*self.mesh.B[i,j]
+
+     #Initial lattice temperature----
+     TL= np.einsum('q,c->qc',a,Tnew)
+
+     #new---
+     tt = np.einsum('qj,qu,u->ju',sigma,Winv,a)*self.kappa_factor*1e-18
+     #bulk = np.einsum('qi,qu,uj->ij',sigma,Winv,sigma)
+    
+     inte = -np.sum(self.mesh.B_with_area_old.todense(),axis=0)
+     #-----
+
+     BB = -np.outer(sigma[:,0],np.sum(self.mesh.B_with_area_old.todense(),axis=0))*self.kappa_factor*1e-18
+
+     Bm = np.zeros((self.n_index,self.mesh.nle))
+     if len(self.db) > 0:
+      Gtb  = np.einsum('qj,jn->qn',sigma,self.dbp,optimize=True)
+      Gtbp = Gtb.clip(min=0)
+      Gtbm = Gtb.clip(max=0).sum(axis=0)
+      SS = np.einsum('qn,n->nq',Gbm,1/Gtbm)
+      for n,(i,j) in enumerate(zip(self.eb,self.sb)):
+        Bm[:,i] -= TB[i,j]*Gbm[:,n]
+
+
+     #---------------------------------------------
+     #Conjugate gradient------------
+     alpha = 1
+     TL_old = TL.copy()
+     for kk in range(2):
+
+      X = solve_from_lu(lu,P + TL + Bm)
+
+      kappa = np.sum(np.multiply(BB,X)); 
+
+      #do integration
+      Xm = np.einsum('qc,c->q',X-((TL.T)/a).T,inte)
+      #else: 
+      # Xm = np.einsum('qc,c->q',X,inte)
+
+      #print(np.sum(np.multiply(BBt,X-((TL.T)/a).T)),kappa)
+      print(np.dot(Xm,tt[0]),kappa)
+
+      TL = np.matmul(S,X)*alpha + (1-alpha)*TL_old; TL_old = TL.copy()
+
+      if len(self.db) > 0: Bm[:,self.eb] = np.einsum('un,un,nq->qn',X[:,self.eb],Gtbp,SS,optimize=True)
+
+
+     Xm.dump('sup.dat')
+     tt.dump('bulk.dat')
+
+
+     #kappa_mode = np.sum(gg,axis=1)
+     #sup_mode = np.sum(X,axis=1)
+     #kappa_bulk_mode = np.sum(BB,axis=1)
+     #kappa_mode.dump('nano.dat')
+     #kappa_bulk_mode.dump('bulk.dat')
+     #sup_mode.dump('sup.dat')
+
+
+      #if len(self.db) > 0: Bm[:,self.eb] = np.einsum('un,uqn->qn',X[:,self.eb],SSS,optimize=True)
+
+      #TL,Bm,kappa =  get_next_data(np.ascontiguousarray(X,dtype=np.float64),S,Sx,BB,Gbm,Gtbp,Gtbm,np.array(self.eb),np.array(self.sb))
+      #print(kappa)
+      #print(time.time()-a)
+
+      #Compute TB----
+
+       #a = time.time()   
+       #Bm = np.zeros((self.n_index,self.mesh.nle))
+       #for n,(i,j) in enumerate(zip(self.eb,self.sb)):
+       # Bm[:,i]  += Gbm[:,n] * np.dot(X[:,i],Gtbp[:,n])/Gtbm[n] #the sum is for each side
+       #print(time.time()-a)
+
+       #a = time.time()
+       #Bm = np.empty((self.n_index,self.mesh.nle))
+
+
+  def solve_bte_cg(self,**argv):
+
+     nT = np.shape(self.mat[0]['B'])[0]
+     kappa_fourier,temp_fourier,temp_fourier_grad,temp_fourier_int,flux_fourier_int = self.get_diffusive_suppression_function()
+     kappa_fourier = np.array([kappa_fourier])
+     Tnew = temp_fourier.copy()
+     TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
+     TB_new = np.array([temp_fourier[i] for n,(i,j) in enumerate(zip(self.eb,self.sb))])
+
+     TL = np.zeros((nT,self.mesh.nle))
+
+     W = np.load('W.dat.npy')
+     a = np.diag(W)
+     Wod = W-np.diag(a)
+     g  = W.sum(axis=0)
+     S = np.outer(g,g)/np.sum(g) - Wod
+     A = W-np.outer(g,g)/np.sum(g) 
+     s = np.sqrt(np.diag(A))
+     TC = np.multiply(a,g/np.sum(g))
+     Aod = Wod-np.outer(g,g)/np.sum(g) 
+     sigma = np.load(open('sigma.dat','rb'),allow_pickle=True)*1e9
+     F = (sigma.T/a).T
+     Sx = sigma[:,0]
+     ss = np.sqrt(a)
+
+     #Solve Bulk
+     #G = np.einsum('qj,jn->qn',sigma,self.k,optimize=True)
+     G = np.einsum('qj,jn->qn',F,self.k,optimize=True)
+     Gp = G.clip(min=0)
+     Gm = G.clip(max=0)
+     D = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
+     for n,i in enumerate(self.i): 
+       D[:,i] += Gp[:,n]
+  
+     D += np.tile(a,(self.mesh.nle,1)).T
+     #D += np.tile(np.ones(self.n_index),(self.mesh.nle,1)).T
+
+     P = np.zeros((self.n_index,self.mesh.nle))
+     for n,(i,j) in enumerate(zip(self.i,self.j)):
+       P[:,i] += Gm[:,n]*self.mesh.B[i,j]
+
+
+     lu = get_lu(self.i,self.j,Gm,D,self.mesh.nle,scaling=[])   
+     #Fourier---
+     X = np.einsum('q,c->qc',np.ones(self.n_index),Tnew)
+     #RTA----
+     X = solve_from_lu(lu,P+X)
+
+     kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,sigma[:,0],optimize=True)*self.kappa_factor*1e-18
+     print(kappa)
+
+
+     quit()
+
+     #lu = get_lu(self.i,self.j,Gm,D,self.mesh.nle,scaling=1/np.sqrt(a))   
+
+     #Conjugate gradient------------
+     TL = np.einsum('q,c->qc',a,Tnew)
+     #TLw = np.einsum('q,c->qc',np.ones(self.n_index),Tnew)
+     #TL = np.einsum('q,c->qc',np.ones(self.n_index),Tnew)
+
+
+     #eta1 = np.einsum('cd,qd->q',self.mesh.B_with_area_old.todense(),X1,optimize=True)*self.kappa_factor*1e-18
+     #plt.plot(eta,color='r')
+     #r = np.dot(Aod,X) + TL
+     
+     #X1 = TLw -np.tile(Sx/a/self.mesh.size[0],(self.mesh.nle,1)).T 
+     X = solve_from_lu(lu,P+TL)
+  
+     kappa = -np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,sigma[:,0],optimize=True)*self.kappa_factor*1e-18
+     print(kappa)
+     quit()
+     #B = -np.tile(Sx,(self.mesh.nle,1)).T/self.mesh.size[0]
+
+     B = (((X-TL).T)*a).T 
+     #B = -X + TL
+     #preconditioning---
+     Aod = np.einsum('ij,i,j->ij',Aod,1/s,1/s)
+     A = np.einsum('ij,i,j->ij',A,1/s,1/s)
+     B = (B.T/s).T
+     TL = (TL.T*s).T
+     P = (P.T*s).T
+     X = (X.T*s).T
+     r = np.dot(A,X)-B
+
+     #X *= a
+     #-----------------
+
+     #Xs = (X.T/s).T
+     #kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),Xs,sigma[:,0],optimize=True)*self.kappa_factor*1e-18
+     #print(kappa)
+
+     #print(np.allclose(X2,X,rtol=1e-1,atol=1e-1))
+     #print(X)
+     #print(X2)
+     #quit()
+     #print(np.allclose(r,r2))
+     #quit()
+     #eta2 = np.einsum('cd,qd->q',self.mesh.B_with_area_old.todense(),X2,optimize=True)*self.kappa_factor*1e-18
+
+     #print(np.allclose(X1,X2,atol=1e-2,rtol=1e-2))
+
+     #quit()
+     #plt.plot(eta,color='c')
+     #plt.legend(['equation','analytical'])
+     #plt.show()
+
+
+     p =-r
+     r_k_norm = np.array([ np.dot(r[:,i],r[:,i]) for i in range(self.mesh.nle)])
+
+     RHS = np.zeros_like(TL)
+     for i in range(100):
+      Ap = np.array([np.dot(A,p[:,i]) for i in range(self.mesh.nle)]).T
+      pAp =np.array([ np.dot(p[:,i],Ap[:,i]) for i in range(self.mesh.nle)])
+      alpha = r_k_norm / pAp
+     # RHS += np.multiply(np.outer(a,alpha),p)
+      RHS += np.multiply(np.outer(np.ones(self.n_index),alpha),p)
+
+      X = solve_from_lu(lu,P+RHS+TL) 
+
+      #redefine this----
+      #------
+      #X += alpha * p
       
+      Xs = (X.T/s).T
+      kappa = -np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),Xs,sigma[:,0],optimize=True)*self.kappa_factor*1e-18
+      print(kappa)
+
+      #TL = np.einsum('qc,q->qc',X,TC) #already scales
+
+      #B = ((X.T)*a).T - TL - RHS
+      B = X-TL-RHS
+      r = np.dot(A,X)-B
+      #r += alpha * Ap
+      #r = np.dot(A,X)-np.tile(Sx,(self.mesh.nle,1)).T/self.mesh.size[0]
+      #r = np.dot(Aod,X) + TL + RHS
+
+
+      r_kplus1_norm = np.array([ np.dot(r[:,i],r[:,i])           for i in range(self.mesh.nle)])
+      beta = r_kplus1_norm / r_k_norm
+      r_k_norm = r_kplus1_norm
+      p = beta * p - r
+
+
+
+     quit() 
+
+
+
+
+     alpha = 0.75
+     TL_old = TL.copy()
+     for kk in range(5):
+      X = solve_from_lu(lu,P+TL)
+      kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,sigma[:,0],optimize=True)*self.kappa_factor*1e-18
+      print(kappa)
+      TL = np.matmul(S,X)
+      TL = alpha*TL + (1-alpha)*TL_old
+
+
+
+
   def solve_bte(self,**argv):
 
      print('    Iter    Thermal Conductivity [W/m/K]      Error        Diffusive  -  BTE  -  Ballistic')
@@ -456,6 +946,7 @@ class SolverGPU(object):
      #delta = 0
      #Bulk----
      #skla.init()
+
      '''
      BB = np.zeros((len(self.i),self.mesh.nle))
 
@@ -505,6 +996,12 @@ class SolverGPU(object):
      #-------------------------------------
 
 
+     #W = np.load('W.dat.npy')
+     #sigma = np.load(open('sigma.dat','rb'),allow_pickle=True)*1e9
+     #a = np.diag(W)
+     #Wod = W-np.diag(a)     
+
+
      W = np.load('W.dat.npy')
      a = np.diag(W)
      Wod = W-np.diag(a)
@@ -512,9 +1009,114 @@ class SolverGPU(object):
      tc = g/np.sum(g)
      S = np.outer(g,g)/np.sum(g) - Wod
      sigma = np.load(open('sigma.dat','rb'),allow_pickle=True)*1e9
+     F = (sigma.T/a).T
+     Sx = sigma[:,0]
+
+     #Solve Bulk
+
+     G = np.einsum('qj,jn->qn',sigma,self.k,optimize=True)
+     #G = np.einsum('qj,jn->qn',F,self.k,optimize=True)
+     #G = np.einsum('q,qj,jn->qn',self.mfp,self.control_angle,self.k,optimize=True)
+     Gp = G.clip(min=0)
+     Gm = G.clip(max=0)
+     D = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
+     for n,i in enumerate(self.i): 
+       D[:,i] += Gp[:,n]
+  
+     #D += np.ones_like(D)
+     D += np.tile(a,(self.mesh.nle,1)).T
+
+     P = np.zeros((self.n_index,self.mesh.nle))
+     for n,(i,j) in enumerate(zip(self.i,self.j)):
+       P[:,i] += Gm[:,n]*self.mesh.B[i,j]
+
+     lu = get_lu(self.i,self.j,Gm,D,self.mesh.nle)   
+
+     #Conjugate gradient------------
+     TL = np.einsum('q,c->qc',a,Tnew)
+     #TL = np.einsum('q,c->qc',np.ones(self.n_index),Tnew)
+     alpha = 0.75
+     TL_old = TL.copy()
+     for kk in range(5):
+      X = solve_from_lu(lu,P+TL)
+      kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,sigma[:,0],optimize=True)*self.kappa_factor*1e-18
+      print(kappa)
+      TL = np.matmul(S,X)
+      TL = alpha*TL + (1-alpha)*TL_old
+
+
+     #Vector
+
+     #Theoretical solution
+     X1 = np.tile(-Sx/np.diag(W)/self.mesh.size[0],(self.mesh.nle,1)).T #+ np.einsum('q,c->qc',np.ones(self.n_index),Tnew)
+     #print(np.sum(X1))
+     kappa = -np.einsum('cd,qd,q->q',self.mesh.B_with_area_old.todense(),X1,Sx,optimize=True)*self.kappa_factor
+
+     plt.plot(kappa,color='r')
+     
+     #b = np.tile(-Sx,(self.mesh.nle,1)).T/self.mesh.size[0]
+
+     X = solve_from_lu(lu,P+TL)
+
+     #print(np.sum(X))
+     #print(np.allclose(X1,X))
+     kappa = -np.einsum('cd,qd,q->q',self.mesh.B_with_area_old.todense(),X - np.einsum('q,c->qc',np.ones(self.n_index),Tnew),sigma[:,0])*self.kappa_factor
+     plt.plot(kappa,color='b')
+     plt.show()
+     print(kappa)
+     quit()
+
+     #print(X1)
+     #quit()
+
+     #kappa = np.sum(np.dot(X.T,Sx))
+     #print(kappa)
+     #quit()
+
+     #b = TL
+     kappa = -np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,Sx,optimize=True)*self.kappa_factor
+     print(kappa)
+     quit()
+
+
+     r = np.dot(W,X)-b
+     p =-r
+     r_k_norm = np.array([ np.dot(r[:,i],r[:,i])           for i in range(self.mesh.nle)])
+     for i in range(4):
+      Ap = np.array([np.dot(W,p[:,i]) for i in range(self.mesh.nle)]).T
+      pAp =np.array([ np.dot(p[:,i],Ap[:,i]) for i in range(self.mesh.nle)])
+      alpha = r_k_norm / pAp
+      #X = solve_from_lu(lu,P+TL+alpha*p)
+      X += alpha * p
+      kappa = -np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,sigma[:,0],optimize=True)*self.kappa_factor
+      print(kappa)
+      r += alpha * Ap
+      r_kplus1_norm = np.array([ np.dot(r[:,i],r[:,i])           for i in range(self.mesh.nle)])
+      beta = r_kplus1_norm / r_k_norm
+      r_k_norm = r_kplus1_norm
+      p = beta * p - r
+
+
+
+     quit() 
+     sigma *=1e9
+     g = W.sum(axis=0)
+
+     a = np.diag(W)
+     A = -W + np.outer(g,g)/np.sum(g)
+     S =  A + np.diag(a) 
+     
+     #Wod = W-np.diag(a)
+     #tc = g/np.sum(g)
+     #S = np.outer(g,g)/np.sum(g) - Wod
+     #S = -A
+     #A = -S - np.diag(a)
+   
 
      #c = np.diag(A)
-     #sigma = (b.T/c).T*1e9
+     F = (sigma.T/a).T
+     Fx = F[:,0]
+     Sx = sigma[:,0]
 
      #-----------------------
      t1 = time.time()
@@ -530,7 +1132,6 @@ class SolverGPU(object):
      D = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
      for n,i in enumerate(self.i): 
        D[:,i] += Gp[:,n]
-
   
      #D += np.ones_like(D)
 
@@ -541,17 +1142,40 @@ class SolverGPU(object):
        P[:,i] += Gm[:,n]*self.mesh.B[i,j]
 
      lu = get_lu(self.i,self.j,Gm,D,self.mesh.nle)   
-  
-     
 
      #Conjugate gradient------------
      TL = np.einsum('q,c->qc',a,Tnew)
-     X = solve_from_lu(lu,P+TL)
-     r = TL
-     p = -r
-     for kk in range(1000):
-         
 
+     X = np.tile(Fx,(self.mesh.nle,1)).T/100
+     kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,sigma[:,0],optimize=True)*self.kappa_factor*1e-18
+     #TL_new = np.matmul(S,X)
+     print(kappa)
+
+     B = np.tile(Sx,(self.mesh.nle,1)).T/100
+     
+
+     r = np.matmul(-W,X) - B
+     p = -r
+     r_k_norm = np.einsum('uc,vc->c',r,r)
+     for kk in range(1):
+      Ap  = np.einsum('uv,vc->uc',A,p)
+      pAp = np.einsum('uc,vc->c',p,Ap)
+      alpha = np.array([ r_k_norm[c]/pAp[c]  for c in range(self.mesh.nle) ])
+      X += np.einsum('c,qc->qc',alpha,p)
+      #X = solve_from_lu(lu,P-dx)
+
+      kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,sigma[:,0],optimize=True)*self.kappa_factor*1e-18
+      print(kappa)
+      quit()
+
+      r += np.einsum('c,qc->qc',alpha,Ap)
+      r_kplus1_norm = np.einsum('uc,vc->c',r,r)
+      beta = r_kplus1_norm / r_k_norm
+      r_k_norm = r_kplus1_norm
+
+      p = np.einsum('c,qc->qc',beta,p) - r
+
+     quit()
 
      #r_k_norm = np.einsum('uc,vc->c',r,r)
 
@@ -571,7 +1195,6 @@ class SolverGPU(object):
       TL = np.matmul(S,X)
       TL = alpha*TL + (1-alpha)*TL_old
       r = np.linalg.norm(TL - TL_old)
-       
       TL_old = TL.copy() 
       #TL = skla.dot(gpuarray.to_gpu(self.Coll),gpuarray.to_gpu(X)).get()
       #kappa = np.einsum('cd,qd,q->',self.mesh.B_with_area_old.todense(),X,self.kappa_directional[:,0],optimize=True)*self.kappa_factor

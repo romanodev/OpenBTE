@@ -425,7 +425,6 @@ class Solver(object):
         AM = (test2 - AP)
         AP = spdiags(np.sum(AP,axis=1).todense(),0,self.mesh.nle,self.mesh.nle,format='csc')
 
-
         self.mesh.B = self.mesh.B.tocsc()
         self.P = np.sum(np.multiply(AM,self.mesh.B),axis=1).todense()
         #if global_index == 12:
@@ -847,7 +846,7 @@ class Solver(object):
        pickle.dump(self.state,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
     else: data = None
     self.state =  MPI.COMM_WORLD.bcast(data,root=0)
-    print(time.time()-a)
+    #print(time.time()-a)
     #KAPPA.dump(open('kappa_old.dat','wb'))    
 
 
@@ -1339,7 +1338,7 @@ class Solver(object):
   def compute_non_orth_contribution(self,temp,**argv) :
 
 
-    gradT = self.mesh.compute_grad(temp,interfacial_temperature = argv['temp_interface'])
+    gradT = self.mesh.compute_grad(temp)#,interfacial_temperature = argv['temp_interface'])
     
     C = np.zeros(self.mesh.nle)
     for i,j in zip(*self.mesh.A.nonzero()):
