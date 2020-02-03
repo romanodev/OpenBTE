@@ -286,7 +286,7 @@ class GeometryGPU(object):
      self.compute_structured_mesh_new(**argv)   
     else:
      #Create mesh---
-     subprocess.check_output(['gmsh','-format','msh2','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
+     subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
      self.import_mesh()
     self.compute_mesh_data()
 
@@ -1154,8 +1154,11 @@ class GeometryGPU(object):
        neighbors = self.get_elem_extended_neighbors(elem)  
      else:
       elem = self.get_elem_from_point(r,guess = neighbors) 
-      #print(elem)
-      value = self.compute_2D_interpolation(data,r,elem)
+      if  elem == -1:
+          value = 0
+      else:        
+       #print(elem)
+       value = self.compute_2D_interpolation(data,r,elem)
       line_data.append(value)
       x.append(n*delta)
      r_old = r
@@ -1175,6 +1178,7 @@ class GeometryGPU(object):
        #print('no guess')  
        return elem
 
+    return -1
 
  def compute_2D_interpolation(self,data,p,elem):
 
@@ -1642,7 +1646,6 @@ class GeometryGPU(object):
 
 
 
-
  def add_patterning(self,elem_mat_map,lone=True):
 
   if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
@@ -1735,12 +1738,6 @@ class GeometryGPU(object):
    # self._update_data()
 
   else: data = None
-  
-  #data = mpi4py.MPI.COMM_WORLD.bcast(data,root=0)
-
-
-  return data
-
 
 
  def plot_structured_mesh(self,**argv):
@@ -3273,8 +3270,6 @@ class GeometryGPU(object):
     self.B_with_area_old = B_with_area_old.to_coo()
     self.pv = np.array(self.pv).T
   
-
-
 
  def compute_least_square_weigths(self):
 

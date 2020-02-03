@@ -134,7 +134,7 @@ class Geometry(object):
      self.porous = True
      if geo_type == 'porous/square_lattice':
       self.frame,self.polygons = GenerateSquareLatticePores(argv)
-     
+    
      if geo_type == 'porous/square_lattice_smooth':
       self.frame,self.polygons = GenerateSquareLatticePoresSmooth(argv)
 
@@ -534,7 +534,7 @@ class Geometry(object):
     c =  self.compute_elem_centroid(elem)
     for node in nodes:
 
-        #check is the are periodic versions, which are more appropriate 
+        #check if the are periodic versions, which are more appropriate 
         n_current = node
         if node in self.periodic_nodes.keys():
           dd = np.linalg.norm(c-self.nodes[node])
@@ -554,7 +554,7 @@ class Geometry(object):
         if not n_current in self.elems[elem]:  
             self.elems[elem].append(n_current)
         if not elem in self.node_elem_map.setdefault(n_current,[]):   
-          self.node_elem_map[n_current].append(elem)
+            self.node_elem_map[n_current] =  list(self.node_elem_map[n_current]).append(elem)
 
     self.elems[elem] = self.reorder(self.elems[elem])
           
@@ -1056,10 +1056,11 @@ class Geometry(object):
     else:
      color='white'
 
-    for poly in self.polygons:
+    for n,poly in enumerate(self.polygons):
      path = create_path(poly)
      patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=2,joinstyle='miter')
      gca().add_patch(patch);
+     text(poly[0][0],poly[0][1],str(n))
      
     
     #plot Boundary Conditions-----
@@ -1125,6 +1126,8 @@ class Geometry(object):
  def compute_line_data(self,p1,p2,data):
 
     #get the first element---
+    master_data = []
+    master_x = []
     x = [0]
     elem = self.get_elem_from_point(p1) 
     value = self.compute_2D_interpolation(data,p1,elem)
@@ -1135,6 +1138,7 @@ class Geometry(object):
     delta = np.linalg.norm(p2-p1)/N
     gamma = 1e-4
     r_old = p1
+    started = False
     for n in range(1,N+1):
      neighbors = self.get_elem_extended_neighbors(elem)  
      r = p1 + n*(p2-p1)/N
@@ -1154,14 +1158,24 @@ class Geometry(object):
        neighbors = self.get_elem_extended_neighbors(elem)  
      else:
       elem = self.get_elem_from_point(r,guess = neighbors) 
-      #print(elem)
-      value = self.compute_2D_interpolation(data,r,elem)
-      line_data.append(value)
-      x.append(n*delta)
+      if elem == -1:
+       if started == False:
+        started = True 
+        master_data.append(line_data)
+        master_x.append(x.copy())
+        line_data = []
+        x=[]
+      else: 
+       started = False
+       value = self.compute_2D_interpolation(data,r,elem)
+       line_data.append(value)
+       x.append(n*delta)
      r_old = r
-
-    
-    return x,line_data,int_points 
+    master_data.append(line_data)
+    master_x.append(x)
+   
+    master_x = np.array(master_x)
+    return master_x,master_data,int_points 
 
 
  def get_elem_from_point(self,r,guess = []): 
@@ -1175,6 +1189,7 @@ class Geometry(object):
        #print('no guess')  
        return elem
 
+    return -1
 
  def compute_2D_interpolation(self,data,p,elem):
 

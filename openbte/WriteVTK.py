@@ -176,7 +176,7 @@ class WriteVtk(object):
     tmp = [[1,0,0],[0,1,0],[0,0,1]]
     if is_scalar:
      increment = tmp[self.mesh.direction]
-
+     increment[0] = -increment[0]
 
     nodes,cells,data = self.repeat_nodes_and_data(node_data,increment)
 

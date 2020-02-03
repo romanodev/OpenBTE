@@ -628,6 +628,7 @@ class SolverGPU(object):
 
      nT = np.shape(self.mat[0]['B'])[0]
      kappa_fourier,temp_fourier,temp_fourier_grad,temp_fourier_int,flux_fourier_int = self.get_diffusive_suppression_function()
+     print(kappa_fourier)
      kappa_fourier = np.array([kappa_fourier])
      Tnew = temp_fourier.copy()
      TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
@@ -636,13 +637,21 @@ class SolverGPU(object):
      TL = np.zeros((nT,self.mesh.nle))
 
      W = np.load('W.dat.npy')
-     Winv = np.linalg.inv(W)
      a = np.diag(W)
+     if argv.setdefault('rta',False):
+      W = np.diag(a) 
+
+     Winv = np.linalg.inv(W)
      Wod = W-np.diag(a)
      g  = W.sum(axis=0)
-     #S = - Wod
      S = np.outer(g,g)/np.sum(g) - Wod
-     sigma = np.load(open('sigma.dat','rb'),allow_pickle=True)*1e9
+     tc = g/sum(g)
+     sigma = np.load(open('sigma.dat','rb'),allow_pickle=True)
+
+     #sigma = self.rotate(sigma,**{'rotate_phi':.0})
+     #sigma.dump('sigma_30.dat')
+     
+
      F = (sigma.T/a).T
      Sx = sigma[:,0]
      #------------------
@@ -681,9 +690,14 @@ class SolverGPU(object):
 
      #Initial lattice temperature----
      TL= np.einsum('q,c->qc',a,Tnew)
+     
 
      #new---
      tt = np.einsum('qj,qu,u->ju',sigma,Winv,a)*self.kappa_factor*1e-18
+     #kappam = np.einsum('qj,qu,u->ju',sigma,Winv,a)*self.kappa_factor*1e-18
+     #kappam.dump('kappam30.dat')
+     #quit()
+     #G = np.einsum('uq,qj->uj',Winv,sigma)
      #bulk = np.einsum('qi,qu,uj->ij',sigma,Winv,sigma)
     
      inte = -np.sum(self.mesh.B_with_area_old.todense(),axis=0)
@@ -705,53 +719,66 @@ class SolverGPU(object):
      #Conjugate gradient------------
      alpha = 1
      TL_old = TL.copy()
-     for kk in range(2):
+     kappa_vec = [kappa_fourier]
+
+     miter = argv.setdefault('max_bte_iter',100)
+     merror = argv.setdefault('max_bte_error',1e-3)
+
+     error = 1
+     kk = 0
+     kappa_old = kappa_fourier
+     while kk < miter and error > merror:
 
       X = solve_from_lu(lu,P + TL + Bm)
 
-      kappa = np.sum(np.multiply(BB,X)); 
+      #T = np.tile(T,(self.n_index,1))
 
-      #do integration
-      Xm = np.einsum('qc,c->q',X-((TL.T)/a).T,inte)
-      #else: 
-      # Xm = np.einsum('qc,c->q',X,inte)
+      kappa = np.sum(np.multiply(BB,X)) 
+      error = abs(kappa_old-kappa)/abs(kappa)
+      kappa_old = kappa
+
+      kappa_vec.append(kappa)
+
+      Xm = np.einsum('qc,c->q',X-((TL.T+Bm.T)/a).T,inte)
+      
+
+      print(np.dot(Xm,tt[0]),kappa)
+      #Xm = np.einsum('qc,c->q',X-T,inte)*self.kappa_factor
+      #print(np.dot(sigma[:,0]*1e-18,Xm),kappa)
 
       #print(np.sum(np.multiply(BBt,X-((TL.T)/a).T)),kappa)
-      print(np.dot(Xm,tt[0]),kappa)
 
       TL = np.matmul(S,X)*alpha + (1-alpha)*TL_old; TL_old = TL.copy()
 
       if len(self.db) > 0: Bm[:,self.eb] = np.einsum('un,un,nq->qn',X[:,self.eb],Gtbp,SS,optimize=True)
 
 
+     #compute grad---
+     #ss = []
+     #for n in range(self.n_index):
+     # cc = -np.einsum('j,cj,c->',F[n],self.mesh.compute_grad(X[n]),inte)
+     # ss.append(cc)
+     #sup = np.array(ss)     
+
+     #kappa_mode = np.multiply(sigma[:,0]*1e-18,G[:,0])
+     #print(np.sum(kappa_mode))
+     #print(np.dot(sup,kappa_mode))
+
+      #print(np.dot(sigma[:,0]*1e-18,G[:,0]))
+     #(Xm/G[:,0]).dump('sup.dat')
+     #sup.dump('sup.dat')
+     #F.dump('f.dat')
      Xm.dump('sup.dat')
+     #sup.dump('sup_grad.dat')
      tt.dump('bulk.dat')
+     #G.dump('full.dat')
+     T = np.einsum('qc,q->c',X,tc)
+     DeltaT = X-np.tile(T,(self.n_index,1))
+     J = np.einsum('qj,qc->cj',sigma,DeltaT)
+     data = {'kappa_vec':kappa_vec,'temperature':T,'flux':J,'temperature_fourier':temp_fourier,'flux_fourier':-self.mat[0]['kappa_bulk_tot']*temp_fourier_grad}
+     pickle.dump(data,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
 
-
-     #kappa_mode = np.sum(gg,axis=1)
-     #sup_mode = np.sum(X,axis=1)
-     #kappa_bulk_mode = np.sum(BB,axis=1)
-     #kappa_mode.dump('nano.dat')
-     #kappa_bulk_mode.dump('bulk.dat')
-     #sup_mode.dump('sup.dat')
-
-
-      #if len(self.db) > 0: Bm[:,self.eb] = np.einsum('un,uqn->qn',X[:,self.eb],SSS,optimize=True)
-
-      #TL,Bm,kappa =  get_next_data(np.ascontiguousarray(X,dtype=np.float64),S,Sx,BB,Gbm,Gtbp,Gtbm,np.array(self.eb),np.array(self.sb))
-      #print(kappa)
-      #print(time.time()-a)
-
-      #Compute TB----
-
-       #a = time.time()   
-       #Bm = np.zeros((self.n_index,self.mesh.nle))
-       #for n,(i,j) in enumerate(zip(self.eb,self.sb)):
-       # Bm[:,i]  += Gbm[:,n] * np.dot(X[:,i],Gtbp[:,n])/Gtbm[n] #the sum is for each side
-       #print(time.time()-a)
-
-       #a = time.time()
-       #Bm = np.empty((self.n_index,self.mesh.nle))
+     
 
 
   def solve_bte_cg(self,**argv):

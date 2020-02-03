@@ -119,7 +119,7 @@ class Plot(object):
 
     if model == 'line':
      argv['variable'] = argv['variable'].split('/')[1]
-     self.plot_over_line(argv)
+     self.plot_over_line(**argv)
 
    if argv['variable'] == 'suppression_function' :
     self.compute_suppression_function(argv)
@@ -293,26 +293,35 @@ class Plot(object):
    
 
 
- def plot_over_line(self,argv):
+ def plot_over_line(self,**argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
    #self.geo = Geometry(type='load')
-   (data,nodes,triangulation) = self.get_data(argv)
+   (data,nodes,triangulation) = self.get_data(**argv)
    (Lx,Ly) = self.geo.get_repeated_size(argv)
 
    #--------
-   p1 = np.array([-Lx/2.0+1e-7,0.0])
-   p2 = np.array([Lx/2.0*(1-1e-7),0.0])
+   #p1 = np.array([-Lx/2.0+1e-7,0.0])
+   #p2 = np.array([Lx/2.0*(1-1e-7),0.0])
+
+   delta = 1e-7
+   p1 = np.array([0,-Ly/2+delta,0])
+   p2 = np.array([0, Ly/2-delta,0])
    (x,data,int_points) = self.geo.compute_line_data(p1,p2,data)
+   self.x = np.array(x)
+   self.data = np.array(data)
    #--------
    #axes([0.5,0.01,0.5,1.0])
-   plot(x,data,linewidth=2)
-
-   for p in int_points:
-    plot([p,p],[min(data),max(data)],ls='--',color='k')
-   plot([min(x),max(x)],[0,0],ls='--',color='k')
-   gca().yaxis.tick_right()
-   show()
+   
+   if argv.setdefault('show',True):
+    for i,j in zip(self.x,self.data):
+     plot(i,j)
+     
+    for p in int_points:
+     plot([p,p],[min(data),max(data)],ls='--',color='k')
+    plot([min(x),max(x)],[0,0],ls='--',color='k')
+    gca().yaxis.tick_right()
+    show()
 
 
  def get_data(self,**argv):

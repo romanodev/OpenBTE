@@ -415,14 +415,6 @@ def GenerateRandomPoresOverlap(argv):
   #------------------------------
 
 
-  #compute distance between pores---
-  mind = 1e9
-  n = len(polys)
-  for p1 in range(n):
-   for p2 in range(p1+1,n):
-     poly1 = polys[p1]
-     poly2 = polys[p2]
-     mind = min([mind,poly1.distance(poly2)])
   #--------------------------------
   area = 0.0
   eps = argv['step']/2.0
@@ -432,6 +424,19 @@ def GenerateRandomPoresOverlap(argv):
     new = list(p.exterior.coords)[:-1]   
     polys_cut.append(new)
     area += p.intersection(frame).area
+
+  #compute distance between pores---
+  mind = 1e9
+  n = len(polys_cut)
+  for p1 in range(n):
+   for p2 in range(p1+1,n):
+     poly1 = Polygon(polys_cut[p1])
+     poly2 = Polygon(polys_cut[p2])
+     if poly1.distance(poly2) < mind:
+        print(p1,p2)  
+     mind = min([mind,poly1.distance(poly2)])
+
+
 
   if argv.setdefault('save_configuration',False) and not argv['load_configuration']:
    np.array(centers).dump(argv.setdefault('configuration_file','conf.dat'))
