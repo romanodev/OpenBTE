@@ -717,12 +717,14 @@ class SolverGPU(object):
 
      #---------------------------------------------
      #Conjugate gradient------------
-     alpha = 1
      TL_old = TL.copy()
      kappa_vec = [kappa_fourier]
 
      miter = argv.setdefault('max_bte_iter',100)
      merror = argv.setdefault('max_bte_error',1e-3)
+
+     alpha = argv.setdefault('alpha',1)
+
 
      error = 1
      kk = 0
