@@ -143,9 +143,11 @@ class SolverGPU(object):
    if 'geometry' in argv.keys():  
      self.mesh = argv['geometry']
      #self.mesh._update_data()
-    
    else:  
     self.mesh = Geometry(model='load',filename_geometry = argv.setdefault('filename_geometry','geometry.p'))
+   
+
+
    if len(self.mesh.elems[0]) == 4:
          self.structured=True
    else:    
@@ -195,10 +197,10 @@ class SolverGPU(object):
    for e in self.elem_mat_map.keys():
      self.elem_kappa_map.update({e:self.mat[self.mesh.elem_mat_map[e]]['kappa_bulk_tot']})
 
-   #if argv.setdefault('kappa_from_patterning',False):
-   # self.elem_kappa_map = self.mesh.elem_kappa_map
-   #else :   
-   # self.compute_kappa_map()
+   if argv.setdefault('kappa_from_patterning',False):
+    self.elem_kappa_map = self.mesh.elem_kappa_map
+   else :   
+    self.compute_kappa_map()
 
    self.control_angle =  self.rotate(np.array(self.mat[0]['control_angle']),**argv)
    self.kappa_directional =  self.rotate(np.array(self.mat[0]['kappa_directional']),**argv)
@@ -213,7 +215,10 @@ class SolverGPU(object):
    self.sb = self.mesh.sb
    self.db = self.mesh.db
    self.dbp = self.mesh.dbp
-   self.mfp  = self.mat[0]['mfp']
+   self.eft = self.mesh.eft
+   self.sft = self.mesh.sft
+   self.dft = self.mesh.dft
+   #self.mfp  = self.mat[0]['mfp']
  
    #(a,b) = np.shape(self.kappa_directional)
    #kappa = 0
@@ -246,7 +251,7 @@ class SolverGPU(object):
     self.compute_transmission_coefficients() 
 
    self.build_kappa_mask()
-   if self.verbose: self.print_bulk_kappa()
+   #if self.verbose: self.print_bulk_kappa()
    
    self.assemble_fourier_new()
 
@@ -259,7 +264,7 @@ class SolverGPU(object):
    #solve the BTE
    #self.solve_bte(**argv)
    #self.solve_bte_cg(**argv)
-   self.solve_bte_working(**argv)
+   self.solve_bte_working_3(**argv)
    #self.solve_bte_working2(**argv)
 
    if MPI.COMM_WORLD.Get_rank() == 0:
@@ -271,7 +276,7 @@ class SolverGPU(object):
 
   def compute_kappa_map(self):
 
-   kappa_matrix = self.mat['kappa_bulk_tot']
+   kappa_matrix = self.mat[0]['kappa_bulk_tot']
    self.elem_kappa_map = {}
    for g in self.mesh.l2g:
      self.elem_kappa_map[g] = kappa_matrix*np.eye(3)
@@ -623,37 +628,285 @@ class SolverGPU(object):
        for n,(i,j) in enumerate(zip(self.eb,self.sb)):
          Bm[:,i]  += Gbm[:,n] * np.dot(X[:,i],Gtbp[:,n])/Gtbm[n] #the sum is for each side
 
+  def solve_bte_working_3(self,**argv):
+
+     nT = np.shape(self.mat[0]['B'])[0]
+     kappa_fourier,temp_fourier,temp_fourier_grad,temp_fourier_int,flux_fourier_int = self.get_diffusive_suppression_function()
+     print(kappa_fourier)
+
+     if argv.setdefault('only_fourier'):
+        quit()
+
+     kappa_fourier = np.array([kappa_fourier])
+     Tnew = temp_fourier.copy()
+     TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
+     
+     tc = np.load('tc')
+     W = np.load('W')
+     invW = np.load('invW')
+     a = np.diag(W)
+     sigma = np.load('sigma')*1e9
+     Wod = np.diag(a) - W
+
+     S = np.einsum('u,uv->uv',a,invW)
+
+     H = np.eye(self.n_index) - S
+
+     #Solve Bulk
+     G = np.einsum('qj,jn->qn',sigma,self.k,optimize=True)
+     Gp = G.clip(min=0)
+     Gm = G.clip(max=0)
+     D = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
+     for n,i in enumerate(self.i): 
+       D[:,i] += Gp[:,n]
+
+     D2 = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
+     D2[:,self.i] = Gp
+
+     D += np.tile(a,(self.mesh.nle,1)).T
+
+     #Compute boundary------------------------------------------
+     Bm = np.zeros((self.n_index,self.mesh.nle))
+     if len(self.db) > 0:
+      Gb = np.einsum('qj,jn->qn',sigma,self.db,optimize=True)
+      Gbp = Gb.clip(min=0)
+      Gbm = Gb.clip(max=0)
+      Bp = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
+    
+      for n,(i,j) in enumerate(zip(self.eb,self.sb)):
+        Bp[:,i] += Gbp[:,n]
+        Bm[:,i] -= TB[i,j]*Gbm[:,n]
+      SS = np.einsum('qn,n->nq',Gbm,1/Gbm.sum(axis=0))
+      D += Bp
+      #------------------------------------------------------
+
+     #Thermostatting------------------------------------------
+     Bt = np.zeros((self.n_index,self.mesh.nle))
+     KP = np.zeros((self.n_index,self.mesh.nle))
+     KM = 0
+     if len(self.dft) > 0:
+      Gb = np.einsum('qj,jn->qn',sigma,self.dft,optimize=True)
+      Gftp = Gb.clip(min=0)
+      Gftm = Gb.clip(max=0)
+
+      Bftp = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
+      for n,(i,j) in enumerate(zip(self.eft,self.sft)):
+       Bftp[:,i] += Gftp[:,n]
+       Bt[:,i]   -= self.mesh.IB[i,j]*Gftm[:,n]
+       
+
+      KP =  np.einsum('uc,c->uc', Bftp,self.mesh.B_area,optimize=True)*self.kappa_factor*1e-18 #Power in
+      KM = -np.einsum('uc,c->',Bt,self.mesh.B_area,optimize=True)*self.kappa_factor*1e-18 #Power in
+      D += Bftp
+
+     ms = MultiSolver(self.i,self.j,Gm,D,self.mesh.nle)
+
+     #Periodic------------------
+     P = np.zeros((self.n_index,self.mesh.nle))
+     for n,(i,j) in enumerate(zip(self.i,self.j)): 
+      P[:,i] += Gm[:,n]*self.mesh.B[i,j]
+
+     #inte = -np.sum(self.mesh.B_with_area_old.todense(),axis=0)
+     BB = -np.outer(sigma[:,0],np.sum(self.mesh.B_with_area_old.todense(),axis=0))*self.kappa_factor*1e-18
+     #Boundary---
+     #Bm = np.zeros((self.n_index,self.mesh.nle))
+     #if len(self.db) > 0:
+      #Gtb  = np.einsum('qj,jn->qn',sigma,self.dbp,optimize=True)
+      #Gtb  = np.einsum('qj,jn->qn',sigma,self.db,optimize=True)
+      #Gtbp = Gtb.clip(min=0)
+      #Gtbm = Gtb.clip(max=0).sum(axis=0)
+      #SS = np.einsum('qn,n->nq',Gbm,1/Gtbm)
+
+
+     #---------------------------------------------
+     kappa_vec = [kappa_fourier]
+     miter = argv.setdefault('max_bte_iter',100)
+     merror = argv.setdefault('max_bte_error',1e-3)
+     alpha = argv.setdefault('alpha',1)
+
+     error = 1
+     kk = 0
+
+     X = np.tile(Tnew,(self.n_index,1))
+     X_old = X.copy()
+
+     B = np.tile(sigma[:,0],(self.mesh.nle,1)).T/100.0
+     alpha = 1
+     #B = np.einsum('uj,cj->uc',sigma,self.mesh.compute_grad(Tnew)) 
+     kappa_old = kappa_fourier
+     while kk < miter and error > merror:
+      #DeltaT = np.matmul(H,B)
+      #DeltaT = np.einsum('uk,kc->uc',H,B)
+      DeltaT = np.matmul(Wod,alpha*X+(1-alpha)*X_old) 
+      X_old = X.copy()
+      X = ms.solve(P  + Bt - Bm  + DeltaT)
+      #X = ms.solve(P + Delta)
+      #if kk > 0:
+      # X = ms.solve(DeltaT+P)
+      #else:    
+      #X = ms.solve(DeltaT)
+      kk +=1
+      #print(X)
+      #quit()
+
+      #for n in range(self.n_index):
+      # B[n] = np.einsum('j,cj->c',sigma[n],self.mesh.compute_grad(X[n]))
+
+      #X = self.cg(W,-(X.T/a).T+DeltaT,BB,x=X)
+      #DeltaT = self.cg(W,B,BB,x=X)
+      #DeltaT = -((DeltaT.T)*a).T
+      #X = self.cg(W,B,BB,x=X)
+      #quit()
+
+      #if len(self.db) > 0: Bm[:,self.eb] = np.einsum('un,un,nq->qn',X[:,self.eb],Gtbp,SS,optimize=True)
+      if len(self.db) > 0: Bm[:,self.eb] = np.einsum('un,un,nq->qn',X[:,self.eb],Gbp,SS,optimize=True)
+
+      #Due to periodicity
+      kappa = np.sum(np.multiply(BB,X))
+
+      #Due to thermostatting
+      kappa += np.sum(np.multiply(KP,X)) + KM
+
+      #print(np.sum(np.multiply(KP,X)))
+      #print(KM)
+      print(kappa)
+      #error = abs(kappa_old-kappa)/abs(kappa)
+      #kappa_old = kappa
+      #kappa_vec.append(kappa)
+    
+      #print(self.mesh.nle)
+
+      #B = np.tile(sigma[:,0],(self.mesh.nle,1)).T
+      #DeltaT = np.matmul(S,B)
+      #print(B)
+      #for n in range(self.n_index):
+      # B[n] = np.einsum('j,cj->c',sigma[n],self.mesh.compute_grad(X[n]))
+     
+      #print(B)
+
+      #B = X + (DeltaT.T/a).T 
+
+      #quit()
+
+      #DeltaT = np.matmul(S,(X.T*a).T+DeltaT+P)
+      #X = np.matmul(invW,B)
+      #quit()
+      #DeltaT = np.matmul(Wod,X)
+      #kappa = -np.sum(np.multiply(BB,X))/100
+
+     #quit()
+     
+     T = np.einsum('qc,q->c',X,tc)
+     #DeltaT = X-np.tile(T,(self.n_index,1))
+     #J = np.einsum('qj,qc->cj',sigma,DeltaT)*1e-18
+     J = np.einsum('qj,qc->cj',sigma,X)*1e-18
+     data = {'kappa_vec':kappa_vec,'temperature':T,'flux':J,'temperature_fourier':temp_fourier,'flux_fourier':-self.mat[0]['kappa_bulk_tot']*temp_fourier_grad}
+     pickle.dump(data,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
+
+
+
+  def cg(self,A, b,BB,precondition=True,x=[]):
+
+    if len(x) == 0:
+     x = b.copy()/np.diag(A)
+
+    kappa = np.sum(np.multiply(BB,x)) 
+    print('Guess ', kappa)
+
+    if precondition:
+     s = np.sqrt(np.diag(A))   
+     A = np.einsum('ij,i,j->ij',A.copy(),1/s,1/s)
+     b = (b.copy().T/s).T
+     x = (x.copy().T*s).T
+    
+
+    n,_ = np.shape(b)
+
+    r = np.dot(A,x)-b
+    #r = np.dot(A, x) - b
+    p = - r
+    r_k_norm = np.array([ np.dot(r[:,i],r[:,i]) for i in range(self.mesh.nle)])
+
+    #r_k_norm = np.dot(r, r)
+    error = 1
+    kappa_old=0
+    xn = 0
+    N = 2*n
+    N = 5
+    delta = np.zeros((self.n_index,self.mesh.nle))
+    for i in range(N):
+
+         
+        Ap = np.array([np.dot(A,p[:,i]) for i in range(self.mesh.nle)]).T
+        pAp =np.array([ np.dot(p[:,i],Ap[:,i]) for i in range(self.mesh.nle)])
+        alpha = r_k_norm / pAp
+        x += alpha * p
+        delta += alpha*p
+        kappa = -np.sum(np.multiply(BB,((x.T)/s).T))
+
+        error = abs((kappa-kappa_old))/abs(kappa)
+        print(i,kappa,error)
+        if error < 1e-4:
+         break
+        kappa_old = kappa
+
+
+        r += alpha * Ap
+        r_kplus1_norm = np.array([ np.dot(r[:,i],r[:,i])           for i in range(self.mesh.nle)])
+        beta = r_kplus1_norm / r_k_norm
+        r_k_norm = r_kplus1_norm
+        p = beta * p - r
+        
+    return ((delta.T)/s).T
+
+
 
   def solve_bte_working(self,**argv):
 
      nT = np.shape(self.mat[0]['B'])[0]
      kappa_fourier,temp_fourier,temp_fourier_grad,temp_fourier_int,flux_fourier_int = self.get_diffusive_suppression_function()
      print(kappa_fourier)
+
+     if argv.setdefault('only_fourier'):
+        quit()
+
      kappa_fourier = np.array([kappa_fourier])
      Tnew = temp_fourier.copy()
      TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
      #TB_new = np.array([temp_fourier[i] for n,(i,j) in enumerate(zip(self.eb,self.sb))])
 
-     TL = np.zeros((nT,self.mesh.nle))
+     #TL = np.zeros((nT,self.mesh.nle))
 
-     W = np.load('W.dat.npy')
+     #W = np.load('W.dat.npy')
+     #a = np.diag(W)
+     #if argv.setdefault('rta',False):
+     # W = np.diag(a) 
+
+     #Winv = np.linalg.inv(W)
+     #Wod = W-np.diag(a)
+     #g  = W.sum(axis=1)
+
+     
+     tc = np.load('tc')
+     W = np.load('W')
      a = np.diag(W)
-     if argv.setdefault('rta',False):
-      W = np.diag(a) 
-
-     Winv = np.linalg.inv(W)
+     sigma = np.load('sigma')*1e9
      Wod = W-np.diag(a)
-     g  = W.sum(axis=0)
-     S = np.outer(g,g)/np.sum(g) - Wod
-     tc = g/sum(g)
-     sigma = np.load(open('sigma.dat','rb'),allow_pickle=True)
+     #tc = W.sum(axis=0)/sum(g)
+     
+     #S = np.outer(g,tc) - Wod
+     #S = - Wod
+     #S = np.load('S.dat')
+     #a = np.load('a.dat')
+     #S = np.outer(g,g) - Wod
+
+     #sigma = np.load(open('sigma.dat','rb'),allow_pickle=True)
 
      #sigma = self.rotate(sigma,**{'rotate_phi':.0})
      #sigma.dump('sigma_30.dat')
-     
 
-     F = (sigma.T/a).T
-     Sx = sigma[:,0]
+     #F = (sigma.T/a).T
+     #Sx = sigma[:,0]
      #------------------
 
      #Solve Bulk
@@ -681,7 +934,10 @@ class SolverGPU(object):
       D += Bp
 
      #Compute super lu---
-     lu = get_lu(self.i,self.j,Gm,D,self.mesh.nle)   
+     #lu = get_lu(self.i,self.j,Gm,D,self.mesh.nle)   
+
+     ms = MultiSolver(self.i,self.j,Gm,D,self.mesh.nle)
+
 
      #Periodic------------------
      P = np.zeros((self.n_index,self.mesh.nle))
@@ -689,11 +945,11 @@ class SolverGPU(object):
       P[:,i] += Gm[:,n]*self.mesh.B[i,j]
 
      #Initial lattice temperature----
-     TL= np.einsum('q,c->qc',a,Tnew)
+     #T= np.einsum('q,c->qc',a,Tnew)
      
-
      #new---
-     tt = np.einsum('qj,qu,u->ju',sigma,Winv,a)*self.kappa_factor*1e-18
+     #tt = np.einsum('qj,qu,u->ju',sigma,Winv,a)*self.kappa_factor*1e-18
+
      #kappam = np.einsum('qj,qu,u->ju',sigma,Winv,a)*self.kappa_factor*1e-18
      #kappam.dump('kappam30.dat')
      #quit()
@@ -717,7 +973,7 @@ class SolverGPU(object):
 
      #---------------------------------------------
      #Conjugate gradient------------
-     TL_old = TL.copy()
+     #TL_old = TL.copy()
      kappa_vec = [kappa_fourier]
 
      miter = argv.setdefault('max_bte_iter',100)
@@ -728,33 +984,51 @@ class SolverGPU(object):
 
      error = 1
      kk = 0
+     DeltaT = np.zeros((self.n_index,self.mesh.nle))
+
+     X = np.tile(Tnew,(self.n_index,1))
+
+
      kappa_old = kappa_fourier
      while kk < miter and error > merror:
 
-      X = solve_from_lu(lu,P + TL + Bm)
+      #X = ms.solve(P + TL + Bm)
+      #X = ms.solve(P + Bm + T + DeltaT)
+
+
+      DeltaT = np.matmul(-Wod,X)
+      #print(np.allclose(np.outer(a,Tnew),DeltaT))
+      X = ms.solve(P + Bm + DeltaT)
 
       #T = np.tile(T,(self.n_index,1))
 
       kappa = np.sum(np.multiply(BB,X)) 
       error = abs(kappa_old-kappa)/abs(kappa)
       kappa_old = kappa
-
       kappa_vec.append(kappa)
+      print(kappa)
 
-      Xm = np.einsum('qc,c->q',X-((TL.T+Bm.T)/a).T,inte)
-      
-
-      print(np.dot(Xm,tt[0]),kappa)
+      #Xm = np.einsum('qc,c->q',X-((TL.T+Bm.T)/a).T,inte)
+      #print(np.dot(Xm,tt[0]),kappa)
       #Xm = np.einsum('qc,c->q',X-T,inte)*self.kappa_factor
       #print(np.dot(sigma[:,0]*1e-18,Xm),kappa)
-
       #print(np.sum(np.multiply(BBt,X-((TL.T)/a).T)),kappa)
+      #DeltaT = np.matmul(Wod,(T.T/a).T-X)
+      #DeltaT = np.matmul(Wod,X)
 
-      TL = np.matmul(S,X)*alpha + (1-alpha)*TL_old; TL_old = TL.copy()
+      #T = np.einsum('qc,q->c',X,tc)
+      #T = np.einsum('q,c->qc',a,T)
+
+
+      #print(np.sum(np.matmul(A,(T.T/a).T))/np.sum(np.matmul(A,X)))
+
+      
+
+      #TL = np.matmul(S,X)*alpha + (1-alpha)*TL_old; TL_old = TL.copy()
 
       if len(self.db) > 0: Bm[:,self.eb] = np.einsum('un,un,nq->qn',X[:,self.eb],Gtbp,SS,optimize=True)
 
-
+     quit()
      #compute grad---
      #ss = []
      #for n in range(self.n_index):
@@ -772,11 +1046,11 @@ class SolverGPU(object):
      #F.dump('f.dat')
      Xm.dump('sup.dat')
      #sup.dump('sup_grad.dat')
-     tt.dump('bulk.dat')
+     #tt.dump('bulk.dat')
      #G.dump('full.dat')
      T = np.einsum('qc,q->c',X,tc)
      DeltaT = X-np.tile(T,(self.n_index,1))
-     J = np.einsum('qj,qc->cj',sigma,DeltaT)
+     J = np.einsum('qj,qc->cj',sigma,DeltaT)*1e-18
      data = {'kappa_vec':kappa_vec,'temperature':T,'flux':J,'temperature_fourier':temp_fourier,'flux_fourier':-self.mat[0]['kappa_bulk_tot']*temp_fourier_grad}
      pickle.dump(data,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -1594,16 +1868,16 @@ class SolverGPU(object):
    self.F = data['F']
 
 
-  def print_bulk_kappa(self):
+  #def print_bulk_kappa(self):
       
-    if MPI.COMM_WORLD.Get_rank() == 0:
-     if self.verbose:
+    #if MPI.COMM_WORLD.Get_rank() == 0:
+    # if self.verbose:
       #print('  ')
       #for region in self.region_kappa_map.keys():
-       print('Kappa bulk: ')
-       for mat in self.mat:
-           print('{:8.2f}'.format(mat['kappa_bulk_tot'])+ ' W/m/K')   
-           print(' ')
+       #print('Kappa bulk: ')
+       #for mat in self.mat:
+       #    print('{:8.2f}'.format(mat['kappa_bulk_tot'])+ ' W/m/K')   
+       #    print(' ')
        #if 'Inclusion' in self.mesh.region_elem_map.keys():
        # print('Kappa inclusion: ')
        # print('{:8.2f}'.format(self.mat['kappa_inclusion'])+ ' W/m/K')   
@@ -1767,35 +2041,30 @@ class SolverGPU(object):
 
 
     #scaling
-    ss = np.array(A.max(axis=1).todense().T)[0]
-    for i in range(np.shape(A)[0]):
-        A[i,:] /= ss[i]
+    #ss = np.array(A.max(axis=1).todense().T)[0]
+    #for i in range(np.shape(A)[0]):
+    #    A[i,:] /= ss[i]
         
     SU = splu(A)
 
     C = np.zeros(self.mesh.nle)
    
-
     n_iter = 0
     kappa_old = 0
     error = 1  
     if self.structured:
         self.argv['max_fourier_iter'] = 1
-    while error > self.argv.setdefault('max_fourier_error',1-2) and \
+    while error > self.argv.setdefault('max_fourier_error',1e-2) and \
                   n_iter < self.argv.setdefault('max_fourier_iter',10) :
     
         RHS = B + C
 
         #scaling---
-        RHS = np.array([ RHS[i]/ss[i]  for i in range(len(RHS))])
+        #RHS = np.array([ RHS[i]/ss[i]  for i in range(len(RHS))])
 
         temp = SU.solve(RHS)
         
         temp = temp - (max(temp)+min(temp))/2.0
-
-        temp_int = self.compute_interfacial_temperature(temp)
-        
-        (C,grad) = self.compute_non_orth_contribution(temp,**{'temp_interface':temp_int})
 
         kappa_eff = self.compute_diffusive_thermal_conductivity(temp)
         if kappa_eff == 0:
@@ -1804,6 +2073,9 @@ class SolverGPU(object):
          error = abs((kappa_eff - kappa_old)/kappa_eff)
         kappa_old = kappa_eff
         n_iter +=1
+
+        temp_int = self.compute_interfacial_temperature(temp)
+        (C,grad) = self.compute_non_orth_contribution(temp,**{'temp_interface':temp_int})
 
     s = kappa_eff#/kappa
 
@@ -2136,7 +2408,7 @@ class SolverGPU(object):
      print('Space DOFs:      ' + str(len(self.mesh.l2g)))
      #print('Azimuthal angles:  ' + str(self.mat['n_theta']))
      #print('Polar angles:      ' + str(self.mat['n_phi']))
-     print('Momentum DOFs:   ' + str(self.n_serial*self.n_parallel))
+     #print('Momentum DOFs:   ' + str(self.n_serial*self.n_parallel))
      #print('Bulk Thermal Conductivity:   ' + str(round(self.mat['kappa_bulk_tot'],4)) +' W/m/K')
      print(' ')
    

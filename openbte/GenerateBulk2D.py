@@ -160,9 +160,9 @@ def create_unstructured_bulk(argv):
     store.write(strc)
   else:
    if direction=='x':
-    strc = r'''Physical Line('Cold') = {2};''' + '\n'
+    strc = r'''Physical Line('Hot') = {2};''' + '\n'
     store.write(strc)
-    strc = r'''Physical Line('Hot') = {4};''' +'\n'
+    strc = r'''Physical Line('Cold') = {4};''' +'\n'
     store.write(strc)
    else:
     bs.append(2)

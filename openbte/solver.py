@@ -811,7 +811,7 @@ class Solver(object):
        if not (TB_plus[n,i] == 0):
          TB_new[n,i] /= TB_minus[n,i]
     
-    TB = self.alpha * TB_new + (1-self.alpha)*TB_old; i
+    TB = self.alpha * TB_new + (1-self.alpha)*TB_old; 
     TB_old = TB.copy()
 
     Tnew = T.copy()

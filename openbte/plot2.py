@@ -301,12 +301,12 @@ class Plot(object):
    (Lx,Ly) = self.geo.get_repeated_size(argv)
 
    #--------
-   #p1 = np.array([-Lx/2.0+1e-7,0.0])
-   #p2 = np.array([Lx/2.0*(1-1e-7),0.0])
+   p1 = np.array([-Lx/2.0+1e-7,0.0])
+   p2 = np.array([Lx/2.0*(1-1e-7),0.0])
 
    delta = 1e-7
-   p1 = np.array([0,-Ly/2+delta,0])
-   p2 = np.array([0, Ly/2-delta,0])
+   #p1 = np.array([0,-Ly/2+delta,0])
+   #p2 = np.array([0, Ly/2-delta,0])
    (x,data,int_points) = self.geo.compute_line_data(p1,p2,data)
    self.x = np.array(x)
    self.data = np.array(data)
@@ -559,8 +559,8 @@ class Plot(object):
 
    minv = min(data)
    maxv = max(data)
-   viridis = cm.get_cmap('jet')
-
+   viridis = cm.get_cmap('winter')
+   
    #if len(self.geo.elems[0]) == 12:
    # N = int(np.sqrt(len(data)))
    # a = data.reshape(N,N)

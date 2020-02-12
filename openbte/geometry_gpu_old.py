@@ -19,6 +19,7 @@ from . import GenerateBulk2D
 from . import GenerateBulk3D
 from . import porous
 import networkx as nx
+import pandas as pd
 
 
 import matplotlib
@@ -100,13 +101,22 @@ class GeometryGPU(object):
 
   if geo_type == 'geo':
    if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
-    self.dim = 3   
-    self.frame=[]
     self.polygons=[]
-    state = self.compute_mesh_data()
-    data = {'state':state}
+    self.import_mesh()
+
+    Lx = max(self.nodes[:,0]) - min(self.nodes[:,0]) 
+    Ly = max(self.nodes[:,1]) - min(self.nodes[:,1]) 
+    self.frame = []
+    self.frame.append([-Lx/2,Ly/2])
+    self.frame.append([Lx/2,Ly/2])
+    self.frame.append([Lx/2,-Ly/2])
+    self.frame.append([-Lx/2,-Ly/2])
+
+
+    self.compute_mesh_data()
+    data = {'state':self.state}
     if self.argv.setdefault('save',True):
-      pickle.dump(state,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
+      pickle.dump(self.state,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
     return
    else: data = None
    data = mpi4py.MPI.COMM_WORLD.bcast(data,root=0)
@@ -114,6 +124,7 @@ class GeometryGPU(object):
 
   if geo_type == 'load':
     self.state = pickle.load(open(argv.setdefault('filename_geometry','geometry.p'),'rb'))
+
     self._update_data()
 
   else:
@@ -168,7 +179,6 @@ class GeometryGPU(object):
       self.polygons = []
       Lx = float(argv['lx'])
       Ly = float(argv['ly'])
-
       self.frame = []
       self.frame.append([-Lx/2,Ly/2])
       self.frame.append([Lx/2,Ly/2])
@@ -1640,7 +1650,8 @@ class GeometryGPU(object):
       else:
        elem_mat_map.update({ne:1})
 
-    self.add_patterning(elem_mat_map)
+    self.elem_mat_map = elem_mat_map
+    #self.add_patterning(elem_mat_map)
     
 
 
@@ -1955,9 +1966,6 @@ class GeometryGPU(object):
           'sb':self.sb,\
           'db':self.db,\
           'dbp':self.dbp,\
-          'eft':self.eft,\
-          'sft':self.sft,\
-          'dft':self.dft,\
           'pv':self.pv,\
           'side_periodic_value':self.side_periodic_value}
 
@@ -2072,10 +2080,12 @@ class GeometryGPU(object):
 
  def compute_elem_map(self):
 
+     
   self.elem_map = {}
   for elem1 in self.elem_side_map:
     for side in self.elem_side_map[elem1]:
      elem2 = self.get_neighbor_elem(elem1,side)
+
      self.elem_map.setdefault(elem1,[]).append(elem2)
 
   #self.elem_list = {'active':list(range(len(self.elems)))}
@@ -2105,7 +2115,6 @@ class GeometryGPU(object):
 
  def get_decomposed_directions(self,elem_1,elem_2,rot = np.eye(3)):
 
-   
     side = self.get_side_between_two_elements(elem_1,elem_2)
     normal = self.compute_side_normal(elem_1,side)
     area = self.compute_side_area(side)
@@ -2594,9 +2603,6 @@ class GeometryGPU(object):
     self.jp = self.state['jp']
     self.dp = self.state['dp']
     self.pv = self.state['pv']
-    self.eft = self.state['eft']
-    self.sft = self.state['sft']
-    self.dft = self.state['dft']
 
 
 
@@ -2634,7 +2640,16 @@ class GeometryGPU(object):
    tmp = f.readline().split()
    nodes.append([float(tmp[1]),float(tmp[2]),float(tmp[3])])
 
+
   nodes = np.array(nodes)
+  #Check dimensionality automatically
+  if np.linalg.norm(nodes[:,2]) < 1e-2:
+      self.dim = 2
+  else:    
+      self.dim = 3
+  #----    
+
+
 
   if self.dim == 3:
    self.size = np.array([ max(nodes[:,0]) - min(nodes[:,0]),\
@@ -3085,6 +3100,7 @@ class GeometryGPU(object):
 
  def compute_centroid(self,side):
 
+  print(side)
   node = np.zeros(3)
   for p in side:
    node += self.nodes[p]
@@ -3257,28 +3273,16 @@ class GeometryGPU(object):
     #In case of fixed temperature----
     self.BN = np.zeros((n_el,len(self.elems[0]),3))
     self.IB = np.zeros((n_el,len(self.elems[0])))
-    self.eft = []; self.sft = []; self.dft = []
     for ll in self.side_list['Hot'] + self.side_list['Cold']:
       elems = self.side_elem_map[ll]
       normal = self.get_side_normal(0,ll)
       ind = self.elem_side_map[elems[0]].index(ll)
       self.BN[elems[0],ind] = normal * self.get_side_area(ll)
-      area = self.get_side_area(ll)
-      vol = self.get_elem_volume(elems[0])
-
-      self.eft.append(elems[0])
-      self.sft.append(ind)
-      self.dft.append(normal*area/vol)
-
-      #This is treated similarly to boundary data
-
       if ll in self.side_list['Hot']:
         self.IB[elems[0],ind] =  0.5
-       # self.dft.append(0.5*normal*area/vol)
       else :
         self.IB[elems[0],ind] = -0.5
-        self.B_area[elems[0]] = area
-       # self.dft.append(-0.5*normal*area/vol)
+        self.B_area[elems[0]] = self.get_side_area(ll)
         
     #----------------------------------------------------------------
     self.area_flux = abs(np.dot(flux_dir,self.c_areas))
@@ -3287,7 +3291,6 @@ class GeometryGPU(object):
     self.B = B.to_coo()
     self.B_with_area_old = B_with_area_old.to_coo()
     self.pv = np.array(self.pv).T
-    self.dft = np.array(self.dft).T
   
 
  def compute_least_square_weigths(self):
@@ -3403,9 +3406,14 @@ class GeometryGPU(object):
    nd = len(self.elems[0])
 
    if self.dim == 2:
-    diff_temp = np.zeros((self.nle,nd))
+
+    diff_temp = self.elems.copy()
+    for n in range(len(diff_temp)):
+     for g in range(len(diff_temp[n])):
+        diff_temp[n][g] = 0
    else:
     diff_temp = np.zeros((self.nle,4))
+
 
    gradT = np.zeros((self.nle,3))
 
