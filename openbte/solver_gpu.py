@@ -635,7 +635,12 @@ class SolverGPU(object):
      print(kappa_fourier)
 
      if argv.setdefault('only_fourier'):
-        quit()
+       data = {'kappa_vec':np.array([kappa_fourier]),'temperature_fourier':temp_fourier,'flux_fourier':-self.mat[0]['kappa_bulk_tot']*temp_fourier_grad}
+       pickle.dump(data,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
+
+       quit()
+
+     rta = argv.setdefault('rta',False)
 
      kappa_fourier = np.array([kappa_fourier])
      Tnew = temp_fourier.copy()
@@ -646,14 +651,18 @@ class SolverGPU(object):
      invW = np.load('invW')
      a = np.diag(W)
      sigma = np.load('sigma')*1e9
+     F = (sigma.T/a).T
+     coeff = sigma
      Wod = np.diag(a) - W
+     #scale = np.ones_like(a)
+     scale = a
+     #S = np.einsum('u,uv->uv',a,invW)
 
-     S = np.einsum('u,uv->uv',a,invW)
-
-     H = np.eye(self.n_index) - S
+     #H = np.eye(self.n_index) - invW
+     H = -(invW - np.diag(np.diag(1/a)))
 
      #Solve Bulk
-     G = np.einsum('qj,jn->qn',sigma,self.k,optimize=True)
+     G = np.einsum('qj,jn->qn',coeff,self.k,optimize=True)
      Gp = G.clip(min=0)
      Gm = G.clip(max=0)
      D = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
@@ -663,12 +672,12 @@ class SolverGPU(object):
      D2 = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
      D2[:,self.i] = Gp
 
-     D += np.tile(a,(self.mesh.nle,1)).T
+     D += np.tile(scale,(self.mesh.nle,1)).T
 
      #Compute boundary------------------------------------------
      Bm = np.zeros((self.n_index,self.mesh.nle))
      if len(self.db) > 0:
-      Gb = np.einsum('qj,jn->qn',sigma,self.db,optimize=True)
+      Gb = np.einsum('qj,jn->qn',coeff,self.db,optimize=True)
       Gbp = Gb.clip(min=0)
       Gbm = Gb.clip(max=0)
       Bp = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
@@ -685,7 +694,7 @@ class SolverGPU(object):
      KP = np.zeros((self.n_index,self.mesh.nle))
      KM = 0
      if len(self.dft) > 0:
-      Gb = np.einsum('qj,jn->qn',sigma,self.dft,optimize=True)
+      Gb = np.einsum('qj,jn->qn',coeff,self.dft,optimize=True)
       Gftp = Gb.clip(min=0)
       Gftm = Gb.clip(max=0)
 
@@ -727,19 +736,45 @@ class SolverGPU(object):
      error = 1
      kk = 0
 
+     #----Constant gradient----
+     #LL = self.mesh.size[0]
+     #Tnew = np.zeros_like(Tnew)
+     #for i in range(self.mesh.nle):
+     # c = self.mesh.compute_elem_centroid(i)[0]
+     # delta = (c+LL/2)/LL
+     # t = -0.5 + delta
+     # Tnew[i] = t
+     
+     #---------------------
      X = np.tile(Tnew,(self.n_index,1))
+     #X = (X.T*scale).T
+     DeltaT = X
+     #X = np.zeros((self.n_index,self.mesh.nle))
      X_old = X.copy()
-
-     B = np.tile(sigma[:,0],(self.mesh.nle,1)).T/100.0
-     alpha = 1
+     #DeltaT = -X.copy()
+     #DeltaT = np.matmul(Wod,alpha*X+(1-alpha)*X_old) 
+     #DeltaT = np.matmul(Wod,X) 
+     #T = np.matmul(Wod,alpha*X+(1-alpha)*X_old) 
+     #DeltaT = np.zeros((self.n_index,self.mesh.nle))
+     #B = np.tile(sigma[:,0],(self.mesh.nle,1)).T/100.0
+     alpha = 0.75
+     Bm_old = Bm.copy()
      #B = np.einsum('uj,cj->uc',sigma,self.mesh.compute_grad(Tnew)) 
      kappa_old = kappa_fourier
      while kk < miter and error > merror:
       #DeltaT = np.matmul(H,B)
       #DeltaT = np.einsum('uk,kc->uc',H,B)
-      DeltaT = np.matmul(Wod,alpha*X+(1-alpha)*X_old) 
+      if not rta:
+       DeltaT = np.matmul(Wod,alpha*X+(1-alpha)*X_old) 
+      else:
+       DeltaT = np.einsum('qc,q,u->uc',X,tc,a)
+
       X_old = X.copy()
-      X = ms.solve(P  + Bt - Bm  + DeltaT)
+      X = ms.solve(P  + Bt  + Bm  + DeltaT)
+      kappa = np.sum(np.multiply(BB,X))
+      print('BTE:', kappa)
+
+      #B = -((X.T)*a).T+DeltaT
       #X = ms.solve(P + Delta)
       #if kk > 0:
       # X = ms.solve(DeltaT+P)
@@ -748,31 +783,48 @@ class SolverGPU(object):
       kk +=1
       #print(X)
       #quit()
-
+      #B = np.zeros_like(DeltaT)
       #for n in range(self.n_index):
       # B[n] = np.einsum('j,cj->c',sigma[n],self.mesh.compute_grad(X[n]))
+      #B = -(X.T*a).T + DeltaT 
+      #B = ((-X + DeltaT).T*a).T
+
+
+      ##DeltaT = -np.matmul(H,B)
+      #print(DeltaT)
+      #quit()
+      
+     #DeltaT = (DeltaT.T*a).T
+
+
+      #B = (X.T*a).T - T
+      #B = np.tile(sigma[:,0],(self.mesh.nle,1)).T/100.0
 
       #X = self.cg(W,-(X.T/a).T+DeltaT,BB,x=X)
-      #DeltaT = self.cg(W,B,BB,x=X)
-      #DeltaT = -((DeltaT.T)*a).T
+
+      #DeltaX = self.cg(W,B,BB,x=X)
+      #DeltaT = ((DeltaT.T)*a).T
       #X = self.cg(W,B,BB,x=X)
       #quit()
 
-      #if len(self.db) > 0: Bm[:,self.eb] = np.einsum('un,un,nq->qn',X[:,self.eb],Gtbp,SS,optimize=True)
-      if len(self.db) > 0: Bm[:,self.eb] = np.einsum('un,un,nq->qn',X[:,self.eb],Gbp,SS,optimize=True)
+      if len(self.db) > 0: 
+         Bm[:,self.eb] = np.einsum('un,un,nq->qn',X[:,self.eb],Gbp,SS,optimize=True)
+         #m = alpha*Bm + (alpha-1)*Bm_old
+         #Bm =
+         #Bm_old = Bm.copy()
 
       #Due to periodicity
-      kappa = np.sum(np.multiply(BB,X))
-
+      #kappa = np.sum(np.multiply(BB,X))
+      #print('CG: ', kappa)
+      #DeltaT = ((DeltaX.T)*a).T
       #Due to thermostatting
-      kappa += np.sum(np.multiply(KP,X)) + KM
+      #kappa += np.sum(np.multiply(KP,X)) + KM
 
       #print(np.sum(np.multiply(KP,X)))
       #print(KM)
-      print(kappa)
-      #error = abs(kappa_old-kappa)/abs(kappa)
-      #kappa_old = kappa
-      #kappa_vec.append(kappa)
+      error = abs(kappa_old-kappa)/abs(kappa)
+      kappa_old = kappa
+      kappa_vec.append(kappa)
     
       #print(self.mesh.nle)
 
@@ -832,7 +884,7 @@ class SolverGPU(object):
     kappa_old=0
     xn = 0
     N = 2*n
-    N = 5
+    N = 14
     delta = np.zeros((self.n_index,self.mesh.nle))
     for i in range(N):
 
@@ -842,7 +894,7 @@ class SolverGPU(object):
         alpha = r_k_norm / pAp
         x += alpha * p
         delta += alpha*p
-        kappa = -np.sum(np.multiply(BB,((x.T)/s).T))
+        kappa = np.sum(np.multiply(BB,((x.T)/s).T))
 
         error = abs((kappa-kappa_old))/abs(kappa)
         print(i,kappa,error)
@@ -2010,7 +2062,6 @@ class SolverGPU(object):
         temp = SU.solve(RHS)
         
         temp = temp - (max(temp)+min(temp))/2.0
-
         (C,grad) = self.compute_non_orth_contribution(temp)
         
         kappa_eff = self.compute_diffusive_thermal_conductivity(temp)*kappa
@@ -2076,13 +2127,14 @@ class SolverGPU(object):
 
         temp_int = self.compute_interfacial_temperature(temp)
         (C,grad) = self.compute_non_orth_contribution(temp,**{'temp_interface':temp_int})
+       
 
     s = kappa_eff#/kappa
 
-    flux_int = self.compute_interfacial_flux(grad,temp,temp_int)
+    #flux_int = self.compute_interfacial_flux(grad,temp,temp_int)
 
     #quit()
-    return s,temp.copy(),grad,temp_int,flux_int
+    return s,temp.copy(),grad,temp_int,None
 
   def compute_interfacial_flux(self,grad,temp,temp_int):
      
@@ -2217,98 +2269,8 @@ class SolverGPU(object):
 
 
 
-  '''
-  def solve_fourier(self,**argv):
-       
-    rank = MPI.COMM_WORLD.rank    
-    #Update matrices---------------------------------------------------
-    G = argv.setdefault('interface_conductance',np.zeros(1))#*self.dom['correction']
-    TL = argv.setdefault('lattice_temperature',np.zeros((1,self.n_elems)))
-    TB = argv.setdefault('boundary_temperature',np.zeros((1,self.n_elems)))
-    mfe_factor = argv.setdefault('mfe_factor',0.0)
-    kappa_bulk = argv.setdefault('kappa',[1.0])
-    
-
-    n_index = len(kappa_bulk)
-
-    #G = np.zeros(n_index)
-    #-------------------------------
-    KAPPAp,KAPPA = np.zeros((2,n_index))
-    FLUX,FLUXp = np.zeros((2,n_index,3,self.n_elems))
-    TLp,TLtot = np.zeros((2,n_index,self.n_elems))
-
-    comm = MPI.COMM_WORLD  
-    size = comm.size
-    rank = comm.rank
-    block = n_index // size + 1
-    #block = argv.setdefault('fourier_cut_mfp',n_index) // size + 1
-    for kk in range(block):
-     index = rank * block + kk   
-     if index < n_index :# and index < argv['fourier_cut_mfp']:
-     #if index < argv.setdefault('fourier_cut_mfp',n_index) :
-    
-    #set up MPI------------------
-    #for index in range(n_index):
-      #Aseemble matrix-------------       
-    
-    
-      A  = kappa_bulk[index] * self.F + mfe_factor * csc_matrix(scipy.sparse.eye(self.n_elems)) 
-      A += mfe_factor * spdiags(self.FF,0,self.n_elems,self.n_elems) * G[index]  
-      B  = kappa_bulk[index] * self.B + mfe_factor * TL[index] 
-      B += mfe_factor * np.multiply(self.FF,TB[index]) * G[index]
-      
-      if mfe_factor == 0.0: A[10,10] = 1.0
-
-      #if index in self.lu_fourier.keys():
-      # SU = self.lu_fourier[index]
-
-      #else:
-      SU = splu(A)
-      # self.lu_fourier.update({index:SU})
-
-      C = np.zeros(self.n_elems)
-      #--------------------------------------
-     
-      n_iter = 0
-      kappa_old = 0
-      error = 1        
-      while error > argv.setdefault('max_fourier_error',1e-2) and \
-                    n_iter < argv.setdefault('max_fourier_iter',10) :
-                    
-        RHS = B + C*kappa_bulk[index]
-        if mfe_factor == 0.0: RHS[10] = 0.0      
-        temp = SU.solve(RHS)
-        temp = temp - (max(temp)+min(temp))/2.0
-        (C,flux) = self.compute_non_orth_contribution(temp)
-        
-        KAPPAp[index] = self.compute_diffusive_thermal_conductivity(temp)*kappa_bulk[index]
-        error = abs((KAPPAp[index] - kappa_old)/KAPPAp[index])
-        kappa_old = KAPPAp[index]
-        n_iter +=1
-        
-      FLUXp[index] = np.array([-self.mat['kappa_bulk_tot']*tmp for k,tmp in enumerate(flux)])
-      #FLUXp[index] = flux.T
-      TLp[index] = temp
-     
-        
-    comm.Allreduce([KAPPAp,MPI.DOUBLE],[KAPPA,MPI.DOUBLE],op=MPI.SUM)
-    comm.Allreduce([TLp,MPI.DOUBLE],[TLtot,MPI.DOUBLE],op=MPI.SUM) #to be changed
-    comm.Allreduce([FLUXp,MPI.DOUBLE],[FLUX,MPI.DOUBLE],op=MPI.SUM)  
-    
-    
-    #if argv.setdefault('verbose',True) and rank==0:
-
-     #print('  ')
-     #print('Thermal Conductivity: '.ljust(20) +  '{:8.2f}'.format(KAPPAp.sum())+ ' W/m/K')
-     #print('  ')
-    
-
-
-    return {'kappa_fourier':KAPPA,'temperature_fourier_gradient':FLUX,'temperature_fourier':TLtot}
- '''
       
   def compute_non_orth_contribution(self,temp,**argv) :
-
 
     gradT = self.mesh.compute_grad(temp,interfacial_temperature = argv['temp_interface'])
     
@@ -2328,7 +2290,6 @@ class SolverGPU(object):
       F_ave = w*np.dot(gradT[i],self.elem_kappa_map[gi]) + (1.0-w)*np.dot(gradT[j],self.elem_kappa_map[gj])
       #------------------------
       (dumm,v_non_orth) = self.mesh.get_decomposed_directions(gi,gj)
-
 
       if not 'kappa' in argv.keys():
        C[i] += np.dot(F_ave,v_non_orth)/2.0/self.mesh.get_elem_volume(gi)

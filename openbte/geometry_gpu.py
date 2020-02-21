@@ -52,12 +52,12 @@ def periodic_kernel(x1, x2, p,l,variance):
 def gram_matrix(xs,p,l,variance):
     return [[periodic_kernel(x1,x2,p,l,variance) for x2 in xs] for x1 in xs]
 
-def generate_random_interface(p,l,variance):
+def generate_random_interface(p,l,variance,scale):
 
- xs = np.arange(-p/2, p/2, 0.01)
+ xs = np.arange(-p/2, p/2,p/200)
  mean = [0 for x in xs]
  gram = gram_matrix(xs,p,l,variance)
- ys = np.random.multivariate_normal(mean, gram)
+ ys = np.random.multivariate_normal(mean, gram)*scale
  f = interpolate.interp1d(xs, ys,fill_value='extrapolate')
 
  return f
@@ -101,12 +101,25 @@ class GeometryGPU(object):
   if geo_type == 'geo':
    if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
     self.dim = 3   
-    self.frame=[]
+
+
     self.polygons=[]
-    state = self.compute_mesh_data()
-    data = {'state':state}
+    self.import_mesh()
+
+    Lx = self.size[0]
+    Ly = self.size[1]
+
+    self.frame = []
+    self.frame.append([-Lx/2,Ly/2])
+    self.frame.append([Lx/2,Ly/2])
+    self.frame.append([Lx/2,-Ly/2])
+    self.frame.append([-Lx/2,-Ly/2])
+
+
+    self.compute_mesh_data()
+    data = {'state':self.state}
     if self.argv.setdefault('save',True):
-      pickle.dump(state,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
+      pickle.dump(self.state,open('geometry.p','wb'),protocol=pickle.HIGHEST_PROTOCOL)
     return
    else: data = None
    data = mpi4py.MPI.COMM_WORLD.bcast(data,root=0)
@@ -1051,15 +1064,26 @@ class GeometryGPU(object):
     patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color='#D4D4D4',zorder=1,joinstyle='miter')
     gca().add_patch(patch);
 
-    if self.argv.setdefault('inclusion',False):
-     color='g'
-    else:
-     color='white'
+    #if self.argv.setdefault('inclusion',False):
+    # color='g'
+    #else:
+    # color='white'
+   
+    for ne in self.elem_list['active']:
+      #ave,dummy = self.compute_general_centroid_and_side(ne)
+      cc =  self.elem_mat_map[ne]
+      if cc == 1:
+         color = 'gray'
+      else:   
+         color = 'green'
+      self.plot_elem(ne,color=color)
 
-    for poly in self.polygons:
-     path = create_path(poly)
-     patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=2,joinstyle='miter')
-     gca().add_patch(patch);
+
+
+    #for poly in self.polygons:
+    # path = create_path(poly)
+    # patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=2,joinstyle='miter')
+    # gca().add_patch(patch);
      
     
     #plot Boundary Conditions-----
@@ -1081,7 +1105,19 @@ class GeometryGPU(object):
       n1 = self.nodes[p1]
       n2 = self.nodes[p2]
       plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=12,zorder=1)
-       
+     
+    if argv.setdefault('plot_interface',True):
+     for side in self.side_list['Interface']:
+      p1 = self.sides[side][0]
+      p2 = self.sides[side][1]
+      n1 = self.nodes[p1]
+      n2 = self.nodes[p2]
+      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=2,zorder=1)
+     
+
+    #----------------------------
+
+
     
     #----------------------------
     axis('off')
@@ -1245,7 +1281,7 @@ class GeometryGPU(object):
      for e in elem:
       pp.append(self.nodes[e][:2])
      path = create_path(pp)
-     patch = patches.PathPatch(path,linestyle=None,linewidth=0.0,color=color,zorder=1,joinstyle='miter',alpha=0.7)
+     patch = patches.PathPatch(path,linestyle=None,linewidth=0.5,color=color,zorder=1,joinstyle='miter',alpha=0.7)
      gca().add_patch(patch);
      ave = np.sum(np.array(pp),axis=0)/4
      ave,dummy = self.compute_general_centroid_and_side(ne)
@@ -1626,15 +1662,18 @@ class GeometryGPU(object):
 
     p = self.size[1] 
     l = argv.setdefault('l',1)
+    scale = argv.setdefault('scale',1)
     variance = argv.setdefault('variance',1)
-    f = generate_random_interface(p,l,variance)
+    f = generate_random_interface(p,l,variance,scale)
 
 
     elem_mat_map = {}
     for ne in self.elem_list['active']:
-      c,dummy = self.compute_general_centroid_and_side(ne)
+      #c,dummy = self.compute_general_centroid_and_side(ne)
+      c = self.compute_elem_centroid(ne)
       dd = f(c[1])
-
+ 
+      
       if c[0] < dd:
        elem_mat_map.update({ne:0})
       else:
@@ -1642,8 +1681,6 @@ class GeometryGPU(object):
 
     self.add_patterning(elem_mat_map)
     
-
-
 
 
  def add_patterning(self,elem_mat_map,lone=True):
@@ -1658,7 +1695,7 @@ class GeometryGPU(object):
     self.elem_list['active']= grid.copy()
 
     #----Restore previous boundary connections---
-    self.side_elem_map = self.side_elem_map_global.copy()
+    #self.side_elem_map = self.side_elem_map_global.copy()
     #for side in self.side_list['Boundary']:
     #  (i,dummy) = self.side_elem_map[side]
     #  for elem in self.elem_map[i]:
@@ -1668,7 +1705,7 @@ class GeometryGPU(object):
     #            break
     self.side_list['Boundary'] = []       
     self.side_list['active'] = self.side_list['active_global'].copy()
-    self.side_list['Periodic'] = self.side_list['Periodic_global'].copy()
+    #self.side_list['Periodic'] = self.side_list['Periodic_global'].copy()
     #------------------------------------------ 
 
 
@@ -1716,6 +1753,7 @@ class GeometryGPU(object):
      k2 = self.elem_mat_map[elems[1]]       
      if not k1 == k2:
       ll.append(side)
+      
     self.side_list['Interface'] = ll
     #----------------------------
 
@@ -2025,19 +2063,19 @@ class GeometryGPU(object):
 
 
        #modify in case of interfaces---
-       if ll in self.side_list['Interface']:
-        s1 = np.where(np.array(self.elem_side_map[kc1])==ll)[0][0]
-        s2 = np.where(np.array(self.elem_side_map[kc2])==ll)[0][0]
-        CM[l1,s1]  = normal*area/vol1
-        CM[l2,s2]  = -normal*area/vol1
+       #if ll in self.side_list['Interface']:
+       # s1 = np.where(np.array(self.elem_side_map[kc1])==ll)[0][0]
+       # s2 = np.where(np.array(self.elem_side_map[kc2])==ll)[0][0]
+       # CM[l1,s1]  = normal*area/vol1
+       # CM[l2,s2]  = -normal*area/vol1
 
         #new development---
-        self.eb.append(l1)
-        self.sb.append(s1)
-        self.db.append(normal*area/vol1)
-        self.eb.append(l2)
-        self.sb.append(s2)
-        self.db.append(-normal*area/vol1) #CHECK THIS
+       # self.eb.append(l1)
+       # self.sb.append(s1)
+       # self.db.append(normal*area/vol1)
+       # self.eb.append(l2)
+       # self.sb.append(s2)
+       # self.db.append(-normal*area/vol1) #CHECK THIS
         #----------------------------
 
        #else: 
@@ -2105,7 +2143,6 @@ class GeometryGPU(object):
 
  def get_decomposed_directions(self,elem_1,elem_2,rot = np.eye(3)):
 
-   
     side = self.get_side_between_two_elements(elem_1,elem_2)
     normal = self.compute_side_normal(elem_1,side)
     area = self.compute_side_area(side)
@@ -2622,8 +2659,6 @@ class GeometryGPU(object):
   self.elem_region_map = {}
   self.region_elem_map = {}
 
-
-
   #import nodes------------------------
   #f.readline()
   f.readline()
@@ -2644,6 +2679,12 @@ class GeometryGPU(object):
    self.size = np.array([ max(nodes[:,0]) - min(nodes[:,0]),\
                   max(nodes[:,1]) - min(nodes[:,1]),0])
 
+  if (max(nodes[:,2]) - min(nodes[:,2])) < 1e-3:
+     self.dim = 2
+  else:   
+     self.dim = 3
+
+
   self.nodes = nodes
   #import elements and create map
   self.side_elem_map = {}
@@ -2660,6 +2701,7 @@ class GeometryGPU(object):
   self.side_node_map = {}
   self.node_elem_map = {}
   self.side_list = {}
+
 
   for n in range(n_tot):
    tmp = f.readline().split()
@@ -3402,10 +3444,17 @@ class GeometryGPU(object):
 
    nd = len(self.elems[0])
 
-   if self.dim == 2:
-    diff_temp = np.zeros((self.nle,nd))
-   else:
-    diff_temp = np.zeros((self.nle,4))
+   #if self.dim == 2:
+   # diff_temp = np.zeros((self.nle,nd))
+   #else:
+   # diff_temp = np.zeros((self.nle,4))
+
+  # diff_temp = self.elems.copy()
+
+
+   diff_temp = len(self.elems)*[None]
+   for i in range(len(diff_temp)):
+      diff_temp[i] = len(self.elems[i])*[None] 
 
    gradT = np.zeros((self.nle,3))
 
@@ -3455,6 +3504,7 @@ class GeometryGPU(object):
 
       diff_temp[self.g2l[kc1]][ind1]  = Tb1 - temp[self.g2l[kc1]]
       diff_temp[self.g2l[kc2]][ind2]  = Tb2 - temp[self.g2l[kc2]]
+
 
    for k in range(self.nle) :
        

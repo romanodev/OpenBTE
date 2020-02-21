@@ -402,7 +402,7 @@ class Solver(object):
 
      return AM,AP#,BNM,BNP
 
-  def get_bulk_data(self,global_index,TB,TL,Tnew,IT):
+  def get_bulk_data(self,global_index,TB,TL,Tnew,IT,TBm):
 
     index_irr = self.mat[0]['temp_vec'][global_index]
     aa = sparse.COO([0,1,2],self.control_angle[global_index],shape=(3))
@@ -427,9 +427,6 @@ class Solver(object):
 
         self.mesh.B = self.mesh.B.tocsc()
         self.P = np.sum(np.multiply(AM,self.mesh.B),axis=1).todense()
-        #if global_index == 12:
-        #  print(mfp*self.P[895])
-        #  quit()
 
         tmp = sparse.tensordot(self.mesh.CM,aa,axes=1).todense()
         HW_PLUS = tmp.clip(min=0)
@@ -454,7 +451,10 @@ class Solver(object):
      lu = splu(F.tocsc())
      if (self.keep_lu) :self.lu[irr_angle] = lu
 
-    boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1)
+    if self.argv.setdefault('thermalizing',True):
+     boundary = np.sum(np.multiply(TB,self.HW_MINUS),axis=1)
+    else: 
+     boundary = np.sum(np.multiply(TBm,self.HW_MINUS),axis=1)
 
 
     interface = np.sum(np.multiply(IT[irr_angle],self.HW_MINUS),axis=1)
@@ -464,7 +464,12 @@ class Solver(object):
     if self.argv.setdefault('Experimental',False):
      RHS = mfp * boundary + np.ones(self.mesh.nle)
     else:
-     RHS = mfp * (self.P + boundary + fixed_temperature + interface) + Tnew + TL[index_irr]
+     if self.argv.setdefault('deviational',False):
+      RHS = mfp * (boundary + fixed_temperature + interface) + Tnew + TL[index_irr] + mfp*aa[0]/100.0 
+     else:      
+      RHS = mfp * (self.P + boundary + fixed_temperature + interface) + Tnew + TL[index_irr]
+   
+
   
     temp = lu.solve(RHS)
  
@@ -554,6 +559,8 @@ class Solver(object):
    #Save if only Fourier---
    flux_fourier = [-temp_fourier_grad[i]*self.elem_kappa_map[self.mesh.l2g[i]] for i in range(self.mesh.nle)]
 
+   TBm = np.tile(TB,(self.n_serial,1,1))
+   TBm_old = TBm.copy()
 
    #data_save = {'flux_fourier':flux_fourier,'temperature_fourier':temp_fourier,'kappa_fourier':kappa_fourier,'kappa_map':self.elem_kappa_map,'temperature_fourier_int':temp_fourier_int,'flux_fourier_int':flux_fourier_int}
    data_save = {'flux_fourier':flux_fourier,'temperature_fourier':temp_fourier,'kappa_fourier':kappa_fourier,'kappa_map':self.elem_kappa_map}
@@ -573,6 +580,23 @@ class Solver(object):
    #-------------------------------
    if self.argv.setdefault('only_fourier',False):
        argv.setdefault('max_bte_iter',1)
+
+
+   #set Tnew as constant gradient---
+   LL = self.mesh.size[0]
+   T_loc = np.zeros_like(Tnew)
+   for i in range(self.mesh.nle):
+     c = self.mesh.compute_elem_centroid(i)[0]
+     delta = (c+LL/2)/LL
+     t = 0.5-delta
+     T_loc[i] = t
+    
+   if self.argv.setdefault('deviational',False):
+    Tnew = np.zeros_like(Tnew)
+
+     #---------------------
+   #temp_fourier=Tnew.copy()
+   #---
 
    while n_iter < argv.setdefault('max_bte_iter',10) and \
           error_vec[-1] > argv.setdefault('max_bte_error',1e-2):
@@ -611,7 +635,9 @@ class Solver(object):
     Vp,V = np.zeros((2,self.mesh.nle,3))
     Jp,J = np.zeros((2,self.mesh.nle,3))
     TBp_minus,TB_minus = np.zeros((2,self.mesh.nle,self.n_side_per_elem))
+    TBpm_minus,TBm_minus = np.zeros((2,self.n_serial,self.mesh.nle,self.n_side_per_elem))
     TBp_plus,TB_plus = np.zeros((2,self.mesh.nle,self.n_side_per_elem))
+    TBpm_plus,TBm_plus = np.zeros((2,self.n_serial,self.mesh.nle,self.n_side_per_elem))
     ITp,IT = np.zeros((2,self.n_parallel,self.mesh.nle,self.n_side_per_elem))
 
     ndifp = np.zeros(1)
@@ -638,7 +664,7 @@ class Solver(object):
           
        #Compute ballistic regime---
        a = time.time()
-       temp_bal = self.get_bulk_data(index * self.n_serial + self.n_serial -1,TB,TL,Tnew,IT)
+       temp_bal = self.get_bulk_data(index * self.n_serial + self.n_serial -1,TB,TL,Tnew,IT,TBm)
        #self.mesh.B_with_area_old.dot(temp_bal).sum()
        eta_bal = np.ones(self.n_serial) * self.mesh.B_with_area_old.dot(temp_bal).sum()
        #-------------------------------------
@@ -669,7 +695,7 @@ class Solver(object):
          temp = TDIFF[n]
          eta = eta_diff[n]
         else:
-         temp = self.get_bulk_data(global_index,TB,TL,Tnew,IT)
+         temp = self.get_bulk_data(global_index,TB,TL,Tnew,IT,TBm[n])
 
          #heat coming from periodic boundary conditions----
          eta = self.mesh.B_with_area_old.dot(temp-Tnew).sum()
@@ -709,6 +735,12 @@ class Solver(object):
 
         TBp_minus += Am 
         TBp_plus  += np.einsum('es,e->es',Ap,temp)
+
+        #MFP dependent---
+        TBpm_minus[n] += Am 
+        TBpm_plus[n]  += np.einsum('es,e->es',Ap,temp)
+        #---------------
+
         TL2p += np.outer(self.mat[0]['B'][:,global_index],temp)   
 
         #update interfacial information--------------------
@@ -789,6 +821,8 @@ class Solver(object):
     comm.Allreduce([TL2p,MPI.DOUBLE],[TL2,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([TBp_minus,MPI.DOUBLE],[TB_minus,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([TBp_plus,MPI.DOUBLE],[TB_plus,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([TBpm_minus,MPI.DOUBLE],[TBm_minus,MPI.DOUBLE],op=MPI.SUM)
+    comm.Allreduce([TBpm_plus,MPI.DOUBLE],[TBm_plus,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([Tp,MPI.DOUBLE],[T,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
     comm.Allreduce([ndifp,MPI.DOUBLE],[ndif,MPI.DOUBLE],op=MPI.SUM)
@@ -811,10 +845,23 @@ class Solver(object):
        if not (TB_plus[n,i] == 0):
          TB_new[n,i] /= TB_minus[n,i]
     
+    TBm_new = np.zeros_like(TBm)
+    for n in range(self.n_serial):
+     for k in range(self.mesh.nle):
+      for s in range(self.n_side_per_elem):
+       if not (TBm_plus[n,k,s] == 0):
+         TBm_new[n,k,s] = TBm_plus[n,k,s]/TBm_minus[n,k,s]
+
+
     TB = self.alpha * TB_new + (1-self.alpha)*TB_old; 
     TB_old = TB.copy()
 
+
+    TBm = self.alpha * TBm_new + (1-self.alpha)*TBm_old; 
+    TBm_old = TBm.copy()
+
     Tnew = T.copy()
+
     TL = self.alpha * TL2.copy() + (1-self.alpha)*self.TL_old;
     #print(np.min(np.min(TL)),np.max(np.max(TL)),np.min(np.min(Tnew)),np.max(np.max(Tnew))) 
     self.TL_old = TL.copy()

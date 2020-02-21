@@ -16,7 +16,7 @@ def GenerateSquareLatticePores(argv):
      options = argv.setdefault('shape_options',{})
 
   elif argv['shape'] == 'smoothed_square':
-    make_pore = get_smoothed_square  
+    make_pore = get_smoothed_square 
     options = {'smooth':argv.setdefault('smooth',3),'Na':6}
   else:  
     make_pore = make_polygon
@@ -75,7 +75,7 @@ def GenerateSquareLatticePores(argv):
      for ky in range(int(Ny)):
       cx = -Lx*Nx*0.5 + (kx+b[0])*Lx + ppp[0]
       cy = -Ly*Ny*0.5 + (ky+b[1])*Ly + ppp[1]
-    
+  
       tmp = make_pore(**options)
       poly = [[t[0]+cx,t[1]+cy]   for t in tmp]
 
