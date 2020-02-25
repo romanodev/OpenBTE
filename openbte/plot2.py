@@ -572,6 +572,15 @@ class Plot(object):
   # if argv.setdefault('plot_interfaces',False):
   #   pp = self.geo.get_interface_point_couples(argv)
 
+   if argv.setdefault('plot_interface',True):
+     for side in self.geo.side_list['Interface']:
+      p1 = self.geo.sides[side][0]
+      p2 = self.geo.sides[side][1]
+      n1 = self.geo.nodes[p1]
+      n2 = self.geo.nodes[p2]
+      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=2,zorder=1)
+
+
    for n in range(self.geo.nle):
      
        color = viridis((data[n] - minv)/(maxv-minv))

@@ -43,49 +43,45 @@ class Material(object):
   self.state = MPI.COMM_WORLD.bcast(data,root=0)
     
 
- def compute_full_2D(self,**argv):
+ #def compute_full_2D(self,**argv):
 
-  if MPI.COMM_WORLD.Get_rank() == 0:
+ # if MPI.COMM_WORLD.Get_rank() == 0:
 
-   data = pickle.load(open(argv['matfile'],'rb'))
-   #if argv.setdefault('synt',False):
-   # mfp = data['FBTE']
-   # nm = len(mfp)
-   #else:
-   mfp = data['MFP']
+  # data = pickle.load(open(argv['matfile'],'rb'))
+  # mfp = data['MFP']
 
-   mfp_b,theta_b,phi_b = self.spherical(mfp)
-   nm = len(mfp_b)
-   versors = np.zeros((nm,3))
-   gversors = np.zeros((nm,3))
-   for i in range(nm):
-    if mfp_b[i] == 0:
-     versors[i] = [0,0,0]
-    else: 
-     versors[i] = mfp[i]/mfp_b[i]
-   versors = np.array(versors)
+  # mfp_b,theta_b,phi_b = self.spherical(mfp)
+  # nm = len(mfp_b)
+  # versors = np.zeros((nm,3))
+  # gversors = np.zeros((nm,3))
+  # for i in range(nm):
+  #  if mfp_b[i] == 0:
+  #   versors[i] = [0,0,0]
+  #  else: 
+  #   versors[i] = mfp[i]/mfp_b[i]
+  # versors = np.array(versors)
 
 
-   mfp_b *= 1e9   #from m to nm
-   kbulk = data['KBULK']
-   Tcoeff = data['TCOEFF']
+  # mfp_b *= 1e9   #from m to nm
+  # kbulk = data['KBULK']
+  # Tcoeff = data['TCOEFF']
 
-   k_coeff = np.array(data['KCOEFF'])*1e-9
-   k_coeff[:,2] = 0 #Enforce zeroflux on z (for visualization purposed)
+  # k_coeff = np.array(data['KCOEFF'])*1e-9
+  # k_coeff[:,2] = 0 #Enforce zeroflux on z (for visualization purposed)
 
 
-   return {'B': data['B'],\
-           'TCOEFF':Tcoeff,\
-           'angle_map':np.arange(nm),\
-           'temp_vec':range(nm),\
-           'kappa_directional':k_coeff,\
-           'n_serial':1,
-           'n_parallel':nm,
-           'mfp':mfp_b,
+  # return {'B': data['B'],\
+  #         'TCOEFF':Tcoeff,\
+  #         'angle_map':np.arange(nm),\
+  #         'temp_vec':range(nm),\
+  #         'kappa_directional':k_coeff,\
+  #         'n_serial':1,
+  #         'n_parallel':nm,
+  #         'mfp':mfp_b,
            #'mfp_rta':data['MFP']*1e9,
-           'control_angle':versors,\
+  #         'control_angle':versors,\
            #'GMFP':data['GMFP'],\
-           'kappa_bulk_tot':kbulk}
+  #         'kappa_bulk_tot':kbulk}
 
 
 

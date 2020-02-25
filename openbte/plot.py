@@ -74,7 +74,6 @@ class Plot(object):
    if argv['variable'] == 'map':
      self.plot_map_new(**argv)
 
-
    if '/' in argv['variable']:
     model= argv['variable'].split('/')[0]
     if model == 'map':
@@ -476,8 +475,8 @@ class Plot(object):
 
 
  def plot_map(self,argv):
-
-   self.geo = Geometry(model='load')
+   self.geo - argv['geo']
+   #self.geo = Geometry(model='load')
    (Lx,Ly) = self.geo.get_repeated_size(argv)
    Sx = 8
    Sy = Sx*Ly/Lx
@@ -488,7 +487,7 @@ class Plot(object):
    #fig = figure(num=' ', figsize=(8*Lx/Ly, 8), dpi=80, facecolor='w', edgecolor='k')
    #axes([0,0,0.5,1.0])
    #axes([0,0,1.0,1.0])
-
+   print('g')
 
    #data += 1.0
    plt.set_cmap(Colormap('hot'))

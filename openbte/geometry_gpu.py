@@ -13,6 +13,7 @@ from .GenerateCustomPores import *
 from .Generate2DInterface import *
 from .GenerateRandomPoresOverlap import *
 from .GenerateCorrelatedPores import *
+from .GenerateInterface import *
 from .GenerateRandomPoresGrid import *
 from . import GenerateMesh2D
 from . import GenerateBulk2D
@@ -79,7 +80,7 @@ def create_path(obj):
    path = Path(verts,codes)
    return path
 
-class GeometryGPU(object):
+class GeometryFull(object):
 
  def __init__(self,**argv):
 
@@ -188,6 +189,10 @@ class GeometryGPU(object):
       self.frame.append([Lx/2,-Ly/2])
       self.frame.append([-Lx/2,-Ly/2])
 
+    #if geo_type == 'interface':
+      #generate_interface(**argv)   
+      #qui()
+
     if argv.setdefault('mesh',True):
      self.mesh(**argv)
      data = {'state':self.state}
@@ -282,8 +287,9 @@ class GeometryGPU(object):
 
        return
 
-   if argv['model'] == '2DInterface':
-       Generate2DInterface(argv)
+   if argv['model'] == 'interface':
+
+       generate_interface(**argv)   
        Lx = float(argv['lx'])
        Ly = float(argv['ly'])
        self.frame = []
@@ -302,6 +308,10 @@ class GeometryGPU(object):
      subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-' + str(self.dim),'mesh.geo','-o','mesh.msh'])
      self.import_mesh()
     self.compute_mesh_data()
+
+    if argv['model'] == 'interface':
+       self.build_interface(**argv)
+
 
    if self.argv.setdefault('save',True) and not argv.setdefault('only_geo',False):
      self.save(**argv)   
@@ -1658,7 +1668,6 @@ class GeometryGPU(object):
 
 
  def build_interface(self,**argv):
-
 
     p = self.size[1] 
     l = argv.setdefault('l',1)
