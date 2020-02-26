@@ -146,16 +146,20 @@ class SolverFull(object):
      for mm in argv['matfiles']:
        self.mat.append(pickle.load(open(mm,'rb')))
     else:     
-      self.mat = [pickle.load(open('material.p','rb'))]
-
+      self.mat = [pickle.load(open('MATERIAL','rb'))]
 
    W = self.mat[0]['W']
+   #self.BB = self.mat[0]['B']
    self.kbulk = self.mat[0]['kappa']
    self.a = np.diag(W)
    self.Wod = np.diag(self.a)  - W
    self.tc = self.mat[0]['tc']
+   #self.jc = self.mat[0]['JC']*1e9
+   #self.FF = self.mat[0]['F']
    self.sigma = self.mat[0]['sigma']
    self.kappa = self.mat[0]['kappa']
+
+   #quit()   
 
    #compute elem kappa map
    self.elem_mat_map = self.mesh.elem_mat_map
@@ -195,7 +199,7 @@ class SolverFull(object):
    #self.n_parallel = self.mat[0]['n_parallel'] #total indexes
    #self.n_serial = self.mat[0]['n_serial'] #total indexes
    #self.n_index = self.n_parallel * self.n_serial
-   self.n_index = len(self.a)
+   self.n_index = len(self.tc)
     
    self.lu_fourier = {}
    self.last_index = -1
@@ -407,7 +411,7 @@ class SolverFull(object):
       print('                        SYSTEM INFO                 ')   
       print(colored(' -----------------------------------------------------------','green'))
       print(colored('  Space Discretization:                    ','green') + str(len(self.mesh.l2g)))
-      print(colored('  Momentum Discretization:                 ','green') + str(len(self.a)))
+      print(colored('  Momentum Discretization:                 ','green') + str(len(self.tc)))
       print(colored('  Bulk Thermal Conductivity [W/m/K]:       ','green')+ str(round(self.kappa[0,0],4)))
 
 
@@ -438,6 +442,7 @@ class SolverFull(object):
      coeff = self.sigma*1e9
      #Solve Bulk
      G = np.einsum('qj,jn->qn',coeff,self.k,optimize=True)
+     #G = np.einsum('qj,jn->qn',self.FF,self.k,optimize=True)
      Gp = G.clip(min=0)
      Gm = G.clip(max=0)
      D = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
@@ -448,11 +453,13 @@ class SolverFull(object):
      D2[:,self.i] = Gp
 
      D += np.tile(self.a,(self.mesh.nle,1)).T
+     #D += np.ones((self.n_index,self.mesh.nle))
 
      #Compute boundary------------------------------------------
      Bm = np.zeros((self.n_index,self.mesh.nle))
      if len(self.db) > 0:
       Gb = np.einsum('qj,jn->qn',coeff,self.db,optimize=True)
+      #Gb = np.einsum('qj,jn->qn',self.jc,self.db,optimize=True)
       Gbp = Gb.clip(min=0)
       Gbm = Gb.clip(max=0)
       Bp = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
@@ -470,6 +477,7 @@ class SolverFull(object):
      KM = 0
      if len(self.dft) > 0:
       Gb = np.einsum('qj,jn->qn',coeff,self.dft,optimize=True)
+      #Gb = np.einsum('qj,jn->qn',self.FF,self.dft,optimize=True)
       Gftp = Gb.clip(min=0)
       Gftm = Gb.clip(max=0)
 
@@ -489,6 +497,7 @@ class SolverFull(object):
      for n,(i,j) in enumerate(zip(self.i,self.j)): 
       P[:,i] += Gm[:,n]*self.mesh.B[i,j]
 
+     #BB = -np.outer(self.jc[:,0],np.sum(self.mesh.B_with_area_old.todense(),axis=0))*self.kappa_factor*1e-9
      BB = -np.outer(self.sigma[:,0],np.sum(self.mesh.B_with_area_old.todense(),axis=0))*self.kappa_factor*1e-9
 
      #---------------------------------------------
@@ -500,8 +509,6 @@ class SolverFull(object):
      error = 1
      kk = 0
 
-
-
      #---------------------
      X = np.tile(Tnew,(self.n_index,1))
      DeltaT = X
@@ -512,8 +519,10 @@ class SolverFull(object):
      while kk < miter and error > merror:
       if not rta:
        DeltaT = np.matmul(self.Wod,alpha*X+(1-alpha)*X_old) 
+       #DeltaT = np.matmul(self.BB,alpha*X+(1-alpha)*X_old) 
       else:
        DeltaT = np.einsum('qc,q,u->uc',X,self.tc,a)
+       #DeltaT = np.einsum('qc,q->uc',X,self.tc)
 
       X_old = X.copy()
       X = ms.solve(P  + Bt  + Bm  + DeltaT)

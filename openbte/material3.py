@@ -272,7 +272,6 @@ class Material(object):
    kappa_directional[:,2] = 0 #Enforce zeroflux on z (for visualization purposed)
    #-----------------------
 
-
    
    return {'CollisionMatrix':A,\
            'TCOEFF':temp_coeff,\
@@ -612,24 +611,34 @@ class Material(object):
    #---------------------------------
 
 
-   return {'B':A,\
-           'TCOEFF':TCOEFF,\
-           'temp_vec':temp_vec,\
-           'angle_map':angle_map,\
-           'dphi':Dphi,\
-           'ftheta':ftheta*np.sin(theta),\
-           'kappa_directional':kappa_directional,\
-           'n_serial':n_mfp,\
-           'n_parallel':n_phi,\
-           'mfp':mfp,\
-           'control_angle':polar_ave,\
-           'angle':polar,\
-           'direction_int':direction_int,\
-           'factor':[np.sin(Dphi/2),np.cos(Dphi/2)/Dphi],\
-           'mfp_bulk':mfp_bulk,\
-           'other_properties':argv.setdefault('other_properties',{}), 
-           'kappa_bulk':kappa_bulk,\
-           'kappa_bulk_tot':np.sum(kappa_bulk)}
+   #This is everything we need---
+   F = np.einsum('u,uj->uj',mfp,polar_ave)
+   tc = TCOEFF
+   B = np.tile(TCOEFF,(len(TCOEFF),1))
+   #--------------------------------
+
+
+   return {'F':F,'TC':tc,'B':B,'JC':kappa_directional}
+
+
+   #return {'B':A,\
+   #        'TCOEFF':TCOEFF,\
+   #        'temp_vec':temp_vec,\
+   #        'angle_map':angle_map,\
+   #        'dphi':Dphi,\
+   #        'ftheta':ftheta*np.sin(theta),\
+   #        'kappa_directional':kappa_directional,\
+   #        'n_serial':n_mfp,\
+   #        'n_parallel':n_phi,\
+   #        'mfp':mfp,\
+   #        'control_angle':polar_ave,\
+   #        'angle':polar,\
+   #        'direction_int':direction_int,\
+   #        'factor':[np.sin(Dphi/2),np.cos(Dphi/2)/Dphi],\
+   #        'mfp_bulk':mfp_bulk,\
+   #        'other_properties':argv.setdefault('other_properties',{}), 
+   #        'kappa_bulk':kappa_bulk,\
+   #        'kappa_bulk_tot':np.sum(kappa_bulk)}
 
 
 

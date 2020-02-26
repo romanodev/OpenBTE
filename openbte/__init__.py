@@ -2,7 +2,7 @@ new = True
 if new:
  from .geometry2 import Geometry
  from .geometry_gpu import GeometryFull
- from .material2 import Material
+ from .material3 import Material
  from .solver import Solver
  from .solver_gpu import SolverFull
  from .elasticity import Elasticity

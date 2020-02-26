@@ -29,6 +29,6 @@ setup(name='openbte',
       package_data = {'openbte':['materials/*.dat','fonts/*.ttf']},
       entry_points = {
      'console_scripts': [
-      'openbte=openbte.__main__:main','shengbte2openbte=openbte.shengbte2openbte:main'],
+      'openbte=openbte.__main__:main','symmetrize=symmetrize:main'],
       },
       zip_safe=False)
