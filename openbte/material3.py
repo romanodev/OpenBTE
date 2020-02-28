@@ -1,4 +1,5 @@
 import numpy as np
+import deepdish as dd
 import os
 import pickle
 from mpi4py import MPI
@@ -6,15 +7,17 @@ from numpy.testing import assert_array_equal
 import math
 import pickle
 from matplotlib.pylab import *
+from .full_model import generate_full
 
 class Material(object):
 
 
  def __init__(self,**argv):
-
   if MPI.COMM_WORLD.Get_rank() == 0:
  
    model = argv.setdefault('model','isotropic_2DSym')
+   if model == 'full':
+     data = generate_full(**argv)
 
    if model == 'full_2D':
      data = self.compute_full_2D(**argv)
@@ -34,13 +37,15 @@ class Material(object):
    if model == 'isotropic_3D':
      data = self.compute_isotropic_3D(**argv)
 
-   data.update({'kappa_inclusion':argv.setdefault('kappa_inclusion',1e-3)})
-   if argv.setdefault('save',True):
-    pickle.dump(data,open(argv.setdefault('save_filename','MATERIAL'),'wb+'))
-  
-  else : data = None
+   #data.update({'kappa_inclusion':argv.setdefault('kappa_inclusion',1e-3)})
+   #if argv.setdefault('save',True):
 
-  self.state = MPI.COMM_WORLD.bcast(data,root=0)
+   dd.io.save('material.h5',data,compression=('zlib', 9))
+   # pickle.dump(data,open(argv.setdefault('save_filename','MATERIAL'),'wb+'))
+  
+  #else : data = None
+
+  #self.state = MPI.COMM_WORLD.bcast(data,root=0)
     
 
  #def compute_full_2D(self,**argv):

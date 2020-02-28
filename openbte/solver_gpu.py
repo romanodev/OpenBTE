@@ -146,16 +146,14 @@ class SolverFull(object):
      for mm in argv['matfiles']:
        self.mat.append(pickle.load(open(mm,'rb')))
     else:     
-      self.mat = [pickle.load(open('MATERIAL','rb'))]
+      self.mat = [pickle.load(open('material.h5','rb'))]
 
+
+   #-----MODIFY THIS-------
    W = self.mat[0]['W']
-   #self.BB = self.mat[0]['B']
-   self.kbulk = self.mat[0]['kappa']
    self.a = np.diag(W)
    self.Wod = np.diag(self.a)  - W
    self.tc = self.mat[0]['tc']
-   #self.jc = self.mat[0]['JC']*1e9
-   #self.FF = self.mat[0]['F']
    self.sigma = self.mat[0]['sigma']
    self.kappa = self.mat[0]['kappa']
 
