@@ -8,6 +8,10 @@ from scipy.sparse import csc_matrix
 import scipy
 import deepdish as dd
 
+def check_symmetric(a, rtol=1e-05, atol=1e-6):
+    return np.allclose(a, a.T, rtol=rtol, atol=atol)
+
+
 def compute_kappa(W,sigma):
 
 
@@ -32,8 +36,54 @@ def compute_kappa(W,sigma):
  return kappa
 
 
-def energy_conserving(W):
 
+def compute_energy_conservation(W):
+
+ bottom = np.sum(np.absolute(W))
+ r = np.sum(np.absolute(np.einsum('ij->j',W)))
+ print('')
+ print('   After:')
+ print('Row check:' + str(r/bottom))
+ c = np.sum(np.absolute(np.einsum('ij->i',W)))
+ print('Column Check:' + str(c/bottom))
+
+def energy_conserving_square(W):
+
+ #W2 = np.multiply(W,W)
+ #delta2= np.einsum('ij->j',W2)
+ delta = np.einsum('ij->j',W)
+ #dd2 = np.divide(delta,delta2)
+
+ d = compute_energy_conservation(W)
+
+ nm = np.shape(W)[0]
+ b = -2*np.ones(2*nm)
+ A = np.zeros((2*nm,2*nm))
+ A[0:nm,0:nm] = np.eye(nm)
+ A[nm:,nm:] = np.eye(nm)
+ 
+ for m in range(nm):
+  for n in range(nm):
+    print(W[m,n]/delta)  
+    A[m,nm+n] = W[m,n]/delta[n]
+    A[nm+m,n] = W[m,n]/delta[m]
+    
+ l = np.linalg.solve(A,b)
+ lr = l[:nm]
+ lv = l[nm:]
+ beta = np.zeros((nm,nm))
+ for i in range(nm):
+  for j in range(nm):
+   beta[i,j] = (lr[j]+lv[i])/2
+
+ W += np.multiply(beta,W)
+
+ d = compute_energy_conservation(W)
+
+ quit()
+
+
+def energy_conserving(W):
 
  print('   Before:')
  bottom = np.sum(np.absolute(W))
@@ -41,8 +91,6 @@ def energy_conserving(W):
  print('Row check:' + str(r/bottom))
  c = np.sum(np.absolute(np.einsum('ij->i',W)))
  print('Column Check:' + str(c/bottom))
-
-
  nm = np.shape(W)[0]
  delta = np.einsum('ij->j',W)
  b = -2*np.concatenate((delta,delta))
@@ -125,31 +173,40 @@ def generate_full(**argv):
  A = np.delete(A,exclude,1)
  A = 0.5*A + 0.5*A.T
  nm = A.shape[0]
- print(' done')
- print(' ')
- print('Sparcifying A ...')
-
- A[np.abs(A) < stol] = 0
-
- print('Sparsity density: ',end='')
- print(len(A.nonzero()[0])/nm/nm,end='')
- print(' with tolerance of ',end='')
- print(stol,end='')
- print(' 1/s')
- print('... done')
- print(' ')
-
+ 
 
  print('Computing W ...',end= '')
  W = np.einsum('u,uq,q->uq',w,A,w)/kb/T0/T0*hbar*hbar/factor
+
  print('... done')
  print(' ')
 
  print('Making W energy conserving ...',end= '')
  energy_conserving(W)
+ #energy_conserving_square(W)
  print('... done')
  print(' ')
  print('Computing kappa bulk ...')
+
+
+ print(' done')
+ print(' ')
+ #print('Sparcifying W ...')
+ #W[np.abs(A) < stol] = 0
+ #print('Sparsity density: ',end='')
+ #print(len(W.nonzero()[0])/nm/nm,end='')
+ #print(' with tolerance of ',end='')
+ #print(stol,end='')
+ #print(' 1/s')
+ #print('... done')
+ #print(' ')
+ #bottom = np.sum(np.absolute(W))
+ #r = np.sum(np.absolute(np.einsum('ij->j',W)))
+ #print('')
+ #print('   After:')
+ #print('Row check:' + str(r/bottom))
+ #c = np.sum(np.absolute(np.einsum('ij->i',W)))
+ #print('Column Check:' + str(c/bottom))
 
  kappa = compute_kappa(W,sigma)
 
@@ -158,18 +215,27 @@ def generate_full(**argv):
  print('... done')
  print(' ')
 
-
+ #kappa = np.eye(3)
  #print('Saving in OpenBTE format ...',end= '')
 
- Ws = scipy.sparse.tril(W,format='csr')
+ Ws = np.empty_like(W)
+ for i in range(nm):
+  for j in range(i,nm):
+   Ws[i,j] = W[i,j]
+
+ #Ws = scipy.sparse.tril(W,format='csr')
  tc = C/sum(C)
 
- data = {'tc':tc,'d':Ws.data,'indices':Ws.indices,'indptr':Ws.indptr,'sigma':sigma,'kappa':kappa}
+ #data = {'tc':tc,'d':Ws.data,'indices':Ws.indices,'indptr':Ws.indptr,'sigma':sigma,'kappa':kappa}
+
+ #a = 1/np.diag(W)
+ #F = np.einsum('ui,u->ui',sigma,a)
+
+ data = {'tc':tc,'W':Ws,'sigma':sigma,'kappa':kappa}
  #print('... done')
  #print(' ')
 
  return data
- #dd.io.save('Graphene_out.h5',data)
 
 
 

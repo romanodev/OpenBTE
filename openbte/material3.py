@@ -40,7 +40,7 @@ class Material(object):
    #data.update({'kappa_inclusion':argv.setdefault('kappa_inclusion',1e-3)})
    #if argv.setdefault('save',True):
 
-   dd.io.save('material.h5',data,compression=('zlib', 9))
+   dd.io.save('material.h5',data,compression=('zlib',9))
    # pickle.dump(data,open(argv.setdefault('save_filename','MATERIAL'),'wb+'))
   
   #else : data = None

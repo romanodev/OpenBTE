@@ -1689,7 +1689,21 @@ class GeometryFull(object):
        elem_mat_map.update({ne:1})
 
     self.add_patterning(elem_mat_map)
+    self.compute_volume_fraction()
     
+
+ def compute_volume_fraction(self):   
+
+   v1 = 0
+   v2 = 0
+   for e in range(len(self.elems)):
+    v = self.compute_elem_volume(e)   
+    if self.elem_mat_map[e] == 0:
+      v1 +=v
+    else:  
+      v2 +=v
+
+   print(v1,v2)   
 
 
  def add_patterning(self,elem_mat_map,lone=True):

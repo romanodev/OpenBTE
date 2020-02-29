@@ -5,12 +5,14 @@ import numpy as np
 import scipy.sparse as sp
 #from GBQsparse import MSparse
 from .GPUSolver import *
+import time
 from scipy import *
 #import scipy.sparse
 import pkg_resources  # part of setuptools
 from scipy.sparse import csc_matrix
 #import sparseqr
 from mpi4py import MPI
+import opt_einsum
 from scipy.sparse.linalg import splu
 #import pycuda.gpuarray as gpuarray
 #import pycuda.driver as cuda
@@ -19,7 +21,6 @@ from itertools import permutations
 from os import listdir
 #from scipy.sparse import *
 from os.path import isfile, join
-import time
 from copy import deepcopy
 from collections import namedtuple
 from scipy.sparse import spdiags
@@ -146,16 +147,26 @@ class SolverFull(object):
      for mm in argv['matfiles']:
        self.mat.append(pickle.load(open(mm,'rb')))
     else:     
-      self.mat = [pickle.load(open('material.h5','rb'))]
+      #self.mat = [pickle.load(open('material.h5','rb'))]
+      self.mat = [dd.io.load('material.h5')]
 
 
-   #-----MODIFY THIS-------
-   W = self.mat[0]['W']
-   self.a = np.diag(W)
-   self.Wod = np.diag(self.a)  - W
+   #-----IMPORT MATERIAL-------------------
    self.tc = self.mat[0]['tc']
-   self.sigma = self.mat[0]['sigma']
+   self.n_index = len(self.tc)
+   W = self.mat[0]['W']
+   self.sigma = self.mat[0]['sigma']*1e9
+   self.a = np.diag(W)
+   W = (W + W.T - np.diag(self.a))
+   self.Wod = np.diag(self.a)  - W
    self.kappa = self.mat[0]['kappa']
+   #----------------IMORT MATERIAL-------
+
+   #print(np.shape(self.Wod))
+   #print(np.shape(self.sigma))
+   #print(np.shape(self.tc))
+   #W = csc_matrix((self.mat[0]['d'],self.mat[0]['indices'],self.mat[0]['indptr']),shape=(self.n_index,self.n_index))
+   #W = (W + W.T - scipy.sparse.diags(self.a)).toarray()
 
    #quit()   
 
@@ -166,8 +177,8 @@ class SolverFull(object):
    self.elem_kappa_map = {}
    for e in self.elem_mat_map.keys():
      if self.mesh.elem_mat_map[e] == 0:
-      self.elem_kappa_map.update({e:self.kappa})
-     else:  
+      self.elem_kappa_map.update({e:self.kappa[0,0]})
+     else: 
       self.elem_kappa_map.update({e:0.5})
 
 
@@ -225,10 +236,7 @@ class SolverFull(object):
   
  
    #solve the BTE
-   #self.solve_bte(**argv)
-   #self.solve_bte_cg(**argv)
    self.solve_full(**argv)
-   #self.solve_bte_working2(**argv)
 
    if MPI.COMM_WORLD.Get_rank() == 0:
     if os.path.isdir(self.cache):
@@ -432,71 +440,34 @@ class SolverFull(object):
       print(colored(' -----------------------------------------------------------','green'))
 
 
-     rta = argv.setdefault('rta',False)
-
      Tnew = temp_fourier.copy()
      TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
-     
-     coeff = self.sigma*1e9
+    
      #Solve Bulk
-     G = np.einsum('qj,jn->qn',coeff,self.k,optimize=True)
-     #G = np.einsum('qj,jn->qn',self.FF,self.k,optimize=True)
-     Gp = G.clip(min=0)
-     Gm = G.clip(max=0)
-     D = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
-     for n,i in enumerate(self.i): 
-       D[:,i] += Gp[:,n]
+     G = np.einsum('qj,jn->qn',self.sigma,self.k,optimize=True)
+     Gp = G.clip(min=0); Gm = G.clip(max=0)
+     D = np.tile(self.a,(self.mesh.nle,1)).T
 
-     D2 = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
-     D2[:,self.i] = Gp
-
-     D += np.tile(self.a,(self.mesh.nle,1)).T
-     #D += np.ones((self.n_index,self.mesh.nle))
-
+     for n,i in enumerate(self.i): D[:,i] += Gp[:,n]
+     
      #Compute boundary------------------------------------------
      Bm = np.zeros((self.n_index,self.mesh.nle))
      if len(self.db) > 0:
-      Gb = np.einsum('qj,jn->qn',coeff,self.db,optimize=True)
-      #Gb = np.einsum('qj,jn->qn',self.jc,self.db,optimize=True)
-      Gbp = Gb.clip(min=0)
-      Gbm = Gb.clip(max=0)
-      Bp = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
+      Gb = np.einsum('qj,jn->qn',self.sigma,self.db,optimize=True)
+      Gbp = Gb.clip(min=0); Gbm = Gb.clip(max=0)
     
       for n,(i,j) in enumerate(zip(self.eb,self.sb)):
-        Bp[:,i] += Gbp[:,n]
+        D[:,i]  += Gbp[:,n]
         Bm[:,i] -= TB[i,j]*Gbm[:,n]
-      SS = np.einsum('qn,n->nq',Gbm,1/Gbm.sum(axis=0))
-      D += Bp
-      #------------------------------------------------------
+      SS = np.einsum('qc,c->qc',Gbm,1/Gbm.sum(axis=0))
 
-     #Thermostatting------------------------------------------
-     Bt = np.zeros((self.n_index,self.mesh.nle))
-     KP = np.zeros((self.n_index,self.mesh.nle))
-     KM = 0
-     if len(self.dft) > 0:
-      Gb = np.einsum('qj,jn->qn',coeff,self.dft,optimize=True)
-      #Gb = np.einsum('qj,jn->qn',self.FF,self.dft,optimize=True)
-      Gftp = Gb.clip(min=0)
-      Gftm = Gb.clip(max=0)
-
-      Bftp = np.zeros((self.n_index,self.mesh.nle),dtype=float64)
-      for n,(i,j) in enumerate(zip(self.eft,self.sft)):
-       Bftp[:,i] += Gftp[:,n]
-       Bt[:,i]   -= self.mesh.IB[i,j]*Gftm[:,n]
-
-      KP =  np.einsum('uc,c->uc', Bftp,self.mesh.B_area,optimize=True)*self.kappa_factor*1e-18 
-      KM = -np.einsum('uc,c->',Bt,self.mesh.B_area,optimize=True)*self.kappa_factor*1e-18 
-      D += Bftp
-
-     ms = MultiSolver(self.i,self.j,Gm,D,self.mesh.nle)
+     ms = MultiSolver(self.i,self.j,Gm,D)
 
      #Periodic------------------
      P = np.zeros((self.n_index,self.mesh.nle))
-     for n,(i,j) in enumerate(zip(self.i,self.j)): 
-      P[:,i] += Gm[:,n]*self.mesh.B[i,j]
+     for n,(i,j) in enumerate(zip(self.i,self.j)): P[:,i] += Gm[:,n]*self.mesh.B[i,j]
 
-     #BB = -np.outer(self.jc[:,0],np.sum(self.mesh.B_with_area_old.todense(),axis=0))*self.kappa_factor*1e-9
-     BB = -np.outer(self.sigma[:,0],np.sum(self.mesh.B_with_area_old.todense(),axis=0))*self.kappa_factor*1e-9
+     BB = -np.outer(self.sigma[:,0],np.sum(self.mesh.B_with_area_old.todense(),axis=0))*self.kappa_factor*1e-18
 
      #---------------------------------------------
      kappa_vec = [kappa_fourier]
@@ -511,24 +482,21 @@ class SolverFull(object):
      X = np.tile(Tnew,(self.n_index,1))
      DeltaT = X
      X_old = X.copy()
-     alpha = 0.75
+     alpha = 1
      Bm_old = Bm.copy()
      kappa_old = kappa_fourier
      while kk < miter and error > merror:
-      if not rta:
-       DeltaT = np.matmul(self.Wod,alpha*X+(1-alpha)*X_old) 
-       #DeltaT = np.matmul(self.BB,alpha*X+(1-alpha)*X_old) 
-      else:
-       DeltaT = np.einsum('qc,q,u->uc',X,self.tc,a)
-       #DeltaT = np.einsum('qc,q->uc',X,self.tc)
 
+      DeltaT = np.matmul(self.Wod,alpha*X+(1-alpha)*X_old) 
       X_old = X.copy()
-      X = ms.solve(P  + Bt  + Bm  + DeltaT)
+      X = ms.solve(P + Bm + DeltaT)
       kappa = np.sum(np.multiply(BB,X))
 
       kk +=1
-      if len(self.db) > 0: 
-         Bm[:,self.eb] = np.einsum('un,un,nq->qn',X[:,self.eb],Gbp,SS,optimize=True)
+      if len(self.db) > 0:
+       Bm = np.zeros((self.n_index,self.mesh.nle))   
+       for n,(i,j) in enumerate(zip(self.eb,self.sb)): 
+         Bm[:,i] +=np.einsum('u,u,q->q',X[:,i],Gbp[:,n],SS[:,n],optimize=True)
 
       error = abs(kappa_old-kappa)/abs(kappa)
       kappa_old = kappa
