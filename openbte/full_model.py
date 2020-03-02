@@ -218,10 +218,10 @@ def generate_full(**argv):
  #kappa = np.eye(3)
  #print('Saving in OpenBTE format ...',end= '')
 
- Ws = np.empty_like(W)
- for i in range(nm):
-  for j in range(i,nm):
-   Ws[i,j] = W[i,j]
+ #Ws = np.empty_like(W)
+ #for i in range(nm):
+ # for j in range(i,nm):
+ #  Ws[i,j] = W[i,j]
 
  #Ws = scipy.sparse.tril(W,format='csr')
  tc = C/sum(C)
@@ -231,9 +231,8 @@ def generate_full(**argv):
  #a = 1/np.diag(W)
  #F = np.einsum('ui,u->ui',sigma,a)
 
- data = {'tc':tc,'W':Ws,'sigma':sigma,'kappa':kappa}
- #print('... done')
- #print(' ')
+ a = np.diag(W)
+ data = {'tc':tc,'W':np.diag(a)-W,'sigma':sigma,'kappa':kappa,'a':a}
 
  return data
 

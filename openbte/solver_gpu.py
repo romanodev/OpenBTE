@@ -2,6 +2,7 @@ from __future__ import absolute_import
 #import os
 import numpy as np
 #from scipy.sparse import *
+from jax import device_put
 import scipy.sparse as sp
 #from GBQsparse import MSparse
 from .GPUSolver import *
@@ -154,11 +155,9 @@ class SolverFull(object):
    #-----IMPORT MATERIAL-------------------
    self.tc = self.mat[0]['tc']
    self.n_index = len(self.tc)
-   W = self.mat[0]['W']
+   self.Wod = self.mat[0]['W']
    self.sigma = self.mat[0]['sigma']*1e9
-   self.a = np.diag(W)
-   W = (W + W.T - np.diag(self.a))
-   self.Wod = np.diag(self.a)  - W
+   self.a = self.mat[0]['a']
    self.kappa = self.mat[0]['kappa']
    #----------------IMORT MATERIAL-------
 
@@ -443,7 +442,20 @@ class SolverFull(object):
      Tnew = temp_fourier.copy()
      TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
     
-     #Solve Bulk
+
+     #Experimenting----
+     self.k = device_put(self.k)
+     self.sigma = device_put(self.sigma)
+     self.a = device_put(self.a)
+     self.eb = device_put(self.eb)
+     self.db = device_put(self.db)
+     self.i = device_put(self.i)
+     self.j = device_put(self.j)
+     self.Wod = device_put(self.Wod)
+     #-------------
+
+
+
      G = np.einsum('qj,jn->qn',self.sigma,self.k,optimize=True)
      Gp = G.clip(min=0); Gm = G.clip(max=0)
      D = np.tile(self.a,(self.mesh.nle,1)).T

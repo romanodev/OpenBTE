@@ -6,8 +6,11 @@ from mpi4py import MPI
 from numpy.testing import assert_array_equal
 import math
 import pickle
+from .database import *
 from matplotlib.pylab import *
 from .full_model import generate_full
+from google_drive_downloader import GoogleDriveDownloader as gdd
+
 
 class Material(object):
 
@@ -15,7 +18,29 @@ class Material(object):
  def __init__(self,**argv):
   if MPI.COMM_WORLD.Get_rank() == 0:
  
+
+   source = argv.setdefault('source','local')
+   filename = argv['filename'] 
+   if source == 'database':
+      if not os.path.exists(filename):
+       print('Download database') 
+       gdd.download_file_from_google_drive(file_id=db[filename],
+                                          dest_path='./' + filename,showsize=True)
+      else: 
+       print('Using local file')  
+   elif source == 'local':
+       print('Using local file')  
+   else:
+       print('Unlisted')  
+       gdd.download_file_from_google_drive(file_id=argv['file_id'],
+                                           dest_path='./' + filename,showsize=True)
+
+
    model = argv.setdefault('model','isotropic_2DSym')
+
+   if model == 'mfp/isotropic_2DSym':
+     data = self.compute_isotropic_2DSym(**argv)
+
    if model == 'full':
      data = generate_full(**argv)
 
@@ -554,8 +579,9 @@ class Material(object):
 
    #Import material-------------------------------------------------------------------
    if 'filename' in argv.keys():
-    source = argv.setdefault('source',os.path.dirname(__file__) + '/materials/')
-    tmp = np.loadtxt(source + argv['filename'],skiprows=1)
+    #source = argv.setdefault('source',os.path.dirname(__file__) + '/materials/')
+    #tmp = np.loadtxt(source + argv['filename'],skiprows=1)
+    tmp = np.loadtxt(argv['filename'],skiprows=1)
     mfp_bulk = tmp[:,0]*1e9; 
     kappa_bulk = tmp[:,1]
    else:
@@ -594,7 +620,6 @@ class Material(object):
        norm += a2* kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]#*mfp[m2]/mfp_bulk[m]
 
 
-
    #replicate bulk values---
    mfp = np.tile(mfp,n_phi)  
    #-----------------------
@@ -622,8 +647,10 @@ class Material(object):
    B = np.tile(TCOEFF,(len(TCOEFF),1))
    #--------------------------------
 
+   data = {'tc':tc,'W':Ws,'sigma':sigma,'kappa':kappa,'a':tcoeff}
+   return data
 
-   return {'F':F,'TC':tc,'B':B,'JC':kappa_directional}
+   #return {'F':F,'TC':tc,'B':B,'JC':kappa_directional}
 
 
    #return {'B':A,\
