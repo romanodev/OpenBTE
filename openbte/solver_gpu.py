@@ -216,8 +216,8 @@ class SolverFull(object):
 #   self.kappa_factor = self.mesh.kappa_factor
    self.kappa_factor = 1
 
-   if self.verbose: 
-    self.print_logo()
+   #if self.verbose: 
+    #self.print_logo()
     #self.print_dof()
    
    #if len(self.mesh.side_list['Interface']) > 0:
