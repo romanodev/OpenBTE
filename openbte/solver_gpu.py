@@ -444,14 +444,14 @@ class SolverFull(object):
     
 
      #Experimenting----
-     self.k = device_put(self.k)
-     self.sigma = device_put(self.sigma)
-     self.a = device_put(self.a)
-     self.eb = device_put(self.eb)
-     self.db = device_put(self.db)
-     self.i = device_put(self.i)
-     self.j = device_put(self.j)
-     self.Wod = device_put(self.Wod)
+     #self.k = device_put(self.k)
+     #self.sigma = device_put(self.sigma)
+     #self.a = device_put(self.a)
+     #self.eb = device_put(self.eb)
+     #self.db = device_put(self.db)
+     #self.i = device_put(self.i)
+     #self.j = device_put(self.j)
+     #self.Wod = device_put(self.Wod)
      #-------------
 
 
