@@ -21,7 +21,7 @@ setup(name='openbte',
                         'termcolor',
                         'alabaster',
                         'deepdish',
-                        'mpi4py==3.0.0',
+                        'mpi4py',
                         'matplotlib',
                          ],
       license='GPLv2',\
