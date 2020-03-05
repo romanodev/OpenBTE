@@ -16,8 +16,8 @@ Solver()
 Plot(variable=['flux','temperature','flux_fourier'])
 ```
 
-![ggg](flux.png)
-![ggg](temp.png)
-![ggg](ff.png)
+![](flux.png)
+![](temp.png)
+![](ff.png)
 
 To become a beta tester for new functionalities, please fill this [form](https://forms.gle/cJBE4Jjqkrh8djJX8).
