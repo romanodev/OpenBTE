@@ -64,12 +64,7 @@ You will have to install gmsh from source, then type
 .. code-block:: shell
 
   pip install --no-cache-dir --upgrade openbte 
-
-
-Tutorial
-=======
-
- `Nongray disordered material  <https://colab.research.google.com/drive/1eAfX3PgyO7TyGWPee8HRx5ZbQ7tZfLDr>`_
+  
 
 Example
 =======
