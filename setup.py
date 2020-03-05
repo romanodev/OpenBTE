@@ -14,7 +14,6 @@ setup(name='openbte',
                         'shapely',
                         'networkx',
                         'pyvtk',
-                        'gbqsparse',
                         'unittest2',
                         'ipython',
                         'future',
@@ -28,7 +27,6 @@ setup(name='openbte',
       packages = ['openbte'],
       package_data = {'openbte':['materials/*.dat','fonts/*.ttf']},
       entry_points = {
-     'console_scripts': [
-      'openbte=openbte.__main__:main','symmetrize=symmetrize:main'],
+     'console_scripts': ['lagrange=openbte.lagrange:main'],
       },
       zip_safe=False)

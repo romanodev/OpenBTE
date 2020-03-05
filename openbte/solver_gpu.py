@@ -80,8 +80,6 @@ def unique_versors(list_arrays):
     return sum([ int(np.allclose(elem,myarr,rtol=1e-5)) for elem in list_arrays])
 
 
-
-
 def log_interp1d(xx, y, kind='linear'):
 
      if len(y) > 1:
@@ -155,7 +153,7 @@ class SolverFull(object):
    #-----IMPORT MATERIAL-------------------
    self.tc = self.mat[0]['tc']
    self.n_index = len(self.tc)
-   self.Wod = self.mat[0]['W']
+   self.Wod = self.mat[0]['B'] + self.mat[0]['B'].T
    self.sigma = self.mat[0]['sigma']*1e9
    self.a = self.mat[0]['a']
    self.kappa = self.mat[0]['kappa']

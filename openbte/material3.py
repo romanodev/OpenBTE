@@ -35,7 +35,6 @@ class Material(object):
        gdd.download_file_from_google_drive(file_id=argv['file_id'],
                                            dest_path='./' + filename,showsize=True)
 
-
    model = argv.setdefault('model','isotropic_2DSym')
 
    if model == 'mfp/isotropic_2DSym':
@@ -43,6 +42,7 @@ class Material(object):
 
    if model == 'full':
      data = generate_full(**argv)
+
 
    if model == 'full_2D':
      data = self.compute_full_2D(**argv)
