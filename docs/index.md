@@ -16,8 +16,8 @@ Solver()
 Plot(variable=['flux','temperature','flux_fourier'])
 ```
 
-![](assets/flux.png)
-![](assets/temp.png)
-![](assets/ff.png)
+![](../assets/flux.png)
+![](../assets/temp.png)
+![](../assets/ff.png)
 
 To become a beta tester for new functionalities, please fill this [form](https://forms.gle/cJBE4Jjqkrh8djJX8).
