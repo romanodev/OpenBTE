@@ -1,8 +1,8 @@
 ---
 layout: default
 title: Publications
-description: List of papers using OpenBTE
 permalink: /publications/
+description: List of papers using OpenBTE
 ---
 
 
