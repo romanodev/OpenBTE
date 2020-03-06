@@ -5,6 +5,9 @@ permalink: /install/
 description: Install manual
 ---
 
+## Cloud
+
+If you have access to Google Colab, you can use the [cloud, interactive version of OpenBTE](https://colab.research.google.com/drive/1eAfX3PgyO7TyGWPee8HRx5ZbQ7tZfLDr).
 
 ## Anaconda
 
