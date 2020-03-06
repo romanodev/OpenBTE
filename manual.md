@@ -22,5 +22,10 @@ In the current directory, we must have a file named `mfp.h5`, with the follwing 
 # Geometry
 # Solver
 # Plot
+# Examples
+https://nbviewer.jupyter.org/github/romanodev/OpenBTE/blob/master/openbte/Tutorial.ipynb  
+The examples are provided via a [notebook](https://nbviewer.jupyter.org/github/romanodev/OpenBTE/blob/master/openbte/Tutorial.ipynb ) or [interactive simulations](https://colab.research.google.com/drive/1eAfX3PgyO7TyGWPee8HRx5ZbQ7tZfLDr) (Google Colab).
+ 
+
 
 
