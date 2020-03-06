@@ -21,6 +21,9 @@ url: "https://romanodev.github.io/OpenBTE/" # the base hostname & protocol for y
 twitter_username: _romanog_
 github_username:  romanodev
 
+sass:
+    sass_dir: assets/css
+
 # Build settings
 markdown: kramdown
 theme: jekyll-theme-cayman
