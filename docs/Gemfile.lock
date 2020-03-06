@@ -236,7 +236,7 @@ GEM
     tzinfo (1.2.6)
       thread_safe (~> 0.1)
     unicode-display_width (1.6.1)
-    zeitwerk (2.3.0)
+    zeitwerk (2.2.2)
 
 PLATFORMS
   ruby
@@ -244,7 +244,7 @@ PLATFORMS
 DEPENDENCIES
   github-pages (~> 204)
   jekyll-feed (~> 0.6)
-  minima (~> 2.0)
+  jekyll-theme-cayman (~> 0.1.1)
   tzinfo-data
 
 BUNDLED WITH
