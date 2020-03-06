@@ -16,7 +16,7 @@
 title: OpenBTE
 email: romanog@mit.edu
 description: Nanoscale Heat Transport Solver 
-baseurl: "" # the subpath of your site, e.g. /blog
+baseurl: "docs" # the subpath of your site, e.g. /blog
 url: "https://romanodev.github.io/OpenBTE/" # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: _romanog_
 github_username:  romanodev
