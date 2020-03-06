@@ -2,6 +2,11 @@
 <html lang="{{ site.lang | default: "en-US" }}">
   <head>
 
+   <!-- For styles with static names... -->
+   <link href="{{ "/assets/css/style.css" | relative_url }}" rel="stylesheet">
+   <!-- For documents/pages whose URLs can change... -->
+   [{{ page.title }}]("{{ page.url | relative_url }}")
+
     {% if site.google_analytics %}
       <script async src="https://www.googletagmanager.com/gtag/js?id={{ site.google_analytics }}"></script>
       <script>
@@ -17,7 +22,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#157878">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="stylesheet" href="{{ './assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
+    <link rel="stylesheet" href="{{ '../assets/css/style.css' }}">
   </head>
   <body>
   
