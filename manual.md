@@ -53,8 +53,8 @@ where $$N$$ is the number of MFPs. The `mfp` model accept the following options:
 
 | Field     | Default     | Description |  
 |:-------------|:------------------|
-| $$n_phi$$    | 48      | Polar angle discretization| 
-| $$n_phi$$    | 50      | MFPs discretiztion. It must be less than $$N$$.|    
+| `n_{phi}`    | 48      | Polar angle discretization| 
+|`n_{mfp}`    | 50      | MFPs discretiztion. It must be less than $$N$$.|    
 
 
 
