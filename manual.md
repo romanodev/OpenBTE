@@ -72,11 +72,13 @@ The examples are provided via a [notebook](https://nbviewer.jupyter.org/github/r
 
 # Notes
 
-### <a name="1"></a> 1. `2DSym` is a system that is infinite in the third dimension. Below are the cases are shown.
+### <a name="1"></a> 1. <pre> `2DSym` is a system that is infinite in the third dimension. Below are the cases are shown.
 
 <p align="left">
 <img  align="left" width="700" src="https://docs.google.com/drawings/d/e/2PACX-1vRUa6nwKHA_kCBaofjivbwPbmgweDab5xXCKdEesLTZF622a020f0xm7rlufdCufwhquPBLLTTFzrEO/pub?w=885&h=138">
 </p>
+
+</pre>
 
  
 
