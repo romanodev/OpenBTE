@@ -60,8 +60,8 @@ where $$N$$ is the number of MFPs. The `mfp` model accept the following options:
 
 
    `2DSym`  &emsp &emsp &emsp &emsp &emsp `3D`   &emsp &emsp &emsp &emsp &emsp   `2D`
-<p align="center">
-<img  align="center" width="700" src="https://docs.google.com/drawings/d/e/2PACX-1vRUa6nwKHA_kCBaofjivbwPbmgweDab5xXCKdEesLTZF622a020f0xm7rlufdCufwhquPBLLTTFzrEO/pub?w=885&h=138">
+<p align="left">
+<img  align="left" width="700" src="https://docs.google.com/drawings/d/e/2PACX-1vRUa6nwKHA_kCBaofjivbwPbmgweDab5xXCKdEesLTZF622a020f0xm7rlufdCufwhquPBLLTTFzrEO/pub?w=885&h=138">
 </p>
 
 # Geometry
