@@ -59,7 +59,7 @@ where $$N$$ is the number of MFPs. The `mfp` model accept the following options:
 | `n_mfp`    | Integer(50)       | MFPs discretiztion. It must be less than $$N$$.|    
 
 
-   `2DSym`                                                                      `3D`                                                           `2D`
+   `2DSym`   &nbsp; &nbsp; &nbsp;  `3D`    &nbsp; &nbsp; &nbsp;   `2D`
 <p align="center">
 <img  align="center" width="700" src="https://docs.google.com/drawings/d/e/2PACX-1vRUa6nwKHA_kCBaofjivbwPbmgweDab5xXCKdEesLTZF622a020f0xm7rlufdCufwhquPBLLTTFzrEO/pub?w=885&h=138">
 </p>
