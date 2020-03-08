@@ -22,7 +22,7 @@ In the current directory we must have a file named `mfp.h5`, with the follwing f
 | Name     | Size     | Units |  
 |:-------------|:------------------|
 | `mfp`    | `N`      | `m`  | 
-   
+| `K`    | `N`      | Wm$$^{-1}$$K$$^{-1}$$  |    
     
 
 
