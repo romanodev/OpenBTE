@@ -53,19 +53,13 @@ where $$N$$ is the number of MFPs. The `mfp` model accept the following options:
 
 | Field     | Values (default)     | Description |  
 |:-------------|:------------------|
-| `submodel`    |  `2DSym`,`3D`, `2D` (`2DSym`)  |  Dimensionality of the system [[1](#1) ] |
+| `submodel`    |  `2DSym`,`3D`, `2D` (`2DSym`)  |  Dimensionality of the system [[1](#1)] |
 | `n_phi`    | Integer (48)      | Polar angle discretization| 
 | `n_theta`  | Integer (24)      | Azimuthal angle discretization| 
 | `n_mfp`    | Integer(50)       | MFPs discretiztion. It must be less than $$N$$.|    
 
 
-## <a name="1"></a> 1
 
-`2DSym` is a system that is infinite in the third dimension.
-
-<p align="left">
-<img  align="left" width="700" src="https://docs.google.com/drawings/d/e/2PACX-1vRUa6nwKHA_kCBaofjivbwPbmgweDab5xXCKdEesLTZF622a020f0xm7rlufdCufwhquPBLLTTFzrEO/pub?w=885&h=138">
-</p>
 
 
 
@@ -75,6 +69,15 @@ where $$N$$ is the number of MFPs. The `mfp` model accept the following options:
 # Examples
 https://nbviewer.jupyter.org/github/romanodev/OpenBTE/blob/master/openbte/Tutorial.ipynb  
 The examples are provided via a [notebook](https://nbviewer.jupyter.org/github/romanodev/OpenBTE/blob/master/openbte/Tutorial.ipynb ) or [interactive simulations](https://colab.research.google.com/drive/1eAfX3PgyO7TyGWPee8HRx5ZbQ7tZfLDr) (Google Colab).
+
+# Notes
+
+### <a name="1"></a> 1. `2DSym` is a system that is infinite in the third dimension. Below are the cases are shown.
+
+<p align="left">
+<img  align="left" width="700" src="https://docs.google.com/drawings/d/e/2PACX-1vRUa6nwKHA_kCBaofjivbwPbmgweDab5xXCKdEesLTZF622a020f0xm7rlufdCufwhquPBLLTTFzrEO/pub?w=885&h=138">
+</p>
+
  
 
 
