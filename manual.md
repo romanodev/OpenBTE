@@ -53,13 +53,16 @@ where $$N$$ is the number of MFPs. The `mfp` model accept the following options:
 
 | Field     | Values (default)     | Description |  
 |:-------------|:------------------|
-| `submodel`    |  `3D`,  `2DSym`,  `2D` (`2DSym`)  |  Dimensionality of the system(NOTE) |
+| `submodel`    |  `2DSym`,`3D`, `2D` (`2DSym`)  |  Dimensionality of the system(NOTE) |
 | `n_phi`    | Integer (48)      | Polar angle discretization| 
 | `n_theta`  | Integer (24)      | Azimuthal angle discretization| 
 | `n_mfp`    | Integer(50)       | MFPs discretiztion. It must be less than $$N$$.|    
 
 
-
+   `2DSym`           `3D`             `2D`
+<p align="center">
+<img  align="center" width="700" src="https://docs.google.com/drawings/d/e/2PACX-1vRUa6nwKHA_kCBaofjivbwPbmgweDab5xXCKdEesLTZF622a020f0xm7rlufdCufwhquPBLLTTFzrEO/pub?w=885&h=138">
+</p>
 
 # Geometry
 # Solver
