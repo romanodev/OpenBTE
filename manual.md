@@ -39,13 +39,13 @@ description: Here we show software architecture
 The first step is to generate `material.h5`, a file in `hdf5` format that containes all the necessary information related to the bulk material. There are three material models: `MFP`, `RTA`, `FULL`; the module `Material` converts data from bulk first-principles calculations to `material.h5`. For example, to create the `MFP` model, we have
 
 ```python
-Material(model='mfp',**options)
+Material(model='rta',n_phi=92)
 ```
 
 Currently, there are the following material models and options:
 
-|  `model`     | Description     | Input file | Options |  
-|:-------------|:------------------|:----------|
+|  `model`   | Description    |  File  |   Options     |  
+|:-----------|:---------------|:-------|:--------------|
 |   `full`     | Full scattering operator | `full.h5` | None |
 |   `rta`     | Relaxation time approximation | `rta.h5` | `n_phi`: number of azimuthal angles (`48`) <br> `n_phi`: number of polar angles (`24`)|
 
