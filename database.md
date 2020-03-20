@@ -27,8 +27,16 @@ The first step in adding your own data is, actually, having published data. If y
 
 The file `material.h5` is created by using the `Material` module in connection with an input file, a `model`, and additional options. Please refer to the [manual](manual.html) for more details. Depending on the chosen model, you might need a file with designed name `full.h5`, `rta.h5` or `mfp.h5`. A good option for creating such a files is [`deepdish`](https://deepdish.readthedocs.io/en/latest/io.html). The format of each file are explained below. Note that the values are intended to be `numpy` arrays.
 
-## `mfp.h5`
+## Format of file `mfp.h5`
 
+| Name     | Size     | Units |  
+|:-------------|:------------------|
+| `mfp`    | $$N$$      | m  | 
+| `K`    | $$N$$      | Wm$$^{-1}$$K$$^{-1}$$  |    
+    
+where $$N$$ is the number of MFPs.     
+
+## Format of file `full.h5`
 
 | Name     | Size     | Units |  
 |:-------------|:------------------|
