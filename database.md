@@ -53,14 +53,11 @@ The first step in adding your own data is, actually, having published data. If y
 
  - Depending on the material model, create one of these files: `full.h5`, `mfp.h5`, `rta.h5`. The format of these files is described below.
  
- - Sanity check your file by typing `check_kappa full.h5`. This command will compute the bulk thermal conductivity tensor from the data provided in the file and will compare it with the field `kappa`.
- 
- - Create a material object. For this step, please refer to the [manual](./manual.html).
+ - Create the `material.h5` file. For this step, please refer to the [manual](./manual.html). We recomment using the option  `check_kappa = True`. This flag compares the bulk thermal conductivity computed by OpenBTE with the one provided by the user. See the [format](#format) section for more details.
 
  - Fill this [form](https://forms.gle/Kjhky3wjrrghXBb48). 
 
-
-## Format
+## <a name="format"></a> Format
 
 The file `material.h5` is created by using the `Material` module in connection with an input file, a `model`, and additional options. Please refer to the [manual](manual.html) for more details. Depending on the chosen model, you might need a file with designed name `full.h5`, `rta.h5` or `mfp.h5`. A good option for creating such a files is [`deepdish`](https://deepdish.readthedocs.io/en/latest/io.html). The format of each file are explained below. Note that the values are intended to be `numpy` arrays.
 
