@@ -67,7 +67,7 @@ The file `material.h5` is created by using the `Material` module in connection w
 ### `mfp.h5`
 
 | Field     | Size     | Units | Description | 
-|:-------------|:------------------|:---------|
+|:-------------|:------------------|:---------|:---------|
 | `mfp`    | $$N$$      | m  |   MFP ($$N$$: number of MFPs)|
 | `K`    | $$N$$      | Wm$$^{-1}$$K$$^{-1}$$  | discrete MFP distribution |   
 | `kappa`    | $$3 \times 3$$      | Wm$$^{-1}$$K$$^{-1}$$  | bulk thermal conductivity tensor |    
@@ -75,7 +75,7 @@ The file `material.h5` is created by using the `Material` module in connection w
 ### `full.h5`
 
 | Field     | Size     | Units |  Description |
-|:-------------|:------------------|----------|
+|:-------------|:------------------|----------|---------|
 | `f`    | $$N$$      | s$$^{-1}$$  | frequency ($$N = N_bN_q$$, where $$N_b:$$ number of branches, $$N_q$$: number of wave vectors) |
 | `alpha`    | $$1$$      | m$$^{-3}$$ | $$V^{-1}N_q^{-1}$$ ($$V$$: volume of the unit cell) |
 | `A`     | $$N \times N $$ | s$$^{-1}$$  | scattering operator as Eq. 7 in [this](https://arxiv.org/pdf/2002.08940.pdf) |
