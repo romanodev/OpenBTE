@@ -57,26 +57,18 @@ The file `material.h5` is created by using the `Material` module in connection w
 
 | Field     | Size     | Units | Description | 
 |:-------------|:------------------|:---------|
-| `mfp`    | $$N$$      | m  |   mean free path (MFP)  |
+| `mfp`    | $$N$$      | m  |   MFP ($$N$$: number of MFPs)|
 | `K`    | $$N$$      | Wm$$^{-1}$$K$$^{-1}$$  | discrete MFP distribution |    
-    
-where $$N$$ is the number of MFPs.     
 
 ### `full.h5`
 
 | Field     | Size     | Units |  Description |
 |:-------------|:------------------|----------|
-| `f`    | $$N$$      | s$$^{-1}$$  | frequency |
-| `alpha`    | $$1$$      | m$$^{-3}$$ | $$V^{-1}N_q^{-1}$$ |
+| `f`    | $$N$$      | s$$^{-1}$$  | frequency ($$N = N_bN_q$$, $$N_b:$$ number of branches, $$N_q$$: number of wave vectors) |
+| `alpha`    | $$1$$      | m$$^{-3}$$ | $$V^{-1}N_q^{-1}$$ ($$V$$: volume of the unit cell) |
 | `A`     | $$N \times N $$ | s$$^{-1}$$  | scattering operator as Eq. 7 in [this](https://arxiv.org/pdf/2002.08940.pdf) |
 | `v` | $$ N \times 3 $$| ms$$^{-1}$$ | group velocity |
 
-##### Note:
-
-$$V$$: volume of unit-cell
-$$N_q$$: number of $$ \mathbf{q}$$ points
-$$N = N_b N_q$$
-$$N_b$$: number of branches
 
 ### `rta.h5`
 
