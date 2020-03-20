@@ -44,7 +44,14 @@ Material(model='mfp',**options)
 
 
 
+The `mfp` model accept the following options:
 
+| Field     | Values (default)     | Description |  
+|:-------------|:------------------|
+| `submodel`    |  `2DSym`,`3D`, `2D` (`2DSym`)  |  Dimensionality of the system [[1](#1)] |
+| `n_phi`    | Integer (48)      | Polar angle discretization| 
+| `n_theta`  | Integer (24)      | Azimuthal angle discretization| 
+| `n_mfp`    | Integer(50)       | MFPs discretiztion. It must be less than $$N$$.|
 
 
 
