@@ -53,24 +53,30 @@ The first step in adding your own data is, actually, having published data. If y
 
 The file `material.h5` is created by using the `Material` module in connection with an input file, a `model`, and additional options. Please refer to the [manual](manual.html) for more details. Depending on the chosen model, you might need a file with designed name `full.h5`, `rta.h5` or `mfp.h5`. A good option for creating such a files is [`deepdish`](https://deepdish.readthedocs.io/en/latest/io.html). The format of each file are explained below. Note that the values are intended to be `numpy` arrays.
 
-### Format of file `mfp.h5`
+### `mfp.h5`
 
-| Name     | Size     | Units |  
-|:-------------|:------------------|
-| `mfp`    | $$N$$      | m  | 
-| `K`    | $$N$$      | Wm$$^{-1}$$K$$^{-1}$$  |    
+| Field     | Size     | Units | Description | 
+|:-------------|:------------------|:---------|
+| `mfp`    | $$N$$      | m  |   mean free path (MFP)  |
+| `K`    | $$N$$      | Wm$$^{-1}$$K$$^{-1}$$  | discrete MFP distribution |    
     
 where $$N$$ is the number of MFPs.     
 
-### Format of file `full.h5`
+### `full.h5`
 
-| Name     | Size     | Units |  
-|:-------------|:------------------|
-| `mfp`    | $$N$$      | m  | 
-| `K`    | $$N$$      | Wm$$^{-1}$$K$$^{-1}$$  |    
-    
-where $$N$$ is the number of MFPs.     
+| Field     | Size     | Units |  Description |
+|:-------------|:------------------|----------|
+| `f`    | $$N$$      | s$$^{-1}$$  | frequency |
+| `alpha`    | $$1$$      | m$$^{-3}$$ | $$VN_q^{-1}$$|
+| `A`     | $$N \times N $$ | s$$^{-1}$$  | scattering operator as Eq. 7 of [this](https://arxiv.org/pdf/2002.08940.pdf) |
+| `v` | $$ N \times 3 $$| ms$$^{-1}$$ | group velocity |
 
+##### Note:
+
+$$V$$: volume of unit-cell
+$$N_q$$: number of $$ \mathbf{q}$$ points
+$$N = N_b N_q$$
+$$N_b$$: number of branches
 
 ## Notes
 
