@@ -47,7 +47,7 @@ Currently, there are the following material models and options:
 |  `model`   | Description    |  File  |   Options     |  
 |:-----------|:---------------|:-------|:--------------|
 |   `full`     | Full scattering operator | `full.h5` | None |
-|   `rta`     | Relaxation time approximation | `rta.h5` | `n_phi`: number of azimuthal angles (`48`) <br> `n_phi`: number of polar angles (`24`)|
+|   `rta`     | Relaxation time approximation | `rta.h5` | `n_phi`: # of polar angles (`48`) <br> `n_phi`: # of azimuthal angles (`24`)  <br> `n_phi`: # of mean free paths (`50`)|
 
 
 
