@@ -84,6 +84,7 @@ The file `material.h5` is created by using the `Material` module in connection w
 
 
 ### `rta.h5`
+
 | Field     | Size     | Units |  Description |
 |:-------------|:------------------|:---------|:---------|
 | `f`    | $$N$$      | s$$^{-1}$$  | frequency ($$N = N_bN_q$$, where $$N_b:$$ number of branches, $$N_q$$: number of wave vectors) |
