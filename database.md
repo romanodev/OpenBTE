@@ -38,7 +38,7 @@ description: User-generated input data
 | [Si_0](#si0)     | 300      | MFP  | Giuseppe Romano  | romanog@mit.edu |  [P1](https://www.sciencedirect.com/science/article/pii/S0010465517302059) |
 
 
-## Adding your data
+## Background
 
 If you have published material data and wish to share if with the community, you may want to add an entry to the database above. The database above has the following features:
 
@@ -47,7 +47,18 @@ If you have published material data and wish to share if with the community, you
  - The quality of the data is not endorsed. We only check that all the needed fields of the hdf5 files are correctly populated. 
  - Once launched, OpenBTE will show the user the recommended citations based on the used input data.
 
-The first step in adding your own data is, actually, having published data. If you have high quality data but haven't published it yet, you may want to consider submitting it to [zenodo](https://zenodo.org/) first. Once you are ready, please fill this [form](https://forms.gle/Kjhky3wjrrghXBb48). 
+## Adding your own data
+
+The first step in adding your own data is, actually, having published data. If you have high quality data but haven't published it yet, you may want to consider submitting it to [zenodo](https://zenodo.org/) first. Once you are ready, please follow these steps:
+
+ - Depending on the material model, create one of these files: `full.h5`, `mfp.h5`, `rta.h5`. The format of these files is described below.
+ 
+ - Sanity check your file by typing `check_kappa full.h5`. This command will compute the bulk thermal conductivity tensor from the data provided in the file and will compare it with the field `kappa`.
+ 
+ - Create a material object. For this step, please refer to the [manual](./manual.html).
+
+ - Fill this [form](https://forms.gle/Kjhky3wjrrghXBb48). 
+
 
 ## Format
 
@@ -58,26 +69,28 @@ The file `material.h5` is created by using the `Material` module in connection w
 | Field     | Size     | Units | Description | 
 |:-------------|:------------------|:---------|
 | `mfp`    | $$N$$      | m  |   MFP ($$N$$: number of MFPs)|
-| `K`    | $$N$$      | Wm$$^{-1}$$K$$^{-1}$$  | discrete MFP distribution |    
+| `K`    | $$N$$      | Wm$$^{-1}$$K$$^{-1}$$  | discrete MFP distribution |   
+| `kappa`    | $$3 \times 3$$      | Wm$$^{-1}$$K$$^{-1}$$  | bulk thermal conductivity tensor |    
 
 ### `full.h5`
 
 | Field     | Size     | Units |  Description |
 |:-------------|:------------------|----------|
-| `f`    | $$N$$      | s$$^{-1}$$  | frequency ($$N = N_bN_q$$, $$N_b:$$ number of branches, $$N_q$$: number of wave vectors) |
+| `f`    | $$N$$      | s$$^{-1}$$  | frequency ($$N = N_bN_q$$, where $$N_b:$$ number of branches, $$N_q$$: number of wave vectors) |
 | `alpha`    | $$1$$      | m$$^{-3}$$ | $$V^{-1}N_q^{-1}$$ ($$V$$: volume of the unit cell) |
 | `A`     | $$N \times N $$ | s$$^{-1}$$  | scattering operator as Eq. 7 in [this](https://arxiv.org/pdf/2002.08940.pdf) |
 | `v` | $$ N \times 3 $$| ms$$^{-1}$$ | group velocity |
+| `kappa`    | $$3 \times 3$$      | Wm$$^{-1}$$K$$^{-1}$$  | bulk thermal conductivity tensor | 
 
 
 ### `rta.h5`
-
 | Field     | Size     | Units |  Description |
 |:-------------|:------------------|----------|
-| `f`    | $$N$$      | s$$^{-1}$$  | frequency |
-| `alpha`    | $$1$$      | m$$^{-3}$$ | $$V^{-1}N_q^{-1}$$ |
-| `tau`     | $$N$$ | s$$^{-1}$$  | scattering rates|
+| `f`    | $$N$$      | s$$^{-1}$$  | frequency ($$N = N_bN_q$$, where $$N_b:$$ number of branches, $$N_q$$: number of wave vectors) |
+| `alpha`    | $$1$$      | m$$^{-3}$$ | $$V^{-1}N_q^{-1}$$ ($$V$$: volume of the unit cell) |
+| `tauinv`     | $$N \times N $$ | s$$^{-1}$$  | scattering rates|
 | `v` | $$ N \times 3 $$| ms$$^{-1}$$ | group velocity |
+| `kappa`    | $$3 \times 3$$      | Wm$$^{-1}$$K$$^{-1}$$  | bulk thermal conductivity tensor | 
 
 ## Notes
 
