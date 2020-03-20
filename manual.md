@@ -42,21 +42,7 @@ The first step is to generate `material.h5`, a file in `hdf5` format that contai
 Material(model='mfp',**options)
 ```
 
-In the current directory we must have a file named `mfp.h5`, with the follwing fields:
 
-| Name     | Size     | Units |  
-|:-------------|:------------------|
-| `mfp`    | $$N$$      | m  | 
-| `K`    | $$N$$      | Wm$$^{-1}$$K$$^{-1}$$  |    
-    
-where $$N$$ is the number of MFPs. The `mfp` model accept the following options:
-
-| Field     | Values (default)     | Description |  
-|:-------------|:------------------|
-| `submodel`    |  `2DSym`,`3D`, `2D` (`2DSym`)  |  Dimensionality of the system [[1](#1)] |
-| `n_phi`    | Integer (48)      | Polar angle discretization| 
-| `n_theta`  | Integer (24)      | Azimuthal angle discretization| 
-| `n_mfp`    | Integer(50)       | MFPs discretiztion. It must be less than $$N$$.|    
 
 
 
