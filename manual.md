@@ -42,16 +42,12 @@ The first step is to generate `material.h5`, a file in `hdf5` format that contai
 Material(model='mfp',**options)
 ```
 
+Currently, there are the following material models and options:
 
-
-The `mfp` model accept the following options:
-
-| Field     | Values (default)     | Description |  
-|:-------------|:------------------|
-| `submodel`    |  `2DSym`,`3D`, `2D` (`2DSym`)  |  Dimensionality of the system [[1](#1)] |
-| `n_phi`    | Integer (48)      | Polar angle discretization| 
-| `n_theta`  | Integer (24)      | Azimuthal angle discretization| 
-| `n_mfp`    | Integer(50)       | MFPs discretiztion. It must be less than $$N$$.|
+|  `model`     | Description     | Input file | Options |  
+|:-------------|:------------------|:----------|
+|   `full`     | Full scattering operator | `full.h5` | None |
+|   `rta`     | Relaxation time approximation | `rta.h5` | `n_phi`: number of azimuthal angles (`48`) <br> `n_phi`: number of polar angles (`24`)|
 
 
 
