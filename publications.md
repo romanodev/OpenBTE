@@ -6,12 +6,7 @@ description: List of papers using OpenBTE
 ---
 
 
-[Stories](#stories) | [Developers](#pubdevs) | [Users](#pubusers)
-
-
-## <a name="stories"></a> Stories (coming soon)
-
-In this sections we will host cloud based simulations provided by users.
+[Developers](#pubdevs) | [Users](#pubusers)
 
 
 ## <a name="pubdevs"></a> Publications from the developer(s)
