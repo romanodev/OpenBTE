@@ -53,7 +53,7 @@ The first step in adding your own data is, actually, having published data. If y
 
  - Depending on the material model, create one of these files: `full.h5`, `mfp.h5`, `rta.h5`. The format of these files is described below.
  
- - Create the `material.h5` file. For this step, please refer to the [manual](./manual.html). We recomment using the option  `check_kappa = True`. This flag compares the bulk thermal conductivity computed by OpenBTE with the one provided by the user (tolerance $$1e-3$$). See the [format](#format) section for more details.
+ - Create the `material.h5` file. For this step, please refer to the [manual](../manual.html). We recomment using the option  `check_kappa = True`. This flag compares the bulk thermal conductivity computed by OpenBTE with the one provided by the user (tolerance $$1e-3$$). See the [format](#format) section for more details.
 
  - Fill this [form](https://forms.gle/Kjhky3wjrrghXBb48). 
 
