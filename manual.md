@@ -36,13 +36,28 @@ description: Here we show software architecture
 
 # Material
 
-The first step is to generate `material.h5`, a file in `hdf5` format that containes all the necessary information related to the bulk material. There are three material models: `MFP`, `RTA`, `FULL`; the module `Material` converts data from bulk first-principles calculations to `material.h5`. For example, to create the `MFP` model, we have
+The `Material` module creates the file `material.h5`, where bulk data is stored. It can be used in three ways:
 
+- __Database mode__. The module simply downloads a file from the online database. Example:
+
+```python
+Material(model='database',filename='C_0')
+```
+In this case `Material` simply retrieves the data from the [database](../database). The value of `filename` has to match one of the `Filename` fields of the database.
+
+ -__Unlisted mode__. Similarly to the Database mode, the Unlisted mode retrives the material file from a `file_id`. This mode is useful when running OpenBTE via Colab with private input data. Example:
+ 
+ ```python
+Material(model='unlisted',filename='some_file_id')
+```
+    
+ -__Local mode__. The file `material.h5` is created from scratch. Depending on the model being used, the input files have designed names. Example: 
+    
 ```python
 Material(model='rta',n_phi=92)
 ```
 
-Currently, there are the following material models and options:
+Currently, there are the follwing material models:
 
 |  `model`   | Description    |  File  |   Options     |  
 |:-----------|:---------------|:-------|:--------------|
@@ -58,6 +73,7 @@ Currently, there are the following material models and options:
 |   `fourier`     | Fourier's law| None | `kappa`: bulk thermal conductivity (Wm$$^{-1}$$k$$^{-1}$$)|
 
 
+The format of input files is desribed in the [database](../database) section. 
 
 
 
