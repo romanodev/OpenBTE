@@ -61,34 +61,7 @@ The first step in adding your own data is, actually, having published data. If y
 
 The file `material.h5` is created by using the `Material` module in connection with an input file, a `model`, and additional options. Please refer to the [manual](manual.html) for more details. Depending on the chosen model, you might need a file with designed name `full.h5`, `rta.h5` or `mfp.h5`. A good option for creating such a files is [`deepdish`](https://deepdish.readthedocs.io/en/latest/io.html). The format of each file are explained below. Note that the values are intended to be `numpy` arrays.
 
-### `mfp.h5`
 
-| Field     | Size     | Units | Description | 
-|:-------------|:------------------|:---------|:---------|
-| `mfp`    | $$N$$      | m  |   MFP ($$N$$: number of MFPs)|
-| `K`    | $$N$$      | Wm$$^{-1}$$K$$^{-1}$$  | discrete MFP distribution |   
-| `kappa`    | $$3 \times 3$$      | Wm$$^{-1}$$K$$^{-1}$$  | bulk thermal conductivity tensor |    
-
-### `full.h5`
-
-| Field     | Size     | Units |  Description |
-|:-------------|:------------------|:---------|:---------|
-| `f`    | $$N$$      | s$$^{-1}$$  | frequency ($$N = N_bN_q$$, where $$N_b:$$ number of branches, $$N_q$$: number of wave vectors) |
-| `alpha`    | $$1$$      | m$$^{-3}$$ | $$V^{-1}N_q^{-1}$$ ($$V$$: volume of the unit cell) |
-| `A`     | $$N \times N $$ | s$$^{-1}$$  | scattering operator as Eq. 7 in [this](https://arxiv.org/pdf/2002.08940.pdf) |
-| `v` | $$ N \times 3 $$| ms$$^{-1}$$ | group velocity |
-| `kappa`    | $$3 \times 3$$      | Wm$$^{-1}$$K$$^{-1}$$  | bulk thermal conductivity tensor | 
-
-
-### `rta.h5`
-
-| Field     | Size     | Units |  Description |
-|:-------------|:------------------|:---------|:---------|
-| `f`    | $$N$$      | s$$^{-1}$$  | frequency ($$N = N_bN_q$$, where $$N_b:$$ number of branches, $$N_q$$: number of wave vectors) |
-| `alpha`    | $$1$$      | m$$^{-3}$$ | $$V^{-1}N_q^{-1}$$ ($$V$$: volume of the unit cell) |
-| `tauinv`     | $$NN $$ | s$$^{-1}$$  | scattering rates as Eq. 7 in [this](https://arxiv.org/pdf/2002.08940.pdf) |
-| `v` | $$ N \times 3 $$| ms$$^{-1}$$ | group velocity |
-| `kappa`    | $$3 \times 3$$      | Wm$$^{-1}$$K$$^{-1}$$  | bulk thermal conductivity tensor |  
 
 ## Notes
 
