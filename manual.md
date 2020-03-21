@@ -56,10 +56,10 @@ __Local mode__. The file `material.h5` is created from scratch. Depending on the
 ```python
 Material(model='rta',n_phi=92)
 ```
-In this case, we are using the `rta` model and the designed input file is `rta.h5`.
-The current list of material models, options and designed filenames is [here](../material).
-The format of input files is desribed [here](../format)
-
+In this case, we are using the `rta` model and the designed input file is `rta.h5`. <br>
+The current list of material models, options and designed filenames is [here](../material). <br>
+The format of input files is desribed [here](../format) <br>
+The list of interface to external solver is [here](../interface)
 
 
 # Geometry
