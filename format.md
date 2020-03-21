@@ -31,7 +31,17 @@ description: Input file format
   src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
 </script>
 
-Below we report the format for the files `hdf5` files `rta.h5`, `mfp.h5` and `full.h5`. All values are intended to be `numpy` arrays. A good Pythonic option for creating `hdf5` files is [`deepdish`](https://deepdish.readthedocs.io/en/latest/io.html).
+Below we report the format for the files `hdf5` files `rta.h5`, `mfp.h5` and `full.h5`. All values are intended to be `numpy` arrays. A good Pythonic option for creating `hdf5` files is the `deepdish` [package](https://deepdish.readthedocs.io/en/latest/io.html)
+
+Here is an example:
+
+```python
+import deepdish as dd
+
+data = {'field1':np.ones(2),'field2':np.ones(3)}
+dd.io.save('file.h5',data)
+```
+
 
 ### `mfp.h5`
 
