@@ -32,5 +32,12 @@ description: Interfaces to external solvers
 
 # AlmaBTE
 
+This interface converts the output of [AlmaBTE](http://www.almabte.eu/)'c command `phononinfo` to OpenBTE format and write the file `rta.f5`. Let's assume you have the file `Si_4_4_4_300K.phononinfo` in your current directory. Then simply type
+
+```python
+AlmaBTE2OpenBTE Si_4_4_4_300K.phononinfo
+```
+The created file, `rta.h5`, can be used by a `Material` [statement](../manual).
+
 
 
