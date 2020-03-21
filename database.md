@@ -51,21 +51,13 @@ If you have published material data and wish to share if with the community, you
 
 The first step in adding your own data is, actually, having published data. If you have high quality data but haven't published it yet, you may want to consider submitting it to [zenodo](https://zenodo.org/) first. Once you are ready, please follow these steps:
 
- - Depending on the material model, create one of these files: `full.h5`, `mfp.h5`, `rta.h5`. The format of these files is described below.
+ - Depending on the material model, create one of these files: `full.h5`, `mfp.h5`, `rta.h5`. The format of these files is described [here](../format).
  
  - Create the `material.h5` file. For this step, please refer to the [manual](../manual). We recomment using the option  `check_kappa = True`. This flag compares the bulk thermal conductivity computed by OpenBTE with the one provided by the user (tolerance $$1e{-3}$$). See the [format](#format) section for more details.
 
  - Fill this [form](https://forms.gle/Kjhky3wjrrghXBb48). 
 
-## <a name="format"></a> Format
 
-The file `material.h5` is created by using the `Material` module in connection with an input file, a `model`, and additional options. Please refer to the [manual](manual.html) for more details. Depending on the chosen model, you might need a file with designed name `full.h5`, `rta.h5` or `mfp.h5`. A good option for creating such a files is [`deepdish`](https://deepdish.readthedocs.io/en/latest/io.html). The format of each file are explained below. Note that the values are intended to be `numpy` arrays.
-
-
-
-## Notes
-
-Here we include the notes from the above database.
 
 ### <a name="si0"></a> Si_0 
 
