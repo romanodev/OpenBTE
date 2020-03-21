@@ -47,7 +47,8 @@ Currently, there are the following material models and options:
 |  `model`   | Description    |  File  |   Options     |  
 |:-----------|:---------------|:-------|:--------------|
 |   `full`     | Full scattering operator | `full.h5` | None |
-|   `rta`     | Relaxation time approximation | `rta.h5` | `n_phi`: # of polar angles (`48`) <br> `n_phi`: # of azimuthal angles (`24`)  <br> `n_phi`: # of mean free paths (`50`)|
+|   `rta`     | Relaxation time approximation (RTA) | `rta.h5` | `n_phi`: number of polar angles (`48`) <br> `n_theta`: number of azimuthal angles (`24`)  <br> `n_mfp`: number of mean free paths (`50`)|
+|   `rta2D`     | RTA for materials with infinite thickness <br> two-dimensional (2D) materials| `rta.h5` | `n_phi`: number of polar angles (`48`)  <br> `n_mfp`: number of mean free paths (`50`)|
 
 
 
