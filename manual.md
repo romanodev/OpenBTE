@@ -38,20 +38,20 @@ description: Here we show software architecture
 
 The `Material` module creates the file `material.h5`, where bulk data is stored. It can be used in three ways:
 
-- __Database mode__. The module simply downloads a file from the online database. Example:
+__Database mode__. The module simply downloads a file from the online database. Example:
 
 ```python
 Material(model='database',filename='C_0')
 ```
 In this case `Material` simply retrieves the data from the [database](../database). The value of `filename` has to match one of the `Filename` fields of the database.
 
- -__Unlisted mode__. Similarly to the Database mode, the Unlisted mode retrives the material file from a `file_id`. This mode is useful when running OpenBTE via Colab with private input data. Example:
+__Unlisted mode__. Similarly to the Database mode, the Unlisted mode retrives the material file from a `file_id`. This mode is useful when running OpenBTE via Colab with private input data. Example:
  
  ```python
 Material(model='unlisted',filename='some_file_id')
 ```
     
- -__Local mode__. The file `material.h5` is created from scratch. Depending on the model being used, the input files have designed names. Example: 
+__Local mode__. The file `material.h5` is created from scratch. Depending on the model being used, the input files have designed names. Example: 
     
 ```python
 Material(model='rta',n_phi=92)
