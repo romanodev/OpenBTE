@@ -30,10 +30,6 @@ description: Material Model
   src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
 </script>
 
-<p align="center">
-<img  align="center" width="700" src="https://docs.google.com/drawings/d/e/2PACX-1vRqrihU3IHGVNRaNN7sc2r5CMphXVz6iT8jesHsX0blyj7GPh5KyiUiOFw8WMH9bHHNZYMzBTIgLPNo/pub?w=800&h=500">
-</p>
-
 
 |  `model`   | Description    |  File  |   Options     |  
 |:-----------|:---------------|:-------|:--------------|
