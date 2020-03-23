@@ -12,9 +12,9 @@ from shapely.geometry import Point,LineString
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
 import shapely
+import subprocess
 
 #def get_loop(points,lines):
-
 
 # return loop
 def line_exists_ordered(l,lines):
@@ -51,7 +51,6 @@ def get_line_from_points(p1,p2,all_lines,points):
    t1 = t
   if p == p2 :
    t2 = t
-
 
  for t,l in enumerate(all_lines):
   if (t1 == l[1] and t2 == l[2]) :
@@ -357,7 +356,10 @@ def create_surface(ss,bulk_surface,store):
   store.write(strc)
 
 
-def mesh(polygons,frame,argv):
+def mesh(argv):
+
+  polygons = argv['polygons']
+  frame = argv['frame']
 
   polygons = regularize_polygons(polygons)
 
@@ -510,13 +512,13 @@ def mesh(polygons,frame,argv):
 
   additional_boundary = []
   if argv.setdefault('Periodic',[True,True,True])[0]:
-   strc = r'''Physical Line('Periodic_1') = {'''
+   strc = r'''Physical Line('Periodic_2') = {'''
    for n in range(len(hot)-1):
     strc += str(hot[n]) + ','
    strc += str(hot[-1]) + '};\n'
    store.write(strc)
 
-   strc = r'''Physical Line('Periodic_2') = {'''
+   strc = r'''Physical Line('Periodic_1') = {'''
    for n in range(len(cold)-1):
     strc += str(cold[n]) + ','
    strc += str(cold[-1]) + '};\n'
@@ -528,13 +530,13 @@ def mesh(polygons,frame,argv):
     additional_boundary.append(k)
 
   if argv.setdefault('Periodic',[True,True,True])[1]:
-   strc = r'''Physical Line('Periodic_3') = {'''
+   strc = r'''Physical Line('Periodic_4') = {'''
    for n in range(len(upper)-1):
     strc += str(upper[n]) + ','
    strc += str(upper[-1]) + '};\n'
    store.write(strc)
 
-   strc = r'''Physical Line('Periodic_4') = {'''
+   strc = r'''Physical Line('Periodic_3') = {'''
    for n in range(len(lower)-1):
     strc += str(lower[n]) + ','
    strc += str(lower[-1]) + '};\n'
@@ -588,5 +590,6 @@ def mesh(polygons,frame,argv):
 
 #-------------------------------------------------------
   store.close()
+  subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-2','mesh.geo','-o','mesh.msh'])
 
 

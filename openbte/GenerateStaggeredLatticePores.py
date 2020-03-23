@@ -3,8 +3,7 @@ import math
 
 def GenerateStaggeredLatticePores(argv):
 
-
-  a = float(argv.setdefault('a',1))
+  a = float(argv.setdefault('lx',1))
   porosity = float(argv['porosity'])
   Lx = 2.0 * np.cos(np.pi/4.0)*a
   Ly = 2.0 * np.cos(np.pi/4.0)*a
@@ -18,7 +17,6 @@ def GenerateStaggeredLatticePores(argv):
      Na = 4;# phi0 = 0.0
   if shape == 'triangle':
      Na = 3;# phi0 = 0.0
-
 
   area = 0.5*Lx * Ly * porosity
   r = math.sqrt(2.0*area/Na/math.sin(2.0 * np.pi/Na))

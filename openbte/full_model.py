@@ -15,11 +15,9 @@ def compute_kappa(W,sigma):
 
  dd = len(W.nonzero()[0])/W.shape[0]/W.shape[1]    
  if dd > 0.1:   
-  print('dense')  
   invW = inv(W)
   return np.einsum('ui,uq,qj->ij',sigma,invW,sigma)  #you can try this to be faster but the matrix is singular.
  else: 
-  print('sparse')   
   W = csc_matrix(W)
   
  a = np.zeros((3,sigma.shape[0]))
@@ -82,7 +80,7 @@ def energy_conserving(W):
 
 def generate_full(**argv):
 
- filename = argv['filename']
+ filename = 'full.h5'
 
  kb = 1.380641e-23 #J/K
  hbar = 6.62607011e-34 #Js
@@ -158,7 +156,6 @@ def generate_full(**argv):
 
  kappa = compute_kappa(W,sigma)
 
- print(kappa)
 
  print('... done')
  print(' ')
@@ -167,18 +164,18 @@ def generate_full(**argv):
  for i in range(nm):
   for j in range(0,i):
    Wod[i,j] = -W[i,j]
-
  for i in range(nm):
    Wod[i,i] = 0
-
- #print(np.diag(Wod))
- #quit()
 
  tc = C/sum(C)
 
  a = np.diag(W)
- #data = {'tc':tc,'B':np.diag(a)-W,'sigma':sigma,'kappa':kappa,'a':a}
- data = {'tc':tc,'B':Wod,'sigma':sigma,'kappa':kappa,'a':a}
+ F = np.einsum('i,ij->ij',1/a,sigma)
+
+ kappa_initial = data['kappa'] 
+
+
+ data = {'temp':tc,'B':Wod,'F':F,'G':sigma,'kappa':kappa,'scale':1/a}
 
  return data
 

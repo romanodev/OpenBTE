@@ -27,6 +27,6 @@ setup(name='openbte',
       packages = ['openbte'],
       package_data = {'openbte':['materials/*.dat','fonts/*.ttf']},
       entry_points = {
-     'console_scripts': ['lagrange=openbte.lagrange:main'],
+     'console_scripts': ['AlmaBTE2OpenBTE=openbte.almabte2openbte:main'],
       },
       zip_safe=False)

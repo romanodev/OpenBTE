@@ -83,7 +83,7 @@ def create_structured_bulk(argv):
 def create_unstructured_bulk(argv):
 
   #res = argv.setdefault('reservoirs',False)
-  direction = argv['direction']
+  direction = argv.setdefault('direction','x')
 
   Lx = float(argv['lx'])
   Ly = float(argv['ly'])
@@ -187,6 +187,10 @@ def create_unstructured_bulk(argv):
 
 #-------------------------------------------------------
   store.close()
+  subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-2','mesh.geo','-o','mesh.msh'])
+
+  
+
 
 def create_unstructured_bulk_refine(argv):
 

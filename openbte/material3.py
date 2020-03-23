@@ -9,63 +9,84 @@ import pickle
 from .database import *
 from matplotlib.pylab import *
 from .full_model import generate_full
+from .mfp_model import generate_mfp
 from google_drive_downloader import GoogleDriveDownloader as gdd
-
 
 class Material(object):
 
 
  def __init__(self,**argv):
   if MPI.COMM_WORLD.Get_rank() == 0:
- 
 
+
+   #Initialization---------------
+   filename = argv['model'] + '.h5'
    source = argv.setdefault('source','local')
-   filename = argv['filename'] 
    if source == 'database':
-      if not os.path.exists(filename):
        print('Download database') 
-       gdd.download_file_from_google_drive(file_id=db[filename],
+       gdd.download_file_from_google_drive(file_id=db['entry_name'],
                                           dest_path='./' + filename,showsize=True)
-      else: 
-       print('Using local file')  
-   elif source == 'local':
-       print('Using local file')  
-   else:
+   elif source == 'unlisted':
        print('Unlisted')  
        gdd.download_file_from_google_drive(file_id=argv['file_id'],
-                                           dest_path='./' + filename,showsize=True)
+                                           dest_path='./'+ filename,showsize=True)
+   else: #Generated locally
 
-   model = argv.setdefault('model','isotropic_2DSym')
+    model = argv['model']
+    if model == 'full':
+      data = generate_full(**argv)
 
-   if model == 'mfp/isotropic_2DSym':
-     data = self.compute_isotropic_2DSym(**argv)
-
-   if model == 'full':
-     data = generate_full(**argv)
+    if model == 'mfp':
+      data = generate_mfp(**argv)
 
 
-   if model == 'full_2D':
-     data = self.compute_full_2D(**argv)
+   #if argv.setdefault('save':True):
+   if argv.setdefault('check_kappa',False):
+       if argv['model'] == 'full':
+         filename = 'full.h5'    
+       kappa_initial = dd.io.load(filename)['kappa']
+       kappa_initial[kappa_initial < np.max(kappa_initial)/100] = 0
+       kappa = data['kappa'].copy()
+       kappa[kappa < np.max(kappa)/100] = 0
+       check = np.allclose(kappa,kappa_initial,rtol=1e-3)
+       if check:
+          cc = 'passed'
+       else:   
+          cc = 'failed'
+       print('Material file check... ' + cc)
+
+
+   dd.io.save('material.h5',data,compression=('zlib',9))
+   #else: 
+   # self.data = data   
+
+   #model = argv.setdefault('model','isotropic_2DSym')
+
+   #if model == 'mfp/isotropic_2DSym':
+   #  data = self.compute_isotropic_2DSym(**argv)
+
+
+   #if model == 'full_2D':
+   #  data = self.compute_full_2D(**argv)
 
    #if model == 'full_2D_new':
    #  data = self.compute_full_2D_new(**argv)
 
-   if model == 'isotropic_2DSym' or model == 'nongray':
-     data = self.compute_isotropic_2DSym(**argv)
+   #if model == 'isotropic_2DSym' or model == 'nongray':
+   #  data = self.compute_isotropic_2DSym(**argv)
  
-   if model == 'anisotropic_2DSym':
-     data = self.compute_anisotropic_2DSym(**argv)
+   #if model == 'anisotropic_2DSym':
+   #  data = self.compute_anisotropic_2DSym(**argv)
 
-   if model == 'anisotropic_3D':
-     data = self.compute_anisotropic_3D(**argv)
+   #if model == 'anisotropic_3D':
+   #  data = self.compute_anisotropic_3D(**argv)
 
-   if model == 'isotropic_3D':
-     data = self.compute_isotropic_3D(**argv)
+   #if model == 'isotropic_3D':
+   #  data = self.compute_isotropic_3D(**argv)
 
    #data.update({'kappa_inclusion':argv.setdefault('kappa_inclusion',1e-3)})
    #if argv.setdefault('save',True):
 
-   dd.io.save('material.h5',data,compression=('zlib',9))
    # pickle.dump(data,open(argv.setdefault('save_filename','MATERIAL'),'wb+'))
   
   #else : data = None
@@ -171,6 +192,7 @@ class Material(object):
            'gcontrol_angle':gversors,\
            'kappa_bulk_tot':kbulk}
  '''
+
 
 
  def get_linear_indexes(self,mfp,value,scale,extent):
@@ -647,7 +669,7 @@ class Material(object):
    B = np.tile(TCOEFF,(len(TCOEFF),1))
    #--------------------------------
 
-   data = {'tc':tc,'W':Ws,'sigma':sigma,'kappa':kappa,'a':tcoeff}
+   data = {'tc':tc,'B':B,'sigma':sigma,'kappa':kappa,'a':tcoeff}
    return data
 
    #return {'F':F,'TC':tc,'B':B,'JC':kappa_directional}

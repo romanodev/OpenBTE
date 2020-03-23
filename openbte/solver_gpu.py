@@ -100,22 +100,25 @@ class SolverFull(object):
 
   def __init__(self,**argv):
 
-   if 'geometry' in argv.keys():  
-     self.mesh = argv['geometry']
+
+   self.mesh = dd.io.load('geometry.h5')
+
+
+   #if 'geometry' in argv.keys():  
+   #  self.mesh = argv['geometry']
      #self.mesh._update_data()
-   else:  
-    self.mesh = Geometry(model='load',filename_geometry = argv.setdefault('filename_geometry','geometry.p'))
+   #else:  
+   # self.mesh = Geometry(model='load',filename_geometry = argv.setdefault('filename_geometry','geometry.p'))
    
 
-
-   if len(self.mesh.elems[0]) == 4:
-         self.structured=True
-   else:    
-         self.structured=False
+   #if len(self.mesh.elems[0]) == 4:
+   #      self.structured=True
+   #else:    
+   #      self.structured=False
 
    self.old_index = -1
-   self.n_side_per_elem = len(self.mesh.elems[0])
-   self.dim = self.mesh.dim
+   self.n_side_per_elem = len(self.mesh['elems'][0])
+   self.dim = 2
    #self.TT = 0.5*self.mesh.B * np.array([self.mesh.elem_volumes]).T    
    self.ms_error = argv.setdefault('ms_error',0.1)
    self.verbose = argv.setdefault('verbose',True)
@@ -151,11 +154,19 @@ class SolverFull(object):
 
 
    #-----IMPORT MATERIAL-------------------
-   self.tc = self.mat[0]['tc']
+   self.tc = self.mat[0]['temp']
    self.n_index = len(self.tc)
-   self.Wod = self.mat[0]['B'] + self.mat[0]['B'].T
-   self.sigma = self.mat[0]['sigma']*1e9
-   self.a = self.mat[0]['a']
+
+   #Get scattering operator---------------------------------
+   tmp = self.mat[0]['B']
+   if np.allclose(tmp, np.tril(tmp)):
+    tmp += tmp.T - 0.5*np.diag(np.diag(tmp))
+   self.BM = np.einsum('i,ij->ij',self.mat[0]['scale'],tmp)
+   #--------------------------------------------------------
+
+   self.sigma = self.mat[0]['G']*1e9
+   self.VMFP = self.mat[0]['F']*1e9
+   #self.a = self.mat[0]['a']
    self.kappa = self.mat[0]['kappa']
    #----------------IMORT MATERIAL-------
 
@@ -175,9 +186,9 @@ class SolverFull(object):
    for e in self.elem_mat_map.keys():
      if self.mesh.elem_mat_map[e] == 0:
       self.elem_kappa_map.update({e:self.kappa[0,0]})
+      #self.elem_kappa_map.update({e:1})
      else: 
       self.elem_kappa_map.update({e:0.5})
-
 
    #self.control_angle =  self.rotate(np.array(self.mat[0]['control_angle']),**argv)
    #self.kappa_directional =  self.rotate(np.array(self.mat[0]['kappa_directional']),**argv)
@@ -215,7 +226,7 @@ class SolverFull(object):
    self.kappa_factor = 1
 
    #if self.verbose: 
-    #self.print_logo()
+   self.print_logo()
     #self.print_dof()
    
    #if len(self.mesh.side_list['Interface']) > 0:
@@ -428,8 +439,8 @@ class SolverFull(object):
      if argv.setdefault('only_fourier'):
        data = {'kappa_vec':np.array([kappa_fourier]),'temperature_fourier':temp_fourier,'flux_fourier':flux_fourier}
        pickle.dump(data,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
-
-       return
+       self.state = data
+       return 
 
      if self.verbose:
       print()
@@ -439,7 +450,6 @@ class SolverFull(object):
 
      Tnew = temp_fourier.copy()
      TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
-    
 
      #Experimenting----
      #self.k = device_put(self.k)
@@ -452,24 +462,30 @@ class SolverFull(object):
      #self.Wod = device_put(self.Wod)
      #-------------
 
+     #G = np.einsum('qj,jn->qn',self.sigma,self.k,optimize=True)
 
-
-     G = np.einsum('qj,jn->qn',self.sigma,self.k,optimize=True)
+     #Main matrix----------------------------------------------
+     G = np.einsum('qj,jn->qn',self.VMFP,self.k,optimize=True)
      Gp = G.clip(min=0); Gm = G.clip(max=0)
-     D = np.tile(self.a,(self.mesh.nle,1)).T
-
+     #D = np.tile(self.a,(self.mesh.nle,1)).T
+     D = np.ones((self.n_index,self.mesh.nle))
      for n,i in enumerate(self.i): D[:,i] += Gp[:,n]
-     
-     #Compute boundary------------------------------------------
+
+     #Main matrix from the boundary----------------------------
+     Gb = np.einsum('qj,jn->qn',self.VMFP,self.db,optimize=True)
+     Gbp = Gb.clip(min=0);Gbm2 = Gb.clip(max=0)
      Bm = np.zeros((self.n_index,self.mesh.nle))
+     for n,(i,j) in enumerate(zip(self.eb,self.sb)):
+         D[:,i]  += Gbp[:,n]
+         Bm[:,i] -= TB[i,j]*Gbm2[:,n]
+     #---------------------------------------------------------
+     
+     #Compute boundary-----------------------------------------------
      if len(self.db) > 0:
       Gb = np.einsum('qj,jn->qn',self.sigma,self.db,optimize=True)
       Gbp = Gb.clip(min=0); Gbm = Gb.clip(max=0)
-    
-      for n,(i,j) in enumerate(zip(self.eb,self.sb)):
-        D[:,i]  += Gbp[:,n]
-        Bm[:,i] -= TB[i,j]*Gbm[:,n]
-      SS = np.einsum('qc,c->qc',Gbm,1/Gbm.sum(axis=0))
+      SS = np.einsum('qc,c->qc',Gbm2,1/Gbm.sum(axis=0))
+     #---------------------------------------------------------------
 
      ms = MultiSolver(self.i,self.j,Gm,D)
 
@@ -497,7 +513,7 @@ class SolverFull(object):
      kappa_old = kappa_fourier
      while kk < miter and error > merror:
 
-      DeltaT = np.matmul(self.Wod,alpha*X+(1-alpha)*X_old) 
+      DeltaT = np.matmul(self.BM,alpha*X+(1-alpha)*X_old) 
       X_old = X.copy()
       X = ms.solve(P + Bm + DeltaT)
       kappa = np.sum(np.multiply(BB,X))
@@ -543,7 +559,7 @@ class SolverFull(object):
       vi = self.mesh.get_elem_volume(i)
       vj = self.mesh.get_elem_volume(j)
       kappa = self.get_kappa(i,j)
-    
+
       (v_orth,dummy) = self.mesh.get_decomposed_directions(i,j,rot=kappa)
       li = self.mesh.g2l[i]; lj = self.mesh.g2l[j]
 

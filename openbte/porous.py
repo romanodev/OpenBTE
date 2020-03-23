@@ -4,10 +4,18 @@ from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
 import shapely
 import numpy as np
+from . import GenerateMesh2D
+
+
 
 class Porous(object):
 
  def __init__(self,**argv):
+
+  if argv.setdefault('lz',0) == 0:
+     GenerateMesh2D.mesh(argv)
+     return
+    
 
   self.step = argv['step']
   self.points = []
@@ -15,7 +23,6 @@ class Porous(object):
   self.loops = []
   self.surfaces = []
   self.argv = argv
- 
     
   self.common(z=-self.argv['lz']/2)
   self.common(z=self.argv['lz']/2)
@@ -23,7 +30,6 @@ class Porous(object):
   self.points = np.array(self.points)
   self.lines = np.array(self.lines)
   self.loops = np.array(self.loops)
-
   
   self.apply_periodic_mesh()
   
@@ -43,7 +49,6 @@ class Porous(object):
         i = 1
     pts.append(self.points[self.lines[abs(n)-1][i]])
    pts = np.array(pts) 
-    
    
    
    return np.mean(pts,axis=0)
@@ -52,8 +57,6 @@ class Porous(object):
 
  def isperiodic(self,s1,s2):
 
-   #n = self.get_surface_normal(s1)
-   #n2 = self.get_surface_normal(s2)
    c1 = self.get_surface_centroid(s1)
    c2 = self.get_surface_centroid(s2)
    

@@ -1,10 +1,10 @@
 new = True
 if new:
  from .geometry2 import Geometry
- from .geometry_gpu import GeometryFull
+ from .geometry_final import GeometryFull
  from .material3 import Material
  from .solver import Solver
- from .solver_gpu import SolverFull
+ from .solver_final import SolverFull
  from .elasticity import Elasticity
  from .plot2 import Plot
 else:
