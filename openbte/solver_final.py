@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 import numpy as np
 from .GPUSolver import *
-import pkg_resources
+#import pkg_resources
 from scipy.sparse.linalg import splu
 from termcolor import colored, cprint 
 from .utils import *
@@ -302,14 +302,14 @@ class SolverFull(object):
   def print_logo(self):
 
 
-    v = pkg_resources.require("OpenBTE")[0].version   
+    #v = pkg_resources.require("OpenBTE")[0].version   
     print(' ')
     print(colored(r'''        ___                   ____ _____ _____ ''','green'))
     print(colored(r'''       / _ \ _ __   ___ _ __ | __ )_   _| ____|''','green'))
     print(colored(r'''      | | | | '_ \ / _ \ '_ \|  _ \ | | |  _|  ''','green'))
     print(colored(r'''      | |_| | |_) |  __/ | | | |_) || | | |___ ''','green'))
     print(colored(r'''       \___/| .__/ \___|_| |_|____/ |_| |_____|''','green'))
-    print(colored(r'''            |_|                                 v'''+v,'green'))
+    print(colored(r'''            |_|                                ''','green'))
     print()
     print('                       GENERAL INFO')
     print(colored(' -----------------------------------------------------------','green'))
