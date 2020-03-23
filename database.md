@@ -31,7 +31,6 @@ description: User-generated input data
   src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
 </script>
 
-<iframe src="https://docs.google.com/forms/d/e/1FAIpQLSfUBztWTZ4p8AOs-soz5hkb5qYRUV-6gbq-Z5zW12xGYOHm4w/viewform?embedded=true" width="640" height="1771" frameborder="0" marginheight="0" marginwidth="0">Loading…</iframe>
 
 ## Here we keep a list of self-hosted data from users. 
 
