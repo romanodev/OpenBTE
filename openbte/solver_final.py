@@ -11,7 +11,11 @@ class SolverFull(object):
   def __init__(self,**argv):
 
         #-----IMPORT MESH-------------------
-        self.mesh = load_dictionary('geometry.h5')
+        if 'geometry' in argv.keys():
+         self.mesh = argv['geometry'].data
+        else: 
+         self.mesh = load_dictionary('geometry.h5')
+
         self.n_elems = self.mesh['n_elems'][0]
 
         #---------------------------------------

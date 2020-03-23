@@ -102,8 +102,12 @@ class GeometryFull(object):
   if model == 'bulk':
     GenerateBulk2D.mesh(argv)
 
-  save_dictionary(self.compute_mesh_data(argv),'geometry.h5')
-  #dd.io.save('geometry.h5',self.compute_mesh_data(argv))  
+  data = self.compute_mesh_data(argv)
+
+  if argv.setdefault('save',True):
+   save_dictionary(data,'geometry.h5')
+  else:
+   self.data = data   
 
   
   '''
