@@ -3,24 +3,24 @@ import numpy as np
 from .GPUSolver import *
 import pkg_resources
 from scipy.sparse.linalg import splu
-import deepdish as dd
 from termcolor import colored, cprint 
-
+from .utils import *
 
 class SolverFull(object):
 
   def __init__(self,**argv):
 
         #-----IMPORT MESH-------------------
-        self.mesh = dd.io.load('geometry.h5')
-        self.n_elems = self.mesh['n_elems']
+        self.mesh = load_dictionary('geometry.h5')
+        self.n_elems = self.mesh['n_elems'][0]
+
         #---------------------------------------
         self.verbose = argv.setdefault('verbose',True)
         self.alpha = argv.setdefault('alpha',1.0)
-        self.n_side_per_elem = self.mesh['n_side_per_elem']
+        self.n_side_per_elem = self.mesh['n_side_per_elem'][0]
 
         #-----IMPORT MATERIAL-------------------
-        self.mat = dd.io.load('material.h5')
+        self.mat = load_dictionary('material.h5')
         self.tc = self.mat['temp']
         self.n_index = len(self.tc)
         tmp = self.mat['B']
@@ -33,7 +33,7 @@ class SolverFull(object):
         #----------------IMORT MATERIAL-------
    
         self.n_index = len(self.tc)
-        self.kappa_factor = self.mesh['kappa_factor']
+        self.kappa_factor = self.mesh['kappa_factor'][0]
 
         if self.verbose: self.print_logo()
    
@@ -42,7 +42,7 @@ class SolverFull(object):
         if self.verbose:
          print('                        SYSTEM INFO                 ')   
          print(colored(' -----------------------------------------------------------','green'))
-         print(colored('  Space Discretization:                    ','green') + str(self.mesh['n_elems']))
+         print(colored('  Space Discretization:                    ','green') + str(self.n_elems))
          print(colored('  Momentum Discretization:                 ','green') + str(len(self.tc)))
          print(colored('  Bulk Thermal Conductivity [W/m/K]:       ','green')+ str(round(self.mat['kappa'][0,0],4)))
 
@@ -83,12 +83,12 @@ class SolverFull(object):
      #Main matrix----------------------------------------------
      G = np.einsum('qj,jn->qn',self.VMFP,self.mesh['k'],optimize=True)
      Gp = G.clip(min=0); Gm = G.clip(max=0)
-     D = np.ones((self.n_index,self.mesh['n_elems']))
+     D = np.ones((self.n_index,self.n_elems))
      for n,i in enumerate(self.mesh['i']): D[:,i] += Gp[:,n]
 
      
      #Compute boundary-----------------------------------------------
-     Bm = np.zeros((self.n_index,self.mesh['n_elems']))
+     Bm = np.zeros((self.n_index,self.n_elems))
      if len(self.mesh['db']) > 0:
       Gb = np.einsum('qj,jn->qn',self.VMFP,self.mesh['db'],optimize=True)
       Gbp = Gb.clip(min=0);Gbm2 = Gb.clip(max=0)
@@ -103,10 +103,10 @@ class SolverFull(object):
      ms = MultiSolver(self.mesh['i'],self.mesh['j'],Gm,D)
 
      #Periodic------------------
-     P = np.zeros((self.n_index,self.mesh['n_elems']))
+     P = np.zeros((self.n_index,self.n_elems))
      for n,(i,j) in enumerate(zip(self.mesh['i'],self.mesh['j'])): P[:,i] -= Gm[:,n]*self.mesh['B'][i,j]
 
-     BB = -np.outer(self.sigma[:,0],np.sum(self.mesh['B_with_area_old'].todense(),axis=0))*self.kappa_factor*1e-18
+     BB = -np.outer(self.sigma[:,0],np.sum(self.mesh['B_with_area_old'],axis=0))*self.kappa_factor*1e-18
 
      #---------------------------------------------
      kappa_vec = [self.data['kappa_fourier'][0]]
@@ -132,7 +132,7 @@ class SolverFull(object):
 
       kk +=1
       if len(self.mesh['db']) > 0:
-       Bm = np.zeros((self.n_index,self.mesh['n_elems']))   
+       Bm = np.zeros((self.n_index,self.n_elems))   
        for n,(i,j) in enumerate(zip(self.mesh['eb'],self.mesh['sb'])): 
          Bm[:,i] +=np.einsum('u,u,q->q',X[:,i],Gbp[:,n],SS[:,n],optimize=True)
 
@@ -162,8 +162,8 @@ class SolverFull(object):
     
   def assemble_fourier(self):
 
-    F = sp.dok_matrix((self.mesh['n_elems'],self.mesh['n_elems']))
-    B = np.zeros(self.mesh['n_elems'])
+    F = sp.dok_matrix((self.n_elems,self.n_elems))
+    B = np.zeros(self.n_elems)
 
     for ll in self.mesh['side_list']['active']:
       area = self.mesh['areas'][ll]  
@@ -178,8 +178,8 @@ class SolverFull(object):
        F[j,j] += v_orth/vj*area
        F[j,i] -= v_orth/vj*area
        if  ll in self.mesh['side_list']['Periodic']:
-        B[i] += self.mesh['periodic_values'][i][j]*v_orth/vi*area
-        B[j] += self.mesh['periodic_values'][j][i]*v_orth/vj*area
+        B[i] += self.mesh['periodic_values'][i][j][0]*v_orth/vi*area
+        B[j] += self.mesh['periodic_values'][j][i][0]*v_orth/vj*area
       else:
        if ll in self.mesh['side_list']['Hot']:
         F[li,li] += v_orth/vi*area
@@ -195,12 +195,12 @@ class SolverFull(object):
 
     SU = splu(self.fourier['A'])
 
-    C = np.zeros(self.mesh['n_elems'])
+    C = np.zeros(self.n_elems)
 
     n_iter = 0
     kappa_old = 0
     error = 1  
-    grad = np.zeros((self.mesh['n_elems'],3))
+    grad = np.zeros((self.n_elems,3))
     while error > argv.setdefault('max_fourier_error',1e-4) and \
                   n_iter < argv.setdefault('max_fourier_iter',10) :
     
@@ -222,29 +222,29 @@ class SolverFull(object):
 
   def compute_grad(self,temp):
 
-   diff_temp = self.mesh['n_elems']*[None]
+   diff_temp = self.n_elems*[None]
    for i in range(len(diff_temp)):
       diff_temp[i] = len(self.mesh['elems'][i])*[0] 
    
 
-   gradT = np.zeros((self.mesh['n_elems'],3))
+   gradT = np.zeros((self.n_elems,3))
    for ll in self.mesh['side_list']['active'] :
     elems = self.mesh['side_elem_map'][ll]
 
     kc1 = elems[0]
     c1 = self.mesh['centroids'][kc1]
 
-    ind1 = self.mesh['elem_side_map'][kc1].index(ll)
+    ind1 = list(self.mesh['elem_side_map'][kc1]).index(ll)
 
     if not ll in self.mesh['side_list']['Boundary']:
 
      kc2 = elems[1]
-     ind2 = self.mesh['elem_side_map'][kc2].index(ll)
+     ind2 = list(self.mesh['elem_side_map'][kc2]).index(ll)
      temp_1 = temp[kc1]
      temp_2 = temp[kc2]
 
      if ll in self.mesh['side_list']['Periodic']:
-      temp_2 -= self.mesh['periodic_values'][kc2][kc1]
+      temp_2 -= self.mesh['periodic_values'][kc2][kc1][0]
 
      diff_t = temp_2 - temp_1
      
@@ -252,7 +252,7 @@ class SolverFull(object):
      diff_temp[kc2][ind2]  = -diff_t
 
    
-   for k in range(self.mesh['n_elems']) :
+   for k in range(self.n_elems) :
     tmp = np.dot(self.mesh['weigths'][k],diff_temp[k])
     gradT[k,0] = tmp[0] #THESE HAS TO BE POSITIVE
     gradT[k,1] = tmp[1]
@@ -264,7 +264,7 @@ class SolverFull(object):
 
   def compute_non_orth_contribution(self,gradT) :
 
-    C = np.zeros(self.mesh['n_elems'])
+    C = np.zeros(self.n_elems)
 
     for ll in self.mesh['side_list']['active']:
 
@@ -273,7 +273,7 @@ class SolverFull(object):
      if not i==j:
 
       area = self.mesh['areas'][ll]   
-      w  = self.mesh['interp_weigths'][ll]
+      w  = self.mesh['interp_weigths'][ll][0]
       F_ave = w*np.dot(gradT[i],self.mat['kappa']) + (1.0-w)*np.dot(gradT[j],self.mat['kappa'])
       grad_ave = w*gradT[i] + (1.0-w)*gradT[j]
 
@@ -293,11 +293,11 @@ class SolverFull(object):
     (i,j) = self.mesh['side_elem_map'][l]
     (v_orth,v_non_orth) = self.get_decomposed_directions(i,j,rot=self.mat['kappa'])
     kappa -= v_orth *  (temp[i] - temp[j] - 1) * self.mesh['areas'][l]
-    w  = self.mesh['interp_weigths'][l]
+    w  = self.mesh['interp_weigths'][l][0]
     grad_ave = w*gradT[i] + (1.0-w)*gradT[j]
     kappa += np.dot(grad_ave,v_non_orth)/2 * self.mesh['areas'][l]
 
-   return kappa*self.mesh['kappa_factor']
+   return kappa*self.kappa_factor
 
   def print_logo(self):
 

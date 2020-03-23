@@ -35,6 +35,7 @@ from shapely.geometry import LineString
 import shapely
 import pickle
 import sparse
+from .utils import *
 
 #import GenerateInterface2D
 #from nanowire import *
@@ -98,11 +99,11 @@ class GeometryFull(object):
     argv['frame'] = frame
     Porous(**argv)
 
-
   if model == 'bulk':
     GenerateBulk2D.mesh(argv)
 
-  dd.io.save('geometry.h5',self.compute_mesh_data(argv))  
+  save_dictionary(self.compute_mesh_data(argv),'geometry.h5')
+  #dd.io.save('geometry.h5',self.compute_mesh_data(argv))  
 
   
   '''
@@ -1225,21 +1226,21 @@ class GeometryFull(object):
     self.nle = len(self.l2g)
 
     data = {'side_list':self.side_list,\
-          'n_elems':self.n_elems,\
+          'n_elems':np.array([self.n_elems]),\
           'elem_side_map':self.elem_side_map,\
           'side_elem_map':self.side_elem_map,\
           'elems':self.elems,\
-          'dim':self.dim,\
+          'dim':np.array([self.dim]),\
           'weigths':self.weigths,\
-          'kappa_factor':self.kappa_factor,\
+          'kappa_factor':np.array([self.kappa_factor]),\
           'areas':self.side_areas,\
           'periodic_values':self.periodic_values,\
           'interp_weigths':self.interp_weigths,\
           'centroids':self.elem_centroids,\
           'side_centroids':self.side_centroids,\
           'volumes':self.elem_volumes,\
-          'B':self.B,\
-          'B_with_area_old':self.B_with_area_old,\
+          'B_with_area_old':self.B_with_area_old.todense(),\
+          'B':self.B.todense(),\
           'normals':self.new_normals,\
           'dists':self.dists,\
           'flux_sides':self.flux_sides,\
@@ -1254,7 +1255,7 @@ class GeometryFull(object):
           'db':self.db,\
           'dbp':self.dbp,\
           'pv':self.pv,\
-          'n_side_per_elem':len(self.elems[0])}
+          'n_side_per_elem':np.array([len(self.elems[0])])}
 
     return data
 
@@ -2380,10 +2381,9 @@ class GeometryFull(object):
      d = np.linalg.norm(P - P1)
      s = d/dist
      #---------------------------------------------------------------
-    self.interp_weigths.update({ll:s})
+    self.interp_weigths.update({ll:[s]})
    else:
-    #self.interp_weigths.update({ll:0.0})
-    self.interp_weigths.update({ll:1.0})
+    self.interp_weigths.update({ll:[1.0]})
 
 
  def get_region_from_elem(self,elem):
@@ -2467,8 +2467,8 @@ class GeometryFull(object):
 
       elem1,elem2 = self.side_elem_map[side[0]]
 
-      self.periodic_values.update({elem1:{elem2:side_value[side[0]]}})
-      self.periodic_values.update({elem2:{elem1:side_value[side[1]]}})
+      self.periodic_values.update({elem1:{elem2:[side_value[side[0]]]}})
+      self.periodic_values.update({elem2:{elem1:[side_value[side[1]]]}})
 
       i = self.g2l[elem1]
       j = self.g2l[elem2]

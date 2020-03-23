@@ -1,62 +1,51 @@
 import numpy as np
-import deepdish as dd
 import os
-import pickle
-from mpi4py import MPI
 from numpy.testing import assert_array_equal
 import math
-import pickle
 from .database import *
 from matplotlib.pylab import *
 from .full_model import generate_full
+from .utils import *
 from .mfp_model import generate_mfp
-from google_drive_downloader import GoogleDriveDownloader as gdd
 
 class Material(object):
 
 
  def __init__(self,**argv):
-  if MPI.COMM_WORLD.Get_rank() == 0:
+
+   model = argv['model']
+   
+   if   model == 'unlisted':
+      download_file(argv['file_id'],'material.h5')
+
+   elif model == 'database':
+      download_file(db['entry_name'],'material.h5')
+
+   elif model == 'full':
+      save_dictionary(generate_full(**argv),'material.h5')
+
+   elif model == 'mfp':
+      save_dictionary(generate_mfp(**argv),'filename.h5')
+
+   #if argv.setdefault('check_kappa',False):
+   #    if argv['model'] == 'full':
+   #      filename = 'full.h5'    
+   #    kappa_initial = dd.io.load(filename)['kappa']
+   #    kappa_initial[kappa_initial < np.max(kappa_initial)/100] = 0
+   #    kappa = data['kappa'].copy()
+   #    kappa[kappa < np.max(kappa)/100] = 0
+   #    check = np.allclose(kappa,kappa_initial,rtol=1e-3)
+   #    if check:
+   #       cc = 'passed'
+   #    else:   
+   #       cc = 'failed'
+   #    print('Material file check... ' + cc)
 
 
-   #Initialization---------------
-   filename = argv['model'] + '.h5'
-   source = argv.setdefault('source','local')
-   if source == 'database':
-       print('Download database') 
-       gdd.download_file_from_google_drive(file_id=db['entry_name'],
-                                          dest_path='./' + filename,showsize=True)
-   elif source == 'unlisted':
-       print('Unlisted')  
-       gdd.download_file_from_google_drive(file_id=argv['file_id'],
-                                           dest_path='./'+ filename,showsize=True)
-   else: #Generated locally
+   #pickle.dump(data,open('MATERIAL','wb+'),protocol=pickle.HIGHEST_PROTOCOL)
+   #dd.io.save('material.h5',data,compression=('zlib',9))
+   #np.save('test.npy', data)
 
-    model = argv['model']
-    if model == 'full':
-      data = generate_full(**argv)
-
-    if model == 'mfp':
-      data = generate_mfp(**argv)
-
-
-   #if argv.setdefault('save':True):
-   if argv.setdefault('check_kappa',False):
-       if argv['model'] == 'full':
-         filename = 'full.h5'    
-       kappa_initial = dd.io.load(filename)['kappa']
-       kappa_initial[kappa_initial < np.max(kappa_initial)/100] = 0
-       kappa = data['kappa'].copy()
-       kappa[kappa < np.max(kappa)/100] = 0
-       check = np.allclose(kappa,kappa_initial,rtol=1e-3)
-       if check:
-          cc = 'passed'
-       else:   
-          cc = 'failed'
-       print('Material file check... ' + cc)
-
-
-   dd.io.save('material.h5',data,compression=('zlib',9))
    #else: 
    # self.data = data   
 
