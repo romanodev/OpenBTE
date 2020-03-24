@@ -5,17 +5,18 @@ class MultiSolver(object):
 
   def __init__(self,row,col,A,A0,**argv):
 
+   self.tt = np.float64
    self.mode = argv.setdefault('mode','cpu')
    if self.mode == 'cpu':  
     (nbatch,d) = np.shape(A0)
-    self.scale = np.zeros(nbatch)
+    #self.scale = np.zeros(nbatch)
     self.lu = {}
     for i in range(nbatch):
-      self.scale[i] = np.max(A[i])  
-      if self.scale[i] == 0:
-        self.scale[i] = 1
-      S1 = sp.csc_matrix((A[i]/self.scale[i],(row,col)),shape=(d,d),dtype=np.float64)
-      S = S1 + sp.diags(A0[i]/self.scale[i],format='csc')
+      #self.scale[i] = np.max(A[i])  
+      #if self.scale[i] == 0:
+      #  self.scale[i] = 1
+      S1 = sp.csc_matrix((A[i],(row,col)),shape=(d,d),dtype=np.float64)
+      S = S1 + sp.diags(A0[i],format='csc')
       lu = sp.linalg.splu(S,permc_spec='COLAMD')
       self.lu.update({i:lu})
    else: 
@@ -26,12 +27,11 @@ class MultiSolver(object):
 
 
   def solve(self,B):    
-
+   B = B.astype(self.tt)
    if self.mode =='cpu': 
     x = np.zeros_like(B) 
     for i in self.lu.keys():
-     x[i] = self.lu[i].solve(B[i]/self.scale[i])
-
+     x[i] = self.lu[i].solve(B[i])
     return x
    else: 
       
@@ -124,7 +124,7 @@ class MultiSolver(object):
       assert(status==0)
 
       #init
-      tt = np.float64
+      
       (n_batch,d) = np.shape(B)
       n = ctypes.c_int(d)
       m = ctypes.c_int(d)
@@ -132,11 +132,10 @@ class MultiSolver(object):
       b2 = ctypes.c_int()
       n_batch = ctypes.c_int(n_batch)
 
-      row = np.concatenate((self.row,np.array(range(d))))
-      col = np.concatenate((self.col,np.array(range(d))))
-      nnz = ctypes.c_int(len(row))
-      Acsr = sp.csr_matrix( (np.ones(len(col)),(row,col)), shape=(d,d),dtype=tt).sorted_indices()
-
+     
+      nnz = ctypes.c_int(len(self.row))
+      Acsr = sp.csr_matrix( (np.ones(len(self.col)),(self.row,self.col)), shape=(d,d),dtype=self.tt).sorted_indices()
+     
 
       dcsrIndPtr = gpuarray.to_gpu(Acsr.indptr)
       dcsrColInd = gpuarray.to_gpu(Acsr.indices)
@@ -154,9 +153,17 @@ class MultiSolver(object):
       #get data---
       global_data = []
       for i in range(n_batch.value):
-        Acsr = sp.csr_matrix((np.concatenate((self.A[i,:],np.ones(d))),(row,col)),shape=(n.value,m.value),dtype=tt).sorted_indices()
-        global_data.append(Acsr.data)
-      data = np.ascontiguousarray(global_data,dtype=tt)
+        
+        Acsr = sp.csr_matrix((self.A[i,:],(self.row,self.col)),shape=(n.value,m.value),dtype=self.tt).sorted_indices()
+        Acsr = Acsr + sp.diags(self.A0[i],format='csr')
+        
+        global_data +=list(Acsr.data)
+
+      
+      global_data = np.array(global_data,dtype=self.tt)
+      data = np.ascontiguousarray(global_data,dtype=self.tt)
+
+
 
       dcsrVal = gpuarray.to_gpu(data)
       
@@ -176,13 +183,13 @@ class MultiSolver(object):
                            ctypes.byref(b2)
                            );
 
-      #print(b2.value/1024/1024)
-      #print(b1.value/1024/1024)
+    #  print(b2.value/1024/1024)
+    #  print(b1.value/1024/1024)
 
-      w_buffer = gpuarray.zeros(b2.value, dtype=tt)
+      w_buffer = gpuarray.zeros(b2.value, dtype=self.tt)
 
-      b = gpuarray.to_gpu(B.astype(tt))
-      dx = pycuda.gpuarray.empty_like(b,dtype=tt)
+      b = gpuarray.to_gpu(B.astype(self.tt))
+      dx = pycuda.gpuarray.empty_like(b)
 
       res = _libcusolver.cusolverSpDcsrqrsvBatched(cuso_handle,
                                  n,
@@ -197,11 +204,8 @@ class MultiSolver(object):
                                  n_batch,
                                  info,
                                  int(w_buffer.gpudata))
-      x= dx.get()
-      
-      print(x)
-      print('ggg')
-
+      x = dx.get()
+  
       status = _libcusolver.cusolverSpDestroy(cuso_handle)
       assert(status == 0)
       status = _libcusparse.cusparseDestroy(cusp_handle)
@@ -209,3 +213,4 @@ class MultiSolver(object):
 
 
       return x
+
