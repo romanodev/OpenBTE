@@ -64,7 +64,7 @@ class SolverFull(object):
         data = self.solve_bte(**argv)
 
         self.data.update(data)
-        pickle.dump(self.data,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
+        save_dictionary(self.data,'solver.h5')
 
         if self.verbose:
          print(' ')   
