@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 import numpy as np
-from .GPUSolver import *
-#import pkg_resources
+from .MSolver import *
 from scipy.sparse.linalg import splu
 from termcolor import colored, cprint 
 from .utils import *
