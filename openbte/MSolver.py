@@ -153,13 +153,13 @@ class MultiSolver(object):
 
       #get data---
       global_data = []
-      for i in range(nbatch.value):
-        Acsr = sp.csr_matrix((np.concatenate((A[i,:],np.ones(d))),(row,col)),shape=(n.value,m.value),dtype=tt).sorted_indices()
+      for i in range(n_batch.value):
+        Acsr = sp.csr_matrix((np.concatenate((self.A[i,:],np.ones(d))),(row,col)),shape=(n.value,m.value),dtype=tt).sorted_indices()
         global_data.append(Acsr.data)
       data = np.ascontiguousarray(global_data,dtype=tt)
 
       dcsrVal = gpuarray.to_gpu(data)
-
+      
 
       #get info
       _libcusolver.cusolverSpDcsrqrBufferInfoBatched(cuso_handle,
@@ -170,27 +170,42 @@ class MultiSolver(object):
                            int(dcsrVal.gpudata),
                            int(dcsrIndPtr.gpudata),
                            int(dcsrColInd.gpudata),
-                           nbatch,
+                           n_batch,
                            info,
                            ctypes.byref(b1),
                            ctypes.byref(b2)
                            );
 
-      print(b2.value/1024/1024)
-      print(b1.value/1024/1024)
+      #print(b2.value/1024/1024)
+      #print(b1.value/1024/1024)
 
+      w_buffer = gpuarray.zeros(b2.value, dtype=tt)
 
-      #dcsrIndPtr = gpuarray.to_gpu(Acsr.indptr)
-     # (nbatch,nnz) = np.shape(self.A)     
-     # Acsr = sp.csr_matrix( (np.ones(len(self.col)),(self.row,self.col)), shape=(d,d),dtype=tt).sorted_indices()
-     # dcsrIndPtr = gpuarray.to_gpu(Acsr.indptr)
-     # dcsrColInd = gpuarray.to_gpu(Acsr.indices)
+      b = gpuarray.to_gpu(B.astype(tt))
+      dx = pycuda.gpuarray.empty_like(b,dtype=tt)
+
+      res = _libcusolver.cusolverSpDcsrqrsvBatched(cuso_handle,
+                                 n,
+                                 m,
+                                 nnz,
+                                 descrA,
+                                 int(dcsrVal.gpudata),
+                                 int(dcsrIndPtr.gpudata),
+                                 int(dcsrColInd.gpudata),
+                                 int(b.gpudata),
+                                 int(dx.gpudata),
+                                 n_batch,
+                                 info,
+                                 int(w_buffer.gpudata))
+      x= dx.get()
+      
+      print(x)
+      print('ggg')
+
       status = _libcusolver.cusolverSpDestroy(cuso_handle)
       assert(status == 0)
       status = _libcusparse.cusparseDestroy(cusp_handle)
       assert(status == 0)
 
 
-
-
-      print('g')
+      return x
