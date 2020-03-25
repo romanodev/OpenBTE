@@ -3,25 +3,25 @@ import scipy.sparse as sp
 
 class MultiSolver(object):
 
-  def __init__(self,row,col,A,A0,**argv):
+  def __init__(self,row,col,A,d,**argv):
 
    self.tt = np.float64
    self.mode = argv.setdefault('mode','cpu')
+   (self.nbatch,self.nnz) = np.shape(A)
    if self.mode == 'cpu':  
-    (nbatch,d) = np.shape(A0)
     #self.scale = np.zeros(nbatch)
     self.lu = {}
-    for i in range(nbatch):
+    for i in range(self.nbatch):
       #self.scale[i] = np.max(A[i])  
       #if self.scale[i] == 0:
       #  self.scale[i] = 1
-      S1 = sp.csc_matrix((A[i],(row,col)),shape=(d,d),dtype=np.float64)
-      S = S1 + sp.diags(A0[i],format='csc')
+      S = sp.csc_matrix((A[i],(row,col)),shape=(d,d),dtype=np.float64)
+      #S = S1 + sp.diags(A0[i],format='csc')
       lu = sp.linalg.splu(S,permc_spec='COLAMD')
       self.lu.update({i:lu})
    else: 
     self.A = A
-    self.A0 = A0
+    self.d = d
     self.row = row
     self.col = col
 
@@ -125,15 +125,14 @@ class MultiSolver(object):
 
       #init
       
-      (n_batch,d) = np.shape(B)
-      n = ctypes.c_int(d)
-      m = ctypes.c_int(d)
+      (n_batch,d_) = np.shape(B)
+      n = ctypes.c_int(self.d)
+      m = ctypes.c_int(self.d)
       b1 = ctypes.c_int()
       b2 = ctypes.c_int()
       n_batch = ctypes.c_int(n_batch)
+      nnz = ctypes.c_int(self.nnz)
 
-     
-      nnz = ctypes.c_int(len(self.row))
       Acsr = sp.csr_matrix( (np.ones(len(self.col)),(self.row,self.col)), shape=(d,d),dtype=self.tt).sorted_indices()
      
 
@@ -149,21 +148,13 @@ class MultiSolver(object):
                                  int(dcsrColInd.gpudata),
                                  info)
      
-
       #get data---
       global_data = []
       for i in range(n_batch.value):
-        
         Acsr = sp.csr_matrix((self.A[i,:],(self.row,self.col)),shape=(n.value,m.value),dtype=self.tt).sorted_indices()
-        Acsr = Acsr + sp.diags(self.A0[i],format='csr')
-        
         global_data +=list(Acsr.data)
-
-      
       global_data = np.array(global_data,dtype=self.tt)
       data = np.ascontiguousarray(global_data,dtype=self.tt)
-
-
 
       dcsrVal = gpuarray.to_gpu(data)
       
@@ -212,5 +203,5 @@ class MultiSolver(object):
       assert(status == 0)
 
 
-      return x
+      return np.reshape(x,(self.n_batch,self.d))
 

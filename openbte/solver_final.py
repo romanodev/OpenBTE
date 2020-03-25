@@ -103,7 +103,11 @@ class SolverFull(object):
       SS = np.einsum('qc,c->qc',Gbm2,1/Gbm.sum(axis=0))
      #---------------------------------------------------------------
 
-     ms = MultiSolver(self.mesh['i'],self.mesh['j'],Gm,D)
+
+     i = np.concatenate((self.mesh['i'],list(np.arange(self.n_elems))))
+     j = np.concatenate((self.mesh['j'],list(np.arange(self.n_elems))))
+     A = np.concatenate((Gm,D),axis=1)
+     ms = MultiSolver(i,j,A,self.n_elems)
 
      #Periodic------------------
      P = np.zeros((self.n_index,self.n_elems))
