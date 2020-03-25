@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
+import time
 
 class MultiSolver(object):
 
@@ -7,11 +8,11 @@ class MultiSolver(object):
 
    self.tt = np.float64
    self.mode = argv.setdefault('mode','cpu')
-   (self.nbatch,self.nnz) = np.shape(A)
+   (self.n_batch,self.nnz) = np.shape(A)
    if self.mode == 'cpu':  
     #self.scale = np.zeros(nbatch)
     self.lu = {}
-    for i in range(self.nbatch):
+    for i in range(self.n_batch):
       #self.scale[i] = np.max(A[i])  
       #if self.scale[i] == 0:
       #  self.scale[i] = 1
@@ -34,7 +35,7 @@ class MultiSolver(object):
      x[i] = self.lu[i].solve(B[i])
     return x
    else: 
-      
+      print('GPU!')
       import ctypes
       import pycuda.gpuarray as gpuarray
       import pycuda.autoinit
@@ -125,15 +126,15 @@ class MultiSolver(object):
 
       #init
       
-      (n_batch,d_) = np.shape(B)
+      
       n = ctypes.c_int(self.d)
       m = ctypes.c_int(self.d)
       b1 = ctypes.c_int()
       b2 = ctypes.c_int()
-      n_batch = ctypes.c_int(n_batch)
+      n_batch = ctypes.c_int(self.n_batch)
       nnz = ctypes.c_int(self.nnz)
 
-      Acsr = sp.csr_matrix( (np.ones(len(self.col)),(self.row,self.col)), shape=(d,d),dtype=self.tt).sorted_indices()
+      Acsr = sp.csr_matrix( (np.ones(len(self.col)),(self.row,self.col)), shape=(self.d,self.d),dtype=self.tt).sorted_indices()
      
 
       dcsrIndPtr = gpuarray.to_gpu(Acsr.indptr)
@@ -181,7 +182,7 @@ class MultiSolver(object):
 
       b = gpuarray.to_gpu(B.astype(self.tt))
       dx = pycuda.gpuarray.empty_like(b)
-
+      a = time.time()
       res = _libcusolver.cusolverSpDcsrqrsvBatched(cuso_handle,
                                  n,
                                  m,
@@ -195,6 +196,7 @@ class MultiSolver(object):
                                  n_batch,
                                  info,
                                  int(w_buffer.gpudata))
+      print(time.time() -a)                             
       x = dx.get()
   
       status = _libcusolver.cusolverSpDestroy(cuso_handle)
@@ -204,4 +206,3 @@ class MultiSolver(object):
 
 
       return np.reshape(x,(self.n_batch,self.d))
-
