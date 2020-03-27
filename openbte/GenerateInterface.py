@@ -1,6 +1,7 @@
 from __future__ import print_function
 import numpy as np
 from scipy import interpolate
+import subprocess
 
 
 def generate_interface(**argv):
@@ -72,6 +73,9 @@ def generate_interface(**argv):
     f.write(s)
 
     f.close()
+    subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-2','mesh.geo','-o','mesh.msh'])
+
+
 
 
 
