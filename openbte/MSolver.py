@@ -10,12 +10,8 @@ class MultiSolver(object):
    self.mode = argv.setdefault('mode','cpu')
    (self.n_batch,self.nnz) = np.shape(A)
    if self.mode == 'cpu':  
-    #self.scale = np.zeros(nbatch)
     self.lu = {}
     for i in range(self.n_batch):
-      #self.scale[i] = np.max(A[i])  
-      #if self.scale[i] == 0:
-      #  self.scale[i] = 1
       S = sp.csc_matrix((A[i],(row,col)),shape=(d,d),dtype=np.float64)
       lu = sp.linalg.splu(S,permc_spec='COLAMD')
       self.lu.update({i:lu})
@@ -26,6 +22,12 @@ class MultiSolver(object):
     self.col = col
     self.M = M
     
+    import pycuda.gpuarray as gpuarray
+    import pycuda.autoinit
+    import skcuda.linalg as linalg
+    import skcuda.misc as misc
+    linalg.init()
+
     print('GPU!')
     import ctypes
     import pycuda.gpuarray as gpuarray
@@ -127,10 +129,14 @@ class MultiSolver(object):
     self.n_batch = ctypes.c_int(self.n_batch)
     self.nnz = ctypes.c_int(self.nnz)
 
-    Acsr = sp.csr_matrix( (np.ones(len(self.col)),(self.row,self.col)), shape=(self.d,self.d),dtype=self.tt).sorted_indices()
+    Acsr = sp.csr_matrix( (  np.arange(len(self.col),dtype=int),(self.row,self.col)), shape=(self.d,self.d),dtype=int).sorted_indices()
+    
+    #here we scrambled the indeces in order to have consistent order with the indptr and colind
+    self.dcsrVal = gpuarray.to_gpu(self.A[:,Acsr.data].flatten())
+   
+
     self.dcsrIndPtr = gpuarray.to_gpu(Acsr.indptr)
     self.dcsrColInd = gpuarray.to_gpu(Acsr.indices)
-
     self._libcusolver.cusolverSpXcsrqrAnalysisBatched(self.cuso_handle,
                                  self.n,
                                  self.m,
@@ -140,15 +146,9 @@ class MultiSolver(object):
                                  int(self.dcsrColInd.gpudata),
                                  self.info)
      
-    #get data---
-    global_data = []
-    for i in range(self.n_batch.value):
-        Acsr = sp.csr_matrix((self.A[i,:],(self.row,self.col)),shape=(self.n.value,self.m.value),dtype=self.tt).sorted_indices()
-        global_data +=list(Acsr.data)
-    global_data = np.array(global_data,dtype=self.tt)
-    data = np.ascontiguousarray(global_data,dtype=self.tt)
-    self.dcsrVal = gpuarray.to_gpu(data)
-      
+
+    
+    
 
     #get info
     self._libcusolver.cusolverSpDcsrqrBufferInfoBatched(self.cuso_handle,
@@ -170,20 +170,48 @@ class MultiSolver(object):
 
     self.w_buffer = gpuarray.zeros(b2.value, dtype=self.tt)
     
+  def solve(self,B):
 
-
-  def solve(self,B):    
    B = B.astype(self.tt)
    if self.mode =='cpu': 
     x = np.zeros_like(B) 
     for i in self.lu.keys():
      x[i] = self.lu[i].solve(B[i])
     return x
-   else: 
-      import pycuda.gpuarray as gpuarray
-      import pycuda.autoinit
-      b = gpuarray.to_gpu(B.flatten().astype(self.tt))
+
+
+  def solve_gpu(self,X,BM,BB,Gbp,SS,P,EB):
+   
+   #Trasnfer to GPU
+  
+   BM = gpuarray.to_gpu(np.ascontiguousarray(BM,dtype=self.tt))
+   P = gpuarray.to_gpu(np.ascontiguousarray(P,dtype=self.tt)).ravel()
+   BB = gpuarray.to_gpu(np.ascontiguousarray(BB,dtype=self.tt))
+   Gbp = gpuarray.to_gpu(np.ascontiguousarray(Gbp,dtype=self.tt))
+   EB = gpuarray.to_gpu(np.ascontiguousarray(EB,dtype=self.tt))
+   SS = gpuarray.to_gpu(np.ascontiguousarray(SS,dtype=self.tt))
+   X = gpuarray.to_gpu(np.ascontiguousarray(X,dtype=self.tt))
+   #--------------------------------   
+
+   for i in range(3):
+     
+      #Processing-------------------------------------
       a = time.time()
+      kappa = linalg.dot(X,BB)
+      print(time.time()-a)
+      print(kappa)
+      X = X.reshape(((self.n_batch.value,self.d)))
+      DeltaT = linalg.dot(BM,X).ravel()
+      tmp = linalg.dot(X,Gbp,transa='T')
+      tmp = misc.multiply(tmp,EB)
+      Bm = linalg.dot(SS,tmp,transb='T').ravel()
+      b = Bm + P + DeltaT
+      
+      #print('processing',a7 -a1, flush=True) 
+    
+      #------------------------------------------------
+     
+      X = gpuarray.empty(self.n_batch.value*self.d,dtype=self.tt)
       self._libcusolver.cusolverSpDcsrqrsvBatched(self.cuso_handle,
                                  self.n,
                                  self.m,
@@ -193,17 +221,41 @@ class MultiSolver(object):
                                  int(self.dcsrIndPtr.gpudata),
                                  int(self.dcsrColInd.gpudata),
                                  int(b.gpudata),
-                                 int(self.dx.gpudata),
+                                 int(X.gpudata),
                                  self.n_batch,
                                  self.info,
                                  int(self.w_buffer.gpudata))
-      print(time.time() -a)                             
+      #print(X.gpudata)                                 
+      a = time.time()
+
+      #h = cublasCreate()
+      #kappa = cublasDdot(h, GG.size, GG.gpudata, 1, self.BB.gpudata, 1)
+      #cublasDestroy(h)
+
+      #kappa = gpuarray.dot(GG, self.BB)
+     
+      #print(time.time()-a)
+      #print(kappa,flush=True)
+      #a = time.time()             
+  # print('start release')
+  # status = self._libcusolver.cusolverSpDestroy(self.cuso_handle)
+  # assert(status == 0)
+  # status = self._libcusparse.cusparseDestroy(self.cusp_handle)
+  # assert(status == 0)
+  # status = self._libcusparse.cusparseDestroyMatDescr(self.descrA)
+  # assert(status == 0)
+  # status = self._libcusolver.cusolverSpDestroyCsrqrInfo(self.info)
+  # assert(status == 0)
+  # print('end release')
+      #print('solving',time.time() -a, flush=True)
+
       
-      return np.reshape(self.dx.get(),(self.n_batch.value,self.d))
+     
 
   def release(self):
 
      if self.mode =='gpu':
+      print('start release')
       status = self._libcusolver.cusolverSpDestroy(self.cuso_handle)
       assert(status == 0)
       status = self._libcusparse.cusparseDestroy(self.cusp_handle)
@@ -212,5 +264,3 @@ class MultiSolver(object):
       assert(status == 0)
       status = self._libcusolver.cusolverSpDestroyCsrqrInfo(self.info)
       assert(status == 0)
-
-

@@ -619,9 +619,7 @@ class SolverFull(object):
    ki = np.dot(normal,np.dot(kappa_i,normal))
    kj = np.dot(normal,np.dot(kappa_j,normal))
 
-   
    kappa = kj*kappa_i/(ki*(1-w) + kj*w)
-
  
    return kappa
 

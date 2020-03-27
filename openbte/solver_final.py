@@ -12,8 +12,23 @@ class SolverFull(object):
         #-----IMPORT MESH-------------------
         if 'geometry' in argv.keys():
          self.mesh = argv['geometry'].data
+         
         else: 
          self.mesh = load_dictionary('geometry.h5')
+
+        #compute kappa map
+        kappa_1 = argv['kappa_1']
+        kappa_2 = argv['kappa_2']
+        self.elem_kappa_map = {}
+        self.kappa_vec = np.zeros((len(self.mesh['elems']),3,3))
+        for n in range(len(self.mesh['elems'])):
+            if self.mesh['elem_mat_map'][n]  == 0:
+              self.elem_kappa_map.update({n:kappa_1})
+              self.kappa_vec[n] = kappa_1
+            else:  
+              self.elem_kappa_map.update({n:kappa_2})
+              self.kappa_vec[n] = kappa_2
+
 
         self.n_elems = self.mesh['n_elems'][0]
 
@@ -23,31 +38,34 @@ class SolverFull(object):
         self.n_side_per_elem = self.mesh['n_side_per_elem'][0]
 
         #-----IMPORT MATERIAL-------------------
-        self.mat = load_dictionary('material.h5')
-        self.tc = self.mat['temp']
-        self.n_index = len(self.tc)
-        tmp = self.mat['B']
-        if np.allclose(tmp, np.tril(tmp)):
-         tmp += tmp.T - 0.5*np.diag(np.diag(tmp))
-        self.BM = np.einsum('i,ij->ij',self.mat['scale'],tmp)
-        self.sigma = self.mat['G']*1e9
-        self.VMFP = self.mat['F']*1e9
-        self.kappa = self.mat['kappa']
-        #----------------IMORT MATERIAL-------
+        if not argv.setdefault('only_fourier',False):
+         self.mat = load_dictionary('material.h5')
+         self.tc = self.mat['temp']
+         self.n_index = len(self.tc)
+         tmp = self.mat['B']
+         if np.allclose(tmp, np.tril(tmp)):
+          tmp += tmp.T - 0.5*np.diag(np.diag(tmp))
+         self.BM = np.einsum('i,ij->ij',self.mat['scale'],tmp)
+         self.sigma = self.mat['G']*1e9
+         self.VMFP = self.mat['F']*1e9
+         self.kappa = self.mat['kappa']
+         self.n_index = len(self.tc)
+         #----------------IMORT MATERIAL-------
    
-        self.n_index = len(self.tc)
         self.kappa_factor = self.mesh['kappa_factor'][0]
 
         if self.verbose: self.print_logo()
-   
+  
+        
         self.assemble_fourier()
 
         if self.verbose:
          print('                        SYSTEM INFO                 ')   
          print(colored(' -----------------------------------------------------------','green'))
          print(colored('  Space Discretization:                    ','green') + str(self.n_elems))
-         print(colored('  Momentum Discretization:                 ','green') + str(len(self.tc)))
-         print(colored('  Bulk Thermal Conductivity [W/m/K]:       ','green')+ str(round(self.mat['kappa'][0,0],4)))
+
+         #print(colored('  Momentum Discretization:                 ','green') + str(len(self.tc)))
+         #print(colored('  Bulk Thermal Conductivity [W/m/K]:       ','green')+ str(round(self.mat['kappa'][0,0],4)))
 
         #solve fourier
         data = self.solve_fourier(argv)
@@ -58,13 +76,15 @@ class SolverFull(object):
          print(colored(' -----------------------------------------------------------','green'))
 
         if argv.setdefault('only_fourier'):
-         pickle.dump(fourier_data,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
-
-       
-        data = self.solve_bte(**argv)
-
-        self.data.update(data)
-        save_dictionary(self.data,'solver.h5')
+         save_dictionary(self.data,'solver.h5')
+         #pickle.dump(fourier_data,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
+        else:
+         if argv.setdefault('gpu',False):
+          self.solve_bte_gpu(**argv)
+         else:
+          data = self.solve_bte(**argv)
+          self.data.update(data)
+          save_dictionary(self.data,'solver.h5')
 
         if self.verbose:
          print(' ')   
@@ -103,11 +123,10 @@ class SolverFull(object):
       SS = np.einsum('qc,c->qc',Gbm2,1/Gbm.sum(axis=0))
      #---------------------------------------------------------------
 
-
      i = np.concatenate((self.mesh['i'],list(np.arange(self.n_elems))))
      j = np.concatenate((self.mesh['j'],list(np.arange(self.n_elems))))
      A = np.concatenate((Gm,D),axis=1)
-     ms = MultiSolver(i,j,A,self.n_elems)
+     ms = MultiSolver(i,j,A,self.n_elems,self.BM)
 
      #Periodic------------------
      P = np.zeros((self.n_index,self.n_elems))
@@ -140,7 +159,7 @@ class SolverFull(object):
       kk +=1
       if len(self.mesh['db']) > 0:
        Bm = np.zeros((self.n_index,self.n_elems))   
-       for n,(i,j) in enumerate(zip(self.mesh['eb'],self.mesh['sb'])): 
+       for n,i in enumerate(self.mesh['eb']): 
          Bm[:,i] +=np.einsum('u,u,q->q',X[:,i],Gbp[:,n],SS[:,n],optimize=True)
 
       error = abs(kappa_old-kappa)/abs(kappa)
@@ -153,9 +172,88 @@ class SolverFull(object):
      if self.verbose:
       print(colored(' -----------------------------------------------------------','green'))
 
+     ms.release()
      T = np.einsum('qc,q->c',X,self.tc)
      J = np.einsum('qj,qc->cj',self.sigma,X)*1e-9
      return {'kappa_vec':kappa_vec,'temperature':T,'flux':J}
+
+
+  def solve_bte_gpu(self,**argv):
+
+     if self.verbose:
+      print()
+      print('      Iter    Thermal Conductivity [W/m/K]      Error ''')
+      print(colored(' -----------------------------------------------------------','green'))
+
+     temp_fourier = self.data['temperature_fourier']
+     Tnew = temp_fourier.copy()
+     TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
+
+     #Main matrix----------------------------------------------
+     G = np.einsum('qj,jn->qn',self.VMFP,self.mesh['k'],optimize=True)
+     Gp = G.clip(min=0); Gm = G.clip(max=0)
+     D = np.ones((self.n_index,self.n_elems))
+     for n,i in enumerate(self.mesh['i']): D[:,i] += Gp[:,n]
+
+     
+     #Compute boundary-----------------------------------------------
+     Bm = np.zeros((self.n_index,self.n_elems))
+     if len(self.mesh['db']) > 0:
+      Gb = np.einsum('qj,jn->qn',self.VMFP,self.mesh['db'],optimize=True)
+      Gbp = Gb.clip(min=0);Gbm2 = Gb.clip(max=0)
+      for n,(i,j) in enumerate(zip(self.mesh['eb'],self.mesh['sb'])):
+         D[:,i]  += Gbp[:,n]
+         Bm[:,i] -= TB[i,j]*Gbm2[:,n]
+      Gb = np.einsum('qj,jn->qn',self.sigma,self.mesh['db'],optimize=True)
+      Gbp = Gb.clip(min=0); Gbm = Gb.clip(max=0)
+      SS = np.einsum('qc,c->qc',Gbm2,1/Gbm.sum(axis=0))
+     #---------------------------------------------------------------
+
+     i = np.concatenate((self.mesh['i'],list(np.arange(self.n_elems))))
+     j = np.concatenate((self.mesh['j'],list(np.arange(self.n_elems))))
+     A = np.concatenate((Gm,D),axis=1)
+     ms = MultiSolver(i,j,A,self.n_elems,self.BM,mode='gpu')
+
+     #Periodic------------------
+     P = np.zeros((self.n_index,self.n_elems))
+     for n,(i,j) in enumerate(zip(self.mesh['i'],self.mesh['j'])): P[:,i] -= Gm[:,n]*self.mesh['B'][i,j]
+
+     BB = -np.outer(self.sigma[:,0],np.sum(self.mesh['B_with_area_old'],axis=0))*self.kappa_factor*1e-18
+
+     #---------------------------------------------
+     kappa_vec = [self.data['kappa_fourier'][0]]
+     miter = argv.setdefault('max_bte_iter',100)
+     merror = argv.setdefault('max_bte_error',1e-4)
+     alpha = argv.setdefault('alpha',1)
+
+     error = 1
+     kk = 0
+
+     #---------------------
+     X = np.tile(Tnew,(self.n_index,1))
+     #DeltaT = X
+     X_old = X.copy()
+     alpha = 1
+     kappa_old = kappa_vec[-1]
+
+
+     #Crate boundary matrix---
+     EB = np.zeros((self.n_elems,len(self.mesh['eb'])))
+     for n,s in enumerate(self.mesh['eb']): EB[s,n] = 1
+     #------------------------
+
+     
+     ms.solve_gpu(X_old.flatten(),self.BM,BB.flatten(),Gbp,SS,P,EB)
+
+     #while kk < miter and error > merror:
+      
+     if self.verbose:
+      print(colored(' -----------------------------------------------------------','green'))
+
+     ms.release()
+     #T = np.einsum('qc,q->c',X,self.tc)
+     #J = np.einsum('qj,qc->cj',self.sigma,X)*1e-9
+     #return {'kappa_vec':kappa_vec,'temperature':T,'flux':J}
 
 
   def get_decomposed_directions(self,i,j,rot=np.eye(3)):
@@ -165,6 +263,26 @@ class SolverFull(object):
      v_orth = np.dot(normal,np.dot(rot,normal))/np.dot(normal,dist)
      v_non_orth = np.dot(rot,normal) - dist*v_orth
      return v_orth,v_non_orth
+
+  def get_kappa(self,i,j,ll):
+
+   if i ==j:
+    return np.array(self.elem_kappa_map[i])*np.eye(3)
+   
+
+   normal = self.mesh['normals'][i][j]
+
+   kappa_i = np.array(self.elem_kappa_map[i])*np.eye(3)
+   kappa_j = np.array(self.elem_kappa_map[j])*np.eye(3)
+
+   ki = np.dot(normal,np.dot(kappa_i,normal))
+   kj = np.dot(normal,np.dot(kappa_j,normal))
+   w  = self.mesh['interp_weigths'][ll][0]
+
+   kappa = kj*kappa_i/(ki*(1-w) + kj*w)
+ 
+   return kappa
+
 
     
   def assemble_fourier(self):
@@ -177,7 +295,8 @@ class SolverFull(object):
       (i,j) = self.mesh['side_elem_map'][ll]
       vi = self.mesh['volumes'][i]
       vj = self.mesh['volumes'][j]
-      kappa = self.mat['kappa']
+#      kappa = self.mat['kappa']
+      kappa = self.get_kappa(i,j,ll)
       if not i == j:
        (v_orth,dummy) = self.get_decomposed_directions(i,j,rot=kappa)
        F[i,i] += v_orth/vi*area
@@ -222,7 +341,7 @@ class SolverFull(object):
         
         C = self.compute_non_orth_contribution(grad)
 
-    flux = np.einsum('ij,cj->ic',self.mat['kappa'],grad)
+    flux = np.einsum('cij,cj->ic',self.kappa_vec,grad)
     return {'flux_fourier':flux,'temperature_fourier':temp,'kappa_fourier':np.array([kappa_eff])}
 
 
@@ -281,7 +400,8 @@ class SolverFull(object):
 
       area = self.mesh['areas'][ll]   
       w  = self.mesh['interp_weigths'][ll][0]
-      F_ave = w*np.dot(gradT[i],self.mat['kappa']) + (1.0-w)*np.dot(gradT[j],self.mat['kappa'])
+      #F_ave = w*np.dot(gradT[i],self.mat['kappa']) + (1.0-w)*np.dot(gradT[j],self.mat['kappa'])
+      F_ave = w*np.dot(gradT[i],self.elem_kappa_map[i]) + (1.0-w)*np.dot(gradT[j],self.elem_kappa_map[j])
       grad_ave = w*gradT[i] + (1.0-w)*gradT[j]
 
       (_,v_non_orth) = self.get_decomposed_directions(i,j)#,rot=self.mat['kappa'])
@@ -298,7 +418,8 @@ class SolverFull(object):
    for l in self.mesh['flux_sides']:
 
     (i,j) = self.mesh['side_elem_map'][l]
-    (v_orth,v_non_orth) = self.get_decomposed_directions(i,j,rot=self.mat['kappa'])
+    #(v_orth,v_non_orth) = self.get_decomposed_directions(i,j,rot=self.mat['kappa'])
+    (v_orth,v_non_orth) = self.get_decomposed_directions(i,j,rot=self.get_kappa(i,j,l))
     kappa -= v_orth *  (temp[i] - temp[j] - 1) * self.mesh['areas'][l]
     w  = self.mesh['interp_weigths'][l][0]
     grad_ave = w*gradT[i] + (1.0-w)*gradT[j]
@@ -318,15 +439,13 @@ class SolverFull(object):
     print(colored(r'''       \___/| .__/ \___|_| |_|____/ |_| |_____|''','green'))
     print(colored(r'''            |_|                                ''','green'))
     print()
-    print('                       GENERAL INFO')
-    print(colored(' -----------------------------------------------------------','green'))
-    print(colored('  Contact:          ','green') + 'romanog@mit.edu                       ') 
-    print(colored('  Source code:      ','green') + 'https://github.com/romanodev/OpenBTE  ')
-    print(colored('  Become a sponsor: ','green') + 'https://github.com/sponsors/romanodev ')
-    print(colored('  Cloud:            ','green') + 'https://shorturl.at/cwDIP             ')
-    print(colored('  Mailing List:     ','green') + 'https://shorturl.at/admB0             ')
-    print(colored(' -----------------------------------------------------------','green'))
-    print()   
-
-
+    #print('                       GENERAL INFO')
+    #print(colored(' -----------------------------------------------------------','green'))
+    #print(colored('  Contact:          ','green') + 'romanog@mit.edu                       ') 
+    #print(colored('  Source code:      ','green') + 'https://github.com/romanodev/OpenBTE  ')
+    #print(colored('  Become a sponsor: ','green') + 'https://github.com/sponsors/romanodev ')
+    #print(colored('  Cloud:            ','green') + 'https://shorturl.at/cwDIP             ')
+    #print(colored('  Mailing List:     ','green') + 'https://shorturl.at/admB0             ')
+    #print(colored(' -----------------------------------------------------------','green'))
+    #print()   
 

@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from mpi4py import MPI
 from .solver import Solver
 from pyvtk import *
+from .utils import *
 import numpy as np
 import deepdish as dd
 import os
@@ -70,29 +71,34 @@ class Plot(object):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
 
+
+   self.mesh = load_dictionary('geometry.h5')
+   self.solver = load_dictionary('solver.h5')
+   self.plot_map_new(argv)
+   '''
    #load solver---
-   if not ('data' in argv.keys()):
-    if not ('solver' in argv.keys()):
-     self.solver = pickle.load(open(argv.setdefault('filename_solver','solver.p'),'rb'))
-    else:
-     self.solver = argv['solver'].state
+   #if not ('data' in argv.keys()):
+   # if not ('solver' in argv.keys()):
+   #  self.solver = pickle.load(open(argv.setdefault('filename_solver','solver.p'),'rb'))
+   # else:
+   #  self.solver = argv['solver'].state
 
    #load geometry---
-   if not ('geometry' in argv.keys()):
-     self.geo = Geometry(model='load',filename = argv.setdefault('filename_geometry','geometry.p'))
-   else:
-     self.geo = argv['geometry']
+   #if not ('geometry' in argv.keys()):
+   #  self.geo = Geometry(model='load',filename = argv.setdefault('filename_geometry','geometry.p'))
+   #else:
+   #  self.geo = argv['geometry']
 
-
-    
    #load material---
-   if not ('material' in argv.keys()):
-     fname = argv.setdefault('filename_material','material.p')
-     if os.path.isfile(fname) :
-      self.mat = pickle.load(open(fname,'rb'))
-   else:
-     self.mat = argv['material']
+   #if not ('material' in argv.keys()):
+   #  fname = argv.setdefault('filename_material','material.p')
+   #  if os.path.isfile(fname) :
+   #   self.mat = pickle.load(open(fname,'rb'))
+   #else:
+   #  self.mat = argv['material']
     
+   
+
 
 
    self.Nx = argv.setdefault('repeat_x',1)
@@ -137,7 +143,7 @@ class Plot(object):
       self.add_interfacial_nodes()
       argv.update({'matrix_inclusion_map':self.matrix_inclusion_map})
     self.save_vtk(argv)
-
+'''
  def add_interfacial_nodes(self):
  
     self.matrix_inclusion_map = {}
@@ -434,16 +440,16 @@ class Plot(object):
 
 
  def plot_map_new(self,**argv):
-   self.mode = 'integrated'  
-   self.ax = -1
+   #self.mode = 'integrated'  
+   #self.ax = -1
    #set main figure----
-   self.geo = Geometry(model='load')
-   self.original_size = self.geo.size[0]
-   self.Nx = argv.setdefault('repeat_x',1)
-   self.Ny = argv.setdefault('repeat_y',1)
-   self.plotted = False
-   self.geo = Geometry(model='load')
-   (Lx,Ly) = self.geo.get_repeated(self.Nx,self.Ny)
+   #self.geo = Geometry(model='load')
+   #self.original_size = self.geo.size[0]
+   #self.Nx = argv.setdefault('repeat_x',1)
+   #self.Ny = argv.setdefault('repeat_y',1)
+   #self.plotted = False
+   #self.geo = Geometry(model='load')
+   #(Lx,Ly) = self.geo.get_repeated(self.Nx,self.Ny)
    Sx = 8
    Sy = Sx*Ly/Lx
    delta = 0.2

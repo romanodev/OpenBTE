@@ -90,24 +90,38 @@ class GeometryFull(object):
   if model == 'porous':
 
     if argv['submodel'] == 'aligned':   
-     (frame,polygons) = GenerateSquareLatticePores(argv)
+     (self.frame,polygons) = GenerateSquareLatticePores(argv)
 
     if argv['submodel'] == 'staggered':
      (frame,polygons) = GenerateStaggeredLatticePores(argv)
 
     argv['polygons'] = polygons
-    argv['frame'] = frame
+    argv['frame'] = self.frame
     Porous(**argv)
 
   if model == 'bulk':
     GenerateBulk2D.mesh(argv)
 
-  data = self.compute_mesh_data(argv)
+  if model == 'interface':
+       generate_interface(**argv)   
+       Lx = float(argv['lx'])
+       Ly = float(argv['ly'])
+       self.frame = []
+       self.frame.append([-Lx/2,Ly/2])
+       self.frame.append([Lx/2,Ly/2])
+       self.frame.append([Lx/2,-Ly/2])
+       self.frame.append([-Lx/2,-Ly/2])
+
+       self.data = self.compute_mesh_data(argv)
+       self.build_interface(**argv)
+
 
   if argv.setdefault('save',True):
-   save_dictionary(data,'geometry.h5')
-  else:
-   self.data = data   
+   save_dictionary(self.data,'geometry.h5')
+
+  if argv.setdefault('show',False):
+   self.plot_structure(show=True)
+   
 
   
   '''
@@ -684,7 +698,7 @@ class GeometryFull(object):
           
             
 
- def plot_polygons(self,**argv):
+ def plot_structure(self,**argv):
 
    self.argv = argv   
    if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
@@ -712,15 +726,13 @@ class GeometryFull(object):
     #else:
     # color='white'
    
-    for ne in self.elem_list['active']:
-      #ave,dummy = self.compute_general_centroid_and_side(ne)
-      cc =  self.elem_mat_map[ne]
+    for ne in range(len(self.data['elems'])):
+      cc =  self.data['elem_mat_map'][ne]
       if cc == 1:
          color = 'gray'
       else:   
          color = 'green'
       self.plot_elem(ne,color=color)
-
 
 
     #for poly in self.polygons:
@@ -758,28 +770,27 @@ class GeometryFull(object):
       plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=2,zorder=1)
      
 
-    #----------------------------
 
 
     
     #----------------------------
     axis('off')
-    data = {}
+    #data = {}
     if self.argv.setdefault('show',False):
      show()
-    if self.argv.setdefault('savefig',False) :
-     savefig(argv.setdefault('fig_file','geometry.png'))
+    #if self.argv.setdefault('savefig',False) :
+    # savefig(argv.setdefault('fig_file','geometry.png'))
 
-    if self.argv.setdefault('store_rgb',False):
-     fig.canvas.draw()   
-     rgb = np.array(fig.canvas.renderer._renderer)
-     data = {'rgb':rgb}
-     clf()
-   else: data = None
-   data =  mpi4py.MPI.COMM_WORLD.bcast(data,root=0)
+    #if self.argv.setdefault('store_rgb',False):
+    # fig.canvas.draw()   
+    # rgb = np.array(fig.canvas.renderer._renderer)
+    # data = {'rgb':rgb}
+    # clf()
+   #else: data = None
+   #data =  mpi4py.MPI.COMM_WORLD.bcast(data,root=0)
 
-   if self.argv.setdefault('store_rgb',False):
-    self.rgb = data['rgb']
+   #if self.argv.setdefault('store_rgb',False):
+   # self.rgb = data['rgb']
 
 
 
@@ -918,7 +929,7 @@ class GeometryFull(object):
 
  def plot_elem(self,ne,color='gray') :
 
-     elem = self.elems[ne]
+     elem = self.data['elems'][ne]
      
      pp = []
      for e in elem:
@@ -935,15 +946,14 @@ class GeometryFull(object):
 
  def build_interface(self,**argv):
 
-    p = self.size[1] 
+    p = argv['ly']
     l = argv.setdefault('l',1)
     scale = argv.setdefault('scale',1)
     variance = argv.setdefault('variance',1)
     f = generate_random_interface(p,l,variance,scale)
 
     elem_mat_map = {}
-    for ne in self.elem_list['active']:
-      #c,dummy = self.compute_general_centroid_and_side(ne)
+    for ne in range(len(self.data['elems'])):
       c = self.compute_elem_centroid(ne)
       dd = f(c[1])
       
@@ -952,8 +962,18 @@ class GeometryFull(object):
       else:
        elem_mat_map.update({ne:1})
 
-    self.state['elem_mat_map'] = elem_mat_map
-    self.add_patterning(elem_mat_map)
+    self.data['elem_mat_map'] = elem_mat_map
+
+    ll = []
+    for side in self.side_list['active']:
+     elems = self.side_elem_map[side]
+     k1 = self.data['elem_mat_map'][elems[0]]       
+     k2 = self.data['elem_mat_map'][elems[1]]       
+     if not k1 == k2:
+      ll.append(side)
+    self.side_list['Interface'] = ll
+    #----------------------------
+
     self.compute_volume_fraction()
     
 
@@ -968,7 +988,8 @@ class GeometryFull(object):
     else:  
       v2 +=v
 
-   print(v1,v2)   
+   #self.fraction = v1/v2
+   #print(v1,v2)   
 
 
  def add_patterning(self,elem_mat_map,lone=True):
@@ -1066,127 +1087,6 @@ class GeometryFull(object):
   else: data = None
 
 
- def plot_structured_mesh(self,**argv):
- 
-   if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
-      
-     n = int(sqrt(self.nle))
-     l = self.size[0]
-
-     #plot_frame----
-     #plot([-l/2,-l/2,l/2,l/2,-l/2],[-l/2,l/2,l/2,-l/2,-l/2],color='k')
-     #--------------
-
-     delta = l/n
-     ptext = argv.setdefault('text',False)
-
-     axis('equal')
-     axis('off')
-     #for n,node in enumerate(self.nodes):
-     #   scatter(node[0],node[1],color='r')
-     #   text(node[0],node[1],n,color='r')
- 
-     #for y in range(n+1):
-     # for x in range(n+1):
-     #  if ptext:
-     #   text(-l/2 + delta*x,l/2 - delta*y+0.15,str(y*(n+1)+x),color='r',ha='center')
-
-
-     if argv.setdefault('plot_interface',True) :
-      for n_side,side in enumerate(self.side_list['Interface']):# + self.exlude):
-       ss = self.sides[side]   
-       p0 = self.nodes[ss[0]]
-       p1 = self.nodes[ss[1]]
-       plot([p0[0],p1[0]],[p0[1],p1[1]],color='gray',lw=3)
-
-
-     #if argv.setdefault('plot_material',False) == False:
-
-     for side in self.side_list['Periodic'] + self.exlude:
-        ss = self.sides[side]   
-        p0 = self.nodes[ss[0]]
-        p1 = self.nodes[ss[1]]
-        plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=2)
-  
-
-     for n_side,side in enumerate(self.side_list['active']+ self.exlude):
-       ss = self.sides[side]   
-     #for n_side,side in enumerate(self.sides):
-
-       p0 = self.nodes[ss[0]]
-       p1 = self.nodes[ss[1]]
-       
-       m = (np.array(p0) + np.array(p1))/2
-     
-      #if ptext:
-      ##if n_side == 186 :
-      #text(m[0],m[1],str(n_side),color='b')
-      # cc = 'r'
-      # lll=3
-      #else: 
-     # cc = 'b'
-      # lll=1
- 
-         
-      # if side in self.side_list['Periodic'] + self.exlude:
-      #  plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=2)
-
-       if side in self.side_list['Hot'] :
-        plot([p0[0],p1[0]],[p0[1],p1[1]],color='r',lw=2)
-
-       if side in self.side_list['Cold'] :
-        plot([p0[0],p1[0]],[p0[1],p1[1]],color='b',lw=2)
-
-       if side in self.side_list['Boundary'] :
-        plot([p0[0],p1[0]],[p0[1],p1[1]],color='g',lw=2)
-     #  else: 
-     #   plot([p0[0],p1[0]],[p0[1],p1[1]],color='k',lw=1)
-
-     #for ne in self.l2g:
-     for ne in self.elem_list['active']:
-     #for ne in self.elem_list['active']:
-         
-     # if ne == 26:
-      #ave = self.plot_elem(ne,color='gray')
-      ave,dummy = self.compute_general_centroid_and_side(ne)
-
-      #if argv.setdefault('plot_material',False):
-
-      
-      #cc =  self.elem_kappa_map[ne]
-      #if cc[0][0] == 1:
-      #   color = 'green'
-      #else:   
-      #   color = 'red'
-
-      self.plot_elem(ne,color='g')
-
-      #print(ave)
-      #scatter(ave[0],ave[1],color='r')
-      #print(ave)
-      #if ptext:
-
-       #print(ne)
-       #if ne==84 :
-      #text(ave[0],ave[1],str(ne),color='black',va='center',ha='center')
-
-     
-     #for g in np.array(grid).T:
-     # ne = g[1]*n + g[0]
-     # self.plot_elem(ne,color='green')
-
-     #s = 23
-     #for elem in self.side_elem_map[s]:    
-     # self.plot_elem(elem,color='red')
-     #p = 15
-     #for elem in self.node_elem_map[p]:    
-     # self.plot_elem(elem,color='red')
-     x = self.size[0]/2
-     y = self.size[1]/2
-     xlim([-x,x])
-     ylim([-y,y])
-
-     show()
 
  def compute_dists(self):
   self.dists= {}   
@@ -1233,6 +1133,7 @@ class GeometryFull(object):
           'n_elems':np.array([self.n_elems]),\
           'elem_side_map':self.elem_side_map,\
           'side_elem_map':self.side_elem_map,\
+          'elem_list':self.elem_list,\
           'elems':self.elems,\
           'dim':np.array([self.dim]),\
           'weigths':self.weigths,\
