@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import scipy.sparse as sp
 
 
 def solve_gpu(row,col,A,d,X,BM,BB,Gbp,SS,P,EB):
@@ -83,7 +84,7 @@ def solve_gpu(row,col,A,d,X,BM,BB,Gbp,SS,P,EB):
     _cuso_handle = ctypes.c_void_p()
     status = _libcusolver.cusolverSpCreate(ctypes.byref(_cuso_handle))
     assert(status == 0)
-    uso_handle = _cuso_handle.value
+    cuso_handle = _cuso_handle.value
  
     # create MatDescriptor
     _libcusparse.cusparseDestroyMatDescr.restype = int
@@ -101,28 +102,26 @@ def solve_gpu(row,col,A,d,X,BM,BB,Gbp,SS,P,EB):
     _libcusolver.cusolverSpDestroyCsrqrInfo.argtypes = [ctypes.c_void_p]
     _libcusolver.cusolverSpDestroyCsrqrInfo.restype = int
 
-    
 
     #init variable----
-    (_,nnz) = A.shape()
-    (n_batch,d) = X.shape()
+    (_,nnz) = A.shape
+    (n_batch,d) = X.shape
     n = ctypes.c_int(d)
     m = ctypes.c_int(d)
-    b1 = ctypes.c_int()
-    b2 = ctypes.c_int()
+  
     n_batch = ctypes.c_int(n_batch)
     nnz = ctypes.c_int(nnz)
  
     #--------------------- 
-
+    
     Acsr = sp.csr_matrix( (  np.arange(len(col),dtype=int),(row,col)), shape=(d,d),dtype=int).sorted_indices()
     
     #here we scrambled the indeces in order to have consistent order with the indptr and colind
     dcsrVal = gpuarray.to_gpu(A[:,Acsr.data].flatten())
    
 
-    dcsrIndPtr = gpuarray.to_gpu(indptr)
-    dcsrColInd = gpuarray.to_gpu(indices)
+    dcsrIndPtr = gpuarray.to_gpu(Acsr.indptr)
+    dcsrColInd = gpuarray.to_gpu(Acsr.indices)
     _libcusolver.cusolverSpXcsrqrAnalysisBatched(cuso_handle,
                                  n,
                                  m,
@@ -132,7 +131,8 @@ def solve_gpu(row,col,A,d,X,BM,BB,Gbp,SS,P,EB):
                                  int(dcsrColInd.gpudata),
                                  info)
      
-    
+    b1 = ctypes.c_int()
+    b2 = ctypes.c_int()
 
     #get info
     _libcusolver.cusolverSpDcsrqrBufferInfoBatched(cuso_handle,
@@ -157,33 +157,32 @@ def solve_gpu(row,col,A,d,X,BM,BB,Gbp,SS,P,EB):
    
     #Trasnfer to GPU
     BM = gpuarray.to_gpu(np.ascontiguousarray(BM,dtype=tt))
-    P = gpuarray.to_gpu(np.ascontiguousarray(P,dtype=tt)).ravel()
-    BB = gpuarray.to_gpu(np.ascontiguousarray(BB,dtype=tt))
+    #P = gpuarray.to_gpu(np.ascontiguousarray(P,dtype=tt)).ravel()
+    P = gpuarray.to_gpu(P).ravel()
+    BB = gpuarray.to_gpu(np.ascontiguousarray(BB,dtype=tt)).ravel()
     Gbp = gpuarray.to_gpu(np.ascontiguousarray(Gbp,dtype=tt))
     EB = gpuarray.to_gpu(np.ascontiguousarray(EB,dtype=tt))
     SS = gpuarray.to_gpu(np.ascontiguousarray(SS,dtype=tt))
-    X = gpuarray.to_gpu(np.ascontiguousarray(X,dtype=tt))
+    X = gpuarray.to_gpu(np.ascontiguousarray(X,dtype=tt)).ravel()
    #--------------------------------   
 
     for i in range(3):
-     
+    
       #Processing-------------------------------------
-      a = time.time()
-      kappa = linalg.dot(X,BB)
-      print(time.time()-a)
-      print(kappa)
+      
+      
       X = X.reshape(((n_batch.value,d)))
       DeltaT = linalg.dot(BM,X).ravel()
       tmp = linalg.dot(X,Gbp,transa='T')
       tmp = misc.multiply(tmp,EB)
       Bm = linalg.dot(SS,tmp,transb='T').ravel()
-      b = Bm + P + DeltaT
+      b = P + Bm + DeltaT
       
       #print('processing',a7 -a1, flush=True) 
     
       #------------------------------------------------
-     
-      X = gpuarray.empty(n_batch.value,d,dtype=tt)
+      X = gpuarray.empty(n_batch.value*d,dtype=tt)
+   
       _libcusolver.cusolverSpDcsrqrsvBatched(cuso_handle,
                                  n,
                                  m,
@@ -197,15 +196,21 @@ def solve_gpu(row,col,A,d,X,BM,BB,Gbp,SS,P,EB):
                                  n_batch,
                                  info,
                                  int(w_buffer.gpudata))
-      #print(X.gpudata)                                 
-      a = time.time()
 
-      print('start release')
-      status = _libcusolver.cusolverSpDestroy(cuso_handle)
-      assert(status == 0)
-      status = _libcusparse.cusparseDestroy(cusp_handle)
-      assert(status == 0)
-      status = _libcusparse.cusparseDestroyMatDescr(descrA)
-      assert(status == 0)
-      status = _libcusolver.cusolverSpDestroyCsrqrInfo(info)
-      assert(status == 0)
+      X.get()
+      a = time.time()                       
+      kappa = linalg.dot(X,BB)
+      print(time.time()-a)
+      print(kappa)
+                                      
+      #a = time.time()
+
+    print('start release')
+    status = _libcusolver.cusolverSpDestroy(cuso_handle)
+    assert(status == 0)
+    status = _libcusparse.cusparseDestroy(cusp_handle)
+    assert(status == 0)
+    status = _libcusparse.cusparseDestroyMatDescr(descrA)
+    assert(status == 0)
+    status = _libcusolver.cusolverSpDestroyCsrqrInfo(info)
+    assert(status == 0)
