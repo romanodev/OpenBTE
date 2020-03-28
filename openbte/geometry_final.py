@@ -98,6 +98,7 @@ class GeometryFull(object):
     argv['polygons'] = polygons
     argv['frame'] = self.frame
     Porous(**argv)
+    self.data = self.compute_mesh_data(argv)
 
   if model == 'bulk':
     GenerateBulk2D.mesh(argv)

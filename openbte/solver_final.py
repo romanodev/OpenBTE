@@ -12,23 +12,23 @@ class SolverFull(object):
         #-----IMPORT MESH-------------------
         if 'geometry' in argv.keys():
          self.mesh = argv['geometry'].data
-         
         else: 
          self.mesh = load_dictionary('geometry.h5')
 
         #compute kappa map
-        kappa_1 = argv['kappa_1']
-        kappa_2 = argv['kappa_2']
-        self.elem_kappa_map = {}
-        self.kappa_vec = np.zeros((len(self.mesh['elems']),3,3))
-        for n in range(len(self.mesh['elems'])):
-            if self.mesh['elem_mat_map'][n]  == 0:
-              self.elem_kappa_map.update({n:kappa_1})
-              self.kappa_vec[n] = kappa_1
-            else:  
-              self.elem_kappa_map.update({n:kappa_2})
-              self.kappa_vec[n] = kappa_2
+        #kappa_1 = argv['kappa_1']
+        #kappa_2 = argv['kappa_2']
+        #self.elem_kappa_map = {}
+        #self.kappa_vec = np.zeros((len(self.mesh['elems']),3,3))
+        #for n in range(len(self.mesh['elems'])):
+        #    if self.mesh['elem_mat_map'][n]  == 0:
+        #      self.elem_kappa_map.update({n:kappa_1})
+        #      self.kappa_vec[n] = kappa_1
+        #    else:  
+        #      self.elem_kappa_map.update({n:kappa_2})
+        #      self.kappa_vec[n] = kappa_2
 
+        
 
         self.n_elems = self.mesh['n_elems'][0]
 
@@ -49,6 +49,9 @@ class SolverFull(object):
          self.sigma = self.mat['G']*1e9
          self.VMFP = self.mat['F']*1e9
          self.kappa = self.mat['kappa']
+         self.kappa_vec = np.zeros((len(self.mesh['elems']),3,3))
+         for i in range(len(self.mesh['elems'])):
+           self.kappa_vec[i] = self.kappa*np.eye(3)
          self.n_index = len(self.tc)
          #----------------IMORT MATERIAL-------
    
@@ -267,13 +270,13 @@ class SolverFull(object):
   def get_kappa(self,i,j,ll):
 
    if i ==j:
-    return np.array(self.elem_kappa_map[i])*np.eye(3)
+    return np.array(self.kappa_vec[i])
    
 
    normal = self.mesh['normals'][i][j]
 
-   kappa_i = np.array(self.elem_kappa_map[i])*np.eye(3)
-   kappa_j = np.array(self.elem_kappa_map[j])*np.eye(3)
+   kappa_i = np.array(self.kappa_vec[i])
+   kappa_j = np.array(self.kappa_vec[j])
 
    ki = np.dot(normal,np.dot(kappa_i,normal))
    kj = np.dot(normal,np.dot(kappa_j,normal))
@@ -401,7 +404,7 @@ class SolverFull(object):
       area = self.mesh['areas'][ll]   
       w  = self.mesh['interp_weigths'][ll][0]
       #F_ave = w*np.dot(gradT[i],self.mat['kappa']) + (1.0-w)*np.dot(gradT[j],self.mat['kappa'])
-      F_ave = w*np.dot(gradT[i],self.elem_kappa_map[i]) + (1.0-w)*np.dot(gradT[j],self.elem_kappa_map[j])
+      F_ave = w*np.dot(gradT[i],self.kappa_vec[i]) + (1.0-w)*np.dot(gradT[j],self.kappa_vec[j])
       grad_ave = w*gradT[i] + (1.0-w)*gradT[j]
 
       (_,v_non_orth) = self.get_decomposed_directions(i,j)#,rot=self.mat['kappa'])
