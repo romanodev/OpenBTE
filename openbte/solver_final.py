@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 import numpy as np
 from .MSolver import *
+from .MSolverGPU import *
 from scipy.sparse.linalg import splu
 from termcolor import colored, cprint 
 from .utils import *
@@ -14,21 +15,6 @@ class SolverFull(object):
          self.mesh = argv['geometry'].data
         else: 
          self.mesh = load_dictionary('geometry.h5')
-
-        #compute kappa map
-        #kappa_1 = argv['kappa_1']
-        #kappa_2 = argv['kappa_2']
-        #self.elem_kappa_map = {}
-        #self.kappa_vec = np.zeros((len(self.mesh['elems']),3,3))
-        #for n in range(len(self.mesh['elems'])):
-        #    if self.mesh['elem_mat_map'][n]  == 0:
-        #      self.elem_kappa_map.update({n:kappa_1})
-        #      self.kappa_vec[n] = kappa_1
-        #    else:  
-        #      self.elem_kappa_map.update({n:kappa_2})
-        #      self.kappa_vec[n] = kappa_2
-
-        
 
         self.n_elems = self.mesh['n_elems'][0]
 
@@ -66,9 +52,8 @@ class SolverFull(object):
          print('                        SYSTEM INFO                 ')   
          print(colored(' -----------------------------------------------------------','green'))
          print(colored('  Space Discretization:                    ','green') + str(self.n_elems))
-
-         #print(colored('  Momentum Discretization:                 ','green') + str(len(self.tc)))
-         #print(colored('  Bulk Thermal Conductivity [W/m/K]:       ','green')+ str(round(self.mat['kappa'][0,0],4)))
+         print(colored('  Momentum Discretization:                 ','green') + str(len(self.tc)))
+         print(colored('  Bulk Thermal Conductivity [W/m/K]:       ','green')+ str(round(self.mat['kappa'][0,0],4)))
 
         #solve fourier
         data = self.solve_fourier(argv)
@@ -80,7 +65,6 @@ class SolverFull(object):
 
         if argv.setdefault('only_fourier'):
          save_dictionary(self.data,'solver.h5')
-         #pickle.dump(fourier_data,open(argv.setdefault('filename_solver','solver.p'),'wb'),protocol=pickle.HIGHEST_PROTOCOL)
         else:
          if argv.setdefault('gpu',False):
           self.solve_bte_gpu(**argv)
@@ -129,7 +113,7 @@ class SolverFull(object):
      i = np.concatenate((self.mesh['i'],list(np.arange(self.n_elems))))
      j = np.concatenate((self.mesh['j'],list(np.arange(self.n_elems))))
      A = np.concatenate((Gm,D),axis=1)
-     ms = MultiSolver(i,j,A,self.n_elems,self.BM)
+     ms = MultiSolver(i,j,A,self.n_elems)
 
      #Periodic------------------
      P = np.zeros((self.n_index,self.n_elems))
@@ -170,12 +154,10 @@ class SolverFull(object):
       kappa_vec.append(kappa)
       if self.verbose:   
        print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error))
-   
 
      if self.verbose:
       print(colored(' -----------------------------------------------------------','green'))
 
-     ms.release()
      T = np.einsum('qc,q->c',X,self.tc)
      J = np.einsum('qj,qc->cj',self.sigma,X)*1e-9
      return {'kappa_vec':kappa_vec,'temperature':T,'flux':J}
@@ -215,7 +197,6 @@ class SolverFull(object):
      i = np.concatenate((self.mesh['i'],list(np.arange(self.n_elems))))
      j = np.concatenate((self.mesh['j'],list(np.arange(self.n_elems))))
      A = np.concatenate((Gm,D),axis=1)
-     ms = MultiSolver(i,j,A,self.n_elems,self.BM,mode='gpu')
 
      #Periodic------------------
      P = np.zeros((self.n_index,self.n_elems))
@@ -239,14 +220,12 @@ class SolverFull(object):
      alpha = 1
      kappa_old = kappa_vec[-1]
 
-
      #Crate boundary matrix---
      EB = np.zeros((self.n_elems,len(self.mesh['eb'])))
      for n,s in enumerate(self.mesh['eb']): EB[s,n] = 1
      #------------------------
-
      
-     ms.solve_gpu(X_old.flatten(),self.BM,BB.flatten(),Gbp,SS,P,EB)
+     ms = MGPU.solve_gpu(i,j,A,self.n_elems,X_old,self.BM,BB,Gbp,SS,P,EB)
 
      #while kk < miter and error > merror:
       
@@ -442,13 +421,13 @@ class SolverFull(object):
     print(colored(r'''       \___/| .__/ \___|_| |_|____/ |_| |_____|''','green'))
     print(colored(r'''            |_|                                ''','green'))
     print()
-    #print('                       GENERAL INFO')
-    #print(colored(' -----------------------------------------------------------','green'))
-    #print(colored('  Contact:          ','green') + 'romanog@mit.edu                       ') 
-    #print(colored('  Source code:      ','green') + 'https://github.com/romanodev/OpenBTE  ')
-    #print(colored('  Become a sponsor: ','green') + 'https://github.com/sponsors/romanodev ')
-    #print(colored('  Cloud:            ','green') + 'https://shorturl.at/cwDIP             ')
-    #print(colored('  Mailing List:     ','green') + 'https://shorturl.at/admB0             ')
-    #print(colored(' -----------------------------------------------------------','green'))
-    #print()   
+    print('                       GENERAL INFO')
+    print(colored(' -----------------------------------------------------------','green'))
+    print(colored('  Contact:          ','green') + 'romanog@mit.edu                       ') 
+    print(colored('  Source code:      ','green') + 'https://github.com/romanodev/OpenBTE  ')
+    print(colored('  Become a sponsor: ','green') + 'https://github.com/sponsors/romanodev ')
+    print(colored('  Cloud:            ','green') + 'https://shorturl.at/cwDIP             ')
+    print(colored('  Mailing List:     ','green') + 'https://shorturl.at/admB0             ')
+    print(colored(' -----------------------------------------------------------','green'))
+    print()   
 
