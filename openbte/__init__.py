@@ -1,14 +1,4 @@
-new = True
-if new:
- from .geometry2 import Geometry
- from .geometry_final import GeometryFull
- from .material3 import Material
- from .solver import Solver
- from .solver_final import SolverFull
- from .elasticity import Elasticity
- from .plot2 import Plot
-else:
- from .material import Material
- from .geometry import Geometry
- from .solver import Solver
- from .plot import Plot
+from .geometry import Geometry
+from .material import Material
+from .solver import Solver
+from .plot import Plot

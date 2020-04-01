@@ -1,13 +1,12 @@
 from __future__ import absolute_import
-from mpi4py import MPI
-from .solver import Solver
 from pyvtk import *
+from .utils import *
 import numpy as np
 import deepdish as dd
 import os
 import matplotlib
 be = matplotlib.get_backend()
-if not be=='nbAgg':
+if not be=='nbAgg' and not be=='module://ipykernel.pylab.backend_inline':
  if not be == 'Qt5Agg': matplotlib.use('Qt5Agg')
 import matplotlib.pylab as plt
 from matplotlib.colors import Colormap
@@ -17,33 +16,14 @@ from .fig_maker import *
 from shapely import geometry,wkt
 from scipy.interpolate import BarycentricInterpolator
 from .WriteVTK import *
-from .geometry import *
 from scipy.interpolate import griddata
 from shapely.geometry import MultiPoint,Point,Polygon,LineString
 import shapely
+from scipy import interpolate
+import os.path
 from matplotlib.widgets import Slider, Button, RadioButtons
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-
-
-def get_suppression(mfps,sup,mfp):
-
-
-  if mfp < mfps[0]:
-   output = sup[0]
-  else:
-   included = False
-   for n in range(len(mfps)-1):
-    mfp_1 = mfps[n]
-    mfp_2 = mfps[n+1]
-    if mfp < mfp_2 and mfp > mfp_1:
-     output = sup[n] + (sup[n+1]-sup[n])/(np.log10(mfps[n+1])-np.log10(mfps[n]))*(np.log10(mfp)-np.log10(mfps[n]))
-     included = True
-     break
-
-   if included == False:
-    output = sup[-1]*mfps[-1]/mfp
-
-  return output
+from  matplotlib import cm
 
 
 def create_path(obj):
@@ -65,81 +45,316 @@ class Plot(object):
 
  def __init__(self,**argv):
 
+   #import data-------------------------------
+   if 'geometry' in argv.keys():
+    self.mesh = argv['geometry'].data
+   else: 
+    if os.path.isfile('geometry.h5') :   
+     self.mesh = load_dictionary('geometry.h5')
 
-  if MPI.COMM_WORLD.Get_rank() == 0:
-   self.solver = dd.io.load(argv.setdefault('solver_filename','solver.hdf5'))
+   if 'solver' in argv.keys():
+    self.solver = argv['solver']
+   else: 
+       if os.path.isfile('solver.h5') :
+        self.solver = load_dictionary('solver.h5')
+
+   if 'material' in argv.keys():
+    self.solver = argv['material']
+   else: 
+       if os.path.isfile('material.h5') :
+        self.solver = load_dictionary('material.h5')
+   #--------------------------------------------
+
+   model = argv['model'].split('/')[0]
+   if model == 'geometry':
+    self.plot_geometry(**argv)
+
+
+ def plot_geometry(self,**argv):
+
+     if self.mesh['dim'][0] == 2:
+
+      size = self.mesh['size']
+      frame = self.mesh['frame']
+      lx = size[0]
+      ly = size[1]
+      fig = figure(num=" ", figsize=(4*lx/ly, 4), dpi=80, facecolor='w', edgecolor='k')
+      axes([0,0,1.0,1.0])
+      xlim([-lx/2.0,lx/2.0])
+      ylim([-ly/2.0,ly/2.0])
+     
+      for ne in range(len(self.mesh['elems'])):
+        cc =  self.mesh['elem_mat_map'][ne]
+        if cc == 1:
+           color = 'gray'
+        else:   
+           color = 'blu'
+        self.plot_elem(self.elems[ne],color=color)
+     else:
+         from mpl_toolkits.mplot3d import Axes3D 
+         from matplotlib.colors import LightSource
+         x = []; y = [];z = []
+         triangles = []
+         #nodes = []
+         for l in list(self.mesh['side_list']['Boundary']) + \
+                  list(self.mesh['side_list']['Periodic']) + \
+                  list(self.mesh['side_list']['Inactive']) :
+          tmp = []   
+          for i in self.mesh['sides'][l]: 
+              x.append(self.mesh['nodes'][i][0])  
+              y.append(self.mesh['nodes'][i][1])  
+              z.append(self.mesh['nodes'][i][2]) 
+              k = len(x)-1
+              tmp.append(k)
+          triangles.append(tmp) 
+         
+         fig = figure()
+         ax = fig.gca(projection='3d')
+
+         ax.plot_trisurf(x, y,z, linewidth=0.2,triangles=triangles,antialiased=True,edgecolor='gray',cmap='viridis',vmin=0.2,vmax=0.2)
+         ax.axis('off')
+
+         MAX = np.max(np.vstack((x,y,z)))
+         for direction in (-1, 1):
+          for point in np.diag(direction * MAX * np.array([1,1,1])):
+           ax.plot([point[0]], [point[1]], [point[2]], 'w')
+
+         show() 
+            
+
+ def plot_elem(self,ne,color='gray') :
+
+    elem = self.mesh['elems'][ne]
+     
+    pp = []
+    for e in elem:
+     pp.append(self.mesh['nodes'][e][:2])
+    path = create_path(pp)
+    patch = patches.PathPatch(path,linestyle=None,linewidth=0.5,color=color,zorder=1,joinstyle='miter',alpha=0.7)
+    gca().add_patch(patch)
+
+
+
+
+    '''
+
+
+    #init_plotting()
+    close()
+    #fig = figure(num=" ", figsize=(8*lx/ly, 4), dpi=80, facecolor='w', edgecolor='k')
+    #axes([0,0,0.5,1.0])
+
+
+
+    path = create_path(self.frame)
+    patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color='#D4D4D4',zorder=1,joinstyle='miter')
+    gca().add_patch(patch);
+
+    #if self.argv.setdefault('inclusion',False):
+    # color='g'
+    #else:
+    # color='white'
+   
+    for ne in range(len(self.data['elems'])):
+      cc =  self.data['elem_mat_map'][ne]
+      if cc == 1:
+         color = 'gray'
+      else:   
+         color = 'green'
+      self.plot_elem(ne,color=color)
+
+
+    #for poly in self.polygons:
+    # path = create_path(poly)
+    # patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=2,joinstyle='miter')
+    # gca().add_patch(patch);
+     
+    
+    #plot Boundary Conditions-----
+    if argv.setdefault('plot_boundary',False):
+     for side in self.side_list['Boundary'] + self.side_list['Interface'] :
+      p1 = self.sides[side][0]
+      p2 = self.sides[side][1]
+      n1 = self.nodes[p1]
+      n2 = self.nodes[p2]
+      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#f77f0e',lw=12)
+      #plot([n1[0],n2[0]],[n1[1],n2[1]],color='k',lw=1)
+     
+     
+      #plot Periodic Conditions-----
+    if argv.setdefault('plot_Periodic',False):
+     for side in self.side_list['Periodic'] + self.side_list['Inactive']  :
+      p1 = self.sides[side][0]
+      p2 = self.sides[side][1]
+      n1 = self.nodes[p1]
+      n2 = self.nodes[p2]
+      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=12,zorder=1)
+     
+    if argv.setdefault('plot_interface',True):
+     for side in self.side_list['Interface']:
+      p1 = self.sides[side][0]
+      p2 = self.sides[side][1]
+      n1 = self.nodes[p1]
+      n2 = self.nodes[p2]
+      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=2,zorder=1)
+     
+
+
+
+    
+    #----------------------------
+    axis('off')
+    #data = {}
+    if self.argv.setdefault('show',False):
+     show()
+    #if self.argv.setdefault('savefig',False) :
+    # savefig(argv.setdefault('fig_file','geometry.png'))
+
+    #if self.argv.setdefault('store_rgb',False):
+    # fig.canvas.draw()   
+    # rgb = np.array(fig.canvas.renderer._renderer)
+    # data = {'rgb':rgb}
+    # clf()
+   #else: data = None
+   #data =  mpi4py.MPI.COMM_WORLD.bcast(data,root=0)
+
+   #if self.argv.setdefault('store_rgb',False):
+
+
+
+   #self.plot_map_new(argv)
+   #load solver---
+   #if not ('data' in argv.keys()):
+   # if not ('solver' in argv.keys()):
+   #  self.solver = pickle.load(open(argv.setdefault('filename_solver','solver.p'),'rb'))
+   # else:
+   #  self.solver = argv['solver'].state
+
+   #load geometry---
+   #if not ('geometry' in argv.keys()):
+   #  self.geo = Geometry(model='load',filename = argv.setdefault('filename_geometry','geometry.p'))
+   #else:
+   #  self.geo = argv['geometry']
+
+   #load material---
+   #if not ('material' in argv.keys()):
+   #  fname = argv.setdefault('filename_material','material.p')
+   #  if os.path.isfile(fname) :
+   #   self.mat = pickle.load(open(fname,'rb'))
+   #else:
+   #  self.mat = argv['material']
+    
+   
+
+
+
    self.Nx = argv.setdefault('repeat_x',1)
    self.Ny = argv.setdefault('repeat_y',1)
 
-   if argv['variable'] == 'map':
-     self.plot_map_new(**argv)
+   #if argv['variable'] == 'map':
+   #  self.plot_map_new(**argv)
 
    if '/' in argv['variable']:
     model= argv['variable'].split('/')[0]
+
     if model == 'map':
+     argv['variable'] = argv['variable'].split('/')[1]
+     #Add interfacial_nodes
+     if argv.setdefault('add_interfacial_nodes',False):
+      self.add_interfacial_nodes()
+      argv.update({'matrix_inclusion_map':self.matrix_inclusion_map})
      self.plot_map(argv)
+
+    if model == 'map_cell':
+     argv['variable'] = argv['variable'].split('/')[1]
+     self.plot_map_cell(argv)
+
+
     if model == 'line':
-     self.plot_over_line(argv)
+     argv['variable'] = argv['variable'].split('/')[1]
+     self.plot_over_line(**argv)
 
-   #if argv['variable'] == 'suppression_function' :
-   # self.plot_suppression_function(argv)
-
-   if argv['variable'] == 'SUP' :
-    self.SUP()
-
+   if argv['variable'] == 'suppression_function' :
+    self.compute_suppression_function(argv)
 
    if argv['variable'] == 'distribution' :
-    self.plot_distribution(argv)
+    s = argv.setdefault('show',False)
+    argv['show'] = False
+    self.compute_suppression_function(argv)
+    argv['show'] = s
+    self.compute_distribution(argv)
 
    if argv['variable'] == 'vtk' :
+    #Add interfacial_nodes
+    if argv.setdefault('add_interfacial_nodes',False):
+      self.add_interfacial_nodes()
+      argv.update({'matrix_inclusion_map':self.matrix_inclusion_map})
     self.save_vtk(argv)
+'''
+ def add_interfacial_nodes(self):
+ 
+    self.matrix_inclusion_map = {}
+    for node in self.geo.node_list['Interface']:
+     self.geo.nodes = np.append(self.geo.nodes,[self.geo.nodes[node]],axis=0)
+
+     node2 = len(self.geo.nodes)-1
+     self.matrix_inclusion_map[node] = node2
+     node_elem_map_1 = []
+     node_elem_map_2 = []
+     for elem in self.geo.node_elem_map[node]:
+      if self.geo.get_region_from_elem(elem) == 'Matrix':
+        node_elem_map_1.append(elem)
+      else:
+        node_elem_map_2.append(elem)
+        index = self.geo.elems[elem].index(node)
+        self.geo.elems[elem][index]= len(self.geo.nodes)-1
+
+     self.geo.node_elem_map[node] = node_elem_map_1
+     self.geo.node_elem_map.update({len(self.geo.nodes)-1:node_elem_map_2})
 
 
-   if argv['variable'] == 'kappa_bte' :
-    solver = dd.io.load('state.hdf5')
-    kappa_bte = solver['kappa_bte']
-    if argv.setdefault('save',True) :
-     f = open('kappa_bte.dat','w+')
-     f.write(str(kappa_bte))
-     f.close()
 
  def save_vtk(self,argv):
-  #if MPI.COMM_WORLD.Get_rank() == 0:
    #Write data-------
-   geo = Geometry(model='load',filename = argv.setdefault('geo_filename','geometry.p'))
-   solver = self.solver
-   argv.update({'Geometry':geo})
-   vw = WriteVtk(argv)
+   if 'data' in argv.keys():
+       seld.solver.update({'data':data})
 
-   if 'temperature' in solver.keys():
-    vw.add_variable(solver['temperature'],label = r'''BTE Temperature [K]''')
+   argv.update({'Geometry':self.geo})
+   argv.update({'Solver':self.solver})
+   vw = WriteVtk(**argv)
 
-   if 'flux' in solver.keys():
-    vw.add_variable(solver['flux'],label = r'''BTE Thermal Flux [W/m/m]''')
+   if 'data' in argv.keys():
+    vw.add_variable('data',label = argv.setdefault('label','a.u.'))
+   else:
+    solver = self.solver
 
-   vw.add_variable(solver['temperature_fourier'],label = r'''Fourier Temperature [K]''')
-   vw.add_variable(solver['flux_fourier'],label = r'''Fourier Thermal Flux [W/m/m]''')
+    if 'temperature' in solver.keys():
+     vw.add_variable('temperature',label = r'''BTE Temperature [K]''')
 
-   if 'pseudotemperature' in solver.keys():
-    vw.add_variable(solver['pseudotemperature'],label = r'''Pseudotemperature [K]''')
+
+    if 'pseudogradient' in solver.keys():
+     vw.add_variable('pseudogradient',label = r'''Pseudo gradient Temperature [K/nm]''')
+
+ 
+    if 'kappa_space' in solver.keys():
+     vw.add_variable('kappa_space',label = r'''Thermal Conductivity [W/m/K]''')
+
+
+    if 'flux' in solver.keys():
+     vw.add_variable('flux',label = r'''BTE Thermal Flux [W/m/m]''')
+     #vw.add_variable(solver['vorticity'],label = r'''BTE Vorticity [W/m/m/m]''')
+     #vw.add_variable(solver['vorticity_fourier'],label = r'''Fourier Vorticity [W/m/m/m]''')
+
+    vw.add_variable('temperature_fourier',label = r'''Fourier Temperature [K]''')
+
+    vw.add_variable('flux_fourier',label = r'''Fourier Thermal Flux [W/m/m]''')
 
    vw.write_vtk()
 
 
- def SUP(self):
-
-    SUP = self.solver['SUP'] 
-    MFP = self.solver['MFP']
-
-    plt.plot(MFP,SUP)
-
-    plt.xscale('log')
-
-    plt.show()
-
-
  def plot_material(self,argv):
   if MPI.COMM_WORLD.Get_rank() == 0:
+
    init_plotting()
    data = dd.io.load('material.hdf5')
    #dis_nano = list(data['B0']*data['kappa_bulk_tot'])
@@ -159,140 +374,110 @@ class Plot(object):
 
 
 
- def plot_distribution(self,argv):
-  if MPI.COMM_WORLD.Get_rank() == 0:
-   init_plotting(extra_x_padding = 0.05)
-   data = dd.io.load('material.hdf5')
-   dis_bulk = list(data['kappa_bulk'])
-   mfp = list(data['mfp_bulk']) #m
+ def compute_distribution(self,argv):
 
-   #plot nano------
-   solver = dd.io.load(argv.setdefault('filename','solver.hdf5'))
-   mfp_sampled = data['mfp_sampled'] #m
-   suppression = solver['suppression']
-   sup = [suppression[m,:,:].sum() for m in range(np.shape(suppression)[0])]
+
+   dis_bulk = self.mat['kappa_bulk']
+   mfp_bulk = self.mat['mfp_bulk']
+
+   suppression = self.suppression
    kappa_nano = []
    mfp_nano = []
-   for n in range(len(mfp)):
-    sup_interp = get_suppression(mfp_sampled,sup,mfp[n])
+   for n,mfp in enumerate(mfp_bulk):
+    sup_interp = get_suppression(self.suppression[0],self.suppression[1],mfp)
     kappa_nano.append(dis_bulk[n]*sup_interp)
-    mfp_nano.append(mfp[n]*sup_interp*1e9)
+    mfp_nano.append(mfp*sup_interp)
 
-   #reordering-----
+
+   #reordering---
    I = np.argsort(np.array(mfp_nano))
    kappa_sorted = []
    for i in I:
     kappa_sorted.append(kappa_nano[i])
-   mfp_nano = sorted(mfp_nano)
+   #mfp_nano = np.array([0]+sorted(mfp_nano))
+   mfp_nano = np.array(sorted(mfp_nano))
 
-   #----------------
-   mfp_bulk = np.array(mfp)*1e9
+   #build cumulative kappa
+   acc = np.zeros(len(mfp_nano))
+   acc[0] = kappa_sorted[0]
+   for n in range(len(mfp_nano)-1):
+    acc[n+1] = acc[n] + kappa_sorted[n+1] 
+  
+   self.nano_dis = [mfp_nano*1e-9,acc]
+   
+   #write
+   if argv.setdefault('save',False):
+    f = open('mfp_nano.dat','w+')
+    for n in range(len(mfp_nano)):
+     f.write('{0:10.4E} {1:20.4E}'.format(mfp_nano[n],acc[n]))
+     f.write('\n')
+    f.close()
+
+   #plot
+   if argv.setdefault('show',False):
 
 
-   #fill([mfp_bulk[0]] + list(mfp_bulk) + [mfp_bulk[-1]+1e-6],[0] + dis_bulk + [0],lw=2,alpha=0.6)
-   fill([mfp_nano[0]] + mfp_nano + [mfp_nano[-1]],[0] + kappa_sorted + [0],color=c2)
+    fonts = init_plotting()
+    mfp_new = []
+    acc_new = []
+    th = 0
+    for n in range(len(mfp_nano)-1):
+      mfp_new.append(mfp_nano[n])
+      acc_new.append(acc[n])
+      mfp_new.append(mfp_nano[n+1])
+      acc_new.append(acc[n])
+      if acc[n]/acc[-1] < 1e-3:
+        th = n
+    acc_new.append(acc[-1])
+    mfp_new.append(mfp_nano[n-1]*5)
 
-   f = open('mfp_nano.dat','w+')
-   for n in range(len(mfp)):
-    f.write('{0:10.4E} {1:20.4E}'.format(mfp_nano[n]*1e-9,kappa_sorted[n]))
-    f.write('\n')
-   f.close()
+    plot(mfp_new,acc_new)
+    xlim([mfp_nano[th],mfp_nano[-1]*5])
+    xscale('log')
 
-   xscale('log')
-   xlabel('$\Lambda$ [nm]')
-   ylabel('$Kd\Lambda$ [Wm$^{-1}$K$^{-1}$]')
-   grid()
-   show()
+    #Update fonts
+    xlabel('$\Lambda$ [nm]',font_properties=fonts['regular'])
+    ylabel(r'''$\alpha(\Lambda)$ [Wm$^{-1}$K$^{-1}$]''',font_properties=fonts['regular'])
 
 
- def plot_over_line(self,argv):
+    finalize_plotting(fonts)
+    show()
+
+   
+
+
+ def plot_over_line(self,**argv):
 
   if MPI.COMM_WORLD.Get_rank() == 0:
-   self.geo = Geometry(type='load')
-   (data,nodes,triangulation) = self.get_data(argv)
+   #self.geo = Geometry(type='load')
+   (data,nodes,triangulation) = self.get_data(**argv)
    (Lx,Ly) = self.geo.get_repeated_size(argv)
 
    #--------
    p1 = np.array([-Lx/2.0+1e-7,0.0])
    p2 = np.array([Lx/2.0*(1-1e-7),0.0])
-   (x,data,int_points) = self.compute_line_data(p1,p2,data)
+
+   delta = 1e-7
+   #p1 = np.array([0,-Ly/2+delta,0])
+   #p2 = np.array([0, Ly/2-delta,0])
+   (x,data,int_points) = self.geo.compute_line_data(p1,p2,data)
+   self.x = np.array(x)
+   self.data = np.array(data)
    #--------
-   axes([0.5,0.01,0.5,1.0])
-   plot(x,data,linewidth=2)
-
-   for p in int_points:
-    plot([p,p],[min(data),max(data)],ls='--',color='k')
-   plot([min(x),max(x)],[0,0],ls='--',color='k')
-   gca().yaxis.tick_right()
-
-
- def point_in_elem(self,elem,p):
-  poly = []
-  for n in self.geo.elems[elem]:
-   t1 = self.geo.nodes[n][0]
-   t2 = self.geo.nodes[n][1]
-   poly.append((t1,t2))
-  polygon = Polygon(poly)
-  if polygon.contains(Point(p[0],p[1])):
-   return True
-  else:
-   return False
-
- def compute_line_data(self,p1,p2,original):
-
-  N = 1000
-  tt = []
-  delta = np.linalg.norm(p2-p1)/N
-  neighbors = range(len(self.geo.elems))
-  h1 = 0
-  h2 = 0
-  gamma = 1e-4
-  data = []
-  x = []
-  int_points = []
-  for n in range(N+1):
-   r = p1 + n*delta*(p2-p1)
-   #Here we include extra points close to the interfaces-------
-   if n > 0:
-    tmp = self.geo.cross_interface(p1 + (n-1)*delta*(p2-p1),r)
-    versor = r - p1 + (n-1)*delta*(p2-p1)
-    versor /= np.linalg.norm(versor)
-    if len(tmp) > 0:
-     pp = [tmp-gamma*versor,tmp + gamma*versor,r]
-     x.append(n*delta-np.linalg.norm(r-tmp)-gamma)
-     x.append(n*delta-np.linalg.norm(r-tmp)+gamma)
-     x.append(n*delta)
-     int_points.append(n*delta-np.linalg.norm(r-tmp)-gamma)
-    else:
-     pp = [r]
-     x.append(n*delta)
-   else:
-    pp = [r]
-    x.append(n*delta)
-   #----------------------------------------------------------
-   for p in pp:
-    is_in = False
-    for elem in neighbors:
-     if self.point_in_elem(elem,p) :
-      is_in = True
-      value = self.geo.compute_2D_interpolation(original,p,elem)
-      data.append(value)
-      neighbors = self.geo.get_elem_extended_neighbors(elem)
-      break
-    if not is_in:
-     for elem in range(len(self.geo.elems)):
-      if self.point_in_elem(elem,p) :
-       neighbors = self.geo.get_elem_extended_neighbors(elem)
-       value = self.geo.compute_2D_interpolation(original,p,elem)
-       data.append(value)
-       break
-
-  return x,data,int_points
+   #axes([0.5,0.01,0.5,1.0])
+   
+   if argv.setdefault('show',True):
+    for i,j in zip(self.x,self.data):
+     plot(i,j)
+     
+    for p in int_points:
+     plot([p,p],[min(data),max(data)],ls='--',color='k')
+    plot([min(x),max(x)],[0,0],ls='--',color='k')
+    gca().yaxis.tick_right()
+    show()
 
 
-
-
- def get_data(self,argv):
+ def get_data(self,**argv):
 
   size = self.geo.size
   Nx = argv.setdefault('repeat_x',1)
@@ -300,37 +485,46 @@ class Plot(object):
   Nz = argv.setdefault('repeat_z',1)
   Lx = size[0]*self.Nx
   Ly = size[1]*self.Ny
-  variable = argv['variable'].split('/')[1]
-  solver = dd.io.load('solver.hdf5')
+  #variable = argv['variable'].split('/')[1]
+  variable = argv['variable']
   argv.update({'Geometry':self.geo})
+  argv.update({'Solver':self.solver})
 
-  vw = WriteVtk(argv)
+  vw = WriteVtk(**argv)
 
+  data_int = None
   if 'index' in argv.keys():
     ii = int(argv['index'])
     if variable == 'temperature':
      data = solver['temperature_vec'][ii]
-     #vmin = np.min(solver['temperature_vec'])
-     #vmax = np.max(solver['temperature_vec'])
     else: 
      data = solver['flux_vec'][ii]
-     #vmin = np.min(solver['flux_vec'])
-     #vmax = np.max(solver['flux_vec'])
 
   else:
-    data = solver[variable]
-    #vmin = min(data)
-    #vmax = min(data)
+    if 'data' in argv.keys():
+     data = argv['data']
+    else:
+     #solver = dd.io.load('solver.hdf5')
+     data = self.solver[variable]
 
-  (triangulation,tmp,nodes) = vw.get_node_data(data)
+  if len(self.geo.side_list['Interface'])> 0:
+    data_int =  self.solver[variable + '_int'] 
+    argv.update({'data_int':data_int})
 
-  argv.setdefault('direction',None)  
+  argv.update({'variable':data})
+  (triangulation,tmp,nodes) = vw.get_node_data(**argv)
+
+  argv.setdefault('direction',None) 
+
+
   if argv['direction'] == 'x':
      data = np.array(tmp).T[0]
   elif argv['direction'] == 'y':
      data = np.array(tmp).T[1]
   elif argv['direction'] == 'z':
      data = np.array(tmp).T[2]
+  elif argv['direction'] == -1: 
+     data = tmp 
   elif argv['direction'] == 'magnitude':
       data = []
       for d in tmp:
@@ -378,7 +572,7 @@ class Plot(object):
 
     self.ax = axes([delta,delta*Sx/(Sy+Sx*delta),1.0,1.0])
     argv['variable'] = 'variable/' + label
-    (data,nodes,triangulation) =  self.get_data(argv)
+    (data,nodes,triangulation) =  self.get_data(**argv)
     vmin = argv.setdefault('vmin',min(data))
     vmax = argv.setdefault('vmax',max(data))
     self.ax.tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),zorder=1)
@@ -393,16 +587,16 @@ class Plot(object):
 
 
  def plot_map_new(self,**argv):
-   self.mode = 'integrated'  
-   self.ax = -1
+   #self.mode = 'integrated'  
+   #self.ax = -1
    #set main figure----
-   self.geo = Geometry(model='load')
-   self.original_size = self.geo.size[0]
-   self.Nx = argv.setdefault('repeat_x',1)
-   self.Ny = argv.setdefault('repeat_y',1)
-   self.plotted = False
-   self.geo = Geometry(model='load')
-   (Lx,Ly) = self.geo.get_repeated(self.Nx,self.Ny)
+   #self.geo = Geometry(model='load')
+   #self.original_size = self.geo.size[0]
+   #self.Nx = argv.setdefault('repeat_x',1)
+   #self.Ny = argv.setdefault('repeat_y',1)
+   #self.plotted = False
+   #self.geo = Geometry(model='load')
+   #(Lx,Ly) = self.geo.get_repeated(self.Nx,self.Ny)
    Sx = 8
    Sy = Sx*Ly/Lx
    delta = 0.2
@@ -474,37 +668,140 @@ class Plot(object):
          return
 
 
- def plot_map(self,argv):
-   self.geo - argv['geo']
-   #self.geo = Geometry(model='load')
+ def plot_map_cell(self,argv):
+
    (Lx,Ly) = self.geo.get_repeated_size(argv)
-   Sx = 8
+
+   Sx = argv.setdefault('fig_size',5)
    Sy = Sx*Ly/Lx
 
-   fig = figure(num=' ', figsize=(Sx,Sy), dpi=80, facecolor='w', edgecolor='k')
-   axes([0,0,1.0,1.0])
+   fig = plt.figure(num=' ', figsize=(Sx,Sy), dpi=80, facecolor='w', edgecolor='k')
+   ax = plt.axes([0,0,1.0,1.0])
 
-   #fig = figure(num=' ', figsize=(8*Lx/Ly, 8), dpi=80, facecolor='w', edgecolor='k')
-   #axes([0,0,0.5,1.0])
-   #axes([0,0,1.0,1.0])
-   print('g')
+   tmp = self.solver[argv['variable']]
+   ndim = len(np.shape(tmp))
+
+   if ndim == 3:
+    d1 = argv.setdefault('direction_1',0)  
+    d2 = argv.setdefault('direction_2',0)  
+    data = np.array(tmp)[:,d1,d2]
+   elif ndim == 2:
+    d = argv.setdefault('direction',-1)  
+    if d == -1: #"Magnitude"
+      data = []
+      for d in tmp:
+       data.append(np.linalg.norm(d))
+      data = np.array(data)
+    else: 
+     data = np.array(tmp)[:,d]
+   else:
+    data = tmp
+
+
+   #if argv['direction'] == 'x':
+   #  data = np.array(tmp).T[0]
+   #elif argv['direction'] == 'y':
+   #  data = np.array(tmp).T[1]
+   #elif argv['direction'] == 'z':
+   #  data = np.array(tmp).T[2]
+   #elif argv['direction'] == 'magnitude':
+   #   data = []
+   #   for d in tmp:
+   #    data.append(np.linalg.norm(d))
+   #   data = np.array(data)
+
+   minv = min(data)
+   maxv = max(data)
+   viridis = cm.get_cmap('winter')
+   
+   #if len(self.geo.elems[0]) == 12:
+   # N = int(np.sqrt(len(data)))
+   # a = data.reshape(N,N)
+   # ax.imshow(a, interpolation='bilinear', cmap=viridis)
+   # plt.xlim([0,N])
+   # plt.ylim([0,N])
+   #else:
+
+  # if argv.setdefault('plot_interfaces',False):
+  #   pp = self.geo.get_interface_point_couples(argv)
+
+   if argv.setdefault('plot_interface',True):
+     for side in self.geo.side_list['Interface']:
+      p1 = self.geo.sides[side][0]
+      p2 = self.geo.sides[side][1]
+      n1 = self.geo.nodes[p1]
+      n2 = self.geo.nodes[p2]
+      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=2,zorder=1)
+
+
+   for n in range(self.geo.nle):
+     
+       color = viridis((data[n] - minv)/(maxv-minv))
+       pp = []
+       for s in self.geo.elems[self.geo.l2g[n]]:
+        pp.append(self.geo.nodes[s][:2])  
+       path = create_path(pp)
+       patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color=color,zorder=1,joinstyle='miter')
+       gca().add_patch(patch);
+
+   plt.xlim([-Lx/2,Lx/2])
+   plt.ylim([-Ly/2,Ly/2])
+   plt.show()
+
+
+
+
+
+
+ def plot_map(self,argv):
+
+   #fonts = init_plotting(square=True)    
+   (Lx,Ly) = self.geo.get_repeated_size(argv)
+   Sx = argv.setdefault('fig_size',5)
+   Sy = Sx*Ly/Lx
+
+   fig = plt.figure(num=' ', figsize=(Sx,Sy), dpi=80, facecolor='w', edgecolor='k')
+   plt.axes([0,0,1.0,1.0])
 
    #data += 1.0
-   plt.set_cmap(Colormap('hot'))
-   
-   (data,nodes,triangulation) =  self.get_data(argv)
+   #plt.set_cmap(Colormap('winter'))
+   (data,nodes,triangulation) =  self.get_data(**argv)
+
+
    vmin = argv.setdefault('vmin',min(data))
    vmax = argv.setdefault('vmax',max(data))
-   tripcolor(triangulation,np.array(data),shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),zorder=1)
 
-   #colorbar(norm=mpl.colors.Normalize(vmin=min(data),vmax=max(data)))
+   if argv.setdefault('normalize',False):
+    data -=vmin
+    data /= (vmax-vmin)
+    vmin = 0
+    vmax = 1
+   
+   cc= 'winter'
+   plt.tripcolor(triangulation,np.array(data),cmap=cc,shading='gouraud',norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),zorder=1)
+   if argv.setdefault('colorbar',False):
+
+    filename = os.path.dirname(__file__) + '/fonts/cmunrm.ttf'
+    prop = fm.FontProperties(fname=filename,family='serif')
+    fonts = {'regular':prop}
+    h = colorbar(norm=mpl.colors.Normalize(vmin=vmin,vmax=vmax),orientation='horizontal',shrink=0.75)
+    finalize_plotting(fonts)
+    h.ax.tick_params(labelsize=16)
 
     #Contour-----
    if argv.setdefault('iso_values',False):
     t = tricontour(triangulation,data,levels=np.linspace(vmin,vmax,10),colors='black',linewidths=1.5)
+    clabel(t, fontsize=14, inline=True)
+ 
 
    if argv.setdefault('streamlines',False):# and (variable == 'fourier_flux' or variable == 'flux' ):
 
+       argv['direction'] = -1
+       (data,nodes,triangulation) =  self.get_data(**argv)
+
+       #argv['direction'] = None
+       #(mod,nodes,triangulation) =  self.get_data(**argv)
+       
 
        n_lines = argv.setdefault('n_lines',10)*self.Ny #assuming transport across x
        xi = np.linspace(-Lx*0.5,Lx*0.5,300*self.Nx)
@@ -517,54 +814,111 @@ class Plot(object):
        Fy = griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
 
        seed_points = np.array([-Lx*0.5*0.99*np.ones(n_lines),np.linspace(-Ly*0.5*0.98,Ly*0.5*0.98,n_lines)])
-       ss = streamplot(xi, yi, Fx, Fy,maxlength = 1e8,start_points=seed_points.T,integration_direction='both',color='r',minlength=0.95,linewidth=1)
 
+       ss = streamplot(xi, yi, Fx, Fy,maxlength = 100,start_points=seed_points.T,integration_direction='both',color='r',minlength=0.95)
+
+       #plot(seed_points[0], seed_points[1], 'bo')
 
    if argv.setdefault('plot_interfaces',False):
     pp = self.geo.get_interface_point_couples(argv)
 
+   if argv.setdefault('plot_elements',False):
+     for n,e in enumerate(self.geo.elems):
+       c = self.geo.get_elem_centroid(n)  
+       p0 = self.geo.nodes[e[0]]  
+       p1 = self.geo.nodes[e[1]]  
+       p2 = self.geo.nodes[e[2]]  
+       plt.plot([p0[0],p1[0],p2[0],p0[0]],[p0[1],p1[1],p2[1],p0[1]],color='w')
+       plt.text(c[0],c[1],str(n),color='w',fontsize=8,va='center',ha='center')
 
 
-   axis('off')
-   gca().invert_yaxis()
-   xlim([-Lx*0.5,Lx*0.5])
-   ylim([-Ly*0.5,Ly*0.5])
-   gca().margins(x=0,y=0)
+   plt.axis('off')
+   plt.gca().invert_yaxis()
+   plt.xlim([-Lx*0.5,Lx*0.5])
+   plt.ylim([-Ly*0.5,Ly*0.5])
+   plt.gca().margins(x=0,y=0)
 
-   axis('tight')
-   axis('equal')
-   savefig('fig.png',dpi=200)
-   show()
-
-
- def plot_suppression_function(self,argv):
-
-  #if MPI.COMM_WORLD.Get_rank() == 0:
-   #init_plotting(extra_bottom_padding= 0.01,extra_x_padding = 0.02)
-   data = dd.io.load(argv.setdefault('filename','solver.hdf5'))
-
-   suppression = data['suppression']
-   iso_sup = data['iso_suppression']
-   #iso_sup = [iso_suppression[m].sum() for m in range(np.shape(iso_suppression)[0])]
-
-   #print(suppression)
-   #quit()
-   tmp = data['fourier_suppression']
-   sup = [suppression[m,:,:].sum() for m in range(np.shape(suppression)[0])]
-   sup_fourier = [tmp[m,:,:].sum() for m in range(np.shape(tmp)[0])]
-
-
-   mfp = data['mfp']*1e6
-   #print(sup_fourier[0])
+   #finalize_plotting(fonts)
+   plt.axis('tight')
+   plt.axis('equal')
+   if argv.setdefault('save',True):
+    plt.savefig('fig.png',dpi=200)
    if argv.setdefault('show',True):
-    plot(mfp,sup,color=c1)
-    plot(mfp,sup_fourier,color=c2)
-    plot(mfp,iso_sup,color=c3)
+    plt.show()
 
-    xscale('log')
-    grid('on')
-    xlabel('Mean Free Path [$\mu$ m]')
-    ylabel('Suppression Function')
-    show()
-   if argv.setdefault('write',True):
-    suppression.dump('suppression.dat')
+
+ def compute_suppression_function(self,argv):
+
+
+   mfp = self.mat['mfp']
+   n_mfp = len(mfp)
+   control_angle = self.mat['control_angle']
+   kappa_directional = self.mat['kappa_directional']
+   n_serial = self.mat['n_serial']
+   n_parallel = self.mat['n_parallel']
+   eta = self.solver['eta']
+   direction_int = self.mat['direction_int']
+  
+   #------------------
+   eta_m = np.zeros((n_parallel,n_serial))
+   kappa_m = np.zeros((n_parallel,n_serial,3))
+   mfp_m = np.zeros((n_parallel,n_serial))
+   angle_m = np.zeros((n_parallel,n_serial,3))
+   for s in range(n_serial):
+    for p in range(n_parallel):
+     eta_m[p,s] = eta[p*n_serial+s]
+     mfp_m[p,s] = mfp[p*n_serial+s]
+     kappa_m[p,s,:] = kappa_directional[p*n_serial+s,:]
+     angle_m[p,s,:] = control_angle[p*n_serial+s,:]
+   #-----------------------------------------------------
+
+
+   #Interpolation------
+   ftheta = self.mat['ftheta'] #this can be arbitrary
+   n_theta = len(ftheta)
+   mfp_sampled = self.mat['mfp'][0:n_serial] #this can be arbitrary
+   N = len(mfp_sampled) 
+   kappa = 0
+   sup = np.zeros(N)
+   for p in range(n_parallel):
+    aa = angle_m[p,0,0]
+    f = interpolate.interp1d(mfp_m[p],eta_m[p],fill_value='extrapolate')
+    for m in range(N):
+     for t in range(n_theta):
+      T = f(mfp_sampled[m]*ftheta[t])
+      #T = f(mfp_sampled[m])
+      #sup[m] += T/mfp_sampled[m]*aa*self.mat['dphi']/np.pi
+      sup[m] += 2*T/mfp_sampled[m]*direction_int[t,p,0]/4.0/np.pi*3*self.geo.kappa_factor
+   #------------------------------------------------------------------ 
+   self.suppression = [mfp_sampled,sup]
+
+   if argv.setdefault('show',False):
+
+    plt.plot(mfp_sampled,sup)
+    plt.ylim([0,2])
+    plt.xscale('log')
+    plt.show()
+
+   return sup
+
+'''
+def get_suppression(mfps,sup,mfp):
+
+  if mfp < mfps[0]:
+   output = sup[0]
+  else:
+   included = False
+   for n in range(len(mfps)-1):
+    mfp_1 = mfps[n]
+    mfp_2 = mfps[n+1]
+    if mfp < mfp_2 and mfp > mfp_1:
+     output = sup[n] + (sup[n+1]-sup[n])/(np.log10(mfps[n+1])-np.log10(mfps[n]))*(np.log10(mfp)-np.log10(mfps[n]))
+     included = True
+     break
+
+   if included == False:
+    output = sup[-1]*mfps[-1]/mfp
+
+  return output
+'''
+
