@@ -606,37 +606,20 @@ class Geometry(object):
 
  def compute_mesh_data(self,**argv):
 
-    tt = []
-    tt.append(time.time())
     self.import_mesh(**argv)
-    tt.append(time.time())
-    #quit()
     self.compute_elem_map()
-    tt.append(time.time())
     self.compute_elem_volumes()
-    tt.append(time.time())
     self.compute_side_areas()
-    tt.append(time.time())
     self.compute_side_normals()
-    tt.append(time.time())
     self.compute_elem_centroids()
-    tt.append(time.time())
     self.compute_side_centroids()
-    tt.append(time.time())
     self.compute_least_square_weigths()
-    tt.append(time.time())
     self.compute_connecting_matrix_new()
-    tt.append(time.time())
     self.compute_interpolation_weigths()
-    tt.append(time.time())
     self.compute_contact_areas()
-    tt.append(time.time())
     self.compute_dists()
-    tt.append(time.time())
     self.compute_boundary_condition_data(argv)
-    tt.append(time.time())
     self.n_elems = len(self.elems)
-    #self.nle = len(self.l2g)
 
     #generate_elem_mat_map
     self.elem_mat_map = { i:[0] for i in range(len(self.elems))}
@@ -645,8 +628,6 @@ class Geometry(object):
     frame = generate_frame(**argv)
     #-----------
 
-
-    tt.append(time.time())
 
     self.data = {'side_list':self.side_list,\
           'n_elems':np.array([self.n_elems]),\
@@ -686,10 +667,12 @@ class Geometry(object):
           'pv':self.pv,\
           'n_side_per_elem':np.array([len(self.elems[0])])}
 
-    tt.append(time.time())
+
+
+
     if argv.setdefault('save',True):
-     #save_dictionary(self.data,'geometry.h5')
-     dd.io.save('geometry.h5',self.data)
+     save_dictionary(self.data,'geometry.h5')
+     #dd.io.save('geometry.h5',self.data)
     #tt.append(time.time())
     #print(np.diff(tt))
 
