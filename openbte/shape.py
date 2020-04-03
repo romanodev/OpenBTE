@@ -10,13 +10,14 @@ def get_shape(argv):
     shape = argv.setdefault('shape','square')
     if shape == 'square':
        return np.array(make_polygon(4,area))
+
     elif shape == 'circle':
        return np.array(make_polygon(24,area))
+
     elif shape == 'custom':
       options = argv.setdefault('shape_options',{})
       options.update({'area':area})
       return argv['shape_function'](options)
-
 
 
 

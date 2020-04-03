@@ -8,21 +8,22 @@ from .shape import *
 from .utils import *
 import subprocess
 
-class Porous(object):
+class Mesher(object):
 
  def __init__(self,argv):
 
-  #create polygons-----
-  base = argv.setdefault('base',[[0,0]])
-  if len(base) == 0:
-   if argv.setdefault('lz',0) == 0:
-    return self.generate_bulk_2D(argv)
-   else :
-    return self.generate_bulk_3D(argv)
+  if argv.setdefault('model','lattice') == 'lattice':   
+   #create polygons-----
+   base = argv.setdefault('base',[[0,0]])
+   if len(base) == 0:
+    if argv.setdefault('lz',0) == 0:
+     return self.generate_bulk_2D(argv)
+    else :
+     return self.generate_bulk_3D(argv)
+   shape = get_shape(argv)
+   polygons = [translate_shape(shape,i) for i in argv['base']]
+   argv.update({'polygons':np.array(polygons)})
 
-  shape = get_shape(argv)
-  polygons = [translate_shape(shape,i) for i in argv['base']]
-  argv.update({'polygons':np.array(polygons)})
   repeat_merge_scale(argv)
   #---------------------
 
@@ -39,7 +40,6 @@ class Porous(object):
   Lz = argv['lz']
 
   frame = generate_frame(**argv)
-
 
   mesh_ext = argv['step']
   Nx = float(argv.setdefault('Nx',1))

@@ -24,6 +24,8 @@ import os.path
 from matplotlib.widgets import Slider, Button, RadioButtons
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from  matplotlib import cm
+from matplotlib.tri import Triangulation
+from google.colab import widgets
 
 
 def create_path(obj):
@@ -58,16 +60,63 @@ class Plot(object):
        if os.path.isfile('solver.h5') :
         self.solver = load_dictionary('solver.h5')
 
-   if 'material' in argv.keys():
-    self.solver = argv['material']
-   else: 
-       if os.path.isfile('material.h5') :
-        self.solver = load_dictionary('material.h5')
+   #if 'material' in argv.keys():
+   # self.solver = argv['material']
+   #else: 
+   #    if os.path.isfile('material.h5') :
+   #     self.material = load_dictionary('material.h5')
    #--------------------------------------------
 
    model = argv['model'].split('/')[0]
+
    if model == 'geometry':
     self.plot_geometry(**argv)
+
+   elif model == 'maps':
+    self.plot_maps(**argv)
+
+
+ def _plot_data(self,tri,variable):
+
+
+   axis([0,0,1,1])  
+   node_data = np.zeros(len(self.mesh['nodes']))
+   data = self.solver['temperature']
+   conn = np.zeros(len(self.mesh['nodes']))
+   for k,e in enumerate(self.mesh['elems']):
+     for n in e:
+      conn[n] +=1
+      node_data[n] += data[k]
+   node_data = [node_data[n]/conn[n] for n in range(len(node_data))]
+   vmin = min(node_data)
+   vmax = max(node_data)
+   node_data -=vmin
+   node_data /= (vmax-vmin)
+
+
+   cc= 'viridis'
+   tripcolor(tri,np.array(node_data),cmap=cc,shading='gouraud',norm=mpl.colors.Normalize(vmin=0,vmax=1),zorder=1)
+   axis('off')
+   axis('equal')
+   Lx = self.mesh['size'][0]
+   Ly = self.mesh['size'][1]
+   xlim([-Lx/2,Lx/2])
+   ylim([-Ly/2,Ly/2])
+
+   show()
+
+
+
+ def plot_maps(self,**argv):
+
+
+   tri = Triangulation(self.mesh['nodes'][:,0],self.mesh['nodes'][:,1], triangles=self.mesh['elems'], mask=None)
+
+   figure(num=' ', figsize=(5,5), dpi=80, facecolor='w', edgecolor='k')
+
+   tb = widgets.TabBar(['Fourier Temperature', 'BTE Temperature'], location='top')
+   with tb.output_to(0): self._plot_data(tri,'temperature')
+   with tb.output_to(1): self._plot_data(tri,'temperature_fourier')
 
 
  def plot_geometry(self,**argv):
@@ -79,10 +128,9 @@ class Plot(object):
       lx = size[0]
       ly = size[1]
       fig = figure(num=" ", figsize=(4*lx/ly, 4), dpi=80, facecolor='w', edgecolor='k')
-      axes([0.,0.,1,1])
-      xlim([-lx/2.0,lx/2.0])
-      ylim([-ly/2.0,ly/2.0])
-      axis('off')
+      ax = axes([0.,0.,1,1])
+      ax.set_xlim([-lx/2.0,lx/2.0])
+      ax.set_ylim([-ly/2.0,ly/2.0])
       for ne in range(len(self.mesh['elems'])):
         cc =  self.mesh['elem_mat_map'][ne]
         if cc == 1:
@@ -98,14 +146,16 @@ class Plot(object):
         p2 = self.mesh['sides'][side][1]
         n1 = self.mesh['nodes'][p1]
         n2 = self.mesh['nodes'][p2]
-        plot([n1[0],n2[0]],[n1[1],n2[1]],color='#f77f0e',lw=4)
+        ax.plot([n1[0],n2[0]],[n1[1],n2[1]],color='#f77f0e',lw=4)
      
        for side in self.mesh['side_list']['Periodic'] + self.mesh['side_list']['Inactive']  :
         p1 = self.mesh['sides'][side][0]
         p2 = self.mesh['sides'][side][1]
         n1 = self.mesh['nodes'][p1]
         n2 = self.mesh['nodes'][p2]
-        plot([n1[0],n2[0]],[n1[1],n2[1]],color='g',lw=8,zorder=1)
+        ax.plot([n1[0],n2[0]],[n1[1],n2[1]],color='g',lw=8,zorder=1)
+        
+      ax.axis('off')
      
       show()
 

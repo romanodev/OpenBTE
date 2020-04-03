@@ -1,6 +1,6 @@
 import numpy as np
 import sparse
-from .porous import *
+from .mesher import *
 from .utils import *
 import time
 import deepdish as dd
@@ -10,12 +10,10 @@ class Geometry(object):
 
  def __init__(self,**argv):
   
-  model = argv.setdefault('model','porous')
 
-  if model == 'porous': Porous(argv) #this create mesh.msh
+  Mesher(argv) #this create mesh.msh
 
   self.compute_mesh_data(**argv)
-
 
 
  def compute_mesh_data(self,**argv):
