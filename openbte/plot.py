@@ -79,9 +79,11 @@ class Plot(object):
  def _plot_data(self,tri,variable):
 
 
-   axis([0,0,1,1])  
+   data = self.solver[variable]
+   if data.ndim == 2:
+      data = np.array([np.linalg.norm(d) for d in data]) 
+
    node_data = np.zeros(len(self.mesh['nodes']))
-   data = self.solver['temperature']
    conn = np.zeros(len(self.mesh['nodes']))
    for k,e in enumerate(self.mesh['elems']):
      for n in e:
@@ -92,7 +94,6 @@ class Plot(object):
    vmax = max(node_data)
    node_data -=vmin
    node_data /= (vmax-vmin)
-
 
    cc= 'viridis'
    tripcolor(tri,np.array(node_data),cmap=cc,shading='gouraud',norm=mpl.colors.Normalize(vmin=0,vmax=1),zorder=1)
@@ -112,11 +113,37 @@ class Plot(object):
 
    tri = Triangulation(self.mesh['nodes'][:,0],self.mesh['nodes'][:,1], triangles=self.mesh['elems'], mask=None)
 
-   figure(num=' ', figsize=(5,5), dpi=80, facecolor='w', edgecolor='k')
+   figure(num=' ', figsize=(5,5), dpi=80, facecolor='w', edgecolor='k');
 
-   tb = widgets.TabBar(['Fourier Temperature', 'BTE Temperature'], location='top')
-   with tb.output_to(0): self._plot_data(tri,'temperature')
-   with tb.output_to(1): self._plot_data(tri,'temperature_fourier')
+   titles = []
+   variables = []
+   directions = []
+
+
+   if 'temperature' in self.solver.keys():
+     titles.append('BTE Temperature')
+     variables.append('temperature')
+     directions.append(-1)
+
+   if 'temperature_fourier' in self.solver.keys():
+     titles.append('Fourier Temperature')
+     variables.append('temperature_fourier')
+     directions.append(-1)
+
+   if 'flux' in self.solver.keys():
+     titles.append('BTE Flux (magnitude)')
+     variables.append('flux')
+     directions.append(-1)
+
+   if 'flux_fourier' in self.solver.keys():
+     titles.append('Fourier flux (magnitude)')
+     variables.append('flux_fourier')
+     directions.append(-1)
+
+   tb = widgets.TabBar(titles, location='top')
+
+   for n,(variable,direction) in enumerate(zip(variables,directions)):
+     with tb.output_to(n): self._plot_data(tri,variable)
 
 
  def plot_geometry(self,**argv):
@@ -989,6 +1016,5 @@ def get_suppression(mfps,sup,mfp):
    if included == False:
     output = sup[-1]*mfps[-1]/mfp
 
-  return output
-'''
-
+  return outputi
+''' 

@@ -5,13 +5,19 @@ from .utils import *
 import time
 import deepdish as dd
 import itertools
+from .GenerateInterface import *
+
 
 class Geometry(object):
 
  def __init__(self,**argv):
   
 
-  Mesher(argv) #this create mesh.msh
+  if argv['model'] == 'interface':
+     GenerateInterface(**argv) 
+  else:
+     Mesher(argv) #this create mesh.msh
+     self.elem_mat_map = { i:[0] for i in range(len(self.elems))}
 
   self.compute_mesh_data(**argv)
 
@@ -32,12 +38,12 @@ class Geometry(object):
     self.n_elems = len(self.elems)
 
     #generate_elem_mat_map
-    self.elem_mat_map = { i:[0] for i in range(len(self.elems))}
 
     #generate_frame
     frame = generate_frame(**argv)
     #-----------
-
+    argv.update({'centroids':self.elem_centroids})
+    self.elem_mat_map = CreateCorrelation(**argv)
 
     self.data = {'side_list':self.side_list,\
           'n_elems':np.array([self.n_elems]),\
@@ -75,8 +81,6 @@ class Geometry(object):
           'dbp':self.dbp,\
           'pv':self.pv,\
           'n_side_per_elem':np.array([len(self.elems[0])])}
-
-
 
 
     if argv.setdefault('save',True):
@@ -222,14 +226,18 @@ class Geometry(object):
    current_line += 1
 
    #type of elements
-   bulk_type = {2:[2],3:[4]}
+   bulk_type = {2:[2,3],3:[4]}
    face_type = {2:[1],3:[2]}
    #---------------------------
 
 
    bulk_tags = [n for n in range(n_elem_tot) if int(lines[current_line + n][1]) in bulk_type[self.dim]] 
-   face_tags = [n for n in range(n_elem_tot) if int(lines[current_line + n][1]) in face_type[self.dim]] 
-   self.elems = np.array([ lines[current_line + n][5:] for n in bulk_tags],dtype=int) - 1
+   face_tags = [n for n in range(n_elem_tot) if int(lines[current_line + n][1]) in face_type[self.dim]]
+
+
+   self.elems = [list(np.array(lines[current_line + n][5:],dtype=int)-1) for n in bulk_tags] 
+
+   
 
    n_elems = len(self.elems)
    boundary_sides = np.array([ sorted(np.array(lines[current_line + n][5:],dtype=int)) for n in face_tags] ) -1
@@ -247,9 +255,9 @@ class Geometry(object):
    #this is the bottleneck.
    for k,elem in enumerate(self.elems):
        tmp = list(elem)
-       for i in range(self.dim + 1):
+       for i in range(len(elem)):
          tmp.append(tmp.pop(0))
-         trial = sorted(tmp[:-1])
+         trial = sorted(tmp[:self.dim])
          if not trial in self.sides:
             self.sides.append(trial)
             r = len(self.sides)-1
@@ -257,11 +265,13 @@ class Geometry(object):
          else: r = self.sides.index(trial)  
          self.elem_side_map.setdefault(k,[]).append(r)   
 
-   #match the boudnary sides with the global side.
+
+
+   #match the boundary sides with the global side.
    physical_boundary = {}
    for n,bs in enumerate(boundary_sides): #match with the boundary side
       side = self.node_side_map[bs[0]]
-      for s in side:  
+      for s in side: 
         if np.allclose(np.array(self.sides[s]),np.array(bs),rtol=1e-4,atol=1e-4):
             #The boundary sides (msh2) are listed at the beginning of the elements list
             physical_boundary.setdefault(self.blabels[int(lines[current_line + n][3])],[]).append(s) 
@@ -352,7 +362,7 @@ class Geometry(object):
       [self.side_list.setdefault('Inactive',[]).append(i) for i in physical_boundary[contact_2]]
 
 
-   self.side_list.update({'Boundary':physical_boundary['Boundary']})
+   if 'Boundary' in physical_boundary.keys(): self.side_list.update({'Boundary':physical_boundary['Boundary']})
 
    for side in self.side_list['Boundary'] :# + self.side_list['Hot'] + self.side_list['Cold']:
     self.side_elem_map[side].append(self.side_elem_map[side][0])

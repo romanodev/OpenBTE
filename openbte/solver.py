@@ -27,9 +27,18 @@ class Solver(object):
         self.mat = load_dictionary('material.h5')
         self.kappa = self.mat['kappa']
         self.kappa_vec = np.zeros((len(self.mesh['elems']),3,3))
+
+        for n in self.mesh['elem_mat_map'].keys():
+            if self.mesh['elem_mat_map'][n] == 0:
+                self.kappa_vec[n] = 0.5* np.eye(3)
+            else:    
+                self.kappa_vec[n] =  np.eye(3)
+
+
         for i in range(len(self.mesh['elems'])):
           self.kappa_vec[i] = self.kappa*np.eye(3)
          
+        self.only_fourier = True
         if not argv.setdefault('only_fourier',False):
          self.only_fourier = False
          self.tc = self.mat['temp']
@@ -326,7 +335,7 @@ class Solver(object):
         
         C = self.compute_non_orth_contribution(grad)
 
-    flux = np.einsum('cij,cj->ic',self.kappa_vec,grad)
+    flux = np.einsum('cij,cj->ci',self.kappa_vec,grad)
     return {'flux_fourier':flux,'temperature_fourier':temp,'kappa_fourier':np.array([kappa_eff])}
 
 
