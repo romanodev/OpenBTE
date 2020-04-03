@@ -62,8 +62,45 @@ The current list of material models, options and designed filenames is [here](..
 The format of input files is desribed [here](../format) <br>
 The list of interface to external solver is [here](../interface)
 
-
 # Geometry
+
+The module `Geometry` aids the creation of the structure and save it in `geometry.h5`. In OpenBTE, any structure is identified by a rectangular unit-cell with size `lx` by `ly`, a `porosity` (i.e. the volume fraction), a `base` - i.e. the position of the pores in the unit-cell and a `shape`. Below is a complete list of options.
+
+|  Option  | Description    | Format |
+|:-----------|:---------------|:-------------|
+|   `lx`     | Size of the unit-cell along x | float [nm] |
+|   `ly`     | Size of the unit-cell along y | float [nm] |
+|   `porosity` | Volume fraction |   float |
+|   `shape`   | shape of the pore | see below  |
+|   `base`    | The positions of the pores | $$[[x_0,y_0],[x_1,y_1] ...$$ |
+|   `direction`  | direction of the applied gradient| `x` (default) or `y`  |
+|   `step`  | characteristic mesh size| float [nm]  |
+ 
+Additional info/tips:
+
+ - Commonly, a shape may cross one or even two boundaries of the unit-cell. The user needs to to include in the base the image pore, since OpenBTE will automatically added it.
+ 
+ - The base has the range $$x\in [-0.5,0.5] $$ and $$y\in [-0.5,0.5] $$
+ 
+ - When two pores overlap, including the cases where the overlap is due to periodicity, a bigger pore - the union of the two overlapping pores, is created.
+ 
+ - The area of the pores is defined by the chosen porosity, the shape and number of pores in the base. For example, when the number of pores in the base doubles - with all other parameters being equal, the area of each pore halves.
+ 
+ - The `step` keyword defined the characteristic size of the mesh. The number of elements will be roughly $$ lx*ly/\mathrm{step}^2 $$.  Typical calcylations have 400-10 K elements. 
+ 
+ - Periodic boundary conditions are applied to the the portion of the boundary orthogonal to the applied gradient. 
+ 
+ - Diffuse scattering boundary conditions are applied to the the portion of the boundary parallel to the applied gradient.
+ 
+ - Diffuse scattering boundary conditions are applied along the walls of the pores.
+ 
+ 
+ An example of `Geometry` instance is 
+ 
+ ```python
+ Geometry(porosity=0.3,shape'circle',lx=100,ly=100,step=5)
+ ```
+ 
 # Solver
 # Plot
 # Examples
