@@ -82,7 +82,7 @@ class Plot(object):
       axes([0.,0.,1,1])
       xlim([-lx/2.0,lx/2.0])
       ylim([-ly/2.0,ly/2.0])
-     
+      axes('off')     
       for ne in range(len(self.mesh['elems'])):
         cc =  self.mesh['elem_mat_map'][ne]
         if cc == 1:
