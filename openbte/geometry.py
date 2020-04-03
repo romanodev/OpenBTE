@@ -18,7 +18,6 @@ class Geometry(object):
 
 
 
-
  def compute_mesh_data(self,**argv):
 
     self.import_mesh(**argv)
@@ -35,7 +34,7 @@ class Geometry(object):
     self.n_elems = len(self.elems)
 
     #generate_elem_mat_map
-    #self.elem_mat_map = { i:[0] for i in range(len(self.elems))}
+    self.elem_mat_map = { i:[0] for i in range(len(self.elems))}
 
     #generate_frame
     frame = generate_frame(**argv)
@@ -46,7 +45,7 @@ class Geometry(object):
           'n_elems':np.array([self.n_elems]),\
           'elem_side_map':self.elem_side_map,\
           'side_elem_map':self.side_elem_map,\
-          #'elem_mat_map':self.elem_mat_map,\
+          'elem_mat_map':self.elem_mat_map,\
           'elems':self.elems,\
           'sides':self.sides,\
           'size':self.size,\

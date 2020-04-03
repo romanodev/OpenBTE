@@ -3,8 +3,10 @@ import time
 import scipy.sparse as sp
 
 
+
 def solve_gpu(row,col,A,d,X,BM,BB,Gbp,SS,P,EB):
     print('GPU!')
+    import sparseqr
     import pycuda.autoinit
     import pycuda.gpuarray as gpuarray
     import skcuda.linalg as linalg
@@ -114,12 +116,21 @@ def solve_gpu(row,col,A,d,X,BM,BB,Gbp,SS,P,EB):
  
     #--------------------- 
     
-    Acsr = sp.csr_matrix( (  np.arange(len(col),dtype=int),(row,col)), shape=(d,d),dtype=int).sorted_indices()
+    #Acsr = sp.csr_matrix((np.arange(len(col),dtype=int),(row,col)),shape=(d,d),dtype=int).sorted_indices()
+    
+    #Get E---
+    Acoo = sp.coo_matrix((np.ones(len(col)),(row, col)),shape=(d,d),dtype=tt)
+    _, _, E, _ = sparseqr.qr(Acoo)
+    E = sparseqr.permutation_vector_to_matrix(E).tocsr()
+    Acsr = sp.csr_matrix((np.arange(len(col),dtype=tt)+1e-4,(row,col)),shape=(d,d),dtype=tt)
+    Acsr = E*Acsr
+    print(np.arange(len(col),dtype=tt)+1e-4)
+    quit()
+
+    Acsr = Acsr.astype(int).sorted_indices()
     
     #here we scrambled the indeces in order to have consistent order with the indptr and colind
     dcsrVal = gpuarray.to_gpu(A[:,Acsr.data].flatten())
-   
-
     dcsrIndPtr = gpuarray.to_gpu(Acsr.indptr)
     dcsrColInd = gpuarray.to_gpu(Acsr.indices)
     _libcusolver.cusolverSpXcsrqrAnalysisBatched(cuso_handle,
@@ -149,28 +160,25 @@ def solve_gpu(row,col,A,d,X,BM,BB,Gbp,SS,P,EB):
                            ctypes.byref(b2)
                            );
 
-    #  print(b2.value/1024/1024)
-    #  print(b1.value/1024/1024)
+    print(b2.value/1024/1024)
+    print(b1.value/1024/1024)
 
     w_buffer = gpuarray.zeros(b2.value, dtype=tt)
     
    
     #Trasnfer to GPU
     BM = gpuarray.to_gpu(np.ascontiguousarray(BM,dtype=tt))
-    #P = gpuarray.to_gpu(np.ascontiguousarray(P,dtype=tt)).ravel()
     P = gpuarray.to_gpu(P).ravel()
-    BB = gpuarray.to_gpu(np.ascontiguousarray(BB,dtype=tt)).ravel()
+    BB = gpuarray.to_gpu(np.ascontiguousarray(BB.flatten(),dtype=tt))
     Gbp = gpuarray.to_gpu(np.ascontiguousarray(Gbp,dtype=tt))
     EB = gpuarray.to_gpu(np.ascontiguousarray(EB,dtype=tt))
     SS = gpuarray.to_gpu(np.ascontiguousarray(SS,dtype=tt))
     X = gpuarray.to_gpu(np.ascontiguousarray(X,dtype=tt)).ravel()
    #--------------------------------   
 
-    for i in range(3):
+    for i in range(1):
     
       #Processing-------------------------------------
-      
-      
       X = X.reshape(((n_batch.value,d)))
       DeltaT = linalg.dot(BM,X).ravel()
       tmp = linalg.dot(X,Gbp,transa='T')
@@ -179,10 +187,11 @@ def solve_gpu(row,col,A,d,X,BM,BB,Gbp,SS,P,EB):
       b = P + Bm + DeltaT
       
       #print('processing',a7 -a1, flush=True) 
-    
+      
       #------------------------------------------------
       X = gpuarray.empty(n_batch.value*d,dtype=tt)
-   
+      #b = gpuarray.empty(n_batch.value*d,dtype=tt)
+      a = time.time() 
       _libcusolver.cusolverSpDcsrqrsvBatched(cuso_handle,
                                  n,
                                  m,
@@ -196,9 +205,8 @@ def solve_gpu(row,col,A,d,X,BM,BB,Gbp,SS,P,EB):
                                  n_batch,
                                  info,
                                  int(w_buffer.gpudata))
-
-      X.get()
-      a = time.time()                       
+                            
+      print(X.get().nonzero())
       kappa = linalg.dot(X,BB)
       print(time.time()-a)
       print(kappa)
@@ -214,3 +222,4 @@ def solve_gpu(row,col,A,d,X,BM,BB,Gbp,SS,P,EB):
     assert(status == 0)
     status = _libcusolver.cusolverSpDestroyCsrqrInfo(info)
     assert(status == 0)
+    print('ebd release')

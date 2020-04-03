@@ -79,7 +79,7 @@ class Plot(object):
       lx = size[0]
       ly = size[1]
       fig = figure(num=" ", figsize=(4*lx/ly, 4), dpi=80, facecolor='w', edgecolor='k')
-      axes([0,0,1.0,1.0])
+      axes([0.,0.,1,1])
       xlim([-lx/2.0,lx/2.0])
       ylim([-ly/2.0,ly/2.0])
      
@@ -88,8 +88,28 @@ class Plot(object):
         if cc == 1:
            color = 'gray'
         else:   
-           color = 'blu'
-        self.plot_elem(self.elems[ne],color=color)
+           color = 'b'
+        self.plot_elem(ne,color=color)
+
+      #plot Boundary Conditions-----
+      if argv.setdefault('plot_boundary',False):
+       for side in self.mesh['side_list']['Boundary'] :
+        p1 = self.mesh['sides'][side][0]
+        p2 = self.mesh['sides'][side][1]
+        n1 = self.mesh['nodes'][p1]
+        n2 = self.mesh['nodes'][p2]
+        plot([n1[0],n2[0]],[n1[1],n2[1]],color='#f77f0e',lw=4)
+     
+       for side in self.mesh['side_list']['Periodic'] + self.mesh['side_list']['Inactive']  :
+        p1 = self.mesh['sides'][side][0]
+        p2 = self.mesh['sides'][side][1]
+        n1 = self.mesh['nodes'][p1]
+        n2 = self.mesh['nodes'][p2]
+        plot([n1[0],n2[0]],[n1[1],n2[1]],color='g',lw=8,zorder=1)
+     
+      show()
+
+
      else:
          from mpl_toolkits.mplot3d import Axes3D 
          from matplotlib.colors import LightSource
@@ -124,8 +144,8 @@ class Plot(object):
 
  def plot_elem(self,ne,color='gray') :
 
+   
     elem = self.mesh['elems'][ne]
-     
     pp = []
     for e in elem:
      pp.append(self.mesh['nodes'][e][:2])
