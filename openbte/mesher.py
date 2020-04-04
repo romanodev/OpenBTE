@@ -21,7 +21,9 @@ class Mesher(object):
     else :
      return self.generate_bulk_3D(argv)
    shape = get_shape(argv)
-   polygons = [translate_shape(shape,i) for i in argv['base']]
+
+   polygons = [translate_shape(shape,i) for i in base]
+
    argv.update({'polygons':np.array(polygons)})
 
   repeat_merge_scale(argv)
@@ -441,7 +443,7 @@ class Mesher(object):
    for k in cold:
     additional_boundary.append(k)
 
-  if argv.setdefault('Periodic',[True,True,True])[1]:
+  if argv.setdefault('Periodic',[True,True,True])[1] and len(upper) > 0:
    strc = r'''Physical Line('Periodic_4') = {'''
    for n in range(len(upper)-1):
     strc += str(upper[n]) + ','

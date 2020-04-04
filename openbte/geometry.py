@@ -17,7 +17,6 @@ class Geometry(object):
      GenerateInterface(**argv) 
   else:
      Mesher(argv) #this create mesh.msh
-     self.elem_mat_map = { i:[0] for i in range(len(self.elems))}
 
   self.compute_mesh_data(**argv)
 
@@ -44,6 +43,7 @@ class Geometry(object):
     #-----------
     #argv.update({'centroids':self.elem_centroids})
     #self.elem_mat_map = CreateCorrelation(**argv)
+    self.elem_mat_map = { i:[0] for i in range(len(self.elems))}
 
     self.data = {'side_list':self.side_list,\
           'n_elems':np.array([self.n_elems]),\
@@ -53,6 +53,8 @@ class Geometry(object):
           'elems':self.elems,\
           'sides':self.sides,\
           'size':self.size,\
+          'lx':argv['lx'],\
+          'ly':argv['ly'],\
           'dim':np.array([self.dim]),\
           'weigths':self.weigths,\
           'kappa_factor':np.array([self.kappa_factor]),\

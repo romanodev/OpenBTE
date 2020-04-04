@@ -107,12 +107,13 @@ def generate_frame(**argv):
 
 
 def translate_shape(shape,base):
-  polygons = shape.copy()  
-  for p in polygons:
-    p[0] += base[0] 
-    p[1] += base[1] 
 
-  return polygons
+  out = []
+  for p in shape:
+    tmp = [p[0] + base[0],p[1] + base[1]]
+    out.append(tmp)
+
+  return out
 
 def repeat_merge_scale(argv):
 

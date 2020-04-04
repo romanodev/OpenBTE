@@ -145,11 +145,71 @@ class Plot(object):
    for n,(variable,direction) in enumerate(zip(variables,directions)):
      with tb.output_to(n): self._plot_data(tri,variable)
 
+ def plot_geometry_2D(self,**argv):
+
+      translate = argv.setdefault('translate',[0,0]) 
+    
+      size = self.mesh['size']
+      frame = self.mesh['frame']
+      for ne in range(len(self.mesh['elems'])):
+        cc =  self.mesh['elem_mat_map'][ne]
+        if cc == 1:
+           color = 'gray'
+        else:   
+           color = 'gray'
+        self.plot_elem(ne,color=color,translate = translate)
+
+
+      if argv.setdefault('plot_boundary',False):
+       #plot Boundary Conditions-----
+       for side in self.mesh['side_list']['Boundary'] :
+        p1 = self.mesh['sides'][side][0]
+        p2 = self.mesh['sides'][side][1]
+        n1 = self.mesh['nodes'][p1] + translate[0]
+        n2 = self.mesh['nodes'][p2] + translate[1]
+        gca().plot([n1[0]+translate[0],n2[0]+translate[0]],[n1[1]+translate[1],n2[1]+translate[1]],color='#f77f0e',lw=2)
+     
+       for side in self.mesh['side_list']['Periodic'] + self.mesh['side_list']['Inactive']  :
+        p1 = self.mesh['sides'][side][0]
+        p2 = self.mesh['sides'][side][1]
+        n1 = self.mesh['nodes'][p1] 
+        n2 = self.mesh['nodes'][p2] 
+        gca().plot([n1[0]+translate[0],n2[0]+translate[0]],[n1[1]+translate[1],n2[1]+translate[1]],color='g',lw=2,zorder=1)
+        
+      gca().axis('off')
+     
+   
+
+
 
  def plot_geometry(self,**argv):
 
      if self.mesh['dim'][0] == 2:
 
+      lx = self.mesh['lx']
+      ly = self.mesh['ly']
+      fig = figure(num=" ", figsize=(4*lx/ly, 4), dpi=80, facecolor='w', edgecolor='k')
+      ax = axes([0.,0.,1,1])
+      nx = argv['nx']
+      ny = argv['ny']
+  
+      ix = int(nx/2)
+      iy = int(ny/2)
+      for i in range(argv['nx']):
+       for j in range(argv['ny']):
+        if i == ix and j ==iy:
+          plot_boundary = argv.setdefault('plot_boundary',False)
+        else:  
+          plot_boundary = False
+
+        self.plot_geometry_2D(translate = [lx*(i-ix),ly*(j-iy)],plot_boundary = plot_boundary)
+
+      ax.set_xlim([-lx/2*nx,lx/2*ny])
+      ax.set_ylim([-ly/2*nx,ly/2*ny])
+      savefig('test.png',dpi=600)
+      show()
+
+      '''
       size = self.mesh['size']
       frame = self.mesh['frame']
       lx = size[0]
@@ -185,8 +245,7 @@ class Plot(object):
       ax.axis('off')
      
       show()
-
-
+      '''
      else:
          from mpl_toolkits.mplot3d import Axes3D 
          from matplotlib.colors import LightSource
@@ -219,15 +278,15 @@ class Plot(object):
          show() 
             
 
- def plot_elem(self,ne,color='gray') :
+ def plot_elem(self,ne,color='gray',translate = [0,0]) :
 
    
     elem = self.mesh['elems'][ne]
     pp = []
     for e in elem:
-     pp.append(self.mesh['nodes'][e][:2])
+     pp.append(self.mesh['nodes'][e][:2] + np.array(translate))
     path = create_path(pp)
-    patch = patches.PathPatch(path,linestyle=None,linewidth=0.5,color=color,zorder=1,joinstyle='miter',alpha=0.7)
+    patch = patches.PathPatch(path,linestyle=None,linewidth=0,color=color,zorder=1,joinstyle='miter',alpha=0.7)
     gca().add_patch(patch)
 
 
