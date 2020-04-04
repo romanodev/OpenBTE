@@ -13,7 +13,7 @@ class Geometry(object):
  def __init__(self,**argv):
   
 
-  if argv['model'] == 'interface':
+  if argv.setdefauly('model','lattice') == 'interface':
      GenerateInterface(**argv) 
   else:
      Mesher(argv) #this create mesh.msh
@@ -42,8 +42,8 @@ class Geometry(object):
     #generate_frame
     frame = generate_frame(**argv)
     #-----------
-    argv.update({'centroids':self.elem_centroids})
-    self.elem_mat_map = CreateCorrelation(**argv)
+    #argv.update({'centroids':self.elem_centroids})
+    #self.elem_mat_map = CreateCorrelation(**argv)
 
     self.data = {'side_list':self.side_list,\
           'n_elems':np.array([self.n_elems]),\
