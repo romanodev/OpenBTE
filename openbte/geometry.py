@@ -13,7 +13,7 @@ class Geometry(object):
  def __init__(self,**argv):
   
 
-  if argv.setdefauly('model','lattice') == 'interface':
+  if argv.setdefault('model','lattice') == 'interface':
      GenerateInterface(**argv) 
   else:
      Mesher(argv) #this create mesh.msh
