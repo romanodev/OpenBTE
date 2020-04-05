@@ -58,9 +58,80 @@ __Local mode__. The file `material.h5` is created from scratch. Depending on the
 Material(model='rta',n_phi=92)
 ```
 In this case, we are using the `rta` model and the designed input file is `rta.h5`. <br>
-The current list of material models, options and designed filenames is [here](../material). <br>
-The format of input files is desribed [here](../format) <br>
-The list of interface to external solver is [here](../interface)
+
+The current list of material models, options and designed filenames is below
+
+## Material Models
+
+|  `model`   | Description    |  File  |   Options     |  
+|:-----------|:---------------|:-------|:--------------|
+|   `full`     | Full scattering operator | `full.h5` | None |
+|   `rta`     | Relaxation time approximation <br> (RTA) | `rta.h5` | `n_phi`: # of polar angles (`48`) <br> `n_theta`: # of azimuthal angles (`24`)  <br> `n_mfp`: # of mean free paths (`50`)|
+|   `rta2D`     | RTA for materials <br> with infinite thickness and <br> two-dimensional (2D) materials| `rta.h5` | `n_phi`: # of polar angles (`48`)  <br> `n_theta`: # of azimuthal angles (`24`)  <br> `n_mfp`: # of mean free paths (`50`)|
+|   `mfp`     | mean-free-path BTE (MFP-BTE)| `mfp.h5` | `n_phi`: # of polar angles (`48`)  <br> `n_theta`: # of azimuthal angles (`24`) <br> `n_mfp`: # of mean free paths (`50`)|
+|   `mfp2DSim`     | MFP-BTE for materials with <br> infinite thickness | `mfp.h5` | `n_phi`: # of polar angles (`48`) <br> `n_mfp`: # of mean free paths (`50`)|
+|   `mfp2D`     | MFP-BTE for 2D materials| `mfp.h5` | `n_phi`: # of polar angles (`48`)   <br> `n_theta`: # of azimuthal angles (`24`)<br> `n_mfp`: # of mean free paths (`50`)|
+|   `gray`     | single MFP| None | `n_phi`: # of polar angles (`48`)   <br> `n_theta`: # of azimuthal angles (`24`) <br> `mfp`: mean free path (m) <br> `kappa`: bulk thermal conductivity (Wm$$^{-1}$$k$$^{-1}$$)|
+|   `gray2Dsim`     | single MFP in materials with <br> infinite thickness| None | `n_phi`: # of polar angles (`48`) <br> `mfp`: mean free path (m) <br> `kappa`: bulk thermal conductivity (Wm$$^{-1}$$k$$^{-1}$$)|
+|   `gray2D`     | single MFP in 2D materials| None | `n_phi`: # of polar angles (`48`) <br> `mfp`: mean free path (m) <br> `kappa`: bulk thermal conductivity (Wm$$^{-1}$$k$$^{-1}$$)|
+|   `fourier`     | Fourier's law| None | `kappa`: bulk thermal conductivity (Wm$$^{-1}$$k$$^{-1}$$)|
+
+## Input files format
+
+Below we report the format for the files `hdf5` files `rta.h5`, `mfp.h5` and `full.h5`. All values are intended to be `numpy` arrays. A good Pythonic option for creating `hdf5` files is the `deepdish` [package](https://deepdish.readthedocs.io/en/latest/io.html)
+
+Here is an example:
+
+```python
+import deepdish as dd
+
+data = {'field1':np.ones(2),'field2':np.ones(3)}
+dd.io.save('file.h5',data)
+```
+
+
+### `mfp.h5`
+
+| Field     | Size     | Units | Description | 
+|:-------------|:------------------|:---------|:---------|
+| `mfp`    | $$N$$      | m  |   MFP ($$N$$: number of MFPs)|
+| `K`    | $$N$$      | Wm$$^{-1}$$K$$^{-1}$$  | discrete MFP distribution |   
+| `kappa`    | $$3 \times 3$$      | Wm$$^{-1}$$K$$^{-1}$$  | bulk thermal conductivity tensor |    
+
+### `full.h5`
+
+| Field     | Size     | Units |  Description |
+|:-------------|:------------------|:---------|:---------|
+| `f`    | $$N$$      | s$$^{-1}$$  | frequency ($$N = N_bN_q$$, where $$N_b:$$ number of branches, $$N_q$$: number of wave vectors) |
+| `alpha`    | $$1$$      | m$$^{-3}$$ | $$VN_q$$ ($$V$$: volume of the unit cell) |
+| `A`     | $$N \times N $$ | s$$^{-1}$$  | scattering operator as Eq. 7 in [this](https://arxiv.org/pdf/2002.08940.pdf) |
+| `v` | $$ N \times 3 $$| ms$$^{-1}$$ | group velocity |
+| `kappa`    | $$3 \times 3$$      | Wm$$^{-1}$$K$$^{-1}$$  | bulk thermal conductivity tensor | 
+
+
+### `rta.h5`
+
+| Field     | Size     | Units |  Description |
+|:-------------|:------------------|:---------|:---------|
+| `f`    | $$N$$      | s$$^{-1}$$  | frequency ($$N = N_bN_q$$, where $$N_b:$$ number of branches, $$N_q$$: number of wave vectors) |
+| `alpha`    | $$1$$      | m$$^{-3}$$ | $$VN_q$$ ($$V$$: volume of the unit cell) |
+| `tauinv`     | $$NN $$ | s$$^{-1}$$  | scattering rates as Eq. 7 in [this](https://arxiv.org/pdf/2002.08940.pdf) |
+| `v` | $$ N \times 3 $$| ms$$^{-1}$$ | group velocity |
+| `kappa`    | $$3 \times 3$$      | Wm$$^{-1}$$K$$^{-1}$$  | bulk thermal conductivity tensor |  
+
+
+## External Solvers
+
+The list of interface to external solves is below
+
+### AlmaBTE
+
+This interface converts the output of [AlmaBTE](http://www.almabte.eu/)'c command `phononinfo` to OpenBTE format and write the file `rta.f5`. Let's assume you have the file `Si_4_4_4_300K.phononinfo` in your current directory. Then simply type
+
+```python
+AlmaBTE2OpenBTE Si_4_4_4_300K.phononinfo
+```
+The created file, `rta.h5`, can be used by a `Material`
 
 # Geometry
 
