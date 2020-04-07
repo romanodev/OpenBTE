@@ -1,14 +1,23 @@
 from __future__ import absolute_import
 import numpy as np
-from .MSolver import *
+#from .MSolver import *
 from scipy.sparse.linalg import splu
 from termcolor import colored, cprint 
 from .utils import *
 import deepdish as dd
+from mpi4py import MPI
+import scipy.sparse as sp
+import time
+
+comm = MPI.COMM_WORLD
+
 
 class Solver(object):
 
   def __init__(self,**argv):
+
+        self.data = argv
+        self.tt = np.float64
 
         #-----IMPORT MESH-------------------
         if 'geometry' in argv.keys():
@@ -25,9 +34,7 @@ class Solver(object):
         self.n_side_per_elem = self.mesh['n_side_per_elem'][0]
 
         #-----IMPORT MATERIAL-------------------
-        #self.mat = load_dictionary('material.h5')
         self.mat = dd.io.load('material.h5')
-
 
         self.kappa = self.mat['kappa']
         self.kappa_vec = np.zeros((len(self.mesh['elems']),3,3))
@@ -37,7 +44,6 @@ class Solver(object):
                 self.kappa_vec[n] = 0.5* np.eye(3)
             else:    
                 self.kappa_vec[n] =  np.eye(3)
-
 
         for i in range(len(self.mesh['elems'])):
           self.kappa_vec[i] = self.kappa*np.eye(3)
@@ -66,123 +72,138 @@ class Solver(object):
    
         self.kappa_factor = self.mesh['kappa_factor'][0]
 
-        if self.verbose: self.print_logo()
+        if comm.rank == 0:
+         if self.verbose: self.print_logo()
   
-        self.assemble_fourier()
-
-        if self.verbose:
-         print('                        SYSTEM INFO                 ')   
-         print(colored(' -----------------------------------------------------------','green'))
-         print(colored('  Space Discretization:                    ','green') + str(self.n_elems))
-         if not self.only_fourier:
-          print(colored('  Momentum Discretization:                 ','green') + str(len(self.tc)))
-         print(colored('  Bulk Thermal Conductivity [W/m/K]:       ','green')+ str(round(self.mat['kappa'][0,0],4)))
+         self.assemble_fourier()
+ 
+         if self.verbose:
+          print('                        SYSTEM INFO                 ')   
+          print(colored(' -----------------------------------------------------------','green'))
+          print(colored('  Space Discretization:                    ','green') + str(self.n_elems))
+          if not self.only_fourier:
+           print(colored('  Momentum Discretization:                 ','green') + str(len(self.tc)))
+          print(colored('  Bulk Thermal Conductivity [W/m/K]:       ','green')+ str(round(self.mat['kappa'][0,0],4)))
 
         #solve fourier
-        data = self.solve_fourier(argv)
-        self.data = data
+        if comm.rank == 0:
+          data = self.solve_fourier(argv)
+        else : data = None
+        self.data = comm.bcast(data,root=0)
         self.data.update({'variables':{'temperature_fourier':'Fourier Temperature [K]','flux_fourier':'Fourier Flux [W/m/m/K]'}})
-        #self.data.update({'variables':{'temperature_fourier':'Fourier Temperature [K]'}})
 
 
-        if self.verbose:
-         print(colored('  Fourier Thermal Conductivity [W/m/K]:    ','green') + str(round(data['kappa_fourier'][0],4)))
-         print(colored(' -----------------------------------------------------------','green'))
+        if comm.rank == 0:
+         if self.verbose:
+          print(colored('  Fourier Thermal Conductivity [W/m/K]:    ','green') + str(round(data['kappa_fourier'][0],4)))
+          print(colored(' -----------------------------------------------------------','green'))
 
-        if argv.setdefault('only_fourier'):
-         #save_dictionary(self.data,'solver.h5')
-         dd.io.save('solver.h5',self.data)
-        else:
-         #if argv.setdefault('gpu',False):
-         # self.solve_bte_gpu(**argv)
-         #else:
-          data = self.solve_bte(**argv)
-          self.data.update(data)
-          self.data.update({'variables':{'temperature':'BTE Temperature [K]','flux':'BTE Flux [W/m/m/K]'}})
-          #save_dictionary(self.data,'solver.h5')
-          dd.io.save('solver.h5',self.data)
+        #Assemble BTE
+        if comm.rank == 0:
+         a = time.time()   
+         data = self.assemble_bte(**argv)
+         #print(time.time()-a)
+        else : data = None
+        data = comm.bcast(data,root=0)
+        self.data.update(data)
 
-        if self.verbose:
-         print(' ')   
-         print(colored('                 OpenBTE ended successfully','green'))
-         print(' ')   
+        data = self.solve_bte()
+        #self.data.update({'variables':{'temperature':'BTE Temperature [K]','flux':'BTE Flux [W/m/m/K]'}})
+
+        if comm.rank == 0:
+         #dd.io.save('solver.h5',self.data)
+         if self.verbose:
+          print(' ')   
+          print(colored('                 OpenBTE ended successfully','green'))
+          print(' ')  
 
 
-  def solve_bte(self,**argv):
-
-     if self.verbose:
-      print()
-      print('      Iter    Thermal Conductivity [W/m/K]      Error ''')
-      print(colored(' -----------------------------------------------------------','green'))
-
-     temp_fourier = self.data['temperature_fourier']
-     Tnew = temp_fourier.copy()
-     TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
+  def assemble_bte(self,**argv):
 
      #Main matrix----------------------------------------------
      G = np.einsum('qj,jn->qn',self.VMFP,self.mesh['k'],optimize=True)
      Gp = G.clip(min=0); Gm = G.clip(max=0)
      D = np.ones((self.n_index,self.n_elems))
      for n,i in enumerate(self.mesh['i']): D[:,i] += Gp[:,n]
-
      
      #Compute boundary-----------------------------------------------
-     Bm = np.zeros((self.n_index,self.n_elems))
+     #Bm = np.zeros((self.n_index,self.n_elems))
+     data = {}
      if len(self.mesh['db']) > 0:
       Gb = np.einsum('qj,jn->qn',self.VMFP,self.mesh['db'],optimize=True)
       Gbp = Gb.clip(min=0);Gbm2 = Gb.clip(max=0)
       for n,(i,j) in enumerate(zip(self.mesh['eb'],self.mesh['sb'])):
          D[:,i]  += Gbp[:,n]
-         Bm[:,i] -= TB[i,j]*Gbm2[:,n]
+      #   Bm[:,i] -= TB[i,j]*Gbm2[:,n]
       Gb = np.einsum('qj,jn->qn',self.sigma,self.mesh['db'],optimize=True)
       Gbp = Gb.clip(min=0); Gbm = Gb.clip(max=0)
       SS = np.einsum('qc,c->qc',Gbm2,1/Gbm.sum(axis=0))
+      data.update({'SS':SS,'Gbp':Gbp})
      #---------------------------------------------------------------
-
-     i = np.concatenate((self.mesh['i'],list(np.arange(self.n_elems))))
-     j = np.concatenate((self.mesh['j'],list(np.arange(self.n_elems))))
+     im = np.concatenate((self.mesh['i'],list(np.arange(self.n_elems))))
+     jm = np.concatenate((self.mesh['j'],list(np.arange(self.n_elems))))
      A = np.concatenate((Gm,D),axis=1)
-     ms = MultiSolver(i,j,A,self.n_elems)
+     data.update({'A':A,'im':im,'jm':jm})
 
      #Periodic------------------
      P = np.zeros((self.n_index,self.n_elems))
      for n,(i,j) in enumerate(zip(self.mesh['i'],self.mesh['j'])): P[:,i] -= Gm[:,n]*self.mesh['B'][i,j]
-
+     data.update({'P':P})
+     
      BB = -np.outer(self.sigma[:,0],np.sum(self.mesh['B_with_area_old'],axis=0))*self.kappa_factor*1e-18
+     data.update({'BB':BB})
 
-     #---------------------------------------------
+     return data
+
+
+  def solve_bte(self):
+  
+    if comm.rank == 0:   
+     if self.verbose:
+      print()
+      print('      Iter    Thermal Conductivity [W/m/K]      Error ''')
+      print(colored(' -----------------------------------------------------------','green'))
+
+      a = time.time()
+
+      lu = {i:sp.linalg.splu(sp.csc_matrix((self.data['A'][i],(self.data['im'],self.data['jm'])),shape=(self.n_elems,self.n_elems),dtype=self.tt)   ) \
+                                   for i in range(self.n_index) }
+      #print(time.time()-a)
+
+
+      #for i in range(self.n_index):
+      # S = sp.csc_matrix((self.data['A'][i],(self.data['im'],self.data['jm'])),shape=(self.n_elems,self.n_elems),dtype=self.tt)
+      # lu = sp.linalg.splu(S,permc_spec='COLAMD')
+      # self.lu.update({i:lu})
+    
+     X = np.tile(self.data['temperature_fourier'],(self.n_index,1))
+     X_old = X.copy()
      kappa_vec = [self.data['kappa_fourier'][0]]
-     miter = argv.setdefault('max_bte_iter',100)
-     merror = argv.setdefault('max_bte_error',1e-4)
-     alpha = argv.setdefault('alpha',1)
-
+     kappa_old = kappa_vec[-1]
+     alpha = self.data.setdefault('alpha',1)
      error = 1
      kk = 0
 
-     #---------------------
-     X = np.tile(Tnew,(self.n_index,1))
-     DeltaT = X
-     X_old = X.copy()
-     alpha = 1
-     kappa_old = kappa_vec[-1]
-     while kk < miter and error > merror:
+     Bm = np.zeros((self.n_index,self.n_elems))
+     while kk < self.data.setdefault('max_bte_iter',100) and error > self.data.setdefault('max_bte_error',1e-2):
 
-      X_old = X.copy()
-
-      if self.coll:
-       DeltaT = np.matmul(self.BM,alpha*X+(1-alpha)*X_old) 
-       X = ms.solve(P + Bm + DeltaT)
-      else: 
-       DeltaT = np.dot(X.T,self.ac)
-       X = ms.solve(P + Bm,common = DeltaT)
-
-      kappa = np.sum(np.multiply(BB,X))
-
-      kk +=1
+      #Boundary-----   
       if len(self.mesh['db']) > 0:
        Bm = np.zeros((self.n_index,self.n_elems))   
        for n,i in enumerate(self.mesh['eb']): 
-         Bm[:,i] +=np.einsum('u,u,q->q',X[:,i],Gbp[:,n],SS[:,n],optimize=True)
+         Bm[:,i] +=np.einsum('u,u,q->q',X[:,i],self.data['Gbp'][:,n],self.data['SS'][:,n],optimize=True)
+      #---------------------
+
+      if self.coll:
+       DeltaT = np.matmul(self.BM,alpha*X+(1-alpha)*X_old) 
+       X = np.array([lu[i].solve(DeltaT[i] + self.data['P'][i] + Bm[i] ) for i in range(self.n_index)])
+      else: 
+       DeltaT = np.dot(X.T,self.ac)
+       X = np.array([lu[i].solve(DeltaT + self.data['P'][i] + Bm[i] ) for i in range(self.n_index)])
+
+      kappa = np.sum(np.multiply(self.data['BB'],X))
+
+      kk +=1
 
       error = abs(kappa_old-kappa)/abs(kappa)
       kappa_old = kappa

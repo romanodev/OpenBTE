@@ -74,12 +74,25 @@ def generate_mfp(**argv):
 
 
    #replicate bulk values---
-  
+   #kappa = np.zeros((3,3))
+   #for t in range(n_theta): 
+   #  for p in range(n_phi): 
+   #   for m in range(n_mfp): 
+   #     index = t * n_mfp * n_phi + p * n_mfp + m
+   #     tmp = kappa_directional[index]
+   #     kappa += np.outer(tmp,direction_ave[t,p])*mfp_sampled[m]
+   #print(kappa)
+   #------------------
+
+
+   #kappa = np.zeros((3,3))
    direction = direction_ave.reshape((n_theta * n_phi,3))
-   direction = np.tile(direction,(n_mfp,1))
+   direction = np.array([np.repeat(direction[:,i],n_mfp) for i in range(3)]).T
    mfp = np.tile(mfp_sampled,n_phi*n_theta)  
    F = np.einsum('i,ij->ij',mfp,direction)
-
+   #for g,f in zip(kappa_directional,F):
+   #   kappa += np.outer(g,f) 
+  
    tc = temp_coeff/np.sum(temp_coeff)
 
 

@@ -11,7 +11,6 @@ from matplotlib.colors import Colormap
 #import os.path
 from  matplotlib import cm
 from matplotlib.tri import Triangulation
-from google.colab import widgets
 from .utils import *
 import deepdish as dd
 
@@ -137,6 +136,7 @@ class Plot(object):
 
  def plot_maps(self,**argv):
 
+   from google.colab import widgets
 
    tri = Triangulation(self.mesh['nodes'][:,0],self.mesh['nodes'][:,1], triangles=self.mesh['elems'], mask=None)
 
