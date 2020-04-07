@@ -656,13 +656,24 @@ class Geometry(object):
    
     #select flux sides-------------------------------
     self.flux_sides = [] #where flux goes
-    area_flux = 0
     for ll in self.side_list['Periodic']:
      normal = self.compute_side_normal(self.side_elem_map[ll][0],ll)
      tmp = np.abs(np.dot(normal,flux_dir))
      if tmp > delta : #either negative or positive
-       area_flux += self.side_areas[ll]
+       if normal[0] == 1:
+           if self.dim == 2:  
+            area_flux = self.size[1]
+           else: 
+            area_flux = self.size[1]*self.size[2]
+
+       elif normal[1] == 1:
+           if self.dim == 2:  
+            area_flux = self.size[0]
+           else: 
+            area_flux = self.size[0]*self.size[2]
+
        self.flux_sides.append(ll)
+
     #-----------------------------------------------
     #----------------------------------------------------------------
     self.side_periodic_value = side_periodic_value
