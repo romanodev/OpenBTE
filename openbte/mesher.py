@@ -141,27 +141,27 @@ class Mesher(object):
 
   boundary_surfaces = []
   if argv.setdefault('Periodic',[True,True,True])[0]:
-   strc = r'''Physical Surface('Periodic_1') = {3} ;''' + '\n'
+   strc = r'''Physical Surface('Periodic_1') = {5} ;''' + '\n'
    store.write(strc)
-   strc = r'''Physical Surface('Periodic_2') = {5} ;''' + '\n'
+   strc = r'''Physical Surface('Periodic_2') = {3} ;''' + '\n'
    store.write(strc)
   else:
    boundary_surfaces.append(3)
    boundary_surfaces.append(5)
 
   if argv.setdefault('Periodic',[True,True,True])[1]:
-   strc = r'''Physical Surface('Periodic_3') = {4} ;''' + '\n'
+   strc = r'''Physical Surface('Periodic_3') = {6} ;''' + '\n'
    store.write(strc)
-   strc = r'''Physical Surface('Periodic_4') = {6} ;''' + '\n'
+   strc = r'''Physical Surface('Periodic_4') = {4} ;''' + '\n'
    store.write(strc)
   else:
    boundary_surfaces.append(4)
    boundary_surfaces.append(6)
 
   if argv.setdefault('Periodic',[True,True,True])[2]:
-   strc = r'''Physical Surface('Periodic_5') = {1} ;''' + '\n'
+   strc = r'''Physical Surface('Periodic_5') = {2} ;''' + '\n'
    store.write(strc)
-   strc = r'''Physical Surface('Periodic_6') = {2} ;''' +'\n'
+   strc = r'''Physical Surface('Periodic_6') = {1} ;''' +'\n'
    store.write(strc)
   else:
    boundary_surfaces.append(1)
@@ -180,7 +180,8 @@ class Mesher(object):
    store.write(strc)
 
 
-   store.close()
+  store.close()
+  subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-n','-3','mesh.geo','-o','mesh.msh'])
 
  
 
@@ -566,7 +567,7 @@ class Mesher(object):
   self.loops = np.array(self.loops)
   
   self.apply_periodic_mesh()
-  
+ 
   self.write_geo()
 
      
