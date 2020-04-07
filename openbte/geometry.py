@@ -11,7 +11,6 @@ from .GenerateInterface import *
 class Geometry(object):
 
  def __init__(self,**argv):
-  
 
   if argv.setdefault('model','lattice') == 'interface':
      GenerateInterface(**argv) 
@@ -19,6 +18,13 @@ class Geometry(object):
      Mesher(argv) #this create mesh.msh
 
   self.compute_mesh_data(**argv)
+
+ def compute_node_map(self,**argv):
+
+   self.conn = np.zeros(len(self.nodes))
+   for k,e in enumerate(self.elems):
+     for n in e:
+      self.conn[n] +=1
 
 
  def compute_mesh_data(self,**argv):
@@ -34,6 +40,7 @@ class Geometry(object):
     self.compute_interpolation_weigths()
     self.compute_dists()
     self.compute_boundary_condition_data(argv)
+    self.compute_node_map()
     self.n_elems = len(self.elems)
 
     #generate_elem_mat_map
@@ -45,6 +52,7 @@ class Geometry(object):
     #self.elem_mat_map = CreateCorrelation(**argv)
     self.elem_mat_map = { i:[0] for i in range(len(self.elems))}
 
+
     self.data = {'side_list':self.side_list,\
           'n_elems':np.array([self.n_elems]),\
           'elem_side_map':self.elem_side_map,\
@@ -54,6 +62,7 @@ class Geometry(object):
           'sides':self.sides,\
           'size':self.size,\
           'lx':argv['lx'],\
+          'conn':self.conn,\
           'ly':argv['ly'],\
           'dim':np.array([self.dim]),\
           'weigths':self.weigths,\
@@ -86,8 +95,8 @@ class Geometry(object):
 
 
     if argv.setdefault('save',True):
-     save_dictionary(self.data,'geometry.h5')
-     #dd.io.save('geometry.h5',self.data)
+     #save_dictionary(self.data,'geometry.h5')
+     dd.io.save('geometry.h5',self.data)
 
  def compute_dists(self):
   self.dists= {}   
@@ -533,7 +542,7 @@ class Geometry(object):
     if self.dim == 3:
      #from here: http://geomalgorithms.com/a05-_intersect-1.html
      u = P1 - P0
-     n = self.get_side_normal(1,ll)
+     n = self.side_normals[ll,1]
      node = self.nodes[self.sides[ll][0]]
      w = P0 - node
      s = -np.dot(n,w)/np.dot(n,u)

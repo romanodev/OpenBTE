@@ -14,12 +14,15 @@ class MultiSolver(object):
       lu = sp.linalg.splu(S,permc_spec='COLAMD')
       self.lu.update({i:lu})
     
-  def solve(self,B):
+  def solve(self,B,common = []):
 
    B = B.astype(self.tt)
    x = np.zeros_like(B) 
    for i in self.lu.keys():
-     x[i] = self.lu[i].solve(B[i])
+     RHS = B[i]
+     if len(common) > 0:
+       RHS += common  
+     x[i] = self.lu[i].solve(RHS)
    return x
 
 

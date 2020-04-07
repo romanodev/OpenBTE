@@ -175,7 +175,7 @@ def generate_full(**argv):
  kappa_initial = data['kappa'] 
 
 
- data = {'temp':tc,'B':Wod,'F':F,'G':sigma,'kappa':kappa,'scale':1/a}
+ data = {'temp':tc,'B':Wod,'F':F,'G':sigma,'kappa':kappa,'scale':1/a,'ac':np.zeros(nm)}
 
  return data
 

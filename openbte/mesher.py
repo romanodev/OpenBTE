@@ -7,6 +7,7 @@ import numpy as np
 from .shape import *
 from .utils import *
 import subprocess
+import os
 
 class Mesher(object):
 
@@ -15,7 +16,7 @@ class Mesher(object):
   if argv.setdefault('model','lattice') == 'lattice':   
    #create polygons-----
    base = argv.setdefault('base',[[0,0]])
-   if len(base) == 0:
+   if len(base) == 0 :
     if argv.setdefault('lz',0) == 0:
      return self.generate_bulk_2D(argv)
     else :
@@ -273,8 +274,8 @@ class Mesher(object):
 
 #-------------------------------------------------------
   store.close()
-  subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-2','mesh.geo','-o','mesh.msh'])
 
+  subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-2','mesh.geo','-o','mesh.msh'])
 
 
 
@@ -505,7 +506,6 @@ class Mesher(object):
 #-------------------------------------------------------
   store.close()
   subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-2','mesh.geo','-o','mesh.msh'])
-  #subprocess.check_output(['gmsh','-optimize_netgen','-save_all','-format','msh2','-2','mesh.geo','-o','mesh.msh'])
 
  def FindPeriodic(self,control,others,points,lines):
   
@@ -628,7 +628,6 @@ class Mesher(object):
     
     ind.append(self.lines[abs(n)-1][i])
 
-
    return np.array(pts),ind
      
      
@@ -641,7 +640,6 @@ class Mesher(object):
          (a,per) = self.isperiodic(s1,s2)
          if not a == None and self.argv['Periodic'][a]:
            
-          
            corr = {}
            pts1,ind1 = self.get_points_from_surface(s1)
            pts2,ind2 = self.get_points_from_surface(s2)
@@ -770,12 +768,12 @@ class Mesher(object):
      value[0] += nl+nll
      tt = key +  nl + nll
      if np.array_equal(np.array([1,0,0]),value[3]) : 
-        vec.setdefault(1,[]).append(value[0]) 
-        vec.setdefault(2,[]).append(tt) 
+        vec.setdefault(2,[]).append(value[0]) 
+        vec.setdefault(1,[]).append(tt) 
      
      if np.array_equal(np.array([-1,0,0]),value[3]): 
-        vec.setdefault(1,[]).append(tt) 
-        vec.setdefault(2,[]).append(value) 
+        vec.setdefault(2,[]).append(tt) 
+        vec.setdefault(1,[]).append(value) 
         
      if np.array_equal(np.array([0,1,0]),value[3]) : 
         vec.setdefault(3,[]).append(value[0]) 
@@ -832,7 +830,7 @@ class Mesher(object):
     store.write(strc) 
 
    store.close()
-   subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-3','mesh.geo','-o','mesh.msh'])
+   subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-n','-3','mesh.geo','-o','mesh.msh'])
 
  def line_exists_ordered(self,p1,p2):
      

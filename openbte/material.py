@@ -6,7 +6,9 @@ from .database import *
 from matplotlib.pylab import *
 from .full_model import generate_full
 from .utils import *
-from .mfp_model import generate_mfp
+from .mfp2DSym import *
+from .mfp import *
+import deepdish as dd
 
 class Material(object):
 
@@ -22,10 +24,15 @@ class Material(object):
       download_file(db['entry_name'],'material.h5')
 
    elif model == 'full':
-      save_dictionary(generate_full(**argv),'material.h5')
+      dd.io.save('material.h5',generate_full(**argv)) 
+
+   elif model == 'mfp2DSym':
+      dd.io.save('material.h5',generate_mfp2DSym(**argv)) 
 
    elif model == 'mfp':
-      save_dictionary(generate_mfp(**argv),'filename.h5')
+      dd.io.save('material.h5',generate_mfp(**argv)) 
+
+
 
    #if argv.setdefault('check_kappa',False):
    #    if argv['model'] == 'full':

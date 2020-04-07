@@ -194,4 +194,42 @@ def repeat_merge_scale(argv):
 
   argv['polygons'] = new_poly
 
+def get_linear_indexes(mfp,value,scale,extent):
+
+   if value == 0:
+     return -1,-1,-1,-1
+
+   n = len(mfp)
+
+   found = False
+   beyond = False
+   if extent:
+    if value < mfp[0]:
+      beyond = True
+      found = True
+      i=0;j=1;
+    elif value > mfp[-1]:
+      i=n-2;j=n-1;
+      beyond = True
+      found = True
+   if beyond == False:
+    for m in range(n-1):
+
+      if (value <= mfp[m+1]) and (value >= mfp[m]) :
+        i = m; j= m+1 
+        found = True
+        break
+  
+   if found == False:
+      print('no interpolation found')
+   else:  
+    aj = (value-mfp[i])/(mfp[j]-mfp[i]) #OK.
+    ai = 1-aj
+
+    if scale=='inverse':
+     ai *=mfp[i]/value
+     aj *=mfp[j]/value
+   return i,ai,j,aj  
+
+
 

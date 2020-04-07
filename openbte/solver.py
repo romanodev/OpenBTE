@@ -1,10 +1,10 @@
 from __future__ import absolute_import
 import numpy as np
 from .MSolver import *
-from .MSolverGPU import *
 from scipy.sparse.linalg import splu
 from termcolor import colored, cprint 
 from .utils import *
+import deepdish as dd
 
 class Solver(object):
 
@@ -14,7 +14,8 @@ class Solver(object):
         if 'geometry' in argv.keys():
          self.mesh = argv['geometry'].data
         else: 
-         self.mesh = load_dictionary('geometry.h5')
+         #self.mesh = load_dictionary('geometry.h5')
+         self.mesh = dd.io.load('geometry.h5')
 
         self.n_elems = self.mesh['n_elems'][0]
 
@@ -24,7 +25,10 @@ class Solver(object):
         self.n_side_per_elem = self.mesh['n_side_per_elem'][0]
 
         #-----IMPORT MATERIAL-------------------
-        self.mat = load_dictionary('material.h5')
+        #self.mat = load_dictionary('material.h5')
+        self.mat = dd.io.load('material.h5')
+
+
         self.kappa = self.mat['kappa']
         self.kappa_vec = np.zeros((len(self.mesh['elems']),3,3))
 
@@ -43,10 +47,18 @@ class Solver(object):
          self.only_fourier = False
          self.tc = self.mat['temp']
          self.n_index = len(self.tc)
-         tmp = self.mat['B']
-         if np.allclose(tmp, np.tril(tmp)):
-          tmp += tmp.T - 0.5*np.diag(np.diag(tmp))
-         self.BM = np.einsum('i,ij->ij',self.mat['scale'],tmp)
+         #Get collision matrix------------------------------------
+         if len(self.mat['B']) == 0:
+           self.coll = False
+           self.ac = self.mat['ac']
+         else:  
+           self.coll = True
+           tmp = self.mat['B']
+           if np.allclose(tmp, np.tril(tmp)):
+            tmp += tmp.T - 0.5*np.diag(np.diag(tmp))
+           self.BM = np.einsum('i,ij->ij',self.mat['scale'],tmp)
+         #-------------------------------------------------------
+
          self.sigma = self.mat['G']*1e9
          self.VMFP = self.mat['F']*1e9
          self.n_index = len(self.tc)
@@ -56,7 +68,6 @@ class Solver(object):
 
         if self.verbose: self.print_logo()
   
-        
         self.assemble_fourier()
 
         if self.verbose:
@@ -70,20 +81,26 @@ class Solver(object):
         #solve fourier
         data = self.solve_fourier(argv)
         self.data = data
+        self.data.update({'variables':{'temperature_fourier':'Fourier Temperature [K]','flux_fourier':'Fourier Flux [W/m/m/K]'}})
+        #self.data.update({'variables':{'temperature_fourier':'Fourier Temperature [K]'}})
+
 
         if self.verbose:
          print(colored('  Fourier Thermal Conductivity [W/m/K]:    ','green') + str(round(data['kappa_fourier'][0],4)))
          print(colored(' -----------------------------------------------------------','green'))
 
         if argv.setdefault('only_fourier'):
-         save_dictionary(self.data,'solver.h5')
+         #save_dictionary(self.data,'solver.h5')
+         dd.io.save('solver.h5',self.data)
         else:
-         if argv.setdefault('gpu',False):
-          self.solve_bte_gpu(**argv)
-         else:
+         #if argv.setdefault('gpu',False):
+         # self.solve_bte_gpu(**argv)
+         #else:
           data = self.solve_bte(**argv)
           self.data.update(data)
-          save_dictionary(self.data,'solver.h5')
+          self.data.update({'variables':{'temperature':'BTE Temperature [K]','flux':'BTE Flux [W/m/m/K]'}})
+          #save_dictionary(self.data,'solver.h5')
+          dd.io.save('solver.h5',self.data)
 
         if self.verbose:
          print(' ')   
@@ -150,9 +167,15 @@ class Solver(object):
      kappa_old = kappa_vec[-1]
      while kk < miter and error > merror:
 
-      DeltaT = np.matmul(self.BM,alpha*X+(1-alpha)*X_old) 
       X_old = X.copy()
-      X = ms.solve(P + Bm + DeltaT)
+
+      if self.coll:
+       DeltaT = np.matmul(self.BM,alpha*X+(1-alpha)*X_old) 
+       X = ms.solve(P + Bm + DeltaT)
+      else: 
+       DeltaT = np.dot(X.T,self.ac)
+       X = ms.solve(P + Bm,common = DeltaT)
+
       kappa = np.sum(np.multiply(BB,X))
 
       kk +=1
@@ -174,80 +197,6 @@ class Solver(object):
      J = np.einsum('qj,qc->cj',self.sigma,X)*1e-9
      return {'kappa_vec':kappa_vec,'temperature':T,'flux':J}
 
-
-  def solve_bte_gpu(self,**argv):
-
-     if self.verbose:
-      print()
-      print('      Iter    Thermal Conductivity [W/m/K]      Error ''')
-      print(colored(' -----------------------------------------------------------','green'))
-
-     temp_fourier = self.data['temperature_fourier']
-     Tnew = temp_fourier.copy()
-     TB = np.tile(temp_fourier,(self.n_side_per_elem,1)).T
-
-     #Main matrix----------------------------------------------
-     G = np.einsum('qj,jn->qn',self.VMFP,self.mesh['k'],optimize=True)
-     Gp = G.clip(min=0); Gm = G.clip(max=0)
-     D = np.ones((self.n_index,self.n_elems))
-     for n,i in enumerate(self.mesh['i']): D[:,i] += Gp[:,n]
-
-     
-     #Compute boundary-----------------------------------------------
-     Bm = np.zeros((self.n_index,self.n_elems))
-     if len(self.mesh['db']) > 0:
-      Gb = np.einsum('qj,jn->qn',self.VMFP,self.mesh['db'],optimize=True)
-      Gbp = Gb.clip(min=0);Gbm2 = Gb.clip(max=0)
-      for n,(i,j) in enumerate(zip(self.mesh['eb'],self.mesh['sb'])):
-         D[:,i]  += Gbp[:,n]
-         Bm[:,i] -= TB[i,j]*Gbm2[:,n]
-      Gb = np.einsum('qj,jn->qn',self.sigma,self.mesh['db'],optimize=True)
-      Gbp = Gb.clip(min=0); Gbm = Gb.clip(max=0)
-      SS = np.einsum('qc,c->qc',Gbm2,1/Gbm.sum(axis=0))
-     #---------------------------------------------------------------
-
-     i = np.concatenate((self.mesh['i'],list(np.arange(self.n_elems))))
-     j = np.concatenate((self.mesh['j'],list(np.arange(self.n_elems))))
-     A = np.concatenate((Gm,D),axis=1)
-
-     #Periodic------------------
-     P = np.zeros((self.n_index,self.n_elems))
-     for n,(i,j) in enumerate(zip(self.mesh['i'],self.mesh['j'])): P[:,i] -= Gm[:,n]*self.mesh['B'][i,j]
-
-     BB = -np.outer(self.sigma[:,0],np.sum(self.mesh['B_with_area_old'],axis=0))*self.kappa_factor*1e-18
-
-     #---------------------------------------------
-     kappa_vec = [self.data['kappa_fourier'][0]]
-     miter = argv.setdefault('max_bte_iter',100)
-     merror = argv.setdefault('max_bte_error',1e-4)
-     alpha = argv.setdefault('alpha',1)
-
-     error = 1
-     kk = 0
-
-     #---------------------
-     X = np.tile(Tnew,(self.n_index,1))
-     #DeltaT = X
-     X_old = X.copy()
-     alpha = 1
-     kappa_old = kappa_vec[-1]
-
-     #Crate boundary matrix---
-     EB = np.zeros((self.n_elems,len(self.mesh['eb'])))
-     for n,s in enumerate(self.mesh['eb']): EB[s,n] = 1
-     #------------------------
-     
-     ms = MGPU.solve_gpu(i,j,A,self.n_elems,X_old,self.BM,BB,Gbp,SS,P,EB)
-
-     #while kk < miter and error > merror:
-      
-     if self.verbose:
-      print(colored(' -----------------------------------------------------------','green'))
-
-     ms.release()
-     #T = np.einsum('qc,q->c',X,self.tc)
-     #J = np.einsum('qj,qc->cj',self.sigma,X)*1e-9
-     #return {'kappa_vec':kappa_vec,'temperature':T,'flux':J}
 
 
   def get_decomposed_directions(self,i,j,rot=np.eye(3)):
@@ -289,7 +238,6 @@ class Solver(object):
       (i,j) = self.mesh['side_elem_map'][ll]
       vi = self.mesh['volumes'][i]
       vj = self.mesh['volumes'][j]
-#      kappa = self.mat['kappa']
       kappa = self.get_kappa(i,j,ll)
       if not i == j:
        (v_orth,dummy) = self.get_decomposed_directions(i,j,rot=kappa)
@@ -300,13 +248,6 @@ class Solver(object):
        if  ll in self.mesh['side_list']['Periodic']:
         B[i] += self.mesh['periodic_values'][i][j][0]*v_orth/vi*area
         B[j] += self.mesh['periodic_values'][j][i][0]*v_orth/vj*area
-      #else:
-       #if ll in self.mesh['side_list']['Hot']:
-       # F[li,li] += v_orth/vi*area
-       # B[li] += v_orth/vi*0.5*area
-       #if ll in self.mesh['side_list']['Cold']:
-       # F[li,li] += v_orth/vi*area
-       # B[li] -= v_orth/vi*0.5*area
     self.fourier = {'A':F.tocsc(),'B':B}
     
 
@@ -414,7 +355,9 @@ class Solver(object):
     (i,j) = self.mesh['side_elem_map'][l]
     #(v_orth,v_non_orth) = self.get_decomposed_directions(i,j,rot=self.mat['kappa'])
     (v_orth,v_non_orth) = self.get_decomposed_directions(i,j,rot=self.get_kappa(i,j,l))
-    kappa -= v_orth *  (temp[i] - temp[j] - 1) * self.mesh['areas'][l]
+
+    deltaT = temp[i] - temp[j] - 1
+    kappa -= v_orth *  deltaT * self.mesh['areas'][l]
     w  = self.mesh['interp_weigths'][l][0]
     grad_ave = w*gradT[i] + (1.0-w)*gradT[j]
     kappa += np.dot(grad_ave,v_non_orth)/2 * self.mesh['areas'][l]
