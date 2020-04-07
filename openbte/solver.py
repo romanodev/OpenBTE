@@ -91,7 +91,10 @@ class Solver(object):
           data = self.solve_fourier(argv)
         else : data = None
         self.data = comm.bcast(data,root=0)
-        self.state.update({'variables':{'temperature_fourier':'Fourier Temperature [K]','flux_fourier':'Fourier Flux [W/m/m/K]'}})
+        self.state.update({'variables':{'temperature_fourier':'Fourier Temperature [K]','flux_fourier':'Fourier Flux [W/m/m/K]'},\
+                           'kappa_fourier':self.data['kappa_fourier'],\
+                           'temperature_fourier':data['temperature_fourier'],\
+                           'flux_fourier':data['flux_fourier']})
 
 
         if comm.rank == 0:
@@ -109,7 +112,10 @@ class Solver(object):
         self.data.update(data)
 
         data = self.solve_bte()
-        self.state.update({'variables':{'temperature':'BTE Temperature [K]','flux':'BTE Flux [W/m/m/K]'}})
+        self.state.update({'variables':{'temperature':'BTE Temperature [K]','flux':'BTE Flux [W/m/m/K]'},\
+                           'kappa':data['kappa_vec'],\
+                           'temperature':data['temperature'],\
+                           'flux':data['flux']})
 
         if comm.rank == 0:
          dd.io.save('solver.h5',self.state)
