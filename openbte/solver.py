@@ -18,6 +18,7 @@ class Solver(object):
 
         self.data = argv
         self.tt = np.float64
+        self.state = {}
 
         #-----IMPORT MESH-------------------
         if 'geometry' in argv.keys():
@@ -90,7 +91,7 @@ class Solver(object):
           data = self.solve_fourier(argv)
         else : data = None
         self.data = comm.bcast(data,root=0)
-        self.data.update({'variables':{'temperature_fourier':'Fourier Temperature [K]','flux_fourier':'Fourier Flux [W/m/m/K]'}})
+        self.state.update({'variables':{'temperature_fourier':'Fourier Temperature [K]','flux_fourier':'Fourier Flux [W/m/m/K]'}})
 
 
         if comm.rank == 0:
@@ -108,10 +109,10 @@ class Solver(object):
         self.data.update(data)
 
         data = self.solve_bte()
-        #self.data.update({'variables':{'temperature':'BTE Temperature [K]','flux':'BTE Flux [W/m/m/K]'}})
+        self.state.update({'variables':{'temperature':'BTE Temperature [K]','flux':'BTE Flux [W/m/m/K]'}})
 
         if comm.rank == 0:
-         #dd.io.save('solver.h5',self.data)
+         dd.io.save('solver.h5',self.state)
          if self.verbose:
           print(' ')   
           print(colored('                 OpenBTE ended successfully','green'))
@@ -170,12 +171,6 @@ class Solver(object):
                                    for i in range(self.n_index) }
       #print(time.time()-a)
 
-
-      #for i in range(self.n_index):
-      # S = sp.csc_matrix((self.data['A'][i],(self.data['im'],self.data['jm'])),shape=(self.n_elems,self.n_elems),dtype=self.tt)
-      # lu = sp.linalg.splu(S,permc_spec='COLAMD')
-      # self.lu.update({i:lu})
-    
      X = np.tile(self.data['temperature_fourier'],(self.n_index,1))
      X_old = X.copy()
      kappa_vec = [self.data['kappa_fourier'][0]]

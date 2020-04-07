@@ -6,7 +6,8 @@ import matplotlib
 be = matplotlib.get_backend()
 if not be=='nbAgg' and not be=='module://ipykernel.pylab.backend_inline':
  if not be == 'Qt5Agg': matplotlib.use('Qt5Agg')
-import matplotlib.pylab as plt
+#import matplotlib.pylab as plt
+from matplotlib.pylab import *
 from matplotlib.colors import Colormap
 #import os.path
 from  matplotlib import cm
@@ -23,7 +24,6 @@ class Plot(object):
     self.mesh = argv['geometry'].data
    else: 
     if os.path.isfile('geometry.h5') :   
-     #self.mesh = load_dictionary('geometry.h5')
      self.mesh = dd.io.load('geometry.h5')
 
 
