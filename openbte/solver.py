@@ -49,9 +49,8 @@ class Solver(object):
         for i in range(len(self.mesh['elems'])):
           self.kappa_vec[i] = self.kappa*np.eye(3)
          
-        self.only_fourier = True
-        if not argv.setdefault('only_fourier',False):
-         self.only_fourier = False
+        self.only_fourier = argv.setdefault('only_fourier',False)
+        if not self.only_fourier:
          self.tc = self.mat['temp']
          self.n_index = len(self.tc)
          #Get collision matrix------------------------------------
@@ -66,6 +65,8 @@ class Solver(object):
            self.BM = np.einsum('i,ij->ij',self.mat['scale'],tmp)
          #-------------------------------------------------------
 
+         self.im = np.concatenate((self.mesh['i'],list(np.arange(self.n_elems))))
+         self.jm = np.concatenate((self.mesh['j'],list(np.arange(self.n_elems))))
          self.sigma = self.mat['G']*1e9
          self.VMFP = self.mat['F']*1e9
          self.n_index = len(self.tc)
@@ -99,16 +100,11 @@ class Solver(object):
          if self.verbose:
           print(colored('  Fourier Thermal Conductivity [W/m/K]:    ','green') + str(round(self.state['kappa_fourier'][0],4)))
           print(colored(' -----------------------------------------------------------','green'))
-
-        #Assemble BTE
-        #if comm.rank == 0:
-        # a = time.time()   
-        # data = self.assemble_bte(**argv)
-        # #print(time.time()-a)
-        #else : data = None
-        #data = comm.bcast(data,root=0)
-        #data.update(data)
-
+  
+          if not self.only_fourier:
+           print()
+           print('      Iter    Thermal Conductivity [W/m/K]      Error ''')
+           print(colored(' -----------------------------------------------------------','green'))
 
         data = self.solve_bte(**argv)
 
@@ -127,16 +123,50 @@ class Solver(object):
           print(' ')  
 
 
+  def solve_bte_parallel(self,**argv):
+
+     block =  self.n_index//comm.size
+     rr = range(block*comm.rank,block*(comm.rank+1))
+     G = np.einsum('qj,jn->qn',self.VMFP[rr],self.mesh['k'],optimize=True)
+     Gp = G.clip(min=0); Gm = G.clip(max=0)
+     D = np.ones((len(rr),self.n_elems))
+     for n,i in enumerate(self.mesh['i']): D[:,i] += Gp[:,n]
+    
+     SS = np.zeros(1)
+     Gbp = np.zeros(1)
+     if len(self.mesh['db']) > 0:
+       Gb = np.einsum('qj,jn->qn',self.VMFP[rr],self.mesh['db'],optimize=True)
+       Gbp = Gb.clip(min=0);Gbm2 = Gb.clip(max=0)
+       for n,(i,j) in enumerate(zip(self.mesh['eb'],self.mesh['sb'])):
+          D[:,i]  += Gbp[:,n]
+       Gb = np.einsum('qj,jn->qn',self.sigma[rr],self.mesh['db'],optimize=True)
+       Gbp = Gb.clip(min=0); Gbm = Gb.clip(max=0)
+       #SS = np.einsum('qc,c->qc',Gbm2,1/Gbm.sum(axis=0))
+     
+     #---------------------------------------------------------------
+     A = np.concatenate((Gm,D),axis=1)
+
+     #Periodic------------------
+     P = np.zeros((len(rr),self.n_elems))
+     for n,(i,j) in enumerate(zip(self.mesh['i'],self.mesh['j'])): P[:,i] -= Gm[:,n]*self.mesh['B'][i,j]
+     BB = -np.outer(self.sigma[rr,0],np.sum(self.mesh['B_with_area_old'],axis=0))*self.kappa_factor*1e-18
+
+
+   
+     lu = {i:sp.linalg.splu(sp.csc_matrix((A[n],(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)) for n,i in enumerate(rr) }
+
+     print('done...almost')
+     quit()
+
+
+
   def solve_bte(self,**argv):
  
 
+     block =  self.n_index//comm.size
+     rr = range(block*comm.rank,block*(comm.rank+1))
+
      if comm.rank == 0:
-      if self.verbose:
-       print()
-       print('      Iter    Thermal Conductivity [W/m/K]      Error ''')
-       print(colored(' -----------------------------------------------------------','green'))
-
-
       G = np.einsum('qj,jn->qn',self.VMFP,self.mesh['k'],optimize=True)
       Gp = G.clip(min=0); Gm = G.clip(max=0)
       D = np.ones((self.n_index,self.n_elems))
@@ -169,8 +199,6 @@ class Solver(object):
      data = comm.bcast(data,root = 0)
 
 
-     block =  self.n_index//comm.size
-     rr = range(block*comm.rank,block*(comm.rank+1))
 
 
      #a = MPI.Wtime() 

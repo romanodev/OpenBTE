@@ -2,7 +2,7 @@ import h5py
 from google_drive_downloader import GoogleDriveDownloader as gdd
 import numpy as np
 from shapely.geometry import Polygon
-from shapely.geometry import MultiPolygon
+from shapely.geometry import MultiPolygon,LineString
 import shapely
 from shapely.ops import cascaded_union
 
@@ -119,7 +119,7 @@ def repeat_merge_scale(argv):
 
   polygons = argv['polygons']
 
-  
+
   pbc = []
   pbc.append([0,0])
   pbc.append([1,0])
@@ -168,21 +168,12 @@ def repeat_merge_scale(argv):
   else: 
        polygons_final.append(list(conso.exterior.coords))
   
-  #-------------------------------------------
-  #scale-----------------------
-  polygons = []
-  for poly in polygons_final:
-   new_poly = []
-   for p in poly:
-    g = list(p)
-    g[0] *=lx
-    g[1] *=ly
-    new_poly.append(g)
-   polygons.append(new_poly) 
+
+  
 
   #cut redundant points (probably unnecessary)
   new_poly = []
-  for poly in polygons:
+  for poly in polygons_final:
    N = len(poly)
    tmp = []
    for n in range(N):
@@ -192,7 +183,60 @@ def repeat_merge_scale(argv):
      tmp.append(p1)
    new_poly.append(tmp)
 
-  argv['polygons'] = new_poly
+
+  dmin = check_distances(new_poly)
+
+
+  #scale-----------------------
+  polygons = []
+  for poly in new_poly:
+   tmp = []
+   for p in poly:
+    g = list(p)
+    g[0] *=lx
+    g[1] *=ly
+    tmp.append(g)
+   polygons.append(tmp) 
+
+  argv['polygons'] = polygons
+  argv['dmin'] = dmin
+
+
+def check_distances(new_poly):
+
+
+  #Merge pores is they are too close
+  Pores = [ Polygon(p)  for p in new_poly]
+  dmin = 1e4
+  move = {}
+  for p1 in range(len(Pores)):
+   #check if intersect   
+   for p2 in range(p1+1,len(Pores)):
+       d = Pores[p1].distance(Pores[p2])
+       if d > 0 and d < dmin : dmin = d
+      
+   #top
+   d = Pores[p1].distance(LineString([(-0.5,0.5),(0.5,0.5)])) 
+   if d < dmin and d > 0:
+     dmin = d
+
+   #left
+   d = Pores[p1].distance(LineString([(0.5,0.5),(0.5,-0.5)])) 
+   if d < dmin and d > 0:
+     dmin = d
+
+   #bottom
+   d = Pores[p1].distance(LineString([(-0.5,-0.5),(0.5,-0.5)])) 
+   if d < dmin and d > 0:
+     dmin = d
+  
+   #left
+   d = Pores[p1].distance(LineString([(-0.5,-0.5),(-0.5,0.5)])) 
+   if d < dmin and d > 0:
+     dmin = d
+
+  return dmin
+
 
 def get_linear_indexes(mfp,value,scale,extent):
 

@@ -28,6 +28,7 @@ class Mesher(object):
    argv.update({'polygons':np.array(polygons)})
 
   repeat_merge_scale(argv)
+  self.dmin = argv['dmin']
   #---------------------
 
   if argv.setdefault('lz',0) == 0:

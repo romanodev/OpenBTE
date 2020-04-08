@@ -6,18 +6,21 @@ import time
 import deepdish as dd
 import itertools
 from .GenerateInterface import *
+from mpi4py import MPI
 
+comm = MPI.COMM_WORLD
 
 class Geometry(object):
 
  def __init__(self,**argv):
-
-  if argv.setdefault('model','lattice') == 'interface':
+  
+  if comm.rank == 0:
+   if argv.setdefault('model','lattice') == 'interface':
      GenerateInterface(**argv) 
-  else:
+   else:
      Mesher(argv) #this create mesh.msh
 
-  self.compute_mesh_data(**argv)
+   self.compute_mesh_data(**argv)
 
  def compute_node_map(self,**argv):
 
