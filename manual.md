@@ -135,7 +135,10 @@ The created file, `rta.h5`, can be used by a `Material`
 
 # Geometry
 
-The module `Geometry` aids the creation of the structure and save it in `geometry.h5`. In OpenBTE, any structure is identified by a rectangular unit-cell with size `lx` by `ly`, a `porosity` (i.e. the volume fraction), a `base` - i.e. the position of the pores in the unit-cell and a `shape`. Below is a complete list of options.
+The module `Geometry` currently features two models, `Lattice` and `Custom`.
+
+##Lattice
+The structure is identified by a rectangular unit-cell with size `lx` by `ly`, a `porosity` (i.e. the volume fraction), a `base` - i.e. the position of the pores in the unit-cell and a `shape`. Below is a complete list of options.
 
 |  Option  | Description    | Format |
 |:-----------|:---------------|:-------------|
@@ -144,8 +147,7 @@ The module `Geometry` aids the creation of the structure and save it in `geometr
 |   `porosity` | Volume fraction |   float |
 |   `shape`   | shape of the pore | see below  |
 |   `base`    | The positions of the pores | $$[[x_0,y_0],[x_1,y_1] ...$$ |
-|   `direction`  | direction of the applied gradient| `x` (default) or `y`  |
-|   `step`  | characteristic mesh size| float [nm]  |
+
  
 Additional info/tips:
 
@@ -165,15 +167,85 @@ Additional info/tips:
  
  - Diffuse scattering boundary conditions are applied along the walls of the pores.
  
+###Shape
+
+A shape can be either a predefined one - including `square`, `triangle` and `circle` - or user defined. In the latter case, the option `shape=custom` must be used and two additional keywords are to be used, i.e. `shape_function` and `shape_options`, where the options can be used for additional parameters to be used to shape function. Note that the shape coordinates are normalized to $$(-0.5,0.5)$$ both in $$x$$ and $$y$$ coordinates. Lastly, the shape function must at least take the option `area` in input, which is internally calculates.
+
+
+ 
+##Commong options
+
+|  Option  | Description    | Format |
+|:-----------|:---------------|:-------------|
+|   `direction`  | direction of the applied gradient| `x` (default) or `y`  |
+|   `step`  | characteristic mesh size| float [nm]  |
  
  An example of `Geometry` instance is 
  
- ```python
- Geometry(porosity=0.3,shape'circle',lx=100,ly=100,step=5)
+ 
  ```
+ def shape(options):
+   area = options['area']
+   T = options['T']
+   f = np.sqrt(2)
+
+   poly_clip = []
+   a = area/T/2
+
+   poly_clip.append([0,0])
+   poly_clip.append([a/f,a/f])
+   poly_clip.append([a/f-T*f,a/f])
+   poly_clip.append([-T*f,0])
+   poly_clip.append([a/f-T*f,-a/f])
+   poly_clip.append([a/f,-a/f])
+
+   return poly_clip
+   
+geo = Geometry(porosity=0.05,lx=100,ly=100,step=5,shape='custom',base=[[0,0]],lz=0,save=False,shape_function=shape,shape_options={'T':0.05})
+ 
+ ```
+ ##Custom
+ 
+ With the custom model, the structured is defined a series of polygons defining the regions of the material to be carved out. Below is an example (also see figure below, panel c)
+ 
+ ```
+k = 0.1
+h = 0.1
+d = 0.07
+poly1 = [[-k/2,0],[-k/2,-h],[k/2,0]]
+poly2 = [[-0.6,0],[-0.6,-0.8],[0.6,-0.8],[0.6,-0],[k/2+d,0],[-k/2-d,-k-2*d],[-k/2-d,0]]
+
+geo = Geometry(model='custom',lx=100,ly=100,step=5,polygons = [poly1,poly2])
+
+```
+
+Note that periodicity is endured when defining the polygons.
+ 
+ 
+ <p align="left">
+<img  align="left" width="700" src="https://docs.google.com/drawings/d/e/2PACX-1vTZ57K5UB6qc_n56lKufOOYpEy8S8K_12fzD-oGRbnO5Rouc-aQhSbU3ci4euuUOl72EvEiszekMZos/pub?w=943&h=898">
+</p>
+ 
  
 # Solver
+
+Solver reads the files `geometry.h5` and `material.h5` and, after solving the BTE, creates the dile `solver.h5`. Here are the list of options
+
+|  Option  | Description    | Format |
+|:-----------|:---------------|:-------------|
+|   `max_bte_iter`  | max number of BTE iterations| int (50) |
+|   `max_bte_error`  | error on the BTE effective thermal conductivity| flat (1e-3)  |
+|   `max_fourier_iter`  | max number of Forier iterations| int (50) |
+|   `max_fourier_error`  | error on the Fourier effective thermal conductivity| flat (1e-3)  |
+|   `only_fourier`  |whether only Fourier is needed| Bool (False)  |
+|   `geometry`  | the geometry object (to avod storing)| None  |
+|   `material`  | the material object (to avod storing)| None  |
+
 # Plot
+
+`Plot` reads in input the files `material.h5`, `geometry.h5` and `solver.h5`. Currently, the possible `models` are `geometry` and `maps`. 
+
+
 # Examples
 https://nbviewer.jupyter.org/github/romanodev/OpenBTE/blob/master/openbte/Tutorial.ipynb  
 The examples are provided via a [notebook](https://nbviewer.jupyter.org/github/romanodev/OpenBTE/blob/master/openbte/Tutorial.ipynb ) or [interactive simulations](https://colab.research.google.com/drive/1eAfX3PgyO7TyGWPee8HRx5ZbQ7tZfLDr) (Google Colab).
