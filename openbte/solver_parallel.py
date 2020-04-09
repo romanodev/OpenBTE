@@ -19,17 +19,15 @@ class Solver(object):
         self.data = argv
         self.tt = np.float64
         self.state = {}
- 
+
         #-----IMPORT MESH-------------------
         if 'geometry' in argv.keys():
          self.mesh = argv['geometry'].data
         else: 
          #self.mesh = load_dictionary('geometry.h5')
          self.mesh = dd.io.load('geometry.h5')
-  
+
         self.n_elems = self.mesh['n_elems'][0]
-        self.im = np.concatenate((self.mesh['i'],list(np.arange(self.n_elems))))
-        self.jm = np.concatenate((self.mesh['j'],list(np.arange(self.n_elems))))
 
         #---------------------------------------
         self.verbose = argv.setdefault('verbose',True)
@@ -66,7 +64,7 @@ class Solver(object):
             tmp += tmp.T - 0.5*np.diag(np.diag(tmp))
            self.BM = np.einsum('i,ij->ij',self.mat['scale'],tmp)
          #-------------------------------------------------------
- 
+
          self.im = np.concatenate((self.mesh['i'],list(np.arange(self.n_elems))))
          self.jm = np.concatenate((self.mesh['j'],list(np.arange(self.n_elems))))
          self.sigma = self.mat['G']*1e9
@@ -75,6 +73,7 @@ class Solver(object):
          #----------------IMORT MATERIAL-------
    
         self.kappa_factor = self.mesh['kappa_factor'][0]
+
         if comm.rank == 0:
          if self.verbose: self.print_logo()
   
@@ -96,6 +95,7 @@ class Solver(object):
                            'temperature_fourier':data['temperature'],\
                            'flux_fourier':data['flux']})
 
+
         if comm.rank == 0:
          if self.verbose:
           print(colored('  Fourier Thermal Conductivity [W/m/K]:    ','green') + str(round(self.state['kappa_fourier'][0],4)))
@@ -106,6 +106,7 @@ class Solver(object):
            print('      Iter    Thermal Conductivity [W/m/K]      Error ''')
            print(colored(' -----------------------------------------------------------','green'))
 
+        #data = self.solve_bte_parallel(**argv)
         data = self.solve_bte(**argv)
 
 
@@ -123,6 +124,99 @@ class Solver(object):
           print(' ')  
 
 
+  def solve_bte_parallel(self,**argv):
+
+     #common-------
+     X = np.tile(self.state['temperature_fourier'],(self.n_index,1))
+     Xp = np.zeros_like(X)
+    
+     Bm = np.zeros((self.n_index,self.n_elems))
+     X_old = X.copy()
+     kappa_vec = [self.state['kappa_fourier'][0]]
+     kappa_old = kappa_vec[-1]
+     alpha = self.data.setdefault('alpha',1)
+     error = 1
+     kk = 0
+     #---------------------
+
+
+     SS = np.zeros(1)
+     Gbp = np.zeros(1)
+     if comm.rank == 0:
+      if len(self.mesh['db']) > 0:
+       Gb = np.einsum('qj,jn->qn',self.VMFP,self.mesh['db'],optimize=True)
+       Gbm2 = Gb.clip(max=0)
+       Gb = np.einsum('qj,jn->qn',self.sigma,self.mesh['db'],optimize=True)
+       Gbp = Gb.clip(min=0); Gbm = Gb.clip(max=0)
+       SS = np.einsum('qc,c->qc',Gbm2,1/Gbm.sum(axis=0))
+       data = {'SS':SS,'Gbp':Gbp}
+     else: data = None 
+     data = comm.bcast(data,root = 0)
+     SS = data['SS']
+     Gbp = data['Gbp']
+
+
+     block =  self.n_index//comm.size
+     rr = range(block*comm.rank,block*(comm.rank+1))
+    
+     #The denominator of the surface effect
+     #Gbm = np.zeros(len(self.mesh['db'].T))
+     #if len(self.mesh['db']) > 0:
+     #  Gb = np.einsum('qj,jn->qn',self.sigma[rr],self.mesh['db'],optimize=True)
+     #  comm.Allreduce([Gb.clip(max=0).sum(axis=0),MPI.DOUBLE],[Gbm,MPI.DOUBLE],op=MPI.SUM)
+     #  Gbp = Gb.clip(min=0)
+     #------------------------------    
+     #This is a per thread operation
+     #Gb = np.einsum('qj,jn->qn',self.VMFP[rr],self.mesh['db'],optimize=True)
+     #SS = np.einsum('qc,c->qc',Gb.clip(max=0),1/Gbm)
+     #---------------------------------------------------------------
+
+     #Main matrix-----------
+     G = np.einsum('qj,jn->qn',self.VMFP[rr],self.mesh['k'],optimize=True)
+     Gp = G.clip(min=0); Gm = G.clip(max=0)
+     D = np.ones((len(rr),self.n_elems))
+     for n,i in enumerate(self.mesh['i']): D[:,i] += Gp[:,n]
+     A = np.concatenate((Gm,D),axis=1)
+     lu = {i:sp.linalg.splu(sp.csc_matrix((A[n],(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)) for n,i in enumerate(rr) }
+     #----------------------- 
+
+     #Periodic------------------
+     P = np.zeros((len(rr),self.n_elems))
+     for n,(i,j) in enumerate(zip(self.mesh['i'],self.mesh['j'])): P[:,i] -= Gm[:,n]*self.mesh['B'][i,j]
+
+     if comm.rank == 0:
+      #COMMON------------------------------
+      DeltaT = np.dot(X.T,self.ac)
+      #Boundary-----   
+      if len(self.mesh['db']) > 0:
+       Bm = np.zeros((self.n_index,self.n_elems))   
+       for n,i in enumerate(self.mesh['eb']): 
+         Bm[:,i] +=np.einsum('u,u,q->q',X[:,i],data['Gbp'][:,n],data['SS'][:,n],optimize=True)
+      data = {'Bm':Bm,'DeltaT':DeltaT}
+     else: data = None
+     data = comm.bcast(data,root=0)
+     Bm = data['Bm']
+     DeltaT = data['DeltaT']
+     #----------------------------------
+     #if len(self.mesh['db']) > 0:
+     # Bmp = np.zeros((self.n_index,self.n_elems))   
+     # Bm = np.zeros((self.n_index,self.n_elems))   
+     # for n,i in enumerate(self.mesh['eb']): 
+     #     Bmp[rr,i] +=np.einsum('u,u,q->q',X[rr,i],Gbp[:,n],SS[:,n],optimize=True)
+     # comm.Allreduce([Bmp,MPI.DOUBLE],[Bm,MPI.DOUBLE],op=MPI.SUM)
+      #---------------------
+
+
+     for n,i in enumerate(rr): Xp[i] = lu[i].solve(P[n] + DeltaT +  Bm[i])
+     comm.Allreduce([Xp,MPI.DOUBLE],[X,MPI.DOUBLE],op=MPI.SUM)
+
+     BB = -np.outer(self.sigma[:,0],np.sum(self.mesh['B_with_area_old'],axis=0))*self.kappa_factor*1e-18
+     kappa = np.sum(np.multiply(BB,X))
+
+     print(kappa)
+     quit()
+
+
 
 
   def solve_bte(self,**argv):
@@ -132,41 +226,52 @@ class Solver(object):
      rr = range(block*comm.rank,block*(comm.rank+1))
 
      if comm.rank == 0:
+      G = np.einsum('qj,jn->qn',self.VMFP,self.mesh['k'],optimize=True)
+      Gp = G.clip(min=0); Gm = G.clip(max=0)
+      D = np.ones((self.n_index,self.n_elems))
+      for n,i in enumerate(self.mesh['i']): D[:,i] += Gp[:,n]
+      A = np.concatenate((Gm,D),axis=1)
+      #Compute boundary-----------------------------------------------
 
       SS = np.zeros(1)
       Gbp = np.zeros(1)
       if len(self.mesh['db']) > 0:
        Gb = np.einsum('qj,jn->qn',self.VMFP,self.mesh['db'],optimize=True)
-       Gbp = Gb.clip(min=0);Gbm2 = Gb.clip(max=0)
+       #Gbp = Gb.clip(min=0);
+       Gbm2 = Gb.clip(max=0)
+       #for n,(i,j) in enumerate(zip(self.mesh['eb'],self.mesh['sb'])):
+       #   D[:,i]  += Gbp[:,n]
        Gb = np.einsum('qj,jn->qn',self.sigma,self.mesh['db'],optimize=True)
        Gbp = Gb.clip(min=0); Gbm = Gb.clip(max=0)
        SS = np.einsum('qc,c->qc',Gbm2,1/Gbm.sum(axis=0))
     
       #---------------------------------------------------------------
+
+      #Periodic------------------
+      P = np.zeros((self.n_index,self.n_elems))
+      for n,(i,j) in enumerate(zip(self.mesh['i'],self.mesh['j'])): P[:,i] -= Gm[:,n]*self.mesh['B'][i,j]
       BB = -np.outer(self.sigma[:,0],np.sum(self.mesh['B_with_area_old'],axis=0))*self.kappa_factor*1e-18
 
-      data = {'BB':BB,'SS':SS,'Gbp':Gbp}
+      data = {'BB':BB,'P':P,'SS':SS,'A':A,'i':self.im,'j':self.jm,'Gbp':Gbp}
+      #data = {'BB':BB,'SS':SS,'A':A,'i':self.im,'j':self.jm,'Gbp':Gbp}
+      #data = {'BB':BB,'SS':SS,'Gbp':Gbp}
      else: data = None 
      data = comm.bcast(data,root = 0)
 
-     #Main matrix----
-     G = np.einsum('qj,jn->qn',self.VMFP[rr],self.mesh['k'],optimize=True)
-     Gp = G.clip(min=0); Gm = G.clip(max=0)
-     D = np.ones((len(rr),self.n_elems))
-     for n,i in enumerate(self.mesh['i']): D[:,i] += Gp[:,n]
-     Gb = np.einsum('qj,jn->qn',self.VMFP[rr],self.mesh['db'],optimize=True)
-     Gbp = Gb.clip(min=0);
-     for n,(i,j) in enumerate(zip(self.mesh['eb'],self.mesh['sb'])):
-         D[:,i]  += Gbp[:,n]
-     A = np.concatenate((Gm,D),axis=1)
-     P = np.zeros((len(rr),self.n_elems))
-     for n,(i,j) in enumerate(zip(self.mesh['i'],self.mesh['j'])): P[:,i] -= Gm[:,n]*self.mesh['B'][i,j]
-     lu = {i:sp.linalg.splu(sp.csc_matrix((A[n],(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)   ) for n,i in enumerate(rr) }
-     #Periodic------------------
-     #Compute boundary-----------------------------------------------
 
+     #G = np.einsum('qj,jn->qn',self.VMFP[rr],self.mesh['k'],optimize=True)
+     #Gp = G.clip(min=0); Gm = G.clip(max=0)
+     #D = np.ones((len(rr),self.n_elems))
+     #for n,i in enumerate(self.mesh['i']): D[:,i] += Gp[:,n]
+     #A = np.concatenate((Gm,D),axis=1)
+
+     #P = np.zeros((len(rr),self.n_elems))
+     #for n,(i,j) in enumerate(zip(self.mesh['i'],self.mesh['j'])): P[:,i] -=  Gm[:,n]*self.mesh['B'][i,j]
 
      #a = MPI.Wtime() 
+     lu = {i:sp.linalg.splu(sp.csc_matrix((data['A'][i],(data['i'],data['j'])),shape=(self.n_elems,self.n_elems),dtype=self.tt)   ) for i in rr }
+     #lu = {i:sp.linalg.splu(sp.csc_matrix((A[n],(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)   ) for n,i in enumerate(rr) }
+
      #print(MPI.Wtime() -a)
 
 
@@ -181,33 +286,32 @@ class Solver(object):
      Xp = np.zeros_like(X)
      Bm = np.zeros((self.n_index,self.n_elems))
 
-     kappa = np.zeros(1)
+     tt = time.time()
      while kk < self.data.setdefault('max_bte_iter',100) and error > self.data.setdefault('max_bte_error',1e-2):
 
       #Boundary-----   
-      a = time.time()
-      Bm = np.zeros((len(rr),self.n_elems))   
       if len(self.mesh['db']) > 0:
-       for n,i in enumerate(self.mesh['eb']): Bm[:,i] +=np.einsum('u,u,q->q',X[:,i],data['Gbp'][:,n],data['SS'][rr,n],optimize=True)
+       Bm = np.zeros((self.n_index,self.n_elems))   
+       for n,i in enumerate(self.mesh['eb']): 
+         Bm[:,i] +=np.einsum('u,u,q->q',X[:,i],data['Gbp'][:,n],data['SS'][:,n],optimize=True)
       #---------------------
 
       if self.coll:
-       DeltaT = np.matmul(self.BM[rr],alpha*X+(1-alpha)*X_old) 
-       for n,i in enumerate(rr): Xp[i] = lu[i].solve(DeltaT[n] + P[n] + Bm[n]) 
+       DeltaT = np.matmul(self.BM,alpha*X+(1-alpha)*X_old) 
+       for i in rr:  Xp[i] = lu[i].solve(DeltaT[i] + data['P'][i] + Bm[i]) 
       else: 
        DeltaT = np.dot(X.T,self.ac)
-       for n,i in enumerate(rr): Xp[i] = lu[i].solve(DeltaT + P[n] + Bm[n]) 
-
-      kappap = np.array([np.sum(np.multiply(data['BB'][rr],Xp[rr]))])
-
-      comm.Allreduce([kappap,MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
+       for i in rr: Xp[i] = lu[i].solve(DeltaT + data['P'][i] + Bm[i]) 
+       #for n,i in enumerate(rr): Xp[i] = lu[i].solve(DeltaT + P[n] + Bm[i]) 
       comm.Allreduce([Xp,MPI.DOUBLE],[X,MPI.DOUBLE],op=MPI.SUM)
+
+      kappa = np.sum(np.multiply(data['BB'],X))
 
       kk +=1
 
-      error = abs(kappa_old-kappa[0])/abs(kappa[0])
-      kappa_old = kappa[0]
-      kappa_vec.append(kappa[0])
+      error = abs(kappa_old-kappa)/abs(kappa)
+      kappa_old = kappa
+      kappa_vec.append(kappa)
       if self.verbose and comm.rank == 0:   
        print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error))
 
