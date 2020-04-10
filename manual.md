@@ -219,11 +219,11 @@ geo = Geometry(model='custom',lx=100,ly=100,step=5,polygons = [poly1,poly2])
 
 ```
 
-Note that periodicity is endured when defining the polygons.
+Note that periodicity is ensured when defining the polygons.
  
  
-<p align="left">
-<img  align="left" width="700" src="https://docs.google.com/drawings/d/e/2PACX-1vTZ57K5UB6qc_n56lKufOOYpEy8S8K_12fzD-oGRbnO5Rouc-aQhSbU3ci4euuUOl72EvEiszekMZos/pub?w=943&h=898">
+<p align="center">
+<img  align="center" width="400" src="https://docs.google.com/drawings/d/e/2PACX-1vTZ57K5UB6qc_n56lKufOOYpEy8S8K_12fzD-oGRbnO5Rouc-aQhSbU3ci4euuUOl72EvEiszekMZos/pub?w=943&h=898">
 </p>
  
 
