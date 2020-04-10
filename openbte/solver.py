@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 import numpy as np
+from cvxopt import spmatrix, matrix, umfpack
 #from .MSolver import *
 from scipy.sparse.linalg import splu
 from termcolor import colored, cprint 
@@ -19,6 +20,7 @@ class Solver(object):
         self.data = argv
         self.tt = np.float64
         self.state = {}
+
  
         #-----IMPORT MESH-------------------
         if 'geometry' in argv.keys():
@@ -61,10 +63,12 @@ class Solver(object):
            self.ac = self.mat['ac']
          else:  
            self.coll = True
-           tmp = self.mat['B']
-           if np.allclose(tmp, np.tril(tmp)):
-            tmp += tmp.T - 0.5*np.diag(np.diag(tmp))
-           self.BM = np.einsum('i,ij->ij',self.mat['scale'],tmp)
+           if comm.rank == 0:
+            B = self.mat['B']
+            B += B.T - 0.5*np.diag(np.diag(B))
+            B = np.einsum('i,ij->ij',self.mat['scale'],B)
+           else : B = None
+           self.BM = comm.bcast(B,root=0) 
          #-------------------------------------------------------
  
          self.im = np.concatenate((self.mesh['i'],list(np.arange(self.n_elems))))
@@ -72,8 +76,16 @@ class Solver(object):
          self.sigma = self.mat['G']*1e9
          self.VMFP = self.mat['F']*1e9
          self.n_index = len(self.tc)
+         #MPI info
+         block =  self.n_index//comm.size
+         if comm.rank == comm.size-1: 
+          self.rr = range(block*comm.rank,self.n_index)
+         else: 
+          self.rr = range(block*comm.rank,block*(comm.rank+1))
+        #------------------
          #----------------IMORT MATERIAL-------
-   
+  
+
         self.kappa_factor = self.mesh['kappa_factor'][0]
         if comm.rank == 0:
          if self.verbose: self.print_logo()
@@ -128,11 +140,7 @@ class Solver(object):
   def solve_bte(self,**argv):
  
 
-     block =  self.n_index//comm.size
-     rr = range(block*comm.rank,block*(comm.rank+1))
-
      if comm.rank == 0:
-
       SS = np.zeros(1)
       Gbp = np.zeros(1)
       if len(self.mesh['db']) > 0:
@@ -150,24 +158,23 @@ class Solver(object):
      data = comm.bcast(data,root = 0)
 
      #Main matrix----
-     G = np.einsum('qj,jn->qn',self.VMFP[rr],self.mesh['k'],optimize=True)
+     G = np.einsum('qj,jn->qn',self.VMFP[self.rr],self.mesh['k'],optimize=True)
      Gp = G.clip(min=0); Gm = G.clip(max=0)
-     D = np.ones((len(rr),self.n_elems))
+     D = np.ones((len(self.rr),self.n_elems))
      for n,i in enumerate(self.mesh['i']): D[:,i] += Gp[:,n]
-     Gb = np.einsum('qj,jn->qn',self.VMFP[rr],self.mesh['db'],optimize=True)
-     Gbp = Gb.clip(min=0);
-     for n,(i,j) in enumerate(zip(self.mesh['eb'],self.mesh['sb'])):
+     if len(self.mesh['db']) > 0:
+      Gb = np.einsum('qj,jn->qn',self.VMFP[self.rr],self.mesh['db'],optimize=True)
+      Gbp = Gb.clip(min=0);
+      for n,(i,j) in enumerate(zip(self.mesh['eb'],self.mesh['sb'])):
          D[:,i]  += Gbp[:,n]
      A = np.concatenate((Gm,D),axis=1)
-     P = np.zeros((len(rr),self.n_elems))
+     P = np.zeros((len(self.rr),self.n_elems))
      for n,(i,j) in enumerate(zip(self.mesh['i'],self.mesh['j'])): P[:,i] -= Gm[:,n]*self.mesh['B'][i,j]
-     lu = {i:sp.linalg.splu(sp.csc_matrix((A[n],(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)   ) for n,i in enumerate(rr) }
+
+     lu = {i:sp.linalg.splu(sp.csc_matrix((A[n],(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)   ) for n,i in enumerate(self.rr) }
+
      #Periodic------------------
      #Compute boundary-----------------------------------------------
-
-
-     #a = MPI.Wtime() 
-     #print(MPI.Wtime() -a)
 
 
      X = np.tile(self.state['temperature_fourier'],(self.n_index,1))
@@ -180,25 +187,29 @@ class Solver(object):
 
      Xp = np.zeros_like(X)
      Bm = np.zeros((self.n_index,self.n_elems))
+     DeltaTp = np.zeros(self.n_elems)   
+     DeltaT = np.zeros(self.n_elems)   
 
      kappa = np.zeros(1)
      while kk < self.data.setdefault('max_bte_iter',100) and error > self.data.setdefault('max_bte_error',1e-2):
 
       #Boundary-----   
       a = time.time()
-      Bm = np.zeros((len(rr),self.n_elems))   
+      Bm = np.zeros((len(self.rr),self.n_elems))   
       if len(self.mesh['db']) > 0:
-       for n,i in enumerate(self.mesh['eb']): Bm[:,i] +=np.einsum('u,u,q->q',X[:,i],data['Gbp'][:,n],data['SS'][rr,n],optimize=True)
+       for n,i in enumerate(self.mesh['eb']): Bm[:,i] +=np.einsum('u,u,q->q',X[:,i],data['Gbp'][:,n],data['SS'][self.rr,n],optimize=True)
       #---------------------
 
       if self.coll:
-       DeltaT = np.matmul(self.BM[rr],alpha*X+(1-alpha)*X_old) 
-       for n,i in enumerate(rr): Xp[i] = lu[i].solve(DeltaT[n] + P[n] + Bm[n]) 
+       DeltaT = np.matmul(self.BM[self.rr],alpha*X+(1-alpha)*X_old) 
+       for n,i in enumerate(self.rr): Xp[i] = lu[i].solve(DeltaT[n] + P[n] + Bm[n]) 
       else: 
-       DeltaT = np.dot(X.T,self.ac)
-       for n,i in enumerate(rr): Xp[i] = lu[i].solve(DeltaT + P[n] + Bm[n]) 
+       DeltaTp = np.dot(X[self.rr].T, self.ac[self.rr])
+       comm.Allreduce([DeltaTp,MPI.DOUBLE],[DeltaT,MPI.DOUBLE],op=MPI.SUM)
 
-      kappap = np.array([np.sum(np.multiply(data['BB'][rr],Xp[rr]))])
+       for n,i in enumerate(self.rr): Xp[i] = lu[i].solve(DeltaT + P[n] + Bm[n]) 
+
+      kappap = np.array([np.sum(np.multiply(data['BB'][self.rr],Xp[self.rr]))])
 
       comm.Allreduce([kappap,MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
       comm.Allreduce([Xp,MPI.DOUBLE],[X,MPI.DOUBLE],op=MPI.SUM)
@@ -409,3 +420,15 @@ class Solver(object):
     print(colored(' -----------------------------------------------------------','green'))
     print()   
 
+     #Fs = umfpack.symbolic(spmatrix(len(self.im),self.im,self.jm,(self.n_elems,self.n_elems)))
+     #for n,i in enumerate(self.rr):
+     #   a = time.time() 
+     #   sp.linalg.splu(sp.csc_matrix((A[n],(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt))
+     #   b = time.time()
+     #   umfpack.numeric(spmatrix(A[n],self.im,self.jm,(self.n_elems,self.n_elems)), Fs)
+     #   c = time.time()
+     #   print((c-b)/(b-a))
+     #Simbolic for everything-----
+     #lu = {i: umfpack.numeric(spmatrix(A[n],self.im,self.jm,(self.n_elems,self.n_elems)), Fs) for n,i in enumerate(self.rr)}
+     #print(time.time()-a)
+     #quit()

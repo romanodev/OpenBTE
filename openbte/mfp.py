@@ -13,8 +13,12 @@ def generate_mfp(**argv):
    #--------------------
 
    #Azimuthal Angle------------------------------
-   n_theta = int(argv.setdefault('n_theta',24)); Dtheta = np.pi/n_theta
-   theta = np.linspace(Dtheta/2.0,np.pi - Dtheta/2.0,n_theta)
+   #n_theta = int( argv.setdefault('n_theta',24)  /2)
+   n_theta = int( argv.setdefault('n_theta',24))
+   sym = 1
+
+   Dtheta = np.pi/n_theta
+   theta = np.linspace(Dtheta/2.0,np.pi/2 - Dtheta/2.0,n_theta)
    dtheta = 2.0*np.sin(Dtheta/2.0)*np.sin(theta)
 
 
@@ -57,7 +61,6 @@ def generate_mfp(**argv):
    n_mfp = len(mfp_sampled)
    temp_coeff = np.zeros(nm) 
    kappa_directional = np.zeros((nm,3)) 
-   norm = 0
 
    for m in range(n_mfp_bulk):
     (m1,a1,m2,a2) = get_linear_indexes(mfp_sampled,mfp_bulk[m],scale='linear',extent=True)
@@ -67,21 +70,20 @@ def generate_mfp(**argv):
       index_2 = t * n_mfp * n_phi + p * n_mfp + m2
       factor = kappa_bulk[m]/4.0/np.pi*domega[t,p]
           
-      kappa_directional[index_1] += 3 * a1 * factor/mfp_bulk[m]*direction_ave[t,p]
-      kappa_directional[index_2] += 3 * a2 * factor/mfp_bulk[m]*direction_ave[t,p]
-      temp_coeff[index_1] += a1 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
-      temp_coeff[index_2] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
+      kappa_directional[index_1] += 3 * a1 * factor/mfp_bulk[m]*direction_ave[t,p]*sym
+      kappa_directional[index_2] += 3 * a2 * factor/mfp_bulk[m]*direction_ave[t,p]*sym
+      temp_coeff[index_1] += a1 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]*sym
+      temp_coeff[index_2] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]*sym
 
 
    #replicate bulk values---
-   #kappa = np.zeros((3,3))
-   #for t in range(n_theta): 
-   #  for p in range(n_phi): 
-   #   for m in range(n_mfp): 
-   #     index = t * n_mfp * n_phi + p * n_mfp + m
-   #     tmp = kappa_directional[index]
-   #     kappa += np.outer(tmp,direction_ave[t,p])*mfp_sampled[m]
-   #print(kappa)
+   kappa = np.zeros((3,3))
+   for t in range(n_theta): 
+     for p in range(n_phi): 
+      for m in range(n_mfp): 
+        index = t * n_mfp * n_phi + p * n_mfp + m
+        tmp = kappa_directional[index]
+        kappa += np.outer(tmp,direction_ave[t,p])*mfp_sampled[m]
    #------------------
 
 
@@ -90,6 +92,15 @@ def generate_mfp(**argv):
    direction = np.array([np.repeat(direction[:,i],n_mfp) for i in range(3)]).T
    mfp = np.tile(mfp_sampled,n_phi*n_theta)  
    F = np.einsum('i,ij->ij',mfp,direction)
+
+   #Build multiscale directions---
+
+   
+
+   #-----------------------------
+
+
+
    #for g,f in zip(kappa_directional,F):
    #   kappa += np.outer(g,f) 
   

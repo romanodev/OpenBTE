@@ -5,7 +5,7 @@ from shapely.geometry import Polygon
 from shapely.geometry import MultiPolygon,LineString
 import shapely
 from shapely.ops import cascaded_union
-
+import os
 
 def periodic_kernel(x1, x2, p,l,variance):
     return variance*np.exp(-2/l/l * np.sin(np.pi*abs(x1-x2)/p) ** 2)
@@ -73,8 +73,15 @@ def load_dictionary(filename):
 
 
 def download_file(file_id,filename):
-      gdd.download_file_from_google_drive(file_id=file_id,
-                                           dest_path='./' + filename,showsize=True,overwrite=True)
+
+    strc = 'wget --no-check-certificate https://docs.google.com/uc?export=download&id=' + file_id +' -O material.h5'
+    print(strc)
+    quit()
+    os.system('wget --no-check-certificate https://docs.google.com/uc?export=download&id=' + file_id +' -O material.h5')
+
+    #  os.system('wget https://googledrive.com/host/' + file_id)
+      #gdd.download_file_from_google_drive(file_id=file_id,
+      #                                     dest_path='./' + filename,showsize=True,overwrite=True)
 
 
 def create_path(obj):

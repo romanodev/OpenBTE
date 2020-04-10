@@ -1,8 +1,8 @@
 import numpy as np
-import sparse
 from .mesher import *
 from .utils import *
 import time
+import scipy.sparse as sp
 import deepdish as dd
 import itertools
 from .GenerateInterface import *
@@ -623,9 +623,9 @@ class Geometry(object):
     self.periodic_values = {}
 
     n_el = len(self.elems)
-    B = sparse.DOK((n_el,n_el),dtype=np.float64)
+    B = sp.dok_matrix((n_el,n_el),dtype=np.float64)
 
-    B_with_area_old = sparse.DOK((n_el,n_el),dtype=np.float64)
+    B_with_area_old = sp.dok_matrix((n_el,n_el),dtype=np.float64)
     self.B_area = np.zeros(n_el,dtype=np.float64)
     
     self.ip = []; self.jp = []; self.dp = []; self.pv = [] 
@@ -680,8 +680,8 @@ class Geometry(object):
     #-----------------------------------------------
     #----------------------------------------------------------------
     self.side_periodic_value = side_periodic_value
-    self.B = B.to_coo()
-    self.B_with_area_old = B_with_area_old.to_coo()
+    self.B = B.tocoo()
+    self.B_with_area_old = B_with_area_old.tocoo()
     self.pv = np.array(self.pv).T
     self.kappa_factor = self.size[gradir]/area_flux
   
