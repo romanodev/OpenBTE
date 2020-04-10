@@ -222,11 +222,12 @@ geo = Geometry(model='custom',lx=100,ly=100,step=5,polygons = [poly1,poly2])
 Note that periodicity is endured when defining the polygons.
  
  
- <p align="left">
+<p align="left">
 <img  align="left" width="700" src="https://docs.google.com/drawings/d/e/2PACX-1vTZ57K5UB6qc_n56lKufOOYpEy8S8K_12fzD-oGRbnO5Rouc-aQhSbU3ci4euuUOl72EvEiszekMZos/pub?w=943&h=898">
 </p>
  
- 
+
+
 # Solver
 
 Solver reads the files `geometry.h5` and `material.h5` and, after solving the BTE, creates the dile `solver.h5`. Here are the list of options
