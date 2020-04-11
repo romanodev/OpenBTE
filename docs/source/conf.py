@@ -40,6 +40,8 @@ nbsphinx_codecell_lexer = 'ipython3'
 
 nbsphinx_execute = 'never'
 
+master_doc = 'index'
+
 #nbsphinx_prolog = """
 
 #  .. only:: html
