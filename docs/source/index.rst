@@ -10,12 +10,9 @@ Welcome to OpenBTE's documentation!
    :maxdepth: 1
    :caption: Quickstart
 
-   material
-   Tutorial.ipynb
+   new.ipynb
 
  
-
-
 
 Indices and tables
 ==================

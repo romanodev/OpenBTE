@@ -32,30 +32,29 @@ release = '1.0'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['recommonmark','sphinx_rtd_theme','nbsphinx']
+extensions = ['recommonmark','sphinx_rtd_theme','nbsphinx','sphinx.ext.mathjax','sphinx.ext.autodoc','sphinx.ext.viewcode','sphinx.ext.autosummary','sphinx.ext.intersphinx']
 
+pygments_style = None
 
-nbsphinx_prolog = """
+nbsphinx_codecell_lexer = 'ipython3'
 
-  .. only:: html
+nbsphinx_execute = 'never'
 
-   .. role:: raw-html(raw)
-        :format: html
+#nbsphinx_prolog = """
 
-   .. nbinfo::
+#  .. only:: html
 
-     Interactive online version:
-     :raw-html:`<a href="https://colab.research.google.com/drive/1eAfX3PgyO7TyGWPee8HRx5ZbQ7tZfLDr"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" style="vertical-align:text-bottom"></a>`
-
-"""
-
-#nbsphinx_prolog = r""" 
-#.. only:: html
-#    .. nbinfo::
-#"""
-#    .. role:: raw-html(raw)
+#   .. role:: raw-html(raw)
 #        :format: html
 
+#   .. nbinfo::
+
+#     Interactive online version:
+#     :raw-html:`<a href="https://colab.research.google.com/github/romanodev/OpenBTE/blob/master/docs/source/Tutorial.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" style="vertical-align:text-bottom"></a>`
+
+#"""
+
+highlight_language = 'python3'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -63,7 +62,7 @@ templates_path = ['_templates']
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = []
+exclude_patterns = ['_build', '**.ipynb_checkpoints']
 
 
 # -- Options for HTML output -------------------------------------------------
