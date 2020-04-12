@@ -3,7 +3,7 @@ Jupyter Sphinx Extension
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Example:
 
    All about strings test
 

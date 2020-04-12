@@ -24,7 +24,7 @@ release = ''#jupyter_sphinx.__version__
 # The short X.Y version
 version = ''#release[: len(release) - len(release.lstrip("0123456789."))].rstrip(".")
 
-master_doc = "index"
+master_doc = "contents"
 
 nbsphinx_execute = 'always'
 
