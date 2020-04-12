@@ -27,6 +27,7 @@ setup(name='openbte',
                         'ipykernel',
                         'ipyleaflet',
                         'jupyter_client',
+                        'nbsphinx',
                         'recommonmark',
                         'sphinx>=1.4.6',
                         'sphinx_rtd_theme'
