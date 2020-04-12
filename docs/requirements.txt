@@ -2,6 +2,7 @@ sphinx
 sphinx_rtd_theme
 jaxlib
 ipykernel
+ipywidgets
 nbsphinx
 sphinx-autodoc-typehints
 # The next packages are for notebooks
