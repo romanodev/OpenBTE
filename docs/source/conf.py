@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath("../.."))
 
-import jupyter_sphinx
+#import jupyter_sphinx
 
 
 project = 'OpenBTE'
