@@ -1,25 +1,10 @@
-.. OpenBTE documentation master file, created by
-   sphinx-quickstart on Fri Apr 10 12:35:16 2020.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
-Welcome to OpenBTE's documentation!
-===================================
+Jupyter Sphinx Extension
+========================
 
 .. toctree::
-   :maxdepth: 1
-   :caption: Quickstart
+   :maxdepth: 2
+   :caption: Contents:
 
-   new.ipynb
-
- 
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-
+   All about strings test
 
 
