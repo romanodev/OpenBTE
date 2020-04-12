@@ -5,6 +5,6 @@ Jupyter Sphinx Extension
    :maxdepth: 2
    :caption: Example:
 
-   All about strings test
+   All about strings <test>
 
 
