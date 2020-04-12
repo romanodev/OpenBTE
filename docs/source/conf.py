@@ -36,10 +36,10 @@ html_theme_options = {
     'logo_only': True,
 }
 
-#html_theme_options = {
-#    "github_user": "jupyter",
-#    "github_repo": "jupyter-sphinx",
-#    "github_banner": True,
-#}
 
-#jupyter_sphinx_thebelab_config = {"binderOptions": {"repo": "jupyter/jupyter-sphinx"}}
+exclude_patterns = []
+
+# Add any paths that contain templates here, relative to this directory.
+templates_path = ['_templates']
+
+html_static_path = ['_static']
