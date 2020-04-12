@@ -28,7 +28,7 @@ master_doc = "index"
 
 nbsphinx_execute = 'always'
 
-extensions = ["sphinx.ext.mathjax", "jupyter_sphinx.execute","nbsphinx"]
+extensions = ["sphinx.ext.mathjax","nbsphinx"]
 
 html_theme = 'sphinx_rtd_theme'
 
