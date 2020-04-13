@@ -1,5 +1,5 @@
-Jupyter Sphinx Extension
-========================
+Welcme to OpenBTE's documentation
+================================
 
 .. toctree::
    :maxdepth: 2
