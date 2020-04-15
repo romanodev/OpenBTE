@@ -1,4 +1,4 @@
-import h5py
+#import h5py
 from google_drive_downloader import GoogleDriveDownloader as gdd
 import numpy as np
 from shapely.geometry import Polygon
@@ -6,6 +6,9 @@ from shapely.geometry import MultiPolygon,LineString
 import shapely
 from shapely.ops import cascaded_union
 import os
+import matplotlib.cm as cm
+import functools
+
 
 def periodic_kernel(x1, x2, p,l,variance):
     return variance*np.exp(-2/l/l * np.sin(np.pi*abs(x1-x2)/p) ** 2)
@@ -281,6 +284,4 @@ def get_linear_indexes(mfp,value,scale,extent):
      ai *=mfp[i]/value
      aj *=mfp[j]/value
    return i,ai,j,aj  
-
-
 

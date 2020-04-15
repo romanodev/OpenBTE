@@ -103,10 +103,13 @@ class Solver(object):
           data = self.solve_fourier(**argv)
         else : data = None
         data = comm.bcast(data,root=0)
-        self.state.update({'variables':{'temperature_fourier':'Fourier Temperature [K]','flux_fourier':'Fourier Flux [W/m/m/K]'},\
-                           'kappa_fourier':data['kappa'],\
-                           'temperature_fourier':data['temperature'],\
-                           'flux_fourier':data['flux']})
+
+
+        variables = {0:{'name':'Temperature Fourier','units':'K',        'data':data['temperature']},\
+                     1:{'name':'Flux Fourier'       ,'units':'W/m/m/K','data':data['flux']}}
+ 
+        self.state.update({'variables':variables,\
+                           'kappa_fourier':data['kappa']})
 
         if comm.rank == 0:
          if self.verbose:
@@ -120,12 +123,14 @@ class Solver(object):
 
         data = self.solve_bte(**argv)
 
+        variables = self.state['variables']
 
+        variables[2]    = {'name':'Temperature BTE','units':'K'             ,'data':data['temperature']}
+        variables[3]    = {'name':'Flux BTE'       ,'units':'W/m/m/K'       ,'data':data['flux']}
 
-        self.state.update({'variables':{'temperature':'BTE Temperature [K]','flux':'BTE Flux [W/m/m/K]'},\
-                           'kappa':data['kappa_vec'],\
-                           'temperature':data['temperature'],\
-                           'flux':data['flux']})
+        self.state.update({'variables':variables,\
+                           'kappa':data['kappa_vec']})
+
 
         if comm.rank == 0:
          dd.io.save('solver.h5',self.state)
@@ -177,7 +182,7 @@ class Solver(object):
      #Compute boundary-----------------------------------------------
 
 
-     X = np.tile(self.state['temperature_fourier'],(self.n_index,1))
+     X = np.tile(self.state['variables'][0]['data'],(self.n_index,1))
      X_old = X.copy()
      kappa_vec = [self.state['kappa_fourier'][0]]
      kappa_old = kappa_vec[-1]
@@ -228,7 +233,7 @@ class Solver(object):
      #print(time.time()-tt)
 
      T = np.einsum('qc,q->c',X,self.tc)
-     J = np.einsum('qj,qc->cj',self.sigma,X)*1e-9
+     J = np.einsum('qj,qc->cj',self.sigma,X)*1e-18
      return {'kappa_vec':kappa_vec,'temperature':T,'flux':J}
 
 
@@ -310,7 +315,7 @@ class Solver(object):
         
         C = self.compute_non_orth_contribution(grad)
 
-    flux = np.einsum('cij,cj->ci',self.kappa_vec,grad)
+    flux = -np.einsum('cij,cj->ci',self.kappa_vec,grad)
     return {'flux':flux,'temperature':temp,'kappa':np.array([kappa_eff])}
 
 
@@ -390,7 +395,7 @@ class Solver(object):
     #(v_orth,v_non_orth) = self.get_decomposed_directions(i,j,rot=self.mat['kappa'])
     (v_orth,v_non_orth) = self.get_decomposed_directions(i,j,rot=self.get_kappa(i,j,l))
 
-    deltaT = temp[i] - temp[j] - 1
+    deltaT = temp[i] - (temp[j] + 1) 
     kappa -= v_orth *  deltaT * self.mesh['areas'][l]
     w  = self.mesh['interp_weigths'][l][0]
     grad_ave = w*gradT[i] + (1.0-w)*gradT[j]

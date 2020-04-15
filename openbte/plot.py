@@ -1,12 +1,16 @@
+
 from pyvtk import *
 import numpy as np
 import deepdish as dd
 import os
-import matplotlib
-be = matplotlib.get_backend()
-if not be=='nbAgg' and not be=='module://ipykernel.pylab.backend_inline':
- if not be == 'Qt5Agg': matplotlib.use('Qt5Agg')
+import matplotlib as mpl
+
+mpl.use('TkAgg')
+#be = matplotlib.get_backend()
+#if not be=='nbAgg' and not be=='module://ipykernel.pylab.backend_inline':
+# if not be == 'Qt5Agg': matplotlib.use('Qt5Agg')
 #import matplotlib.pylab as plt
+
 from matplotlib.pylab import *
 from matplotlib.colors import Colormap
 #import os.path
@@ -14,10 +18,15 @@ from  matplotlib import cm
 from matplotlib.tri import Triangulation
 from .utils import *
 import deepdish as dd
+from .viewer import *
+
 
 class Plot(object):
 
  def __init__(self,**argv):
+
+  
+
 
    #import data-------------------------------
    if 'geometry' in argv.keys():
@@ -82,16 +91,13 @@ class Plot(object):
 
 
 
- def get_node_data(self,variable):
+ def _get_node_data(self,data):
 
-
-   data = self.solver[variable]
 
    if data.ndim > 1:
        node_data = np.zeros((len(self.mesh['nodes']),3))
    else:   
        node_data = np.zeros(len(self.mesh['nodes']))
-
 
    for k,e in enumerate(self.mesh['elems']):
      for n in e:
@@ -100,77 +106,15 @@ class Plot(object):
    return node_data
 
 
- def _plot_data(self,tri,variable):
-
-
-   data = self.solver[variable]
-   if data.ndim == 2:
-      data = np.array([np.linalg.norm(d) for d in data]) 
-
-   node_data = np.zeros(len(self.mesh['nodes']))
-   conn = np.zeros(len(self.mesh['nodes']))
-   for k,e in enumerate(self.mesh['elems']):
-     for n in e:
-      conn[n] +=1
-      node_data[n] += data[k]
-
-
-   node_data = [node_data[n]/conn[n] for n in range(len(node_data))]
-   vmin = min(node_data)
-   vmax = max(node_data)
-   node_data -=vmin
-   node_data /= (vmax-vmin)
-
-   cc= 'viridis'
-   tripcolor(tri,np.array(node_data),cmap=cc,shading='gouraud',norm=mpl.colors.Normalize(vmin=0,vmax=1),zorder=1)
-   axis('off')
-   axis('equal')
-   Lx = self.mesh['size'][0]
-   Ly = self.mesh['size'][1]
-   xlim([-Lx/2,Lx/2])
-   ylim([-Ly/2,Ly/2])
-
-   show()
-
-
-
  def plot_maps(self,**argv):
 
-   from google.colab import widgets
 
-   tri = Triangulation(self.mesh['nodes'][:,0],self.mesh['nodes'][:,1], triangles=self.mesh['elems'], mask=None)
+   for key in self.solver['variables'].keys(): 
+       self.solver['variables'][key]['data'] = self._get_node_data(self.solver['variables'][key]['data'])
 
-   figure(num=' ', figsize=(5,5), dpi=80, facecolor='w', edgecolor='k');
-
-   titles = []
-   variables = []
-   directions = []
+   plot_results(self.solver['variables'],self.mesh['nodes'],np.array(self.mesh['elems']))
 
 
-   if 'temperature' in self.solver.keys():
-     titles.append('BTE Temperature')
-     variables.append('temperature')
-     directions.append(-1)
-
-   if 'temperature_fourier' in self.solver.keys():
-     titles.append('Fourier Temperature')
-     variables.append('temperature_fourier')
-     directions.append(-1)
-
-   if 'flux' in self.solver.keys():
-     titles.append('BTE Flux (magnitude)')
-     variables.append('flux')
-     directions.append(-1)
-
-   if 'flux_fourier' in self.solver.keys():
-     titles.append('Fourier flux (magnitude)')
-     variables.append('flux_fourier')
-     directions.append(-1)
-
-   tb = widgets.TabBar(titles, location='top')
-
-   for n,(variable,direction) in enumerate(zip(variables,directions)):
-     with tb.output_to(n): self._plot_data(tri,variable)
 
  def plot_geometry_2D(self,**argv):
 
@@ -269,7 +213,6 @@ class Plot(object):
             
 
  def plot_elem(self,ne,color='gray',translate = [0,0]) :
-
    
     elem = self.mesh['elems'][ne]
     pp = []
@@ -280,3 +223,23 @@ class Plot(object):
     gca().add_patch(patch)
 
 
+   #from google.colab import widgets
+   #tri = Triangulation(self.mesh['nodes'][:,0],self.mesh['nodes'][:,1], triangles=self.mesh['elems'], mask=None)
+   #figure(num=' ', figsize=(5,5), dpi=80, facecolor='w', edgecolor='k');
+   #print(variables)
+   #import ipywidgets as widgets
+   #from ipywidgets import interact, interactive, fixed, interact_manual
+   #from ipywidgets.embed import embed_data
+   #from ipywidgets.embed import embed_minimal_html
+   #import webbrowser
+   #interact(self._plot_data, x=[('one', 10), ('two', 20)])
+   #w = widgets.RadioButtons(
+   # options=variables,
+   # description='Maps',
+   # disabled=False
+   # )
+   #embed_minimal_html('export.html', views=[w], title='Widgets export')
+   #webbrowser.open_new('export.html')
+   #tb = widgets.TabBar(titles, location='top')
+   #for n,(variable,direction) in enumerate(zip(variables,directions)):
+   #  with tb.output_to(n): self._plot_data(tri,variable)

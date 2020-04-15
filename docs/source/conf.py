@@ -26,9 +26,21 @@ version = ''#release[: len(release) - len(release.lstrip("0123456789."))].rstrip
 
 master_doc = "index"
 
-nbsphinx_execute = 'always'
+nbsphinx_execute = 'auto'
 
-extensions = ["sphinx.ext.mathjax","nbsphinx"]
+#extensions = ["sphinx.ext.mathjax","nbsphinx"]
+
+
+extensions = ['sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',\
+    'sphinx.ext.intersphinx',\
+    'sphinx.ext.mathjax',\
+    'sphinx.ext.napoleon',\
+    'sphinx.ext.viewcode',\
+    'nbsphinx']
+
+
+
 
 html_theme = 'sphinx_rtd_theme'
 
