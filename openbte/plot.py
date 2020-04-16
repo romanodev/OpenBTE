@@ -52,16 +52,20 @@ class Plot(object):
 
  def write_vtk(self,**argv):
 
+   for key in self.solver['variables'].keys(): 
+       self.solver['variables'][key]['data'] = self._get_node_data(self.solver['variables'][key]['data'])
+
    output = []
    strc = 'PointData('
    for n,(key, value) in enumerate(self.solver['variables'].items()):
-     node_data = self.get_node_data(key)
-     output.append(node_data)
-     if node_data.ndim == 1:
-       strc += r'''Scalars(output[''' + str(n) + r'''],name =' ''' + value +  r''' ')'''
+       
+     output.append(value['data'])
+     name = value['name'] + '[' + value['units'] + ']'
+     if value['data'].ndim == 1:
+       strc += r'''Scalars(output[''' + str(n) + r'''],name =' ''' + name +  r''' ')'''
     
-     if node_data.ndim == 2:
-       strc += r'''Vectors(output[''' + str(n) + r'''],name =' ''' + value +  r''' ')'''
+     if value['data'].ndim == 2:
+       strc += r'''Vectors(output[''' + str(n) + r'''],name =' ''' + name +  r''' ')'''
 
      if n == len(self.solver['variables'])-1:
       strc += ')'
@@ -75,7 +79,6 @@ class Plot(object):
     vtk = VtkData(UnstructuredGrid(self.mesh['nodes'],triangle=self.mesh['elems']),data)
 
    vtk.tofile('output.vtk','ascii')
-
 
 
  def _get_node_data(self,data):

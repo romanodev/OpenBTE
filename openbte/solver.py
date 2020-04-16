@@ -137,7 +137,8 @@ class Solver(object):
 
 
         if comm.rank == 0:
-         dd.io.save('solver.h5',self.state)
+         if argv.setdefault('save',True):
+          dd.io.save('solver.h5',self.state)
          if self.verbose:
           print(' ')   
           print(colored('                 OpenBTE ended successfully','green'))
