@@ -1,7 +1,5 @@
 from __future__ import absolute_import
 import numpy as np
-from cvxopt import spmatrix, matrix, umfpack
-#from .MSolver import *
 from scipy.sparse.linalg import splu
 from termcolor import colored, cprint 
 from .utils import *
@@ -122,9 +120,6 @@ class Solver(object):
            print(colored(' -----------------------------------------------------------','green'))
 
         if not self.only_fourier:
-         if argv.setdefault('deviational',False):
-          data = self.solve_bte_deviational(**argv)
-         else: 
           data = self.solve_bte(**argv)
 
          variables = self.state['variables']
@@ -145,102 +140,6 @@ class Solver(object):
           print(' ')  
 
 
-  def solve_bte_deviational(self,**argv):
-
-     #Create the gradient function----
-     Lx = self.mesh['size'][0]
-     Tloc = np.zeros(self.mesh['n_elems'][0]) 
-     for e in range(self.mesh['n_elems'][0]):
-        cx = self.mesh['centroids'][e][0]
-        Tloc[e] = -0.5 + (cx+Lx/2)/Lx
-     #-------------------------------
-
-     if comm.rank == 0:
-      SS = np.zeros(1)
-      Gbp = np.zeros(1)
-      if len(self.mesh['db']) > 0:
-       Gb = np.einsum('qj,jn->qn',self.VMFP,self.mesh['db'],optimize=True)
-       Gbp = Gb.clip(min=0);Gbm2 = Gb.clip(max=0)
-       Gb = np.einsum('qj,jn->qn',self.sigma,self.mesh['db'],optimize=True)
-       Gbp = Gb.clip(min=0); Gbm = Gb.clip(max=0)
-       SS = np.einsum('qc,c->qc',Gbm2,1/Gbm.sum(axis=0))
-    
-      #---------------------------------------------------------------
-      BB = -np.outer(self.sigma[:,0],np.sum(self.mesh['B_with_area_old'],axis=0))*self.kappa_factor*1e-18
-
-      data = {'BB':BB,'SS':SS,'Gbp':Gbp}
-     else: data = None 
-     data = comm.bcast(data,root = 0)
-
-     #Main matrix----
-     G = np.einsum('qj,jn->qn',self.VMFP[self.rr],self.mesh['k'],optimize=True)
-     Gp = G.clip(min=0); Gm = G.clip(max=0)
-     D = np.ones((len(self.rr),self.n_elems))
-     for n,i in enumerate(self.mesh['i']): D[:,i] += Gp[:,n]
-     if len(self.mesh['db']) > 0:
-      Gb = np.einsum('qj,jn->qn',self.VMFP[self.rr],self.mesh['db'],optimize=True)
-      Gbp = Gb.clip(min=0);
-      for n,(i,j) in enumerate(zip(self.mesh['eb'],self.mesh['sb'])):
-         D[:,i]  += Gbp[:,n]
-     A = np.concatenate((Gm,D),axis=1)
-     P = np.zeros((len(self.rr),self.n_elems))
-     for n,(i,j) in enumerate(zip(self.mesh['i'],self.mesh['j'])): P[:,i] -= Gm[:,n]*self.mesh['B'][i,j]
-
-     lu = {i:sp.linalg.splu(sp.csc_matrix((A[n],(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)   ) for n,i in enumerate(self.rr) }
-
-     #Periodic------------------
-     #Compute boundary-----------------------------------------------
-     Xd = np.tile(self.state['variables'][0]['data'],(self.n_index,1))-Tloc
-     Xd_old = Xd.copy()
-     kappa_vec = [self.state['kappa_fourier'][0]]
-     kappa_old = kappa_vec[-1]
-     alpha = self.data.setdefault('alpha',1)
-     error = 1
-     kk = 0
-
-     Xdp = np.zeros_like(Xd)
-     Bm = np.zeros((self.n_index,self.n_elems))
-     DeltaTp = np.zeros(self.n_elems)   
-     DeltaT = np.zeros(self.n_elems)   
-
-     kappa = np.zeros(1)
-     while kk < self.data.setdefault('max_bte_iter',100) and error > self.data.setdefault('max_bte_error',1e-2):
-
-      #Boundary-----   
-      a = time.time()
-      Bm = np.zeros((len(self.rr),self.n_elems))   
-      if len(self.mesh['db']) > 0:
-       for n,i in enumerate(self.mesh['eb']): Bm[:,i] +=np.einsum('u,u,q->q',Xd[:,i],data['Gbp'][:,n],data['SS'][self.rr,n],optimize=True)
-      #---------------------
-
-      if self.coll:
-       DeltaT = np.matmul(self.BM[self.rr],alpha*X+(1-alpha)*X_old) 
-       for n,i in enumerate(self.rr): Xp[i] = lu[i].solve(DeltaT[n] + P[n] + Bm[n]) 
-      else: 
-       DeltaTp = np.dot(Xd[self.rr].T, self.ac[self.rr])
-       comm.Allreduce([DeltaTp,MPI.DOUBLE],[DeltaT,MPI.DOUBLE],op=MPI.SUM)
-
-       for n,i in enumerate(self.rr): Xdp[i] = lu[i].solve(DeltaT + Bm[n]  - self.VMFP[i,0]/100.0  ) 
-
-      kappap = np.array([np.sum(np.multiply(data['BB'][self.rr],Xdp[self.rr] + Tloc))])
-
-      comm.Allreduce([kappap,MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
-      comm.Allreduce([Xdp,MPI.DOUBLE],[Xd,MPI.DOUBLE],op=MPI.SUM)
-
-      kk +=1
-
-      error = abs(kappa_old-kappa[0])/abs(kappa[0])
-      kappa_old = kappa[0]
-      kappa_vec.append(kappa[0])
-      if self.verbose and comm.rank == 0:   
-       print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error))
-
-     if self.verbose and comm.rank == 0:
-      print(colored(' -----------------------------------------------------------','green'))
-
-     T = np.einsum('qc,q->c',Xd+Tloc,self.tc)
-     J = np.einsum('qj,qc->cj',self.sigma,Xd+Tloc)*1e-18
-     return {'kappa_vec':kappa_vec,'temperature':T,'flux':J}
 
 
   def solve_bte(self,**argv):
@@ -281,8 +180,6 @@ class Solver(object):
 
      #Periodic------------------
      #Compute boundary-----------------------------------------------
-
-
      X = np.tile(self.state['variables'][0]['data'],(self.n_index,1))
      X_old = X.copy()
      kappa_vec = [self.state['kappa_fourier'][0]]
@@ -331,8 +228,6 @@ class Solver(object):
      if self.verbose and comm.rank == 0:
       print(colored(' -----------------------------------------------------------','green'))
 
-     #print(time.time()-tt)
-    
 
      T = np.einsum('qc,q->c',X,self.tc)
      J = np.einsum('qj,qc->cj',self.sigma,X)*1e-18
@@ -529,15 +424,3 @@ class Solver(object):
     print(colored(' -----------------------------------------------------------','green'))
     print()   
 
-     #Fs = umfpack.symbolic(spmatrix(len(self.im),self.im,self.jm,(self.n_elems,self.n_elems)))
-     #for n,i in enumerate(self.rr):
-     #   a = time.time() 
-     #   sp.linalg.splu(sp.csc_matrix((A[n],(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt))
-     #   b = time.time()
-     #   umfpack.numeric(spmatrix(A[n],self.im,self.jm,(self.n_elems,self.n_elems)), Fs)
-     #   c = time.time()
-     #   print((c-b)/(b-a))
-     #Simbolic for everything-----
-     #lu = {i: umfpack.numeric(spmatrix(A[n],self.im,self.jm,(self.n_elems,self.n_elems)), Fs) for n,i in enumerate(self.rr)}
-     #print(time.time()-a)
-     #quit()
