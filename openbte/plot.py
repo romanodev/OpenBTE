@@ -6,11 +6,14 @@ from .utils import *
 import deepdish as dd
 from .viewer import *
 
+from mpi4py import MPI
+comm = MPI.COMM_WORLD
 
 class Plot(object):
 
  def __init__(self,**argv):
 
+  if comm.rank == 0:
 
    #import data-------------------------------
    if 'geometry' in argv.keys():

@@ -56,7 +56,9 @@ def plot_results(data,nodes,elems):
          add_data(nodes,elems,value['name'] + '(x)',value['data'][:,0],value['units'],buttons,fig,nv)
          add_data(nodes,elems,value['name'] + '(y)',value['data'][:,1],value['units'],buttons,fig,nv)
          if dim == 3: add_data(value['name']+ '(x)',value['data'][:,2],value['units'],buttons,fig,nv)
-         add_data(nodes,elems,value['name'] + '(mag.)',[np.linalg.norm(value) for value in value['data']],value['units'],buttons,fig,nv)
+         mag = [np.linalg.norm(value) for value in value['data']]
+         print(min(mag),max(mag))
+         add_data(nodes,elems,value['name'] + '(mag.)',mag,value['units'],buttons,fig,nv)
 
    fig.update_layout(
     font=dict(

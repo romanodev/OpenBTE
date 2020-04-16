@@ -7,6 +7,10 @@ import deepdish as dd
 import itertools
 from .GenerateInterface import *
 from mpi4py import MPI
+#import matplotlib
+#matplotlib.use('TkAgg')
+#from matplotlib.pylab import *
+
 
 comm = MPI.COMM_WORLD
 
@@ -20,7 +24,14 @@ class Geometry(object):
    else:
      Mesher(argv) #this create mesh.msh
 
-   self.compute_mesh_data(**argv)
+   data = self.compute_mesh_data(**argv)
+   if argv.setdefault('save',True):
+     dd.io.save('geometry.h5',self.data)
+  else:  data = None
+  self.data = comm.bcast(data,root=0)
+
+
+
 
  def compute_node_map(self,**argv):
 
@@ -56,7 +67,7 @@ class Geometry(object):
     self.elem_mat_map = { i:[0] for i in range(len(self.elems))}
 
 
-    self.data = {'side_list':self.side_list,\
+    return {'side_list':self.side_list,\
           'n_elems':np.array([self.n_elems]),\
           'elem_side_map':self.elem_side_map,\
           'side_elem_map':self.side_elem_map,\
@@ -73,6 +84,7 @@ class Geometry(object):
           'areas':self.side_areas,\
           'nodes':self.nodes,\
           'periodic_values':self.periodic_values,\
+          'periodic_side_values':self.periodic_side_values,\
           'interp_weigths':self.interp_weigths,\
           'centroids':self.elem_centroids,\
           'side_centroids':self.side_centroids,\
@@ -97,9 +109,6 @@ class Geometry(object):
           'n_side_per_elem':np.array([len(self.elems[0])])}
 
 
-    if argv.setdefault('save',True):
-     #save_dictionary(self.data,'geometry.h5')
-     dd.io.save('geometry.h5',self.data)
 
  def compute_dists(self):
   self.dists= {}   
@@ -355,6 +364,12 @@ class Geometry(object):
         c1 = self.compute_side_centroid(s[0])
         c2 = self.compute_side_centroid(s[1])
         plot([c1[0],c2[0]],[c1[1],c2[1]])
+       c1 = self.compute_elem_centroid(4151)
+       scatter(c1[0],c1[1],color='r')
+       c1 = self.compute_elem_centroid(4154)
+       scatter(c1[0],c1[1],color = 'g')
+       c1 = self.compute_elem_centroid(4150)
+       scatter(c1[0],c1[1],color = 'b')
        show()
 
       #Amend map
@@ -621,6 +636,7 @@ class Geometry(object):
 
     side_periodic_value = np.zeros((nsides,2))
     self.periodic_values = {}
+    self.periodic_side_values = {}
 
     n_el = len(self.elems)
     B = sp.dok_matrix((n_el,n_el),dtype=np.float64)
@@ -641,6 +657,9 @@ class Geometry(object):
 
       self.periodic_values.update({i:{j:[side_value[side[0]]]}})
       self.periodic_values.update({j:{i:[side_value[side[1]]]}})
+    
+      self.periodic_side_values.update({side[0]:side_value[side[0]]})
+
 
       normal = self.compute_side_normal(i,side[0])
       
@@ -653,10 +672,10 @@ class Geometry(object):
       self.ip.append(i); self.jp.append(j); self.dp.append(side_value[side[0]]); self.pv.append(normal*area/voli)
       self.ip.append(j); self.jp.append(i); self.dp.append(side_value[side[1]]); self.pv.append(-normal*area/volj)
 
-      if np.linalg.norm(np.cross(self.side_normals[side[0],1],applied_grad)) < 1e-5:
+      if np.linalg.norm(np.cross(self.side_normals[side[0],1],applied_grad)) < 1e-12:
        B_with_area_old[i,j] = abs(side_value[side[0]]*area)
        
-   
+
     #select flux sides-------------------------------
     self.flux_sides = [] #where flux goes
     total_area = 0

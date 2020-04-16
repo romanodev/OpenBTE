@@ -121,17 +121,18 @@ class Solver(object):
            print('      Iter    Thermal Conductivity [W/m/K]      Error ''')
            print(colored(' -----------------------------------------------------------','green'))
 
-        if argv.setdefault('deviational',False):
-         data = self.solve_bte_deviational(**argv)
-        else: 
-         data = self.solve_bte(**argv)
+        if not self.only_fourier:
+         if argv.setdefault('deviational',False):
+          data = self.solve_bte_deviational(**argv)
+         else: 
+          data = self.solve_bte(**argv)
 
-        variables = self.state['variables']
+         variables = self.state['variables']
 
-        variables[2]    = {'name':'Temperature BTE','units':'K'             ,'data':data['temperature']}
-        variables[3]    = {'name':'Flux BTE'       ,'units':'W/m/m/K'       ,'data':data['flux']}
+         variables[2]    = {'name':'Temperature BTE','units':'K'             ,'data':data['temperature']}
+         variables[3]    = {'name':'Flux BTE'       ,'units':'W/m/m/K'       ,'data':data['flux']}
 
-        self.state.update({'variables':variables,\
+         self.state.update({'variables':variables,\
                            'kappa':data['kappa_vec']})
 
 
@@ -143,7 +144,7 @@ class Solver(object):
           print(' ')  
 
 
-  def solve_deviational(self,**argv):
+  def solve_bte_deviational(self,**argv):
 
      #Create the gradient function----
      Lx = self.mesh['size'][0]
@@ -188,18 +189,15 @@ class Solver(object):
 
      #Periodic------------------
      #Compute boundary-----------------------------------------------
-
-
-     X = np.tile(self.state['variables'][0]['data'],(self.n_index,1))
-     X_old = X.copy()
+     Xd = np.tile(self.state['variables'][0]['data'],(self.n_index,1))-Tloc
+     Xd_old = Xd.copy()
      kappa_vec = [self.state['kappa_fourier'][0]]
      kappa_old = kappa_vec[-1]
      alpha = self.data.setdefault('alpha',1)
      error = 1
      kk = 0
 
-     Xp = np.zeros_like(X)
-     X = np.zeros_like(X)
+     Xdp = np.zeros_like(Xd)
      Bm = np.zeros((self.n_index,self.n_elems))
      DeltaTp = np.zeros(self.n_elems)   
      DeltaT = np.zeros(self.n_elems)   
@@ -211,23 +209,22 @@ class Solver(object):
       a = time.time()
       Bm = np.zeros((len(self.rr),self.n_elems))   
       if len(self.mesh['db']) > 0:
-       for n,i in enumerate(self.mesh['eb']): Bm[:,i] +=np.einsum('u,u,q->q',X[:,i],data['Gbp'][:,n],data['SS'][self.rr,n],optimize=True)
+       for n,i in enumerate(self.mesh['eb']): Bm[:,i] +=np.einsum('u,u,q->q',Xd[:,i],data['Gbp'][:,n],data['SS'][self.rr,n],optimize=True)
       #---------------------
 
       if self.coll:
        DeltaT = np.matmul(self.BM[self.rr],alpha*X+(1-alpha)*X_old) 
        for n,i in enumerate(self.rr): Xp[i] = lu[i].solve(DeltaT[n] + P[n] + Bm[n]) 
       else: 
-       DeltaTp = np.dot(X[self.rr].T, self.ac[self.rr])
+       DeltaTp = np.dot(Xd[self.rr].T, self.ac[self.rr])
        comm.Allreduce([DeltaTp,MPI.DOUBLE],[DeltaT,MPI.DOUBLE],op=MPI.SUM)
 
-       #for n,i in enumerate(self.rr): Xp[i] = lu[i].solve(DeltaT + P[n] + Bm[n]  + self.VMFP[i]/100.0  ) 
-       for n,i in enumerate(self.rr): Xp[i] = lu[i].solve(DeltaT + Bm[n]  - self.VMFP[i,0]/100.0  ) 
+       for n,i in enumerate(self.rr): Xdp[i] = lu[i].solve(DeltaT + Bm[n]  - self.VMFP[i,0]/100.0  ) 
 
-      kappap = np.array([np.sum(np.multiply(data['BB'][self.rr],Xp[self.rr] + Tloc))])
+      kappap = np.array([np.sum(np.multiply(data['BB'][self.rr],Xdp[self.rr] + Tloc))])
 
       comm.Allreduce([kappap,MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
-      comm.Allreduce([Xp,MPI.DOUBLE],[X,MPI.DOUBLE],op=MPI.SUM)
+      comm.Allreduce([Xdp,MPI.DOUBLE],[Xd,MPI.DOUBLE],op=MPI.SUM)
 
       kk +=1
 
@@ -240,8 +237,9 @@ class Solver(object):
      if self.verbose and comm.rank == 0:
       print(colored(' -----------------------------------------------------------','green'))
 
-     T = np.einsum('qc,q->c',X+Tloc,self.tc)
-     J = np.einsum('qj,qc->cj',self.sigma,X+Tloc)*1e-18
+     T = np.einsum('qc,q->c',Xd+Tloc,self.tc)
+     J = np.einsum('qj,qc->cj',self.sigma,Xd+Tloc)*1e-18
+     return {'kappa_vec':kappa_vec,'temperature':T,'flux':J}
 
 
   def solve_bte(self,**argv):
@@ -386,12 +384,13 @@ class Solver(object):
        F[i,j] -= v_orth/vi*area
        F[j,j] += v_orth/vj*area
        F[j,i] -= v_orth/vj*area
-       if  ll in self.mesh['side_list']['Periodic']:
-        B[i] += self.mesh['periodic_values'][i][j][0]*v_orth/vi*area
-        B[j] += self.mesh['periodic_values'][j][i][0]*v_orth/vj*area
+       if ll in self.mesh['side_list']['Periodic']:
+        #B[i] += self.mesh['periodic_values'][i][j][0]*v_orth/vi*area
+        #B[j] += self.mesh['periodic_values'][j][i][0]*v_orth/vj*area
+        B[i] += self.mesh['periodic_side_values'][ll]*v_orth/vi*area
+        B[j] -= self.mesh['periodic_side_values'][ll]*v_orth/vj*area
     self.fourier = {'Af':F.tocsc(),'Bf':B}
 
-    
 
 
   def solve_fourier(self,**argv):
@@ -447,7 +446,8 @@ class Solver(object):
      temp_2 = temp[kc2]
 
      if ll in self.mesh['side_list']['Periodic']:
-      temp_2 -= self.mesh['periodic_values'][kc2][kc1][0]
+      #temp_2 -= self.mesh['periodic_values'][kc2][kc1][0]
+      temp_2 -= self.mesh['periodic_side_values'][ll]
 
      diff_t = temp_2 - temp_1
      
