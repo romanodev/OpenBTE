@@ -120,7 +120,7 @@ class Solver(object):
            print(colored(' -----------------------------------------------------------','green'))
 
         if not self.only_fourier:
-          data = self.solve_bte(**argv)
+         data = self.solve_bte(**argv)
 
          variables = self.state['variables']
 
