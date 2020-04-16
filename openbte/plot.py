@@ -1,21 +1,7 @@
-
 from pyvtk import *
 import numpy as np
 import deepdish as dd
 import os
-import matplotlib as mpl
-#mpl.use('TkAgg')
-#be = mpl.get_backend()
-#print(be)
-#quit()
-#if not be=='nbAgg' and not be=='module://ipykernel.pylab.backend_inline':
-# if not be == 'Qt5Agg': matplotlib.use('Qt5Agg')
-#import matplotlib.pylab as plt
-#from matplotlib.pylab import *
-#from matplotlib.colors import Colormap
-#import os.path
-#from  matplotlib import cm
-#from matplotlib.tri import Triangulation
 from .utils import *
 import deepdish as dd
 from .viewer import *
@@ -24,8 +10,6 @@ from .viewer import *
 class Plot(object):
 
  def __init__(self,**argv):
-
-  
 
 
    #import data-------------------------------
@@ -37,7 +21,7 @@ class Plot(object):
 
 
    if 'solver' in argv.keys():
-    self.solver = argv['solver']
+    self.solver = argv['solver'].state
    else: 
        if os.path.isfile('solver.h5') :
         #self.solver = load_dictionary('solver.h5')

@@ -18,7 +18,6 @@ def plotly_trisurf(nodes, simplices, data,name,units,visible=False):
                      j=simplices[:,1],
                      k=simplices[:,2],
                      name=name,
-                     #showscale = True if len(units) > 0 else False,
                      showscale = True,
                      visible=visible
                     )
@@ -62,7 +61,7 @@ def plot_results(data,nodes,elems):
    fig.update_layout(
     font=dict(
         family="Courier New, monospace",
-        size=16,
+        size=12,
         color="#7f7f7f"
     )
    )
@@ -71,14 +70,14 @@ def plot_results(data,nodes,elems):
    fig.update_layout(
     title={
         'text': "OpenBTE",
-        'y':0.97,
+        'y':0.95,
         'x':0.5,
         'xanchor': 'center',
         'yanchor': 'top'})
 
    fig.update_layout(
-    width=800,
-    height=800,
+    width=500,
+    height=500,
     autosize=True,
     margin=dict(t=50, b=50, l=140, r=0),
     template='plotly_dark'
