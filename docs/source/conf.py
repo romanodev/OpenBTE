@@ -36,9 +36,19 @@ extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',\
     'sphinx.ext.mathjax',\
     'sphinx.ext.napoleon',\
+    'sphinx_autorun',\
     'sphinx.ext.viewcode',\
     'nbsphinx']
 
+
+nbsphinx_prolog = r"""
+.. raw:: html
+
+    <script src='http://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js'></script>
+    <script>require=requirejs;</script>
+
+
+"""
 
 
 

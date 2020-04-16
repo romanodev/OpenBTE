@@ -18,12 +18,14 @@ def plotly_trisurf(nodes, simplices, data,name,units,visible=False):
                      j=simplices[:,1],
                      k=simplices[:,2],
                      name=name,
+                     #showscale = True if len(units) > 0 else False,
+                     showscale = True,
                      visible=visible
                     )
 
 def add_data(nodes,elems,name,data,units,buttons,fig,nv):
 
-      plotly_data=plotly_trisurf(nodes,elems,data,name,units,visible= True if len(buttons) == 0 else False)
+      plotly_data=plotly_trisurf(nodes,elems,data,name,units,visible= True if len(buttons) == nv-1 else False)
       fig.add_trace(plotly_data)
       visible = nv*[False]; visible[len(buttons)] = True
       buttons.append(dict(label=name,
@@ -57,18 +59,6 @@ def plot_results(data,nodes,elems):
          if dim == 3: add_data(value['name']+ '(x)',value['data'][:,2],value['units'],buttons,fig,nv)
          add_data(nodes,elems,value['name'] + '(mag.)',[np.linalg.norm(value) for value in value['data']],value['units'],buttons,fig,nv)
 
-   updatemenus=[dict(direction='down',active=0,x=0.1,y=0.95,buttons=list(buttons))]
-   fig.update_layout(updatemenus=updatemenus)
-
-
-
-   fig.update_layout(
-    width=800,
-    height=800,
-    autosize=False,
-    margin=dict(t=0.1, b=0, l=0, r=0)
-   )  
-
    fig.update_layout(
     font=dict(
         family="Courier New, monospace",
@@ -81,41 +71,74 @@ def plot_results(data,nodes,elems):
    fig.update_layout(
     title={
         'text': "OpenBTE",
-        'y':0.94,
+        'y':0.97,
         'x':0.5,
         'xanchor': 'center',
         'yanchor': 'top'})
 
+   fig.update_layout(
+    width=800,
+    height=800,
+    autosize=True,
+    margin=dict(t=50, b=50, l=140, r=0),
+    template='plotly_dark'
+   )  
+
+   updatemenus=[dict(direction='down',active=nv-1,x=-0.05,y=1.05,buttons=list(buttons),showactive=True)]
+   fig.update_layout(updatemenus=updatemenus)
+
 
    #update axes---------------
    axis = dict(
-          showbackground=True,
           backgroundcolor="rgb(230, 230,230)",
           gridcolor="rgb(255, 255, 255)",
           zerolinecolor="rgb(255, 255, 255)",
+          showbackground=False
          )
 
-   #axis = dict(ticktext=[],tickvals= [])
+   #axis = dict(ticktext=[],tickvals= [],showbackground=False)
 
    # Update 3D scene options
    fig.update_scenes(
-    aspectratio=dict(x=1, y=1, z=0.5),
+    aspectratio=dict(x=1, y=1, z=1),
     aspectmode="manual",
     xaxis=dict(axis),
     yaxis=dict(axis),
     zaxis=dict(axis))
 
 
-
    #camera
    camera = dict(
-    up=dict(x=0, y=0, z=1),
+    up=dict(x=0, y=1, z=0),
     center=dict(x=0, y=0, z=0),
-    eye=dict(x=0, y=0, z=3)
+    eye=dict(x=0, y=0, z=2)
    )
 
+   fig.update_layout(xaxis_showgrid=False, yaxis_showgrid=False)
    fig.update_layout(scene_camera=camera)
+   #show_in_window(fig)
+
+   #fig.show()
 
    py.iplot(fig, filename='OpenBTE')
+
+
+#def show_in_window(fig):
+#    import sys, os
+#    import plotly.offline
+#    from PyQt5.QtCore import QUrl
+#    from PyQt5.QtWebEngineWidgets import QWebEngineView
+#    from PyQt5.QtWidgets import QApplication
+#
+#    plotly.offline.plot(fig, filename='name.html', auto_open=False)
+
+#    app = QApplication(sys.argv)
+#    web = QWebEngineView()
+#    file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "name.html"))
+#    web.load(QUrl.fromLocalFile(file_path))
+#    web.show()
+#    sys.exit(app.exec_())
+
+
 
 

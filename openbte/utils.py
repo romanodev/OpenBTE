@@ -8,6 +8,8 @@ from shapely.ops import cascaded_union
 import os
 import matplotlib.cm as cm
 import functools
+from matplotlib.path import Path
+import matplotlib.patches as patches
 
 
 def periodic_kernel(x1, x2, p,l,variance):
@@ -77,14 +79,8 @@ def load_dictionary(filename):
 
 def download_file(file_id,filename):
 
-    strc = 'wget --no-check-certificate https://docs.google.com/uc?export=download&id=' + file_id +' -O material.h5'
-    print(strc)
-    quit()
-    os.system('wget --no-check-certificate https://docs.google.com/uc?export=download&id=' + file_id +' -O material.h5')
-
-    #  os.system('wget https://googledrive.com/host/' + file_id)
-      #gdd.download_file_from_google_drive(file_id=file_id,
-      #                                     dest_path='./' + filename,showsize=True,overwrite=True)
+      gdd.download_file_from_google_drive(file_id=file_id,
+                                           dest_path='./' + filename,showsize=True,overwrite=True)
 
 
 def create_path(obj):

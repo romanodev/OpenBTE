@@ -4,18 +4,18 @@ import numpy as np
 import deepdish as dd
 import os
 import matplotlib as mpl
-
-mpl.use('TkAgg')
-#be = matplotlib.get_backend()
+#mpl.use('TkAgg')
+#be = mpl.get_backend()
+#print(be)
+#quit()
 #if not be=='nbAgg' and not be=='module://ipykernel.pylab.backend_inline':
 # if not be == 'Qt5Agg': matplotlib.use('Qt5Agg')
 #import matplotlib.pylab as plt
-
-from matplotlib.pylab import *
-from matplotlib.colors import Colormap
+#from matplotlib.pylab import *
+#from matplotlib.colors import Colormap
 #import os.path
-from  matplotlib import cm
-from matplotlib.tri import Triangulation
+#from  matplotlib import cm
+#from matplotlib.tri import Triangulation
 from .utils import *
 import deepdish as dd
 from .viewer import *
@@ -36,7 +36,6 @@ class Plot(object):
      self.mesh = dd.io.load('geometry.h5')
 
 
-
    if 'solver' in argv.keys():
     self.solver = argv['solver']
    else: 
@@ -53,8 +52,9 @@ class Plot(object):
 
    model = argv['model'].split('/')[0]
 
-   if model == 'geometry':
-    self.plot_geometry(**argv)
+   if model == 'structure':
+    #self.plot_geometry(**argv)
+    self.plot_structure(**argv)
 
    elif model == 'maps':
     self.plot_maps(**argv)
@@ -105,6 +105,13 @@ class Plot(object):
 
    return node_data
 
+ 
+ def plot_structure(self,**argv):
+
+   data = {0:{'name':'Structure','units':'','data':np.zeros(len(self.mesh['nodes']))}}
+
+   plot_results(data,self.mesh['nodes'],np.array(self.mesh['elems']))
+
 
  def plot_maps(self,**argv):
 
@@ -112,8 +119,8 @@ class Plot(object):
    for key in self.solver['variables'].keys(): 
        self.solver['variables'][key]['data'] = self._get_node_data(self.solver['variables'][key]['data'])
 
+   self.solver['variables'][-1] = {'name':'Structure','units':'','data':np.zeros(len(self.mesh['nodes']))}
    plot_results(self.solver['variables'],self.mesh['nodes'],np.array(self.mesh['elems']))
-
 
 
  def plot_geometry_2D(self,**argv):
@@ -129,7 +136,6 @@ class Plot(object):
         else:   
            color = 'gray'
         self.plot_elem(ne,color=color,translate = translate)
-
 
       if argv.setdefault('plot_boundary',False):
        #plot Boundary Conditions-----
@@ -161,8 +167,8 @@ class Plot(object):
       ly = self.mesh['ly']
       fig = figure(num=" ", figsize=(4*lx/ly, 4), dpi=80, facecolor='w', edgecolor='k')
       ax = axes([0.,0.,1,1])
-      nx = argv['nx']
-      ny = argv['ny']
+      nx = argv.setdefault('nx',1)
+      ny = argv.setdefault('ny',1)
   
       ix = int(nx/2)
       iy = int(ny/2)
