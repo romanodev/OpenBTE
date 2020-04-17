@@ -4,6 +4,7 @@ jaxlib
 ipykernel
 ipywidgets
 nbsphinx
+sphinx-autorun
 sphinx-autodoc-typehints
 # The next packages are for notebooks
 matplotlib
