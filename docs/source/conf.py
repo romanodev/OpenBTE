@@ -37,7 +37,6 @@ extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.mathjax',\
     'sphinx.ext.napoleon',\
     'sphinx_autorun',\
-    'jupyter_sphinx.execute',
     'sphinx.ext.viewcode',\
     'nbsphinx']
 
