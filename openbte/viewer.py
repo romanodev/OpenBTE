@@ -1,6 +1,8 @@
 import plotly.offline as py
 import plotly.graph_objs as go
 import numpy as np
+import plotly.io as pio
+py.renderer='jupyterlab'
 
 
 def plotly_trisurf(nodes, simplices, data,name,units,visible=False):
@@ -57,7 +59,6 @@ def plot_results(data,nodes,elems):
          add_data(nodes,elems,value['name'] + '(y)',value['data'][:,1],value['units'],buttons,fig,nv)
          if dim == 3: add_data(value['name']+ '(x)',value['data'][:,2],value['units'],buttons,fig,nv)
          mag = [np.linalg.norm(value) for value in value['data']]
-         print(min(mag),max(mag))
          add_data(nodes,elems,value['name'] + '(mag.)',mag,value['units'],buttons,fig,nv)
 
    fig.update_layout(
@@ -120,7 +121,6 @@ def plot_results(data,nodes,elems):
    #show_in_window(fig)
 
    #fig.show()
-
    py.iplot(fig, filename='OpenBTE')
 
 

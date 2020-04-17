@@ -14,7 +14,6 @@ comm = MPI.COMM_WORLD
 class Solver(object):
 
   def __init__(self,**argv):
-
         self.data = argv
         self.tt = np.float64
         self.state = {}
