@@ -36,6 +36,7 @@ class Mesher(object):
   else:   
      self.generate_mesh_3D(argv)
 
+
  def generate_bulk_3D(self,argv):
 
 
@@ -646,8 +647,6 @@ class Mesher(object):
            pts1,ind1 = self.get_points_from_surface(s1)
            pts2,ind2 = self.get_points_from_surface(s2)
 
-           #if a == 1:
-           #  print(pts1)
 
            for n1,p1 in zip(ind1,pts1):
             for n2,p2 in zip(ind2,pts2):

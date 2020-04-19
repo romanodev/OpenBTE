@@ -12,7 +12,7 @@ def plotly_trisurf(nodes, simplices, data,name,units,visible=False):
                       y=nodes[:,1],
                       z=z,
                       colorscale='Viridis',
-                      colorbar_title = '[' + units + ']',
+                      colorbar_title = '[' + units + ']' if len(units) > 0 else "",
                      intensity = data,
                      colorbar=dict(len=0.5),
                      intensitymode='vertex',
@@ -26,18 +26,21 @@ def plotly_trisurf(nodes, simplices, data,name,units,visible=False):
 
 def add_data(nodes,elems,name,data,units,buttons,fig,nv):
 
-      plotly_data=plotly_trisurf(nodes,elems,data,name,units,visible= True if len(buttons) == nv-1 else False)
+      plotly_data=plotly_trisurf(nodes,elems,data,name,units,visible= True if (len(buttons) == nv-2 or nv == 1) else False)
       fig.add_trace(plotly_data)
       visible = nv*[False]; visible[len(buttons)] = True
       buttons.append(dict(label=name,
                      method="update",
-                     args=[{"visible":visible},
-                           ]))
+                     args=[{"visible":visible},]))
 
 
 def plot_results(data,nodes,elems):
 
-   dim = 2   if (max(nodes[:,2]) - min(nodes[:,2])) == 0 else 3
+       
+   size = [ max(nodes[:,i]) - min(nodes[:,i])  for i in range(3)] 
+   dim = 2   if size[2] == 0 else 3
+
+   print(dim)
    #Get total number of variables to be plotted 
    nv = 0
    for key,value in data.items():
@@ -57,7 +60,7 @@ def plot_results(data,nodes,elems):
      elif value['data'].ndim == 2 : #vector 
          add_data(nodes,elems,value['name'] + '(x)',value['data'][:,0],value['units'],buttons,fig,nv)
          add_data(nodes,elems,value['name'] + '(y)',value['data'][:,1],value['units'],buttons,fig,nv)
-         if dim == 3: add_data(value['name']+ '(x)',value['data'][:,2],value['units'],buttons,fig,nv)
+         if dim == 3: add_data(nodes,elems,value['name']+ '(z)',value['data'][:,2],value['units'],buttons,fig,nv)
          mag = [np.linalg.norm(value) for value in value['data']]
          add_data(nodes,elems,value['name'] + '(mag.)',mag,value['units'],buttons,fig,nv)
 
@@ -65,7 +68,8 @@ def plot_results(data,nodes,elems):
     font=dict(
         family="Courier New, monospace",
         size=12,
-        color="#7f7f7f"
+        #color="#7f7f7f"
+        color="gray"
     )
    )
 
@@ -73,8 +77,8 @@ def plot_results(data,nodes,elems):
    fig.update_layout(
     title={
         'text': "OpenBTE",
-        'y':0.95,
-        'x':0.5,
+        'y':0.93,
+        'x':0.88,
         'xanchor': 'center',
         'yanchor': 'top'})
 
@@ -82,11 +86,11 @@ def plot_results(data,nodes,elems):
     width=500,
     height=500,
     autosize=True,
-    margin=dict(t=50, b=50, l=140, r=0),
+    margin=dict(t=50, b=20, l=20, r=20),
     template='plotly_dark'
    )  
 
-   updatemenus=[dict(direction='down',active=nv-1,x=-0.05,y=1.05,buttons=list(buttons),showactive=True)]
+   updatemenus=[dict(direction='down',active=nv-2 if nv > 1 else 0,x=0.4,y=1.15,buttons=list(buttons),showactive=True)]
    fig.update_layout(updatemenus=updatemenus)
 
 
@@ -102,7 +106,9 @@ def plot_results(data,nodes,elems):
 
    # Update 3D scene options
    fig.update_scenes(
-    aspectratio=dict(x=1, y=1, z=1),
+    aspectratio=dict(x=1, \
+                     y=size[1]/size[0], \
+                     z= 1 if dim == 2 else size[2]/size[0]),
     aspectmode="manual",
     xaxis=dict(axis),
     yaxis=dict(axis),

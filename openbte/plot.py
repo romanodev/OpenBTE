@@ -22,12 +22,10 @@ class Plot(object):
     if os.path.isfile('geometry.h5') :   
      self.mesh = dd.io.load('geometry.h5')
 
-
    if 'solver' in argv.keys():
     self.solver = argv['solver'].state
    else: 
        if os.path.isfile('solver.h5') :
-        #self.solver = load_dictionary('solver.h5')
         self.solver = dd.io.load('solver.h5')
 
    #if 'material' in argv.keys():
@@ -40,7 +38,6 @@ class Plot(object):
    model = argv['model'].split('/')[0]
 
    if model == 'structure':
-    #self.plot_geometry(**argv)
     self.plot_structure(**argv)
 
    elif model == 'maps':
@@ -81,7 +78,7 @@ class Plot(object):
    vtk.tofile('output.vtk','ascii')
 
 
- def _get_node_data(self,data):
+ def _get_node_data(self,data,indices=None):
 
 
    if data.ndim > 1:
@@ -93,149 +90,58 @@ class Plot(object):
      for n in e:
       node_data[n] += data[k]/self.mesh['conn'][n]
 
+   if not indices == None: node_data = node_data[indices]
+
    return node_data
+
+
+ def get_surface_nodes(self):
+
+
+     triangles = []
+     nodes = []
+     for l in list(self.mesh['side_list']['Boundary']) + \
+               list(self.mesh['side_list']['Periodic']) + \
+               list(self.mesh['side_list']['Inactive']) :
+          tmp = []
+          for i in self.mesh['sides'][l]:
+              #if i in nodes:  
+              # k = nodes.index(i)   
+              #else: 
+               nodes.append(i)
+               k = len(nodes)-1
+               tmp.append(k)
+          triangles.append(tmp)
+
+     return np.array(triangles),nodes
 
  
  def plot_structure(self,**argv):
 
-   data = {0:{'name':'Structure','units':'','data':np.zeros(len(self.mesh['nodes']))}}
-
-   plot_results(data,self.mesh['nodes'],np.array(self.mesh['elems']))
-
+   if self.mesh['dim'] == 2:   
+    data = {0:{'name':'Structure','units':'','data':np.zeros(len(self.mesh['nodes']))}}
+    plot_results(data,self.mesh['nodes'],np.array(self.mesh['elems']))
+   else: 
+    if self.mesh['dim'] == 3:
+     triangles,indices = self.get_surface_nodes()   
+     data = {0:{'name':'Structure','units':'','data':np.zeros(len(indices))}}
+     plot_results(data,self.mesh['nodes'][indices],triangles)
+     
 
  def plot_maps(self,**argv):
 
 
+   if self.mesh['dim'] == 3:
+     elems,indices = self.get_surface_nodes()  
+   else:  
+     elems = self.mesh['elems']
+     indices = np.arange(len(self.mesh['nodes']))
+
    for key in self.solver['variables'].keys(): 
-       self.solver['variables'][key]['data'] = self._get_node_data(self.solver['variables'][key]['data'])
+       self.solver['variables'][key]['data'] = self._get_node_data(self.solver['variables'][key]['data'],indices=indices)
 
-   self.solver['variables'][-1] = {'name':'Structure','units':'','data':np.zeros(len(self.mesh['nodes']))}
-   plot_results(self.solver['variables'],self.mesh['nodes'],np.array(self.mesh['elems']))
+   self.solver['variables'][-1] = {'name':'Structure','units':'','data':np.zeros(len(indices))}
 
-
- def plot_geometry_2D(self,**argv):
-
-      translate = argv.setdefault('translate',[0,0]) 
-    
-      size = self.mesh['size']
-      frame = self.mesh['frame']
-      for ne in range(len(self.mesh['elems'])):
-        cc =  self.mesh['elem_mat_map'][ne]
-        if cc == 1:
-           color = 'gray'
-        else:   
-           color = 'gray'
-        self.plot_elem(ne,color=color,translate = translate)
-
-      if argv.setdefault('plot_boundary',False):
-       #plot Boundary Conditions-----
-       for side in self.mesh['side_list']['Boundary'] :
-        p1 = self.mesh['sides'][side][0]
-        p2 = self.mesh['sides'][side][1]
-        n1 = self.mesh['nodes'][p1] + translate[0]
-        n2 = self.mesh['nodes'][p2] + translate[1]
-        gca().plot([n1[0]+translate[0],n2[0]+translate[0]],[n1[1]+translate[1],n2[1]+translate[1]],color='#f77f0e',lw=2)
-     
-       for side in self.mesh['side_list']['Periodic'] + self.mesh['side_list']['Inactive']  :
-        p1 = self.mesh['sides'][side][0]
-        p2 = self.mesh['sides'][side][1]
-        n1 = self.mesh['nodes'][p1] 
-        n2 = self.mesh['nodes'][p2] 
-        gca().plot([n1[0]+translate[0],n2[0]+translate[0]],[n1[1]+translate[1],n2[1]+translate[1]],color='g',lw=2,zorder=1)
-        
-      gca().axis('off')
-     
-   
+   plot_results(self.solver['variables'],self.mesh['nodes'][indices],elems)
 
 
-
- def plot_geometry(self,**argv):
-
-     if self.mesh['dim'][0] == 2:
-
-      lx = self.mesh['lx']
-      ly = self.mesh['ly']
-      fig = figure(num=" ", figsize=(4*lx/ly, 4), dpi=80, facecolor='w', edgecolor='k')
-      ax = axes([0.,0.,1,1])
-      nx = argv.setdefault('nx',1)
-      ny = argv.setdefault('ny',1)
-  
-      ix = int(nx/2)
-      iy = int(ny/2)
-      for i in range(argv['nx']):
-       for j in range(argv['ny']):
-        if i == ix and j ==iy:
-          plot_boundary = argv.setdefault('plot_boundary',False)
-        else:  
-          plot_boundary = False
-
-        self.plot_geometry_2D(translate = [lx*(i-ix),ly*(j-iy)],plot_boundary = plot_boundary)
-
-      ax.set_xlim([-lx/2*nx,lx/2*ny])
-      ax.set_ylim([-ly/2*nx,ly/2*ny])
-      savefig('test.png',dpi=600)
-      show()
-
-     else:
-         from mpl_toolkits.mplot3d import Axes3D 
-         from matplotlib.colors import LightSource
-         x = []; y = [];z = []
-         triangles = []
-         #nodes = []
-         for l in list(self.mesh['side_list']['Boundary']) + \
-                  list(self.mesh['side_list']['Periodic']) + \
-                  list(self.mesh['side_list']['Inactive']) :
-          tmp = []   
-          for i in self.mesh['sides'][l]: 
-              x.append(self.mesh['nodes'][i][0])  
-              y.append(self.mesh['nodes'][i][1])  
-              z.append(self.mesh['nodes'][i][2]) 
-              k = len(x)-1
-              tmp.append(k)
-          triangles.append(tmp) 
-         
-         fig = figure()
-         ax = fig.gca(projection='3d')
-
-         ax.plot_trisurf(x, y,z, linewidth=0.2,triangles=triangles,antialiased=True,edgecolor='gray',cmap='viridis',vmin=0.2,vmax=0.2)
-         ax.axis('off')
-
-         MAX = np.max(np.vstack((x,y,z)))
-         for direction in (-1, 1):
-          for point in np.diag(direction * MAX * np.array([1,1,1])):
-           ax.plot([point[0]], [point[1]], [point[2]], 'w')
-
-         show() 
-            
-
- def plot_elem(self,ne,color='gray',translate = [0,0]) :
-   
-    elem = self.mesh['elems'][ne]
-    pp = []
-    for e in elem:
-     pp.append(self.mesh['nodes'][e][:2] + np.array(translate))
-    path = create_path(pp)
-    patch = patches.PathPatch(path,linestyle=None,linewidth=0,color=color,zorder=1,joinstyle='miter',alpha=0.7)
-    gca().add_patch(patch)
-
-
-   #from google.colab import widgets
-   #tri = Triangulation(self.mesh['nodes'][:,0],self.mesh['nodes'][:,1], triangles=self.mesh['elems'], mask=None)
-   #figure(num=' ', figsize=(5,5), dpi=80, facecolor='w', edgecolor='k');
-   #print(variables)
-   #import ipywidgets as widgets
-   #from ipywidgets import interact, interactive, fixed, interact_manual
-   #from ipywidgets.embed import embed_data
-   #from ipywidgets.embed import embed_minimal_html
-   #import webbrowser
-   #interact(self._plot_data, x=[('one', 10), ('two', 20)])
-   #w = widgets.RadioButtons(
-   # options=variables,
-   # description='Maps',
-   # disabled=False
-   # )
-   #embed_minimal_html('export.html', views=[w], title='Widgets export')
-   #webbrowser.open_new('export.html')
-   #tb = widgets.TabBar(titles, location='top')
-   #for n,(variable,direction) in enumerate(zip(variables,directions)):
-   #  with tb.output_to(n): self._plot_data(tri,variable)

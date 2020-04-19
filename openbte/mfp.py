@@ -18,7 +18,7 @@ def generate_mfp(**argv):
    sym = 1
 
    Dtheta = np.pi/n_theta
-   theta = np.linspace(Dtheta/2.0,np.pi/2 - Dtheta/2.0,n_theta)
+   theta = np.linspace(Dtheta/2.0,np.pi - Dtheta/2.0,n_theta)
    dtheta = 2.0*np.sin(Dtheta/2.0)*np.sin(theta)
 
 

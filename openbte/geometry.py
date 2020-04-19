@@ -7,10 +7,7 @@ import deepdish as dd
 import itertools
 from .GenerateInterface import *
 from mpi4py import MPI
-#import matplotlib
-#matplotlib.use('TkAgg')
-#from matplotlib.pylab import *
-
+import time
 
 comm = MPI.COMM_WORLD
 
@@ -23,14 +20,13 @@ class Geometry(object):
      GenerateInterface(**argv) 
    else:
      Mesher(argv) #this create mesh.msh
+     self.dmin = argv['dmin']
 
    data = self.compute_mesh_data(**argv)
    if argv.setdefault('save',True):
      dd.io.save('geometry.h5',self.data)
   else:  data = None
   self.data = comm.bcast(data,root=0)
-
-
 
 
  def compute_node_map(self,**argv):
@@ -157,7 +153,7 @@ class Geometry(object):
      else:
        s = np.where(np.array(self.elem_side_map[l1])==ll)[0][0]
        self.eb.append(l1)
-       self.sb.append(s)
+       self.sb.append(ll)
        self.db.append(normal*area/vol1)
        self.dbp.append(normal)
 

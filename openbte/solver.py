@@ -6,7 +6,8 @@ from .utils import *
 import deepdish as dd
 from mpi4py import MPI
 import scipy.sparse as sp
-import time
+import plotly.express as px
+
 
 comm = MPI.COMM_WORLD
 
@@ -18,14 +19,13 @@ class Solver(object):
         self.tt = np.float64
         self.state = {}
 
- 
         #-----IMPORT MESH-------------------
         if 'geometry' in argv.keys():
          self.mesh = argv['geometry'].data
         else: 
          #self.mesh = load_dictionary('geometry.h5')
          self.mesh = dd.io.load('geometry.h5')
-  
+
         self.n_elems = self.mesh['n_elems'][0]
         self.im = np.concatenate((self.mesh['i'],list(np.arange(self.n_elems))))
         self.jm = np.concatenate((self.mesh['j'],list(np.arange(self.n_elems))))
@@ -169,8 +169,7 @@ class Solver(object):
      if len(self.mesh['db']) > 0:
       Gb = np.einsum('qj,jn->qn',self.VMFP[self.rr],self.mesh['db'],optimize=True)
       Gbp = Gb.clip(min=0);
-      for n,(i,j) in enumerate(zip(self.mesh['eb'],self.mesh['sb'])):
-         D[:,i]  += Gbp[:,n]
+      for n,i in enumerate(self.mesh['eb']): D[:,i]  += Gbp[:,n]
      A = np.concatenate((Gm,D),axis=1)
      P = np.zeros((len(self.rr),self.n_elems))
      for n,(i,j) in enumerate(zip(self.mesh['i'],self.mesh['j'])): P[:,i] -= Gm[:,n]*self.mesh['B'][i,j]
@@ -196,7 +195,6 @@ class Solver(object):
      while kk < self.data.setdefault('max_bte_iter',100) and error > self.data.setdefault('max_bte_error',1e-2):
 
       #Boundary-----   
-      a = time.time()
       Bm = np.zeros((len(self.rr),self.n_elems))   
       if len(self.mesh['db']) > 0:
        for n,i in enumerate(self.mesh['eb']): Bm[:,i] +=np.einsum('u,u,q->q',X[:,i],data['Gbp'][:,n],data['SS'][self.rr,n],optimize=True)
@@ -341,8 +339,7 @@ class Solver(object):
      temp_2 = temp[kc2]
 
      if ll in self.mesh['side_list']['Periodic']:
-      #temp_2 -= self.mesh['periodic_values'][kc2][kc1][0]
-      temp_2 -= self.mesh['periodic_side_values'][ll]
+      temp_2 += self.mesh['periodic_side_values'][ll]
 
      diff_t = temp_2 - temp_1
      
