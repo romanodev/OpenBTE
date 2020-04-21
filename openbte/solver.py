@@ -155,8 +155,8 @@ class Solver(object):
        SS = np.einsum('qc,c->qc',Gbm2,1/Gbm.sum(axis=0))
     
       #---------------------------------------------------------------
-      BB = -np.outer(self.sigma[:,0],np.sum(self.mesh['B_with_area_old'],axis=0))*self.kappa_factor*1e-18
-
+      #BB = -np.outer(self.sigma[:,0],self.mesh['B_with_area_old'])*self.kappa_factor*1e-18
+      BB = -np.einsum('q,c->qc',self.sigma[:,0],self.mesh['B_with_area_old'][0])*self.kappa_factor*1e-18
       data = {'BB':BB,'SS':SS,'Gbp':Gbp}
      else: data = None 
      data = comm.bcast(data,root = 0)

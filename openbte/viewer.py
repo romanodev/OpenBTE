@@ -7,6 +7,7 @@ py.renderer='jupyterlab'
 
 def plotly_trisurf(nodes, simplices, data,name,units,visible=False):
 
+
     z = np.zeros(len(nodes))  if np.shape(nodes)[1] == 2 else nodes[:,2]
     return go.Mesh3d(x=nodes[:,0],
                       y=nodes[:,1],
@@ -40,8 +41,6 @@ def plot_results(data,nodes,elems):
    size = [ max(nodes[:,i]) - min(nodes[:,i])  for i in range(3)] 
    dim = 2   if size[2] == 0 else 3
 
-   print(dim)
-   #Get total number of variables to be plotted 
    nv = 0
    for key,value in data.items():
      if value['data'].ndim == 1:

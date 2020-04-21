@@ -85,7 +85,7 @@ class Geometry(object):
           'centroids':self.elem_centroids,\
           'side_centroids':self.side_centroids,\
           'volumes':self.elem_volumes,\
-          'B_with_area_old':self.B_with_area_old.todense(),\
+          'B_with_area_old':np.array(np.sum(self.B_with_area_old.todense(),axis=0)),\
           'B':self.B.todense(),\
           'normals':self.new_normals,\
           'dists':self.dists,\

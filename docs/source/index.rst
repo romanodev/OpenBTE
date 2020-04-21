@@ -5,4 +5,4 @@ Welcome to OpenBTE's documentation
    :maxdepth: 2
    :caption: Example:
 
-   test
+   notebooks/example_1

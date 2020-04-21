@@ -17,6 +17,7 @@ class Mesher(object):
    #create polygons-----
    base = argv.setdefault('base',[[0,0]])
    if len(base) == 0 :
+    argv['dmin'] = 1e5
     if argv.setdefault('lz',0) == 0:
      return self.generate_bulk_2D(argv)
     else :
@@ -28,7 +29,6 @@ class Mesher(object):
    argv.update({'polygons':np.array(polygons)})
 
   repeat_merge_scale(argv)
-  self.dmin = argv['dmin']
   #---------------------
 
   if argv.setdefault('lz',0) == 0:
