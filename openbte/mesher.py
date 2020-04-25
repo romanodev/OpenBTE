@@ -183,7 +183,7 @@ class Mesher(object):
 
 
   store.close()
-  subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-n','-3','mesh.geo','-o','mesh.msh'])
+  subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-3','mesh.geo','-o','mesh.msh'])
 
  
 
@@ -831,7 +831,7 @@ class Mesher(object):
     store.write(strc) 
 
    store.close()
-   subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-n','-3','mesh.geo','-o','mesh.msh'])
+   subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-3','mesh.geo','-o','mesh.msh'])
 
  def line_exists_ordered(self,p1,p2):
      
