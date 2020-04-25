@@ -67,9 +67,9 @@ def generate_mfp2DSym(**argv):
  mfp = np.logspace(min([-2,np.log10(min(mfp_bulk)*0.99)]),np.log10(max(mfp_bulk)*1.01),n_mfp)#min MFP = 1e-2 
 
  n_mfp = len(mfp)
- temp_coeff = np.zeros(n_mfp*n_phi) 
- kappa_directional = np.zeros((n_mfp*n_phi,3)) 
- kappa_directional_not_int = np.zeros((n_mfp*n_phi,3)) 
+ temp_coeff = np.zeros((n_mfp,n_phi))
+ kappa_directional = np.zeros((n_mfp,n_phi,3)) 
+ #kappa_directional_not_int = np.zeros((n_mfp*n_phi,3)) 
    
  for p in range(n_phi): 
   for t in range(n_theta): 
@@ -79,14 +79,14 @@ def generate_mfp2DSym(**argv):
       index_1 = p*n_mfp + m1
       index_2 = p*n_mfp + m2
       if mfp_bulk[m] > 0:
-       kappa_directional[index_1]         += 3 * a1 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]
-       kappa_directional[index_2]         += 3 * a2 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]
-       temp_coeff[index_1] += a1 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
-       temp_coeff[index_2] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
+       kappa_directional[m1,p]         += 3 * a1 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]
+       kappa_directional[m2,p]         += 3 * a2 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]
+       temp_coeff[m1,p] += a1 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
+       temp_coeff[m2,p] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
 
 
  #replicate bulk values---
- mfp = np.tile(mfp,n_phi)  
+ #mfp = np.tile(mfp,n_phi)  
  #-----------------------
 
  tc = temp_coeff/np.sum(temp_coeff)
@@ -96,21 +96,25 @@ def generate_mfp2DSym(**argv):
  angle_map = np.repeat(angle_map,n_mfp)
 
  #repeat angle---
- kappa_directional[:,2] = 0 #Enforce zeroflux on z (for visualization purposed)
- polar_ave = np.array([np.repeat(polar_ave[:,i],n_mfp) for i in range(3)]).T
- polar = np.array([np.repeat(polar[:,i],n_mfp) for i in range(3)]).T
+ kappa_directional[:,:,2] = 0 #Enforce zeroflux on z (for visualization purposed)
+ #polar_ave = np.array([np.repeat(polar_ave[:,i],n_mfp) for i in range(3)]).T
+ #polar = np.array([np.repeat(polar[:,i],n_mfp) for i in range(3)]).T
  #---------------------------------
- 
- F = np.einsum('i,ij->ij',mfp,polar)
 
- #G = Flux--- [W/m/K]
- #F = vectorial MFP [m]
- #Wod = Matrix
- #kapp
 
+ #this is for Fourier----
+ #angular_average = np.zeros((3,3))
+ #for p in range(n_phi):
+ #    angular_average += np.einsum('i,j->ij',polar_ave[p],polar_ave[p])/n_phi
+
+ #print(angular_average)
+ #quit()
+ #F = np.einsum('i,ij->ij',mfp,polar)
+ F = np.einsum('m,pi->mpi',mfp,polar_ave)
+
+ rhs_average = mfp_sampled*mfp_sampled/2
  
  #Final----
- data = {'temp':tc,'F':F,'B':[],'G':kappa_directional,'kappa':kappa,'ac':tc,'scale':np.ones(nm)}
+ return {'temp':tc,'B':[],'F':F,'G':kappa_directional,'kappa':kappa,'scale':np.ones((n_mfp,n_phi)),'ac':tc,'mfp_average':rhs_average}
 
- return data
 

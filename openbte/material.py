@@ -6,7 +6,6 @@ from .full_model import generate_full
 from .utils import *
 from .mfp2DSym import *
 from .mfp import *
-from .mfp_ms import *
 import deepdish as dd
 from mpi4py import MPI
 
@@ -30,7 +29,7 @@ class Material(object):
     elif model == 'full':
       dd.io.save('material.h5',generate_full(**argv)) 
 
-    elif model == 'mfp2DSym':
+    elif model == 'mfp2DSym_ms':
       dd.io.save('material.h5',generate_mfp2DSym(**argv)) 
 
     elif model == 'mfp':
