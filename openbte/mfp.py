@@ -5,7 +5,7 @@ import scipy
 import deepdish as dd
 from .utils import *
 
-def generate_mfp_ms(**argv): 
+def generate_mfp(**argv): 
 
    #Polar Angle-----
    n_phi = int(argv.setdefault('n_phi',48)); Dphi = 2.0*np.pi/n_phi
