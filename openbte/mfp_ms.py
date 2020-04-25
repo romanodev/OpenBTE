@@ -71,7 +71,6 @@ def generate_mfp_ms(**argv):
       temp_coeff[m1,index_1] += a1 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]*sym
       temp_coeff[m2,index_2] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]*sym
 
-
    #kappa = np.zeros((3,3))
    direction = direction_ave.reshape((n_theta * n_phi,3))
    #direction = np.array([np.repeat(direction[:,i],n_mfp) for i in range(3)]).T
@@ -79,10 +78,10 @@ def generate_mfp_ms(**argv):
    #F = np.einsum('i,ij->ij',mfp,direction)
 
    #Build multiscale directions---
-   F = np.einsum('m,dj->mdj',np.flip(mfp_sampled),direction)
-   #F = np.einsum('m,dj->mdj',mfp_sampled,direction)
-   temp_coeff = np.flip(temp_coeff,axis=0)
-   kappa_directional = np.flip(kappa_directional,axis=0)
+   #F = np.einsum('m,dj->mdj',np.flip(mfp_sampled),direction)
+   F = np.einsum('m,dj->mdj',mfp_sampled,direction)
+   #temp_coeff = np.flip(temp_coeff,axis=0)
+   #kappa_directional = np.flip(kappa_directional,axis=0)
 
    #this is for Fourier----
    angular_average = np.zeros((3,3))
@@ -90,9 +89,10 @@ def generate_mfp_ms(**argv):
     for p in range(n_phi):
      angular_average += np.einsum('i,j->ij',direction_ave[t,p],direction_ave[t,p])*domega[t,p]/4.0/np.pi
 
-   kappa_average = np.einsum('l,ij->lij',3*np.flip(kappa_m),angular_average)
-   rhs_average = 1/np.flip(kappa_m)/np.flip(kappa_m)
-
+   #kappa_average = np.einsum('l,ij->lij',3*np.flip(kappa_m),angular_average)
+   kappa_average = np.einsum('l,ij->lij',3*kappa_m,angular_average)
+   #rhs_average = 3/np.flip(mfp_sampled)/np.flip(mfp_sampled)
+   rhs_average = mfp_sampled*mfp_sampled/3
    #-----------------------------
 
    #replicate bulk values---
@@ -102,7 +102,8 @@ def generate_mfp_ms(**argv):
       for m in range(n_mfp): 
         index = t * n_phi + p 
         tmp = kappa_directional[m,index]
-        kappa += np.outer(tmp,direction_ave[t,p])*np.flip(mfp_sampled)[m]
+        #kappa += np.outer(tmp,direction_ave[t,p])*np.flip(mfp_sampled)[m]
+        kappa += np.outer(tmp,direction_ave[t,p])*mfp_sampled[m]
    #------------------
    #-----------------------------
    tc = temp_coeff/np.sum(temp_coeff)

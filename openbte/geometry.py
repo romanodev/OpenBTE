@@ -24,7 +24,7 @@ class Geometry(object):
 
    data = self.compute_mesh_data(**argv)
    if argv.setdefault('save',True):
-     dd.io.save('geometry.h5',self.data)
+     dd.io.save('geometry.h5',data)
   else:  data = None
   self.data = comm.bcast(data,root=0)
 
@@ -85,7 +85,7 @@ class Geometry(object):
           'centroids':self.elem_centroids,\
           'side_centroids':self.side_centroids,\
           'volumes':self.elem_volumes,\
-          'B_with_area_old':np.array(np.sum(self.B_with_area_old.todense(),axis=0)),\
+          'kappa_mask':np.array(np.sum(self.B_with_area_old.todense(),axis=0))[0],\
           'B':self.B.todense(),\
           'normals':self.new_normals,\
           'dists':self.dists,\

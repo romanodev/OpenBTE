@@ -58,8 +58,7 @@ html_theme_options = {
     'logo_only': True,
 }
 
-
-exclude_patterns = []
+exclude_patterns = ['**.ipynb_checkpoints']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

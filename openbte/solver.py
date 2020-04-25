@@ -139,10 +139,7 @@ class Solver(object):
           print(' ')  
 
 
-
-
   def solve_bte(self,**argv):
-
 
      if comm.rank == 0:
       SS = np.zeros(1)
@@ -156,7 +153,7 @@ class Solver(object):
     
       #---------------------------------------------------------------
       #BB = -np.outer(self.sigma[:,0],self.mesh['B_with_area_old'])*self.kappa_factor*1e-18
-      BB = -np.einsum('q,c->qc',self.sigma[:,0],self.mesh['B_with_area_old'][0])*self.kappa_factor*1e-18
+      BB = -np.einsum('q,c->qc',self.sigma[:,0],self.mesh['kappa_mask'])*self.kappa_factor*1e-18
       data = {'BB':BB,'SS':SS,'Gbp':Gbp}
      else: data = None 
      data = comm.bcast(data,root = 0)

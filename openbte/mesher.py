@@ -12,7 +12,7 @@ import os
 class Mesher(object):
 
  def __init__(self,argv):
-
+  argv['base'] = np.array(argv['base'])
   if argv.setdefault('model','lattice') == 'lattice':   
    #create polygons-----
    base = argv.setdefault('base',[[0,0]])

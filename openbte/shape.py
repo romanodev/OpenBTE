@@ -5,6 +5,7 @@ import math
 
 def get_shape(argv):
 
+
     area  = argv.setdefault('porosity')/len(argv['base'])
     
     shape = argv.setdefault('shape','square')

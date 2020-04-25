@@ -1,4 +1,5 @@
 import plotly.offline as py
+import chart_studio.plotly as py_online
 import plotly.graph_objs as go
 import numpy as np
 import plotly.io as pio
@@ -35,7 +36,7 @@ def add_data(nodes,elems,name,data,units,buttons,fig,nv):
                      args=[{"visible":visible},]))
 
 
-def plot_results(data,nodes,elems):
+def plot_results(data,nodes,elems,**argv):
 
        
    size = [ max(nodes[:,i]) - min(nodes[:,i])  for i in range(3)] 
@@ -126,25 +127,7 @@ def plot_results(data,nodes,elems):
    #show_in_window(fig)
 
    #fig.show()
-   py.iplot(fig, filename='OpenBTE')
-
-
-#def show_in_window(fig):
-#    import sys, os
-#    import plotly.offline
-#    from PyQt5.QtCore import QUrl
-#    from PyQt5.QtWebEngineWidgets import QWebEngineView
-#    from PyQt5.QtWidgets import QApplication
-#
-#    plotly.offline.plot(fig, filename='name.html', auto_open=False)
-
-#    app = QApplication(sys.argv)
-#    web = QWebEngineView()
-#    file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "name.html"))
-#    web.load(QUrl.fromLocalFile(file_path))
-#    web.show()
-#    sys.exit(app.exec_())
-
-
-
+   #py.plot(fig, filename='OpenBTE.html',auto_open=False)
+   py.plot(fig, filename=argv.setdefault('html_file','index.html'),auto_open =argv.setdefault('auto_open',False))
+   #py_online.plot(fig, filename='OpenBTE',sharing='public')
 

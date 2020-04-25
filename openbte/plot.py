@@ -90,7 +90,7 @@ class Plot(object):
      for n in e:
       node_data[n] += data[k]/self.mesh['conn'][n]
 
-   #if not indices == None: node_data = node_data[indices]
+   node_data = node_data[indices]
 
    return node_data
 
@@ -132,7 +132,7 @@ class Plot(object):
 
 
    if self.mesh['dim'] == 3:
-     elems,indices = self.get_surface_nodes()  
+     elems,indices = self.get_surface_nodes() 
    else:  
      elems = np.array(self.mesh['elems'])
      indices = np.arange(len(self.mesh['nodes']))
@@ -142,6 +142,6 @@ class Plot(object):
 
    self.solver['variables'][-1] = {'name':'Structure','units':'','data':np.zeros(len(indices))}
 
-   plot_results(self.solver['variables'],self.mesh['nodes'][indices],elems)
+   plot_results(self.solver['variables'],self.mesh['nodes'][indices],elems,**argv)
 
 
