@@ -9,7 +9,6 @@ import scipy.sparse as sp
 import plotly.express as px
 import plotly.graph_objects as go
 import time
-from matplotlib.pylab import *
 
 
 comm = MPI.COMM_WORLD

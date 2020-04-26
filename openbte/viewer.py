@@ -1,5 +1,4 @@
 import plotly.offline as py
-import chart_studio.plotly as py_online
 import plotly.graph_objs as go
 import numpy as np
 import plotly.io as pio

@@ -1,11 +1,10 @@
 
 package:
   name: "openbte"
-  version: "0.9.85"
+  version: "0.99"
 
 source:
-  url: ../dist/openbte-0.9.85.tar.gz
-
+  url: ../dist/openbte-0.99.tar.gz
 build:
         
   number: 1
@@ -14,38 +13,32 @@ build:
 
 requirements:
   host:
-    - alabaster
     - deepdish
-    - future
-    - ipython
-    - matplotlib
     - mpi4py==2.0.0
-    - networkx
     - numpy
     - pip
+    - plotly==4.6.0  
     - python >=3.6
     - pyvtk
     - scipy
     - shapely
-    - sparse
     - twisted  
+    - pandas  
     - termcolor
     - unittest2
+    - googledrivedownloader
   run:
-    - alabaster
     - deepdish
     - future
-    - ipython
-    - matplotlib
+    - pandas  
     - mpi4py==2.0.0
-    - networkx
+    - plotly==4.6.0  
     - numpy
+    - googledrivedownloader
     - python >=3.6
     - pyvtk
     - scipy
-    - twisted  
     - shapely
-    - sparse
     - termcolor
     - unittest2
     - gmsh==3.0.6

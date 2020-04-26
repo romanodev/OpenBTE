@@ -6,10 +6,7 @@ from shapely.geometry import MultiPolygon,LineString
 import shapely
 from shapely.ops import cascaded_union
 import os
-import matplotlib.cm as cm
 import functools
-from matplotlib.path import Path
-import matplotlib.patches as patches
 
 
 def periodic_kernel(x1, x2, p,l,variance):
@@ -28,75 +25,10 @@ def generate_random_interface(p,l,variance,scale):
 
  return f
 
-def create_layer(data,f):
-
-  for i in data.keys():
-         if not isinstance(i,str): 
-                ind = str(i)
-         else:  
-                ind = i
-         if isinstance(data[i],dict):
-            g = f.create_group(ind)
-            create_layer(data[i],g)
-         else:
-             f.create_dataset(ind,data=data[i],compression="gzip",compression_opts=9) 
-
-
-def save_dictionary(data,filename):
-
- with h5py.File(filename, "w") as f:
-      create_layer(data,f)
-
-def load_layer(f):
-     tmp = {}
-     for i in f.keys():
-        if i.isdigit():
-               ind = int(i)
-        else:   
-               ind = i 
-        if isinstance(f[i],h5py._hl.group.Group):
-            name = f[i].name.split('/')[-1]
-            if name.isdigit():
-               ind2 = int(name)
-            else:   
-               ind2 = name 
-            tmp.update({ind2:load_layer(f[i])}) 
-        else:
-            tmp.update({ind:np.array(f[i])}) 
-     return tmp 
-
-
-
-def load_dictionary(filename):
-
- data = {}
- with h5py.File(filename, "r") as f:
-     data.update({'root':load_layer(f)})
-
- return data['root']
-
-
-
 def download_file(file_id,filename):
 
       gdd.download_file_from_google_drive(file_id=file_id,
                                            dest_path='./' + filename,showsize=True,overwrite=True)
-
-
-def create_path(obj):
-
-   codes = [Path.MOVETO]
-   for n in list(range(len(obj)-1)):
-    codes.append(Path.LINETO)
-   codes.append(Path.CLOSEPOLY)
-
-   verts = []
-   for tmp in obj:
-     verts.append(tmp)
-   verts.append(verts[0])
-
-   path = Path(verts,codes)
-   return path
 
 
 def generate_frame(**argv):

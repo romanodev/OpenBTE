@@ -22,6 +22,9 @@ class Geometry(object):
      Mesher(argv) #this create mesh.msh
      self.dmin = argv['dmin']
 
+  self.import_mesh(**argv)
+
+  if comm.rank == 0:
    data = self.compute_mesh_data(**argv)
    if argv.setdefault('save',True):
      dd.io.save('geometry.h5',data)
@@ -39,7 +42,7 @@ class Geometry(object):
 
  def compute_mesh_data(self,**argv):
 
-    self.import_mesh(**argv)
+
     self.compute_elem_volumes()
     self.compute_side_areas()
     self.compute_side_normals()
@@ -221,6 +224,7 @@ class Geometry(object):
 
  def import_mesh(self,**argv):
 
+  if comm.rank == 0:
    self.elem_region_map = {}
    self.region_elem_map = {}
 
@@ -262,16 +266,18 @@ class Geometry(object):
    boundary_sides = np.array([ sorted(np.array(lines[current_line + n][5:],dtype=int)) for n in face_tags] ) -1
 
    #generate sides and maps---
-   self.elem_side_map = {}
-   self.node_side_map = {}
-   side = np.zeros(3)
+   #side = np.zeros(3)
 
    tt = time.time()
-   self.sides = []
 
    tt = time.time()
 
    #this is the bottleneck.
+   b = time.time()
+
+   self.elem_side_map = {}
+   self.node_side_map = {}
+   self.sides = []
    for k,elem in enumerate(self.elems):
        tmp = list(elem)
        for i in range(len(elem)):
@@ -283,9 +289,8 @@ class Geometry(object):
             for t in trial: self.node_side_map.setdefault(t,[]).append(r) 
          else: r = self.sides.index(trial)  
          self.elem_side_map.setdefault(k,[]).append(r)   
-
-
-
+   #----------------------------------------------------      
+  if comm.rank == 0:
    #match the boundary sides with the global side.
    physical_boundary = {}
    for n,bs in enumerate(boundary_sides): #match with the boundary side
