@@ -89,7 +89,7 @@ class Geometry(object):
           'side_centroids':self.side_centroids,\
           'volumes':self.elem_volumes,\
           'kappa_mask':np.array(np.sum(self.B_with_area_old.todense(),axis=0))[0],\
-          'B':self.B.todense(),\
+          'B':self.B,\
           'normals':self.new_normals,\
           'dists':self.dists,\
           'flux_sides':self.flux_sides,\
@@ -105,6 +105,8 @@ class Geometry(object):
           'db':self.db,\
           'dbp':self.dbp,\
           'pv':self.pv,\
+          'ij':self.ij,\
+          'pp':self.pp,\
           'n_side_per_elem':np.array([len(self.elems[0])])}
 
 
@@ -134,7 +136,8 @@ class Geometry(object):
 
    data = []
 
-   
+  
+   self.ij = ()
    for ll in self.side_list['active'] :
      elems = self.side_elem_map[ll]
      l1 = elems[0]
@@ -147,9 +150,11 @@ class Geometry(object):
        #New development-----------------
        self.i.append(l1)
        self.j.append(l2)
+       self.ij += ((l1,l2),)
        self.k.append(normal*area/vol1)
        self.j.append(l1)
        self.i.append(l2)
+       self.ij += ((l2,l1),)
        self.k.append(-normal*area/vol2)
        #---------------------------------
 
@@ -163,6 +168,7 @@ class Geometry(object):
    self.k = np.array(self.k).T
    self.db = np.array(self.db).T
    self.dbp = np.array(self.dbp).T
+
 
 
 
@@ -644,7 +650,8 @@ class Geometry(object):
 
     B_with_area_old = sp.dok_matrix((n_el,n_el),dtype=np.float64)
     self.B_area = np.zeros(n_el,dtype=np.float64)
-    
+   
+    self.pp = ()
     self.ip = []; self.jp = []; self.dp = []; self.pv = [] 
     if len(self.side_list.setdefault('Periodic',[])) > 0:
      for side in self.pairs:
@@ -661,22 +668,25 @@ class Geometry(object):
     
       self.periodic_side_values.update({side[0]:side_value[side[0]]})
 
-
       normal = self.compute_side_normal(i,side[0])
       
       voli = self.elem_volumes[i]
       volj = self.elem_volumes[j]
  
-
       B[i,j] = side_value[side[0]]
       B[j,i] = side_value[side[1]]
-      self.ip.append(i); self.jp.append(j); self.dp.append(side_value[side[0]]); self.pv.append(normal*area/voli)
-      self.ip.append(j); self.jp.append(i); self.dp.append(side_value[side[1]]); self.pv.append(-normal*area/volj)
+   
+      if abs(side_value[side[0]]) > 0:
+       self.pp += ((self.ij.index((i,j)),side_value[side[0]]),)
+       self.ip.append(i); self.jp.append(j); self.dp.append(side_value[side[0]]); self.pv.append(normal*area/voli)
+
+      if abs(side_value[side[1]]) > 0:
+       self.pp += ((self.ij.index((j,i)),side_value[side[1]]),)
+       self.ip.append(j); self.jp.append(i); self.dp.append(side_value[side[1]]); self.pv.append(-normal*area/volj)
 
       if np.linalg.norm(np.cross(self.side_normals[side[0],1],applied_grad)) < 1e-12:
        B_with_area_old[i,j] = abs(side_value[side[0]]*area)
        
-
     #select flux sides-------------------------------
     self.flux_sides = [] #where flux goes
     total_area = 0
@@ -702,7 +712,7 @@ class Geometry(object):
     #-----------------------------------------------
     #----------------------------------------------------------------
     self.side_periodic_value = side_periodic_value
-    self.B = B.tocoo()
+    self.B = B.tocoo().todense()
     self.B_with_area_old = B_with_area_old.tocoo()
     self.pv = np.array(self.pv).T
     self.kappa_factor = self.size[gradir]/area_flux
