@@ -79,22 +79,21 @@ class Solver(object):
 
           self.tc = np.array(self.mat['temp'])
           self.sigma = self.mat['G']*1e9
-          self.VMFP = self.mat['F']*1e9
-
+          self.VMFP = self.mat['F']*1e9 
+          self.BM = np.zeros(1)
           if self.tc.ndim == 1:
             self.coll = True
             self.meta = np.array([1,len(self.tc),1])
             self.tc = np.array([self.tc])
             B = self.mat['B']
             B += B.T - 0.5*np.diag(np.diag(B))
-            B = np.einsum('i,ij->ij',self.mat['scale'],B)
+            self.BM = np.einsum('i,ij->ij',self.mat['scale'],B)
             self.sigma = np.array([self.sigma])
             self.VMFP = np.array([self.VMFP]) 
           else: 
             self.meta = np.array([self.tc.shape[0],self.tc.shape[1],0])
-            
 
-         self.create_shared_memory(['sigma','VMFP','tc','meta'])
+         self.create_shared_memory(['sigma','VMFP','tc','meta','BM'])
          self.n_serial = self.meta[0]           
          self.n_parallel = self.meta[1]           
          self.coll = bool(self.meta[2])
@@ -387,28 +386,25 @@ class Solver(object):
      SS = data2['SS']
 
      #Main matrix----
-     G = np.einsum('mqj,jn->mqn',self.VMFP[:,self.rr],self.mesh['k'],optimize=True)
+     G = np.einsum('mqj,jn->mqn',self.VMFP[:,self.rr],self.k,optimize=True)
      Gp = G.clip(min=0); Gm = G.clip(max=0)
 
-     D = np.ones((self.n_serial,len(self.rr),self.ne))
-     for n,i in enumerate(self.mesh['i']): 
+     D = np.ones((self.n_serial,len(self.rr),self.n_elems))
+
+     for n,i in enumerate(self.i): 
          D[:,:,i] += Gp[:,:,n]
-     if len(self.mesh['db']) > 0:
-      Gb = np.einsum('mqj,jn->mqn',self.VMFP[:,self.rr],self.mesh['db'],optimize=True)
+     if len(self.db) > 0:
+      Gb = np.einsum('mqj,jn->mqn',self.VMFP[:,self.rr],self.db,optimize=True)
       Gbp2 = Gb.clip(min=0);
-      for n,i in enumerate(self.mesh['eb']): D[:,:,i]  += Gbp2[:,:,n]
+      for n,i in enumerate(self.eb): D[:,:,i]  += Gbp2[:,:,n]
 
      A = np.concatenate((Gm,D),axis=2)
 
-     P = np.zeros((self.n_serial,len(self.rr),self.n_elems))
-     for n,(i,j) in enumerate(zip(self.mesh['i'],self.mesh['j'])): 
-         P[:,:,i] -= Gm[:,:,n]*self.mesh['B'][i,j]
-
      lu =  {}
 
-     X = np.tile(self.state['variables'][0]['data'],(self.n_serial,self.n_parallel,1))
+     X = np.tile(self.temperature_fourier,(self.n_serial,self.n_parallel,1))
      X_old = X.copy()
-     kappa_vec = [self.state['kappa_fourier']]
+     kappa_vec = list(self.kappa_fourier)
      kappa_old = kappa_vec[-1]
      alpha = self.data.setdefault('alpha',1)
      error = 1
@@ -421,117 +417,50 @@ class Solver(object):
      kappa_tot = np.zeros(1)
      MM = np.zeros(1)
      Mp = np.zeros(1)
-     kappap = np.zeros((self.n_serial,self.n_parallel))
      kappa = np.zeros((self.n_serial,self.n_parallel))
-     if not self.coll:
-      tf = np.zeros((self.n_serial,self.mesh['n_elems'][0]))
-      tfg = np.zeros((self.n_serial,self.mesh['n_elems'][0],3))
-      tfp = np.zeros((self.n_serial,self.mesh['n_elems'][0]))
-      tfgp = np.zeros((self.n_serial,self.mesh['n_elems'][0],3))
-     termination = True
-     if self.multiscale:
-      mfp_ave = np.sqrt(3*self.mat['mfp_average'])*1e9
-     kappafp = np.zeros((self.n_serial,self.n_parallel));kappaf = np.zeros((self.n_serial,self.n_parallel))
+
      while kk < self.data.setdefault('max_bte_iter',100) and error > self.data.setdefault('max_bte_error',1e-2):
 
+       kappap = np.zeros((self.n_serial,self.n_parallel))
       # COMMON----- 
        Bm = np.zeros((self.n_serial,len(self.rr),self.n_elems))   
-       if len(self.mesh['db']) > 0: 
-         for n,i in enumerate(self.mesh['eb']):
-              if self.coll:
+       if len(self.db) > 0: 
+         for n,i in enumerate(self.eb):
                Bm[:,:,i] +=np.einsum('mu,mu,lq->lq',X[:,:,i],Gbp[:,:,n],SS[:,self.rr,n],optimize=True)
-              else: 
-               Bm[:,:,i] +=np.einsum('mu,mu,mq->mq',X[:,:,i],Gbp[:,:,n],SS[:,self.rr,n],optimize=True)
        
-       if self.coll:
-        DeltaT = np.matmul(self.BM[self.rr],alpha*X[0]+(1-alpha)*X_old[0]) 
-        for n,i in enumerate(self.rr):
+       DeltaT = np.matmul(self.BM[self.rr],alpha*X[0]+(1-alpha)*X_old[0]) 
+       for n,i in enumerate(self.rr):
 
             if not i in lu.keys() :
-                lu_loc = sp.linalg.splu(sp.csc_matrix((A[0,n],(self.im,self.jm)),shape=(self.ne,self.ne),dtype=self.tt))
+                lu_loc = sp.linalg.splu(sp.csc_matrix((A[0,n],(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt))
                 if argv.setdefault('keep_lu',True):
                  lu.update({i:lu_loc})
             else: lu_loc   = lu[i]
+            
+            #PERIODIC--
+            P = np.zeros(self.n_elems)
+            for ss,v in self.pp:  P[self.i[int(ss)]] = -Gm[0,n,int(ss)]*v
+            #---------
 
-            Xp[0,i] = lu_loc.solve(DeltaT[n] + Bm[0,n] + P[0,n])
-            kappap[0,i] =  -np.dot(self.mesh['kappa_mask'],Xp[0,i])
-        comm.Allreduce([kappap,MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
-        comm.Allreduce([Xp,MPI.DOUBLE],[X,MPI.DOUBLE],op=MPI.SUM)
-       else: 
+            Xp[0,i] = lu_loc.solve(DeltaT[n] + Bm[0,n] + P)
+            kappap[0,i] -= np.dot(self.kappa_mask,Xp[0,i])
 
-        DeltaTp = np.einsum('mqc,mq->c',X[:,self.rr], self.ac[:,self.rr])
-        comm.Allreduce([DeltaTp,MPI.DOUBLE],[DeltaT,MPI.DOUBLE],op=MPI.SUM)
+       comm.Allreduce([kappap,MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
+       comm.Allreduce([Xp,MPI.DOUBLE],[X,MPI.DOUBLE],op=MPI.SUM)
 
-        if self.multiscale:
-         for n,m in enumerate(self.ff):
-           dataf = self.solve_fourier_new(self.mat['mfp_average'][m]*1e-18,**argv,pseudo=DeltaT)
-           tfp[m] = dataf['temperature']
-           tfgp[m] = dataf['grad']
-           for q in range(self.n_parallel): 
-            kappafp[m,q] = -np.dot(self.mesh['kappa_mask'],dataf['temperature'] - np.dot(self.VMFP[m,q],dataf['grad'].T))
-         comm.Allreduce([kappafp,MPI.DOUBLE],[kappaf,MPI.DOUBLE],op=MPI.SUM)
-         comm.Allreduce([tfp,MPI.DOUBLE],[tf,MPI.DOUBLE],op=MPI.SUM)
-         comm.Allreduce([tfgp,MPI.DOUBLE],[tfg,MPI.DOUBLE],op=MPI.SUM)
-
-        #Multiscale scheme-----------------------------
-        diffusive = 0
-        for n,q in enumerate(self.rr): 
-           fourier = False
-           for m in range(self.n_serial)[::-1]:
-              if fourier:
-               kappap[m,q] = kappaf[m,q]
-               Xp[m,q] = tf[m] - np.dot(self.VMFP[m,q],tfg[m].T)
-               diffusive +=1
-
-              else: 
-               if not (m,q) in lu.keys() :
-                lu_loc = sp.linalg.splu(sp.csc_matrix((A[m,n],(self.im,self.jm)),shape=(self.ne,self.ne),dtype=self.tt))
-                if argv.setdefault('keep_lu',True):
-                 lu.update({(m,q):lu_loc})
-               else: lu_loc   = lu[(m,q)]
-
-               Xp[m,q] = lu_loc.solve(DeltaT + P[m,n] + Bm[m,n]) 
-               kappap[m,q] = -np.dot(self.mesh['kappa_mask'],Xp[m,q])
-
-                
-                   
-               if abs(kappap[m,q] - kappaf[m,q])/abs(kappap[m,q]) < 0.015 and self.multiscale:
-                  kappap[m,q] = kappaf[m,q]
-                  diffusive +=1
-                  fourier=True
-               else:   
-                   if self.multiscale and m == 0:
-                       termination = False
-        Mp[0] = diffusive
-        comm.Allreduce([kappap,MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
-        comm.Allreduce([Xp,MPI.DOUBLE],[X,MPI.DOUBLE],op=MPI.SUM)
-        comm.Allreduce([Mp,MPI.DOUBLE],[MM,MPI.DOUBLE],op=MPI.SUM)
-
-       #-----------------------------------------------
        kappa_totp = np.array([np.einsum('mq,mq->',self.sigma[:,self.rr,0],kappa[:,self.rr])])*self.kappa_factor*1e-18
        comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
-       kk +=1
+
 
        error = abs(kappa_old-kappa_tot[0])/abs(kappa_tot[0])
        kappa_old = kappa_tot[0]
        kappa_vec.append(kappa_tot[0])
        if self.verbose and comm.rank == 0:   
         print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error))
+       kk+=1
 
      if self.verbose and comm.rank == 0:
       print(colored(' -----------------------------------------------------------','green'))
-
-
-     if self.multiscale and comm.rank == 0:
-        print()
-        print('                  Multiscale Diagnostics        ''')
-        print(colored(' -----------------------------------------------------------','green'))
-
-        diff = int(MM[0])/self.n_serial/self.n_parallel 
-        print(colored(' BTE:              ','green') + str(round((1-diff)*100,2)) + ' %' )
-        print(colored(' FOURIER:          ','green') + str(round(diff*100,2)) + ' %' )
-        print(colored(' Full termination: ','green') + str(termination) )
-        print(colored(' -----------------------------------------------------------','green'))
 
      
      T = np.einsum('mqc,mq->c',X,self.tc)
