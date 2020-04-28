@@ -92,7 +92,9 @@ class Solver(object):
   
         self.kappa_factor = self.mesh['kappa_factor'][0]
         if comm.rank == 0:
-         if self.verbose: self.print_logo()
+         if self.verbose: 
+             self.print_logo()
+             #self.print_info_mesh()
   
          #self.assemble_fourier()
          #self.assemble_modified_fourier()

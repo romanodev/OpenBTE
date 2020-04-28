@@ -616,6 +616,7 @@ class Solver(object):
        if ll in self.mesh['side_list']['Periodic']:
         B[i] += self.mesh['periodic_side_values'][ll]*v_orth/vi*area
         B[j] -= self.mesh['periodic_side_values'][ll]*v_orth/vj*area
+    
     #rescaleand fix one point to 0
     F = F.tocsc()
     if 'pseudo' in argv.keys():

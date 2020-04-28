@@ -30,7 +30,7 @@ class Geometry(object):
      self.import_mesh(**argv)
      data = self.compute_mesh_data(**argv)
      if argv.setdefault('save',True):
-      dd.io.save('geometry.h5',self.data)
+      dd.io.save('geometry.h5',data)
   else:  data = None
   self.data = comm.bcast(data,root=0)
 
@@ -167,11 +167,20 @@ class Geometry(object):
 
   if self.dim == 2:
    self.side_areas = [  np.linalg.norm(self.nodes[s[1]] - self.nodes[s[0]]) for s in self.sides ]
-  else:      
-   M = np.ones((3,3))
-   for i,e in enumerate(self.sides):
-    M[:,:2] = self.nodes[e,0:2]
-    self.side_areas[i] = abs(0.5*np.linalg.det(M))
+  else:     
+      
+   self.side_areas = np.zeros(len(self.sides))   
+   for ns in range(len(self.sides)):
+    p = self.nodes[self.sides[ns]]
+    v = np.cross(p[1]-p[0],p[1]-p[2])
+    normal = v/np.linalg.norm(v)
+    tmp = np.zeros(3)
+    for i in range(len(p)):
+     vi1 = p[i]
+     vi2 = p[(i+1)%len(p)]
+     tmp += np.cross(vi1, vi2)
+    result = np.dot(tmp,normal)
+    self.side_areas[ns] =  abs(result/2)
 
 
 
@@ -463,7 +472,9 @@ class Geometry(object):
     if self.dim == 3:
      #from here: http://geomalgorithms.com/a05-_intersect-1.html
      u = P1 - P0
-     n = self.side_normals[ll,1]
+     (e1,e2) = self.side_elem_map[ll]
+     n = self.new_normals[e1][e2]
+     #n = self.side_normals[ll,1]
      node = self.nodes[self.sides[ll][0]]
      w = P0 - node
      s = -np.dot(n,w)/np.dot(n,u)
