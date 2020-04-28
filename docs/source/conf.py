@@ -35,8 +35,8 @@ extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.autosummary',\
     'sphinx.ext.intersphinx',\
     'sphinx.ext.mathjax',\
+    'recommonmark',\
     'sphinx.ext.napoleon',\
-    'sphinx_autorun',\
     'sphinx.ext.viewcode',\
     'nbsphinx']
 

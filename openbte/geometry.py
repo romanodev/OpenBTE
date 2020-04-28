@@ -1,3 +1,5 @@
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 import numpy as np
 from .mesher import *
 from .utils import *
@@ -8,6 +10,9 @@ import itertools
 from .GenerateInterface import *
 from mpi4py import MPI
 import time
+from matplotlib.pylab import *
+import numpy.testing as npt
+from statistics import mean
 
 comm = MPI.COMM_WORLD
 
@@ -21,13 +26,11 @@ class Geometry(object):
    else:
      Mesher(argv) #this create mesh.msh
      self.dmin = argv['dmin']
-
-  self.import_mesh(**argv)
-
-  if comm.rank == 0:
-   data = self.compute_mesh_data(**argv)
-   if argv.setdefault('save',True):
-     dd.io.save('geometry.h5',data)
+     a = time.time()
+     self.import_mesh(**argv)
+     data = self.compute_mesh_data(**argv)
+     if argv.setdefault('save',True):
+      dd.io.save('geometry.h5',self.data)
   else:  data = None
   self.data = comm.bcast(data,root=0)
 
@@ -43,13 +46,11 @@ class Geometry(object):
  def compute_mesh_data(self,**argv):
 
 
-    self.compute_elem_volumes()
-    self.compute_side_areas()
-    self.compute_side_normals()
-    self.compute_elem_centroids()
-    self.compute_side_centroids()
+    self.compute_side_normals() 
     self.compute_least_square_weigths()
     self.compute_connecting_matrix()
+
+
     self.compute_interpolation_weigths()
     self.compute_dists()
     self.compute_boundary_condition_data(argv)
@@ -67,7 +68,6 @@ class Geometry(object):
 
 
     return {'side_list':self.side_list,\
-          'n_elems':np.array([self.n_elems]),\
           'elem_side_map':self.elem_side_map,\
           'side_elem_map':self.side_elem_map,\
           'elem_mat_map':self.elem_mat_map,\
@@ -79,7 +79,6 @@ class Geometry(object):
           'ly':argv['ly'],\
           'dim':np.array([self.dim]),\
           'weigths':self.weigths,\
-          'kappa_factor':np.array([self.kappa_factor]),\
           'areas':self.side_areas,\
           'nodes':self.nodes,\
           'periodic_values':self.periodic_values,\
@@ -94,34 +93,31 @@ class Geometry(object):
           'dists':self.dists,\
           'flux_sides':self.flux_sides,\
           'frame':frame,\
-          'i':self.i,\
-          'j':self.j,\
+          'i':np.array(self.i),\
+          'j':np.array(self.j),\
           'k':self.k,\
           'ip':self.ip,\
           'jp':self.jp,\
           'dp':self.dp,\
-          'eb':self.eb,\
+          'eb':np.array(self.eb),\
           'sb':self.sb,\
           'db':self.db,\
           'dbp':self.dbp,\
           'pv':self.pv,\
-          'ij':self.ij,\
-          'pp':self.pp,\
-          'n_side_per_elem':np.array([len(self.elems[0])])}
+          'ij':np.array(self.ij),\
+          'pp':np.array(self.pp),\
+          'meta':np.asarray([self.n_elems,self.kappa_factor,self.dim],np.float64)}
 
 
 
  def compute_dists(self):
   self.dists= {}   
   for ll in self.side_list['active']:
-   if not (ll in self.side_list['Boundary']):# + self.side_list['Hot'] + self.side_list['Cold'])) :
+   if not (ll in self.side_list['Boundary']):
     elem_1 = self.side_elem_map[ll][0]
     elem_2 = self.side_elem_map[ll][1]
     c1 = self.elem_centroids[elem_1]
-    if elem_1 == elem_2:
-     c2 = self.get_side_centroid(ll)
-    else:    
-     c2 = self.get_next_elem_centroid(elem_1,ll)
+    c2 = self.get_next_elem_centroid(elem_1,ll)
     dist = c2 - c1
     self.dists.setdefault(elem_1,{}).update({elem_2:dist})
 
@@ -135,29 +131,23 @@ class Geometry(object):
    self.eb = [];self.sb = []; self.db = []; self.dbp = []
 
    data = []
-
   
-   self.ij = ()
+   ij = []
    for ll in self.side_list['active'] :
-     elems = self.side_elem_map[ll]
-     l1 = elems[0]
-     l2 = elems[1]
+     (l1,l2) = self.side_elem_map[ll]
      vol1 = self.elem_volumes[l1]
      vol2 = self.elem_volumes[l2]
-     area = self.compute_side_area(ll)
-     normal = self.compute_side_normal(l1,ll)
+     area = self.side_areas[ll]
+     normal = self.new_normals[l1][l2]
      if not l1 == l2:
-       #New development-----------------
-       self.i.append(l1)
-       self.j.append(l2)
-       self.ij += ((l1,l2),)
-       self.k.append(normal*area/vol1)
-       self.j.append(l1)
-       self.i.append(l2)
-       self.ij += ((l2,l1),)
-       self.k.append(-normal*area/vol2)
-       #---------------------------------
-
+      self.i.append(l1)   
+      self.j.append(l2)   
+      self.i.append(l2)   
+      self.j.append(l1)   
+      ij.append([l1,l2])
+      ij.append([l2,l1])
+      self.k.append(normal*area/vol1)
+      self.k.append(-normal*area/vol2)
      else:
        s = np.where(np.array(self.elem_side_map[l1])==ll)[0][0]
        self.eb.append(l1)
@@ -168,63 +158,20 @@ class Geometry(object):
    self.k = np.array(self.k).T
    self.db = np.array(self.db).T
    self.dbp = np.array(self.dbp).T
+   self.ij = ij
 
 
-
-
-
-
- def get_decomposed_directions(self,elem_1,elem_2,rot = np.eye(3)):
-
-    side = self.get_side_between_two_elements(elem_1,elem_2)
-    normal = self.compute_side_normal(elem_1,side)
-    area = self.compute_side_area(side)
-    Af = area*normal
-    c1 = self.get_elem_centroid(elem_1)
-
-    if elem_1 == elem_2:
-     c2 = self.get_side_centroid(side)
-    else:    
-     c2 = self.get_next_elem_centroid(elem_1,side)
-
-    dist = c2 - c1
-
-    v_orth = np.dot(normal,np.dot(rot,normal))/np.dot(normal,dist)
-    v_non_orth = np.dot(rot,normal) - dist*v_orth
-    return area*v_orth,area*v_non_orth
-
-
-
- def get_side_between_two_elements(self,elem_1,elem_2):
-
-   if elem_1 == elem_2: #Boundary side
-    for side in self.elem_side_map[elem_1]:
-     if side in self.side_list['Boundary'] :
-      return side
-    print('No boundary side')
-    quit()
-   else:
-
-    for side_1 in self.elem_side_map[elem_1]:
-     for side_2 in self.elem_side_map[elem_2]:
-      if side_1 == side_2:
-       return side_1
-
-    print('no adjacents elems')
-    assert(1==0)
-    quit()
-
- def compute_elem_volumes(self):
-
-  self.elem_volumes = np.zeros(len(self.elems))
-  for k in range(len(self.elems)):
-   self.elem_volumes[k] = self.compute_elem_volume(k)
 
 
  def compute_side_areas(self):
-  self.side_areas = np.zeros(len(self.sides))
-  for k in range(len(self.sides)):
-   self.side_areas[k] = self.compute_side_area(k)
+
+  if self.dim == 2:
+   self.side_areas = [  np.linalg.norm(self.nodes[s[1]] - self.nodes[s[0]]) for s in self.sides ]
+  else:      
+   M = np.ones((3,3))
+   for i,e in enumerate(self.sides):
+    M[:,:2] = self.nodes[e,0:2]
+    self.side_areas[i] = abs(0.5*np.linalg.det(M))
 
 
 
@@ -268,34 +215,40 @@ class Geometry(object):
    self.elems = [list(np.array(lines[current_line + n][5:],dtype=int)-1) for n in bulk_tags] 
 
 
-   n_elems = len(self.elems)
+   self.n_elems = len(self.elems)
    boundary_sides = np.array([ sorted(np.array(lines[current_line + n][5:],dtype=int)) for n in face_tags] ) -1
 
    #generate sides and maps---
-   #side = np.zeros(3)
-
-   tt = time.time()
-
-   tt = time.time()
-
-   #this is the bottleneck.
-   b = time.time()
-
-   self.elem_side_map = {}
-   self.node_side_map = {}
-   self.sides = []
+   self.node_side_map = { i:[] for i in range(len(self.nodes))}
+   self.elem_side_map = { i:[] for i in range(len(self.elems))}
+   sides = []
+   tmp_indices = []
    for k,elem in enumerate(self.elems):
        tmp = list(elem)
        for i in range(len(elem)):
          tmp.append(tmp.pop(0))
          trial = sorted(tmp[:self.dim])
-         if not trial in self.sides:
-            self.sides.append(trial)
-            r = len(self.sides)-1
-            for t in trial: self.node_side_map.setdefault(t,[]).append(r) 
-         else: r = self.sides.index(trial)  
-         self.elem_side_map.setdefault(k,[]).append(r)   
+         sides.append(trial)
+         tmp_indices.append(k)
+   self.sides,inverse = np.unique(sides,axis=0,return_inverse = True)
+   for k,s in enumerate(inverse): self.elem_side_map[tmp_indices[k]].append(s)
+   
+   for s,side in enumerate(self.sides): 
+        for t in side:
+            self.node_side_map[t].append(s)
+   self.side_elem_map = { i:[] for i in range(len(self.sides))}
+   for key, value in self.elem_side_map.items():
+     for v in value:   
+      self.side_elem_map[v].append(key)    
    #----------------------------------------------------      
+
+  #Build relevant data
+  self.compute_side_areas()
+  self.compute_elem_volumes() #OPTIMIZED 
+  self.compute_side_centroids() #OPTIMIZED
+  self.compute_elem_centroids() #OPTIMIZED
+  #-------------------
+
   if comm.rank == 0:
    #match the boundary sides with the global side.
    physical_boundary = {}
@@ -307,11 +260,6 @@ class Geometry(object):
             physical_boundary.setdefault(self.blabels[int(lines[current_line + n][3])],[]).append(s) 
             break
    #--------------------------------------------
-
-   self.side_elem_map = {}
-   for key, value in self.elem_side_map.items():
-     for v in value:   
-      self.side_elem_map.setdefault(v,[]).append(key)
 
    self.side_list = {}
 
@@ -340,9 +288,9 @@ class Geometry(object):
       group_1 = physical_boundary[contact_1]
       group_2 = physical_boundary[contact_2]
       for s in group_1:
-        c = self.compute_side_centroid(s)
+        c = self.side_centroids[s]
       for s in group_2:
-        c = self.compute_side_centroid(s)
+        c = self.side_centroids[s]
 
       #----create pairs
       pairs = []
@@ -353,8 +301,8 @@ class Geometry(object):
       for s1 in group_1:
        d_min = 1e6
        for s in group_2:
-        c1 = self.compute_side_centroid(s1)
-        c2 = self.compute_side_centroid(s)
+        c1 = self.side_centroids[s1]
+        c2 = self.side_centroids[s]
         d = np.linalg.norm(c2-c1)
         if d < d_min:
          d_min = d
@@ -365,20 +313,6 @@ class Geometry(object):
        self.side_periodicity[s2][1] = -pp
       self.pairs +=pairs
       #----------------------------------
-      plot_sides = False
-      if plot_sides:
-       for s in pairs:
-        c1 = self.compute_side_centroid(s[0])
-        c2 = self.compute_side_centroid(s[1])
-        plot([c1[0],c2[0]],[c1[1],c2[1]])
-       c1 = self.compute_elem_centroid(4151)
-       scatter(c1[0],c1[1],color='r')
-       c1 = self.compute_elem_centroid(4154)
-       scatter(c1[0],c1[1],color = 'g')
-       c1 = self.compute_elem_centroid(4150)
-       scatter(c1[0],c1[1],color = 'b')
-       show()
-
       #Amend map
       for s in pairs:
        s1 = s[0]
@@ -392,11 +326,10 @@ class Geometry(object):
        self.side_elem_map[s2].append(self.side_elem_map[s1][0])
        self.side_list['active'].remove(s2)
        #-----------------------------------------
-
+        
       #Polish sides
       [self.side_list.setdefault('Periodic',[]).append(i) for i in physical_boundary[contact_1]]
       [self.side_list.setdefault('Inactive',[]).append(i) for i in physical_boundary[contact_2]]
-
 
    if 'Boundary' in physical_boundary.keys(): self.side_list.update({'Boundary':physical_boundary['Boundary']})
 
@@ -407,18 +340,20 @@ class Geometry(object):
    self.elem_mat_map = { ne:0 for ne in list(range(len(self.elems)))}
 
 
-
  def compute_side_normals(self):
 
   self.new_normals = {}   
-  self.side_normals = np.zeros((len(self.sides),2,3))
   for s in range(len(self.sides)):
    elems = self.side_elem_map[s]
-   self.side_normals[s][0] = self.compute_side_normal(elems[0],s)
-   self.new_normals.setdefault(elems[0],{}).update({elems[1]:self.compute_side_normal(elems[0],s)})
-   if len(elems)>1:
-    self.side_normals[s][1] = self.compute_side_normal(elems[1],s)
-    self.new_normals.setdefault(elems[1],{}).update({elems[0]:self.compute_side_normal(elems[1],s)})
+   if elems[0] == elems[1]:
+    self.new_normals.setdefault(elems[0],{}).update({elems[0]:self.compute_side_normal(elems[0],s)})
+   else: 
+    normal = self.compute_side_normal(elems[1],s)   
+    self.new_normals.setdefault(elems[1],{}).update({elems[0]:normal})
+    self.new_normals.setdefault(elems[0],{}).update({elems[1]:-normal})
+
+
+    
 
  def compute_side_normal(self,ne,ns):
 
@@ -434,87 +369,63 @@ class Geometry(object):
 
   #Check sign
   ind = self.side_elem_map[ns].index(ne)
-  c_el   = self.compute_centroid(self.elems[ne])
-  c_side = self.compute_centroid(self.sides[ns]) -  self.side_periodicity[ns][ind]
+  c_el = self.elem_centroids[ne]
+  c_side = self.side_centroids[ns] -  self.side_periodicity[ns][ind]
 
   c = (c_side - c_el)
   if np.dot(normal,c) < 0: normal = - normal
 
   return normal
 
- def compute_side_area(self,ns):
-
-  p = self.nodes[self.sides[ns]]
-  if self.dim == 2:
-    return np.linalg.norm(p[1]-p[0])
-  else:
-   v = np.cross(p[1]-p[0],p[1]-p[2])
-   normal = v/np.linalg.norm(v)
-   tmp = np.zeros(3)
-   for i in range(len(p)):
-    vi1 = p[i]
-    vi2 = p[(i+1)%len(p)]
-    tmp += np.cross(vi1, vi2)
-
-   result = np.dot(tmp,normal)
-   return abs(result/2)
 
 
  def compute_side_centroids(self):
 
-  self.side_centroids = np.zeros((len(self.sides),3))
-  for s in range(len(self.sides)):
-   self.side_centroids[s] = self.compute_side_centroid(s)
+  self.side_centroids = [np.mean(self.nodes[i],axis=0) for i in self.sides]
 
- def compute_side_centroid(self,ns):
 
-  nodes = self.nodes[self.sides[ns]]
 
-  centroid = np.zeros(3)
-  for p in nodes:
-   centroid += p
-  return centroid/len(nodes)
+ #def compute_side_centroid(self,ns):
+
+ # nodes = self.nodes[self.sides[ns]]
+ # centroid = np.zeros(3)
+ # for p in nodes:
+ #  centroid += p
+ # return centroid/len(nodes)
 
 
  def compute_elem_centroids(self):
 
-  self.elem_centroids = np.zeros((len(self.elems),3))
-  for elem in range(len(self.elems)):
-   self.elem_centroids[elem] = self.compute_elem_centroid(elem)
+  self.elem_centroids = [np.mean(self.nodes[i],axis=0) for i in self.elems]
+  
+  
 
 
- def compute_elem_centroid(self,ne):
-  nodes = self.nodes[self.elems[ne]]
-  centroid = np.zeros(3)
-  for p in nodes:
-   centroid += p
 
-  return centroid/len(nodes)
+ #def compute_elem_centroid(self,ne):
+ # nodes = self.nodes[self.elems[ne]]
+ # centroid = np.zeros(3)
+ # for p in nodes:
+ #  centroid += p
 
- def compute_elem_volume(self,kc1):
+ # return centroid/len(nodes)
 
+ def compute_elem_volumes(self):
+
+  self.elem_volumes = np.zeros(len(self.elems))
   if self.dim == 3: #Assuming Tetraedron
-   ns = self.elems[kc1]
-   m = np.ones((4,4))
-   m[0,0:3] = self.nodes[ns[0]]
-   m[1,0:3] = self.nodes[ns[1]]
-   m[2,0:3] = self.nodes[ns[2]]
-   m[3,0:3] = self.nodes[ns[3]]
-   return abs(1.0/6.0 * np.linalg.det(m))
 
-  if self.dim == 2: #Assuming Tetraedron
+   M = np.ones((4,4))
+   for i,e in enumerate(self.elems):
+    M[:,:3] = self.nodes[e,:]
+    self.elem_volumes[i] = 1.0/6.0 * abs(np.linalg.det(M))
 
-    
-   points = self.nodes[self.elems[kc1]]
-   x = []; y= []
-   for p in points:
-    x.append(p[0])
-    y.append(p[1])
+  if self.dim == 2: #Assuming Triangulation
 
-   return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
-
-
-   return volume
+   M = np.ones((3,3))
+   for i,e in enumerate(self.elems):
+    M[:,:2] = self.nodes[e,0:2]
+    self.elem_volumes[i] = abs(0.5*np.linalg.det(M))
 
 
 
@@ -528,21 +439,6 @@ class Geometry(object):
   centroid = centroid2 - self.side_periodicity[side][ind1] + self.side_periodicity[side][ind2]
   return centroid
 
- def compute_centroid(self,side):
-
-  node = np.zeros(3)
-  for p in side:
-   node += self.nodes[p]
-
-  return node/len(side)
-
-
- def get_elem_neighbors(self,elem):
-
-  neighbors = []
-  for ll in self.elem_side_map[elem]:
-   neighbors.append(self.get_neighbor_elem(elem,ll))
-  return neighbors
 
  def get_neighbor_elem(self,elem,ll) :
 
@@ -557,7 +453,7 @@ class Geometry(object):
 
   self.interp_weigths = {}# np.zeros(len(self.sides))
   for ll in self.side_list['active']:
-   if not (ll in self.side_list['Boundary']) : # + self.side_list['Hot'] + self.side_list['Cold'])) :
+   if not (ll in self.side_list['Boundary']) :
     e0 = self.side_elem_map[ll][0]
     e1 = self.side_elem_map[ll][1]
     
@@ -630,10 +526,9 @@ class Geometry(object):
     tmp = self.side_list.setdefault('Periodic',[]) + self.side_list.setdefault('Inactive',[])# + self.side_list.setdefault('Cold',[])
 
     for kl,ll in enumerate(tmp) :
-     normal = self.compute_side_normal(self.side_elem_map[ll][0],ll)
+     e1,e2 = self.side_elem_map[ll]
+     normal = self.new_normals[e1][e2]  
      tmp = np.dot(normal,flux_dir)
-     #if tmp < -delta : #either negative or positive
-     # flux_sides.append(ll)
 
      if tmp < - delta :
         side_value[ll] = -1.0
@@ -668,30 +563,32 @@ class Geometry(object):
     
       self.periodic_side_values.update({side[0]:side_value[side[0]]})
 
-      normal = self.compute_side_normal(i,side[0])
+      normal = self.new_normals[i][j]
       
       voli = self.elem_volumes[i]
       volj = self.elem_volumes[j]
  
       B[i,j] = side_value[side[0]]
       B[j,i] = side_value[side[1]]
-   
+  
+
       if abs(side_value[side[0]]) > 0:
-       self.pp += ((self.ij.index((i,j)),side_value[side[0]]),)
+       self.pp += ((self.ij.index([i,j]),side_value[side[0]]),)
        self.ip.append(i); self.jp.append(j); self.dp.append(side_value[side[0]]); self.pv.append(normal*area/voli)
 
       if abs(side_value[side[1]]) > 0:
-       self.pp += ((self.ij.index((j,i)),side_value[side[1]]),)
+       self.pp += ((self.ij.index([j,i]),side_value[side[1]]),)
        self.ip.append(j); self.jp.append(i); self.dp.append(side_value[side[1]]); self.pv.append(-normal*area/volj)
 
-      if np.linalg.norm(np.cross(self.side_normals[side[0],1],applied_grad)) < 1e-12:
+      if np.linalg.norm(np.cross(self.new_normals[i][j],applied_grad)) < 1e-12:
        B_with_area_old[i,j] = abs(side_value[side[0]]*area)
-       
+      
     #select flux sides-------------------------------
     self.flux_sides = [] #where flux goes
     total_area = 0
     for ll in self.side_list['Periodic']:
-     normal = self.compute_side_normal(self.side_elem_map[ll][0],ll)
+     e1,e2 = self.side_elem_map[ll]
+     normal = self.new_normals[e1][e2]   
      tmp = np.abs(np.dot(normal,flux_dir))
      if tmp > delta : #either negative or positive
        if normal[0] == 1:
@@ -739,7 +636,7 @@ class Geometry(object):
       diff_dist.setdefault(kc1,np.zeros((len(self.elem_side_map[kc1]),self.dim)))[ind1][i] = dist[i]   
       diff_dist.setdefault(kc2,np.zeros((len(self.elem_side_map[kc2]),self.dim)))[ind2][i] = -dist[i]   
     else :
-     dist = self.compute_side_centroid(ll) - c1
+     dist = self.side_centroids[ll] - c1
      for i in range(self.dim):
       #diff_dist[kc1][ind1][i] = dist[i]
       diff_dist.setdefault(kc1,np.zeros((len(self.elem_side_map[kc1]),self.dim)))[ind1][i] = dist[i]   

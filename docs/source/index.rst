@@ -1,8 +1,23 @@
-Welcome to OpenBTE's documentation
+Welcome to OpenBTE's documentation!
 ===================================
 
 .. toctree::
    :maxdepth: 2
-   :caption: Example:
+   :caption: Material
+   
+   material
+   mfp 
+   rta
+   full
+   database
 
-   notebooks/example_1
+.. toctree::
+   :maxdepth: 2
+   :caption: Geometry
+
+   geometry
+   shape
+   lattice
+   custom
+
+

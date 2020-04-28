@@ -1,3 +1,5 @@
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 from pyvtk import *
 import numpy as np
 import deepdish as dd

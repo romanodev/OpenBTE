@@ -70,8 +70,6 @@ class Solver(object):
            self.BM = comm.bcast(B,root=0) 
          #-------------------------------------------------------
 
-         self.im = np.concatenate((self.mesh['i'],list(np.arange(self.n_elems))))
-         self.jm = np.concatenate((self.mesh['j'],list(np.arange(self.n_elems))))
          self.sigma = self.mat['G']*1e9
          if self.coll : self.sigma = np.array([self.sigma])
          self.VMFP = self.mat['F']*1e9
@@ -253,10 +251,9 @@ class Solver(object):
                else: lu_loc   = lu[(m,q)]
 
                #reconstruct RHS---
-                
                P = np.zeros(self.ne)
                for ss,v in self.mesh['pp']: 
-                P[self.mesh['i'][ss]] = -Gm[m,n,ss]*v
+                   P[self.mesh['i'][ss]] = -Gm[m,n,ss]*v
 
                RHS = DeltaT + P
                for c,i in enumerate(self.mesh['eb']): RHS[i] += Bm[m,q,c]
@@ -269,9 +266,9 @@ class Solver(object):
 
                #------------------------
                if len(self.mesh['db']) > 0:
+
                 for c,i in enumerate(self.mesh['eb']):
                   Bmp[m,:,c] += X[i]*Gbp[m,q,c]*SS[m,:,c]
-
 
                if abs(kappap[m,q] - kappaf[m,q])/abs(kappap[m,q]) < 0.015 and self.multiscale:
                   kappap[m,q] = kappaf[m,q]
