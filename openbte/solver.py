@@ -112,7 +112,6 @@ class Solver(object):
         else : data = None
         data = comm.bcast(data,root=0)
  
-
         variables = {0:{'name':'Temperature Fourier','units':'K',        'data':data['temperature']},\
                      1:{'name':'Flux Fourier'       ,'units':'W/m/m/K','data':data['flux']}}
  
@@ -232,6 +231,7 @@ class Solver(object):
          comm.Allreduce([tfp,MPI.DOUBLE],[tf,MPI.DOUBLE],op=MPI.SUM)
          comm.Allreduce([tfgp,MPI.DOUBLE],[tfg,MPI.DOUBLE],op=MPI.SUM)
 
+        quit() 
         #Multiscale scheme-----------------------------
         diffusive = 0
         DeltaTp = np.zeros(self.ne)   
@@ -251,7 +251,6 @@ class Solver(object):
                 if argv.setdefault('keep_lu',True):
                  lu.update({(m,q):lu_loc})
                else: lu_loc   = lu[(m,q)]
-
                #reconstruct RHS---
                P = np.zeros(self.ne)
                for ss,v in self.mesh['pp']: 
@@ -261,12 +260,11 @@ class Solver(object):
                for c,i in enumerate(self.mesh['eb']): RHS[i] += Bm[m,q,c]
                #--------------------------
                X = lu_loc.solve(RHS) 
-               kappap[m,q] = -np.dot(self.mesh['kappa_mask'],X)
-                
-               DeltaTp += X*self.tc[m,q]
-               Jp += np.outer(X,self.sigma[m,q])*1e-18
 
-               #------------------------
+              kappap[m,q] = -np.dot(self.mesh['kappa_mask'],X)
+              DeltaTp += X*self.tc[m,q]
+              Jp += np.outer(X,self.sigma[m,q])*1e-18
+              #------------------------
                if len(self.mesh['db']) > 0:
 
                 for c,i in enumerate(self.mesh['eb']):

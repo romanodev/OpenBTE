@@ -66,6 +66,18 @@ class Geometry(object):
     #self.elem_mat_map = CreateCorrelation(**argv)
     self.elem_mat_map = { i:[0] for i in range(len(self.elems))}
 
+    periodic_side_values_vec = []
+    for ll in self.side_list['Periodic']:
+      periodic_side_values_vec.append(self.periodic_side_values[ll])
+      
+    weigths_vec = np.zeros((self.n_elems,self.dim,len(self.elems[0])))  
+    for value,items in self.weigths.items(): 
+     weigths_vec[value] = items
+
+    interp_weigths = np.zeros(len(self.sides))
+    for value,items in self.interp_weigths.items():
+      interp_weigths[value] = items[0]
+    
 
     return {'side_list':self.side_list,\
           'elem_side_map':self.elem_side_map,\
@@ -79,19 +91,24 @@ class Geometry(object):
           'ly':argv['ly'],\
           'dim':np.array([self.dim]),\
           'weigths':self.weigths,\
-          'areas':self.side_areas,\
+          'weigths_vec': weigths_vec,\
+          'areas':np.array(self.side_areas),\
+          'face_normals':np.array(self.face_normals),\
           'nodes':self.nodes,\
+          'side_elem_map_vec':np.array([self.side_elem_map[ll]  for ll in range(len(self.sides))]) ,\
+          'elem_side_map_vec':np.array([self.elem_side_map[ll]  for ll in range(len(self.elems))]) ,\
           'periodic_values':self.periodic_values,\
-          'periodic_side_values':self.periodic_side_values,\
-          'interp_weigths':self.interp_weigths,\
-          'centroids':self.elem_centroids,\
+          'periodic_side_values':np.array(periodic_side_values_vec),\
+          'interp_weigths':np.array(interp_weigths),\
+          'centroids':np.array(self.elem_centroids),\
           'side_centroids':self.side_centroids,\
           'volumes':self.elem_volumes,\
           'kappa_mask':np.array(np.sum(self.B_with_area_old.todense(),axis=0))[0],\
           'B':self.B,\
           'normals':self.new_normals,\
-          'dists':self.dists,\
-          'flux_sides':self.flux_sides,\
+          #'dists':self.dists,\
+          'dists':np.array(self.dists_side),\
+          'flux_sides':np.array(self.flux_sides),\
           'frame':frame,\
           'i':np.array(self.i),\
           'j':np.array(self.j),\
@@ -103,6 +120,10 @@ class Geometry(object):
           'sb':self.sb,\
           'db':self.db,\
           'dbp':self.dbp,\
+          'active_sides':np.array(self.side_list['active']),
+          'periodic_sides':np.array(self.side_list['Periodic']),
+          'boundary_sides':np.array(self.side_list['Boundary']),
+          'n_side_per_elem': np.array([len(i)  for i in self.elems]),
           'pv':self.pv,\
           'ij':np.array(self.ij),\
           'pp':np.array(self.pp),\
@@ -111,7 +132,9 @@ class Geometry(object):
 
 
  def compute_dists(self):
-  self.dists= {}   
+  self.dists = {}   
+  self.dists_side = np.zeros((len(self.sides),3))
+
   for ll in self.side_list['active']:
    if not (ll in self.side_list['Boundary']):
     elem_1 = self.side_elem_map[ll][0]
@@ -120,6 +143,8 @@ class Geometry(object):
     c2 = self.get_next_elem_centroid(elem_1,ll)
     dist = c2 - c1
     self.dists.setdefault(elem_1,{}).update({elem_2:dist})
+    self.dists.setdefault(elem_2,{}).update({elem_1:dist})
+    self.dists_side[ll] = dist 
 
 
 
@@ -181,7 +206,6 @@ class Geometry(object):
      tmp += np.cross(vi1, vi2)
     result = np.dot(tmp,normal)
     self.side_areas[ns] =  abs(result/2)
-
 
 
  def import_mesh(self,**argv):
@@ -352,14 +376,19 @@ class Geometry(object):
  def compute_side_normals(self):
 
   self.new_normals = {}   
+  self.face_normals = np.zeros((len(self.sides),3))
   for s in range(len(self.sides)):
    elems = self.side_elem_map[s]
    if elems[0] == elems[1]:
-    self.new_normals.setdefault(elems[0],{}).update({elems[0]:self.compute_side_normal(elems[0],s)})
+    normal = self.compute_side_normal(elems[0],s)   
+    self.new_normals.setdefault(elems[0],{}).update({elems[0]:normal})
+    self.face_normals[s] = normal
    else: 
     normal = self.compute_side_normal(elems[1],s)   
     self.new_normals.setdefault(elems[1],{}).update({elems[0]:normal})
     self.new_normals.setdefault(elems[0],{}).update({elems[1]:-normal})
+    self.face_normals[s] = -normal
+
 
 
     

@@ -29,7 +29,7 @@ class Material(object):
     elif model == 'full':
       dd.io.save('material.h5',generate_full(**argv)) 
 
-    elif model == 'mfp2DSym_ms':
+    elif model == 'mfp2DSym':
       dd.io.save('material.h5',generate_mfp2DSym(**argv)) 
 
     elif model == 'mfp':

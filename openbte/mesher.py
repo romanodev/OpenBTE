@@ -183,7 +183,8 @@ class Mesher(object):
 
 
   store.close()
-  subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-3','mesh.geo','-o','mesh.msh'])
+  with open(os.devnull, 'w') as devnull:
+    output = subprocess.check_output("gmsh -optimize_netgen -format msh2 -3 mesh.geo -o mesh.msh".split(), stderr=devnull)
 
  
 
@@ -278,7 +279,10 @@ class Mesher(object):
 #-------------------------------------------------------
   store.close()
 
-  subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-2','mesh.geo','-o','mesh.msh'])
+  
+  with open(os.devnull, 'w') as devnull:
+    output = subprocess.check_output("gmsh -format msh2 -2 mesh.geo -o mesh.msh".split(), stderr=devnull)
+
 
 
 
@@ -508,7 +512,10 @@ class Mesher(object):
 
 #-------------------------------------------------------
   store.close()
-  subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-2','mesh.geo','-o','mesh.msh'])
+
+  with open(os.devnull, 'w') as devnull:
+    output = subprocess.check_output("gmsh -format msh2 -2 mesh.geo -o mesh.msh".split(), stderr=devnull)
+
 
  def FindPeriodic(self,control,others,points,lines):
   
@@ -831,7 +838,11 @@ class Mesher(object):
     store.write(strc) 
 
    store.close()
-   subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-3','mesh.geo','-o','mesh.msh'])
+
+
+   with open(os.devnull, 'w') as devnull:
+    output = subprocess.check_output("gmsh -format msh2 -3 mesh.geo -o mesh.msh".split(), stderr=devnull)
+
 
  def line_exists_ordered(self,p1,p2):
      

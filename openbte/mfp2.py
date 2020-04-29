@@ -12,12 +12,12 @@ def generate_mfp(**argv):
    phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
    #--------------------
    #Azimuthal Angle------------------------------
-   #n_theta = int( argv.setdefault('n_theta',24)  /2)
-   n_theta = int( argv.setdefault('n_theta',24))
-   sym = 1
+   n_theta = int( argv.setdefault('n_theta',24)  /2)
+   #n_theta = int( argv.setdefault('n_theta',24))
+   sym = 2
 
-   Dtheta = np.pi/n_theta
-   theta = np.linspace(Dtheta/2.0,np.pi - Dtheta/2.0,n_theta)
+   Dtheta = np.pi/n_theta/2.0
+   theta = np.linspace(Dtheta/2.0,np.pi/2.0 - Dtheta/2.0,n_theta)
    dtheta = 2.0*np.sin(Dtheta/2.0)*np.sin(theta)
 
    #Compute directions---
@@ -99,11 +99,12 @@ def generate_mfp(**argv):
       for m in range(n_mfp): 
         index = t * n_phi + p 
         tmp = kappa_directional[m,index]
-        #kappa += np.outer(tmp,direction_ave[t,p])*np.flip(mfp_sampled)[m]
         kappa += np.outer(tmp,direction_ave[t,p])*mfp_sampled[m]
+
    #------------------
    #-----------------------------
    tc = temp_coeff/np.sum(temp_coeff)
+
 
    return {'temp':tc,'B':[],'F':F,'G':kappa_directional,'kappa':kappa,'scale':np.ones((n_mfp,n_theta*n_phi)),'ac':tc,'mfp_average':rhs_average,'kappa_average':kappa_average}
 
