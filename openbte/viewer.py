@@ -127,6 +127,6 @@ def plot_results(data,nodes,elems,**argv):
 
    #fig.show()
    #py.plot(fig, filename='OpenBTE.html',auto_open=False)
-   py.plot(fig, filename=argv.setdefault('html_file','index.html'),auto_open =argv.setdefault('auto_open',False))
+   py.plot(fig, filename=argv.setdefault('html_file','index.html'),auto_open =argv.setdefault('auto_open',True))
    #py_online.plot(fig, filename='OpenBTE',sharing='public')
 
