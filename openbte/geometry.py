@@ -28,11 +28,11 @@ class Geometry(object):
      self.dmin = argv['dmin']
      a = time.time()
      self.import_mesh(**argv)
-     data = self.compute_mesh_data(**argv)
+     self.data = self.compute_mesh_data(**argv)
      if argv.setdefault('save',True):
-      dd.io.save('geometry.h5',data)
-  else:  data = None
-  self.data = comm.bcast(data,root=0)
+      dd.io.save('geometry.h5',self.data)
+  #else:  data = None
+  #self.data = comm.bcast(data,root=0)
 
 
  def compute_node_map(self,**argv):

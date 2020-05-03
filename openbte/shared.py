@@ -8,6 +8,8 @@ from mpi4py import MPI
 import scipy.sparse as sp
 import time
 from matplotlib.pylab import *
+import scikits.umfpack as um
+
 
 comm = MPI.COMM_WORLD
 
@@ -282,35 +284,57 @@ class Solver(object):
          return kappaf,tf,tfg 
 
 
+  def solve(self,m,n,q):
+
+                        
+        Master.data = np.concatenate((self.Gm[m,n],self.D[m,n]))[self.conversion]
+        lu_loc = sp.linalg.splu(Master)
+        if self.keep_lu: lu[(m,q)] = lu_loc
+        else: lu_loc   = lu[(m,q)]
+        P = np.zeros(self.n_elems)
+        for ss,v in self.pp: P[self.i[int(ss)]] -= Gm[m,n,int(ss)]*v
+        RHS = DeltaT + P
+        for c,i in enumerate(self.eb): RHS[i] += Bm[m,q,c]
+        return  lu_loc.solve(RHS)
+               #---------------------------------------------------------
 
 
 
+  #@profile  
   def solve_mfp(self,**argv):
+
+     if not self.keep_lu:
+      import scikits.umfpack as um
+      umfpack = um.UmfpackContext()
 
      if comm.rank == 0:
            print()
            print('      Iter    Thermal Conductivity [W/m/K]      Error ''')
            print(colored(' -----------------------------------------------------------','green'))   
 
-
+     #---------------------------------------------
      if comm.rank == 0:   
-      SS = np.zeros(1)
-      Gbp = np.zeros(1)
+      ESS = np.zeros(1)
+      EGbp = np.zeros(1)
       if len(self.mesh['db']) > 0:
        Gbm2 = np.einsum('mqj,jn->mqn',self.VMFP ,self.mesh['db'],optimize=True).clip(max=0)
        Gb   = np.einsum('mqj,jn->mqn',self.sigma,self.mesh['db'],optimize=True)
-       Gbp = Gb.clip(min=0); Gbm = Gb.clip(max=0)
+       self.Gbp = Gb.clip(min=0);
        with np.errstate(divide='ignore', invalid='ignore'):
-         tmp = 1/Gbm.sum(axis=1); tmp[np.isinf(tmp)] = 0
-       SS = np.einsum('mqc,mc->mqc',Gbm2,tmp)
-      #---------------------------------------------------------------
-      data1 = {'Gbp':Gbp}
-      data2 = {'SS':SS}
-     else: data1 = None; data2 = None 
-     data1 = comm.bcast(data1,root = 0)
-     data2 = comm.bcast(data2,root = 0)
-     Gbp = data1['Gbp']
-     SS = data2['SS']
+         tmp = 1/Gb.clip(max=0).sum(axis=1); tmp[np.isinf(tmp)] = 0
+       self.SS = np.einsum('mqc,mc->mqc',Gbm2,tmp)
+       self.SS2 = np.zeros((self.n_serial,self.n_parallel,self.n_elems))
+       self.Gbp2 = np.zeros((self.n_serial,self.n_parallel,self.n_elems))
+       for n,i in enumerate(self.eb):
+         self.SS2[:,:,i]   = self.SS[:,:,n]
+         self.Gbp2[:,:,i]  = self.Gbp[:,:,n]
+
+
+       del tmp,Gbm2,Gb,self.SS,self.Gbp
+     #self.create_shared_memory(['SS','Gbp','SS2','Gbp2'])
+     self.create_shared_memory(['SS2','Gbp2'])
+
+     #------------------------------------------------
 
      #Main matrix----
      G = np.einsum('mqj,jn->mqn',self.VMFP[:,self.rr],self.k,optimize=True)
@@ -322,10 +346,19 @@ class Solver(object):
       Gb = np.einsum('mqj,jn->mqn',self.VMFP[:,self.rr],self.db,optimize=True)
       Gbp2 = Gb.clip(min=0);
       for n,i in enumerate(self.eb): D[:,:,i]  += Gbp2[:,:,n]
-     #---------------------
-     
+
+     #Periodic---
+     P = np.zeros((self.n_serial,len(self.rr),self.n_elems))
+     for ss,v in self.pp:
+           P[:,:,self.i[int(ss)]] -= Gm[:,:,int(ss)]*v
+
+     del Gbp2,G,Gp
+     #--------------------------
+    
      Master = sp.csc_matrix((np.arange(len(self.im))+1,(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)
      conversion = np.asarray(Master.data-1,np.int) 
+     if not self.keep_lu:
+      umfpack.symbolic(Master)
 
      lu =  {}
      DeltaT = self.temperature_fourier
@@ -343,20 +376,16 @@ class Solver(object):
      kappa = np.zeros((self.n_serial,self.n_parallel))
      termination = True
 
-     Bm = np.zeros((self.n_serial,self.n_parallel,len(self.eb)))   
-     if len(self.db) > 0: 
-        tmp = np.einsum('mrn->mn',Gbp) 
-        for n,i in enumerate(self.eb):
-          Bm[:,self.rr,n] += DeltaT[i]*np.einsum('m,mq->mq',tmp[:,n],SS[:,self.rr,n],optimize=True)
-     
      #Bm = np.zeros((self.n_serial,self.n_parallel,len(self.eb)))   
-     #if len(self.db) > 0: 
-     #   for n,i in enumerate(self.eb):
-     #     Bm[:,self.rr,n] += DeltaT[i]*np.einsum('mu,mq->mq',Gbp[:,:,n],SS[:,self.rr,n],optimize=True)
-     #print('after')
+     Bm = np.zeros((self.n_serial,self.n_parallel,self.n_elems))   
+     if len(self.db) > 0: 
+        tmp = np.einsum('mrn->mn',self.Gbp2) 
+        for n,i in enumerate(self.eb):
+          Bm[:,self.rr,i] += DeltaT[i]*np.einsum('m,mq->mq',tmp[:,i],self.SS2[:,self.rr,i],optimize=True)
+        del tmp
 
      while kk < self.data.setdefault('max_bte_iter',100) and error > self.data.setdefault('max_bte_error',1e-2):
-
+        
         if self.multiscale: 
          (kappaf,tf,tfg) = self.solve_modified_fourier(DeltaT)
 
@@ -384,31 +413,28 @@ class Solver(object):
             idx  = np.argwhere(np.diff(np.sign(kappaf[:,q] - kappa_bal*np.ones(self.n_serial)))).flatten()
             if len(idx) == 0: idx = [self.n_serial-1]
            else: idx = [self.n_serial-1]
-           #idx = [self.n_serial-1]
            #----------------------------------------
-
            fourier = False
-           #idx = [self.n_serial-1]
+           idx = [self.n_serial-1]
            for m in range(self.n_serial)[idx[0]::-1]:
-
+              a = time.time()
               if fourier:
                kappap[m,q] = kappaf[m,q]
                X = tf[m] - np.dot(self.VMFP[m,q],tfg[m].T)
                diffusive +=1
               else:
-               #-------------------------------------------------------   
+               #----------------------------SOLVE BTE----------------------------------  
                if not (m,q) in lu.keys() :
                 Master.data = np.concatenate((Gm[m,n],D[m,n]))[conversion]
-                a = time.time()
-                lu_loc = sp.linalg.splu(Master)
-                #print(time.time()-a)
-                if self.keep_lu: lu[(m,q)] = lu_loc
+                if not self.keep_lu:
+                 umfpack.numeric(Master)
+                else:
+                 lu_loc = sp.linalg.splu(Master)
+                 lu[(m,q)] = lu_loc
                else: lu_loc   = lu[(m,q)]
-               P = np.zeros(self.n_elems)
-               for ss,v in self.pp: P[self.i[int(ss)]] -= Gm[m,n,int(ss)]*v
-               RHS = DeltaT + P
-               for c,i in enumerate(self.eb): RHS[i] += Bm[m,q,c]
-               X = lu_loc.solve(RHS)
+               X = lu_loc.solve(Bm[m,q] + DeltaT + P[m,n])  if self.keep_lu else umfpack.solve(um.UMFPACK_A,Master,DeltaT  + P[m,n] + Bm[m,q], autoTranspose = False)
+               #----------------------------------------------------------------------
+
                kappap[m,q] = -np.dot(self.kappa_mask,X)
                if self.multiscale:
                 if abs(kappap[m,q] - kappaf[m,q])/abs(kappap[m,q]) < self.error_multiscale :
@@ -416,14 +442,14 @@ class Solver(object):
                   diffusive +=1
                   fourier=True
                #---------------------------------------------------------
-
-              Jp += np.outer(X,self.sigma[m,q])*1e-18
               DeltaTp += X*self.ddd[m,q]
-              if len(self.db) > 0:
-                for c,i in enumerate(self.eb):
-                  Bmp[m,:,c] += X[i]*Gbp[m,q,c]*SS[m,:,c]
 
-       
+              if len(self.db) > 0: Bmp[m] += X*self.Gbp2[m,q,:]*self.SS2[m]
+              if kk < self.max_bte_iter and error > self.max_bte_error:
+                Jp += np.outer(X,self.sigma[m,q])*1e-18
+
+              del X
+           
            #BALLISTIC               
            ballistic = False
            for m in range(self.n_serial)[idx[0]+1:]:
@@ -449,12 +475,16 @@ class Solver(object):
                    ballistic=True
                #--------------------------
 
-              Jp += np.outer(X,self.sigma[m,q])*1e-18
               DeltaTp += X*self.ddd[m,q]
               if len(self.db) > 0:
                 for c,i in enumerate(self.eb):
-                  Bmp[m,:,c] += X[i]*Gbp[m,q,c]*SS[m,:,c]
+                  Bmp[m,:,c] += X[i]*self.Gbp[m,q,c]*self.SS[m,:,c]
+               
+              if kk < self.max_bte_iter and error > self.data.max_bte_error:
+                Jp += np.outer(X,self.sigma[m,q])*1e-18
+                
 
+              del X
            #if q ==12:
            # plot(kappaf[:,12],marker='o') 
            # plot(kappap[:,12],marker='o') 
@@ -463,6 +493,7 @@ class Solver(object):
            # show()
         Mp[0] = diffusive
         Mp[1] = bal
+
         comm.Barrier()
         comm.Allreduce([DeltaTp,MPI.DOUBLE],[DeltaT,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
