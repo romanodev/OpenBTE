@@ -32,6 +32,7 @@ class Solver(object):
         self.max_bte_error = argv.setdefault('max_bte_error',1e-3)
         self.max_fourier_iter = argv.setdefault('max_fourier_iter',20)
         self.max_fourier_error = argv.setdefault('max_fourier_error',1e-5)
+        self.MF = {}
         #----------------------------
          
         if comm.rank == 0:
@@ -223,7 +224,7 @@ class Solver(object):
           #print(colored(' -----------------------------------------------------------','green'))
           print(colored('  Dimension:                               ','green') + str(self.dim))
           print(colored('  Number of Elements:                      ','green') + str(self.n_elems))
-          print(colored('  Number of Sides:                         ','green') + str(len(self.mesh['sides'])))
+          print(colored('  Number of Sides:                         ','green') + str(len(self.mesh['active_sides'])))
           print(colored('  Number of Nodes:                         ','green') + str(len(self.mesh['nodes'])))
           #print(colored(' -----------------------------------------------------------','green'))
           #print(" ")
@@ -272,7 +273,7 @@ class Solver(object):
          tf = np.zeros((self.n_serial,self.n_elems))
          tfg = np.zeros((self.n_serial,self.n_elems,3))
          for m in self.ff:
-           dataf = self.solve_fourier(self.mfp_average[m]*1e-18,pseudo=DeltaT)
+           dataf = self.solve_fourier(self.mfp_average[m]*1e-18,pseudo=DeltaT,m=m)
            tfp[m] = dataf['temperature']
            tfgp[m] = dataf['grad']
            for q in range(self.n_parallel): 
@@ -317,8 +318,8 @@ class Solver(object):
       ESS = np.zeros(1)
       EGbp = np.zeros(1)
       if len(self.mesh['db']) > 0:
-       Gbm2 = np.einsum('mqj,jn->mqn',self.VMFP ,self.mesh['db'],optimize=True).clip(max=0)
-       Gb   = np.einsum('mqj,jn->mqn',self.sigma,self.mesh['db'],optimize=True)
+       Gbm2 = np.einsum('mqj,jn->mqn',self.VMFP ,self.db,optimize=True).clip(max=0)
+       Gb   = np.einsum('mqj,jn->mqn',self.sigma,self.db,optimize=True)
        self.Gbp = Gb.clip(min=0);
        with np.errstate(divide='ignore', invalid='ignore'):
          tmp = 1/Gb.clip(max=0).sum(axis=1); tmp[np.isinf(tmp)] = 0
@@ -328,7 +329,6 @@ class Solver(object):
        for n,i in enumerate(self.eb):
          self.SS2[:,:,i]   = self.SS[:,:,n]
          self.Gbp2[:,:,i]  = self.Gbp[:,:,n]
-
 
        del tmp,Gbm2,Gb,self.SS,self.Gbp
      #self.create_shared_memory(['SS','Gbp','SS2','Gbp2'])
@@ -385,8 +385,8 @@ class Solver(object):
         del tmp
 
      while kk < self.data.setdefault('max_bte_iter',100) and error > self.data.setdefault('max_bte_error',1e-2):
-        
-        if self.multiscale: 
+
+        if self.multiscale:
          (kappaf,tf,tfg) = self.solve_modified_fourier(DeltaT)
 
         #Multiscale scheme-----------------------------
@@ -404,11 +404,7 @@ class Solver(object):
               lu_loc = sp.linalg.splu(Master)
               if self.keep_lu: lu[(-1,q)] = lu_loc
             else: lu_loc   = lu[(-1,q)]
-            P = np.zeros(self.n_elems)
-            for ss,v in self.pp: P[self.i[int(ss)]] -= Gm[-1,n,int(ss)]*v
-            RHS = DeltaT + P
-            for c,i in enumerate(self.eb): RHS[i] += Bm[-1,q,c]
-            X_bal = lu_loc.solve(RHS)
+            X_bal = lu_loc.solve( Bm[-1,q] + DeltaT + P[-1,n])
             kappa_bal = -np.dot(self.kappa_mask,X_bal)
             idx  = np.argwhere(np.diff(np.sign(kappaf[:,q] - kappa_bal*np.ones(self.n_serial)))).flatten()
             if len(idx) == 0: idx = [self.n_serial-1]
@@ -463,11 +459,7 @@ class Solver(object):
                 lu_loc = sp.linalg.splu(Master)
                 if self.keep_lu: lu[(m,q)] = lu_loc
                else: lu_loc   = lu[(m,q)]
-               P = np.zeros(self.n_elems)
-               for ss,v in self.pp: P[self.i[int(ss)]] -= Gm[m,n,int(ss)]*v
-               RHS = DeltaT + P
-               for c,i in enumerate(self.eb): RHS[i] += Bm[m,q,c]
-               X = lu_loc.solve(RHS)
+               X = lu_loc.solve(Bm[m,q] + DeltaT + P[m,n])
                kappap[m,q] = -np.dot(self.kappa_mask,X)
                if abs(kappap[m,q] - kappa_bal)/abs(kappap[m,q]) < self.error_multiscale :
                    kappap[m,q] = kappa_bal
@@ -577,8 +569,6 @@ class Solver(object):
       Gbp2 = Gb.clip(min=0);
       for n,i in enumerate(self.eb): D[:,:,i]  += Gbp2[:,:,n]
 
-     #A = np.concatenate((Gm,D),axis=2)
-
      
      Master = sp.csc_matrix((np.arange(len(self.im))+1,(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)
      conversion = np.asarray(Master.data-1,np.int) 
@@ -687,15 +677,25 @@ class Solver(object):
 
   def solve_fourier(self,kappa,**argv):
 
-    if np.isscalar(kappa):
+
+   if np.isscalar(kappa):
        kappa = np.diag(np.diag(kappa*np.eye(3)))
 
-    if kappa.ndim == 2:
+   if kappa.ndim == 2:
       kappa = np.repeat(np.array([np.diag(np.diag(kappa))]),self.n_elems,axis=0)
+
+
+   m = argv.setdefault('m',-1)
+   if m in self.MF.keys():
+       SU = self.MF[m]['SU']
+       scale = self.MF[m]['scale']
+       B = self.MF[m]['B'] + argv['pseudo']
+   else:   
+
+
 
     F = sp.dok_matrix((self.n_elems,self.n_elems))
     B = np.zeros(self.n_elems)
-
     for ll in self.active_sides:
 
       area = self.areas[ll] 
@@ -718,10 +718,12 @@ class Solver(object):
     #rescaleand fix one point to 0
     F = F.tocsc()
     if 'pseudo' in argv.keys():
-      F = F + sp.eye(self.n_elems)
-      B = B + argv['pseudo']
-      scale = 1/F.max(axis=0).toarray()[0]
-      F.data = F.data * scale[F.indices]
+       F = F + sp.eye(self.n_elems)
+       scale = 1/F.max(axis=0).toarray()[0]
+       F.data = F.data * scale[F.indices]
+       SU = splu(F)
+       self.MF[m] = {'SU':SU,'scale':scale,'B':B}
+       B = B + argv['pseudo']
     else:  
       scale = 1/F.max(axis=0).toarray()[0]
       n = np.random.randint(self.n_elems)
@@ -729,17 +731,17 @@ class Solver(object):
       F.data = F.data * scale[F.indices]
       F[n,n] = 1
       B[n] = 0
+      SU = splu(F)
     #-----------------------
 
-    SU = splu(F)
 
-    C = np.zeros(self.n_elems)
+   C = np.zeros(self.n_elems)
     
-    n_iter = 0
-    kappa_old = 0
-    error = 1  
-    grad = np.zeros((self.n_elems,3))
-    while error > self.max_fourier_error and \
+   n_iter = 0
+   kappa_old = 0
+   error = 1  
+   grad = np.zeros((self.n_elems,3))
+   while error > self.max_fourier_error and \
                   n_iter < self.max_fourier_iter :
         RHS = B + C
         for n in range(self.n_elems):
@@ -753,9 +755,9 @@ class Solver(object):
         n_iter +=1
         grad = self.compute_grad(temp)
         C = self.compute_non_orth_contribution(grad,kappa)
-    flux = -np.einsum('cij,cj->ci',kappa,grad)
+   flux = -np.einsum('cij,cj->ci',kappa,grad)
 
-    return {'flux':flux,'temperature':temp,'kappa':kappa_eff,'grad':grad,'error':error,'n_iter':n_iter}
+   return {'flux':flux,'temperature':temp,'kappa':kappa_eff,'grad':grad,'error':error,'n_iter':n_iter}
 
   def compute_grad(self,temp):
 

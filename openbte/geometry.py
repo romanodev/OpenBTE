@@ -26,13 +26,11 @@ class Geometry(object):
    else:
      Mesher(argv) #this create mesh.msh
      self.dmin = argv['dmin']
-     a = time.time()
      self.import_mesh(**argv)
      self.data = self.compute_mesh_data(**argv)
      if argv.setdefault('save',True):
+      a = time.time()
       dd.io.save('geometry.h5',self.data)
-  #else:  data = None
-  #self.data = comm.bcast(data,root=0)
 
 
  def compute_node_map(self,**argv):
@@ -45,16 +43,14 @@ class Geometry(object):
 
  def compute_mesh_data(self,**argv):
 
-
     self.compute_side_normals() 
     self.compute_least_square_weigths()
     self.compute_connecting_matrix()
-
-
     self.compute_interpolation_weigths()
     self.compute_dists()
     self.compute_boundary_condition_data(argv)
     self.compute_node_map()
+
     self.n_elems = len(self.elems)
 
     #generate_elem_mat_map
@@ -78,54 +74,36 @@ class Geometry(object):
     for value,items in self.interp_weigths.items():
       interp_weigths[value] = items[0]
     
-
-    return {'side_list':self.side_list,\
-          'elem_side_map':self.elem_side_map,\
-          'side_elem_map':self.side_elem_map,\
-          'elem_mat_map':self.elem_mat_map,\
-          'elems':self.elems,\
-          'sides':self.sides,\
+    return {
           'size':self.size,\
           'lx':argv['lx'],\
           'conn':self.conn,\
           'ly':argv['ly'],\
           'dim':np.array([self.dim]),\
-          'weigths':self.weigths,\
           'weigths_vec': weigths_vec,\
           'areas':np.array(self.side_areas),\
           'face_normals':np.array(self.face_normals),\
           'nodes':self.nodes,\
           'side_elem_map_vec':np.array([self.side_elem_map[ll]  for ll in range(len(self.sides))]) ,\
           'elem_side_map_vec':np.array([self.elem_side_map[ll]  for ll in range(len(self.elems))]) ,\
-          'periodic_values':self.periodic_values,\
           'periodic_side_values':np.array(periodic_side_values_vec),\
           'interp_weigths':np.array(interp_weigths),\
           'centroids':np.array(self.elem_centroids),\
           'side_centroids':self.side_centroids,\
           'volumes':self.elem_volumes,\
           'kappa_mask':np.array(np.sum(self.B_with_area_old.todense(),axis=0))[0],\
-          'B':self.B,\
-          'normals':self.new_normals,\
-          #'dists':self.dists,\
           'dists':np.array(self.dists_side),\
           'flux_sides':np.array(self.flux_sides),\
           'frame':frame,\
           'i':np.array(self.i),\
           'j':np.array(self.j),\
           'k':self.k,\
-          'ip':self.ip,\
-          'jp':self.jp,\
-          'dp':self.dp,\
           'eb':np.array(self.eb),\
-          'sb':self.sb,\
           'db':self.db,\
-          'dbp':self.dbp,\
           'active_sides':np.array(self.side_list['active']),
           'periodic_sides':np.array(self.side_list['Periodic']),
           'boundary_sides':np.array(self.side_list['Boundary']),
           'n_side_per_elem': np.array([len(i)  for i in self.elems]),
-          'pv':self.pv,\
-          'ij':np.array(self.ij),\
           'pp':np.array(self.pp),\
           'meta':np.asarray([self.n_elems,self.kappa_factor,self.dim],np.float64)}
 
@@ -193,19 +171,9 @@ class Geometry(object):
   if self.dim == 2:
    self.side_areas = [  np.linalg.norm(self.nodes[s[1]] - self.nodes[s[0]]) for s in self.sides ]
   else:     
-      
-   self.side_areas = np.zeros(len(self.sides))   
-   for ns in range(len(self.sides)):
-    p = self.nodes[self.sides[ns]]
-    v = np.cross(p[1]-p[0],p[1]-p[2])
-    normal = v/np.linalg.norm(v)
-    tmp = np.zeros(3)
-    for i in range(len(p)):
-     vi1 = p[i]
-     vi2 = p[(i+1)%len(p)]
-     tmp += np.cross(vi1, vi2)
-    result = np.dot(tmp,normal)
-    self.side_areas[ns] =  abs(result/2)
+   p = self.nodes[self.sides]
+   self.side_areas = np.linalg.norm(np.cross(p[:,0]-p[:,1],p[:,0]-p[:,2]),keepdims=True,axis=1).T[0]/2
+ 
 
 
  def import_mesh(self,**argv):
@@ -241,12 +209,10 @@ class Geometry(object):
    face_type = {2:[1],3:[2]}
    #---------------------------
 
-
    bulk_tags = [n for n in range(n_elem_tot) if int(lines[current_line + n][1]) in bulk_type[self.dim]] 
    face_tags = [n for n in range(n_elem_tot) if int(lines[current_line + n][1]) in face_type[self.dim]]
 
    self.elems = [list(np.array(lines[current_line + n][5:],dtype=int)-1) for n in bulk_tags] 
-
 
    self.n_elems = len(self.elems)
    boundary_sides = np.array([ sorted(np.array(lines[current_line + n][5:],dtype=int)) for n in face_tags] ) -1
@@ -276,12 +242,11 @@ class Geometry(object):
    #----------------------------------------------------      
 
   #Build relevant data
-  self.compute_side_areas()
+  self.compute_side_areas() #OPTIMIZED
   self.compute_elem_volumes() #OPTIMIZED 
   self.compute_side_centroids() #OPTIMIZED
   self.compute_elem_centroids() #OPTIMIZED
   #-------------------
-
   if comm.rank == 0:
    #match the boundary sides with the global side.
    physical_boundary = {}
@@ -295,7 +260,6 @@ class Geometry(object):
    #--------------------------------------------
 
    self.side_list = {}
-
    #Apply Periodic Boundary Conditions
    self.side_list.update({'active':list(range(len(self.sides)))})
    self.side_periodicity = np.zeros((len(self.sides),2,3))
@@ -371,7 +335,6 @@ class Geometry(object):
 
    self.elem_kappa_map = {}
    self.elem_mat_map = { ne:0 for ne in list(range(len(self.elems)))}
-
 
  def compute_side_normals(self):
 
@@ -452,7 +415,6 @@ class Geometry(object):
 
   self.elem_volumes = np.zeros(len(self.elems))
   if self.dim == 3: #Assuming Tetraedron
-
    M = np.ones((4,4))
    for i,e in enumerate(self.elems):
     M[:,:3] = self.nodes[e,:]
