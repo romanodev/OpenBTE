@@ -12,7 +12,6 @@ def generate_mfp(**argv):
    phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
    #--------------------
    #Azimuthal Angle------------------------------
-   #n_theta = int( argv.setdefault('n_theta',24)  /2)
    n_theta = int( argv.setdefault('n_theta',24))
    sym = 1
 
@@ -86,9 +85,7 @@ def generate_mfp(**argv):
     for p in range(n_phi):
      angular_average += np.einsum('i,j->ij',direction_ave[t,p],direction_ave[t,p])*domega[t,p]/4.0/np.pi
 
-   #kappa_average = np.einsum('l,ij->lij',3*np.flip(kappa_m),angular_average)
    kappa_average = np.einsum('l,ij->lij',3*kappa_m,angular_average)
-   #rhs_average = 3/np.flip(mfp_sampled)/np.flip(mfp_sampled)
    rhs_average = mfp_sampled*mfp_sampled/3
    #-----------------------------
 
@@ -99,12 +96,11 @@ def generate_mfp(**argv):
       for m in range(n_mfp): 
         index = t * n_phi + p 
         tmp = kappa_directional[m,index]
-        #kappa += np.outer(tmp,direction_ave[t,p])*np.flip(mfp_sampled)[m]
         kappa += np.outer(tmp,direction_ave[t,p])*mfp_sampled[m]
    #------------------
    #-----------------------------
    tc = temp_coeff/np.sum(temp_coeff)
 
-   return {'temp':tc,'B':[],'F':F,'G':kappa_directional,'kappa':kappa,'scale':np.ones((n_mfp,n_theta*n_phi)),'ac':tc,'mfp_average':rhs_average,'kappa_average':kappa_average}
+   return {'temp':tc,'B':[],'F':direction,'G':kappa_directional,'kappa':kappa,'scale':np.ones((n_mfp,n_theta*n_phi)),'ac':tc,'mfp_average':rhs_average,'kappa_average':kappa_average,'mfp_sampled':mfp_sampled}
 
 

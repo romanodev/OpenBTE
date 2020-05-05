@@ -85,6 +85,8 @@ def generate_mfp2DSym(**argv):
        temp_coeff[m2,p] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
 
 
+ 
+
  #replicate bulk values---
  #mfp = np.tile(mfp,n_phi)  
  #-----------------------
@@ -97,24 +99,11 @@ def generate_mfp2DSym(**argv):
 
  #repeat angle---
  kappa_directional[:,:,2] = 0 #Enforce zeroflux on z (for visualization purposed)
- #polar_ave = np.array([np.repeat(polar_ave[:,i],n_mfp) for i in range(3)]).T
- #polar = np.array([np.repeat(polar[:,i],n_mfp) for i in range(3)]).T
- #---------------------------------
-
-
- #this is for Fourier----
- #angular_average = np.zeros((3,3))
- #for p in range(n_phi):
- #    angular_average += np.einsum('i,j->ij',polar_ave[p],polar_ave[p])/n_phi
-
- #print(angular_average)
- #quit()
- #F = np.einsum('i,ij->ij',mfp,polar)
  F = np.einsum('m,pi->mpi',mfp,polar_ave)
 
  rhs_average = mfp_sampled*mfp_sampled/2
  
  #Final----
- return {'temp':tc,'B':[],'F':F,'G':kappa_directional,'kappa':kappa,'scale':np.ones((n_mfp,n_phi)),'ac':tc,'mfp_average':rhs_average}
+ return {'temp':tc,'B':[],'G':kappa_directional,'kappa':kappa,'scale':np.ones((n_mfp,n_phi)),'ac':tc,'mfp_average':rhs_average,'F':polar_ave,'mfp_sampled':mfp}
 
 
