@@ -78,6 +78,7 @@ class Geometry(object):
           'size':self.size,\
           'lx':argv['lx'],\
           'conn':self.conn,\
+          'elems':self.elems,\
           'ly':argv['ly'],\
           'dim':np.array([self.dim]),\
           'weigths_vec': weigths_vec,\

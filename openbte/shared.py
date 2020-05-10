@@ -9,7 +9,7 @@ import scipy.sparse as sp
 import time
 from matplotlib.pylab import *
 import scikits.umfpack as um
-
+from scipy.sparse.linalg import lgmres
 
 comm = MPI.COMM_WORLD
 
@@ -343,6 +343,7 @@ class Solver(object):
 
      lu =  {}
      DeltaT = self.temperature_fourier
+     X = DeltaT.copy()
 
      Sup = np.zeros_like(self.kappam)
      Supd = np.zeros_like(self.kappam)
@@ -364,6 +365,7 @@ class Solver(object):
         TB = np.zeros((self.n_serial,len(self.eb)))   
         for c,i in enumerate(self.eb): TB[:,c] = DeltaT[i]   
         for n,i in enumerate(self.eb): Bm[:,:,i] -= np.einsum('m,q->mq' ,TB[:,n],Gbm2[:,n])
+
 
      while kk < self.data.setdefault('max_bte_iter',100) and error > self.data.setdefault('max_bte_error',1e-2):
 
@@ -403,7 +405,7 @@ class Solver(object):
            #idx = [self.n_serial-1]
            #----------------------------------------
            fourier = False
-
+           outer_v = []
            for m in range(self.n_serial)[idx[0]::-1]:
               if self.multiscale:
                Xd = tf[m] - self.mfp_sampled[m]*np.dot(self.VMFP[q],tfg[m].T)
@@ -412,17 +414,24 @@ class Solver(object):
                X = tf[m] - self.mfp_sampled[m]*np.dot(self.VMFP[q],tfg[m].T)
                diffusive +=1
               else:
-               #----------------------------SOLVE BTE----------------------------------  
+               #----------------------------SOLVE BTE---------------------------------- 
+               
+               B = DeltaT  + self.mfp_sampled[m]*(P[n] + Bm[m,n])
                if not (m,q) in lu.keys() :
                 Master.data = np.concatenate((self.mfp_sampled[m]*Gm[n],self.mfp_sampled[m]*D[n]+np.ones(self.n_elems)))[conversion]
                 if not self.keep_lu:
+                 a = time.time()   
                  umfpack.numeric(Master)
                 else:
                  lu_loc = sp.linalg.splu(Master)
                  lu[(m,q)] = lu_loc
                else: lu_loc   = lu[(m,q)]
-               X = lu_loc.solve(DeltaT  + self.mfp_sampled[m]*(P[n] + Bm[m,n]))  if self.keep_lu else umfpack.solve(um.UMFPACK_A,Master,DeltaT  + self.mfp_sampled[m]*(P[n] + Bm[m,n]), autoTranspose = False)
+               #X = lu_loc.solve(DeltaT  + self.mfp_sampled[m]*(P[n] + Bm[m,n]))  if self.keep_lu else umfpack.solve(um.UMFPACK_A,Master,DeltaT  + self.mfp_sampled[m]*(P[n] + Bm[m,n]), autoTranspose = False)
+               X = lu_loc.solve(DeltaT  + self.mfp_sampled[m]*(P[n] + Bm[m,n]))  if self.keep_lu else umfpack.solve(um.UMFPACK_A,Master,B, autoTranspose = False)
                #----------------------------------------------------------------------
+               #a = time.time()
+               #X,_ = lgmres(Master,X,outer_v=outer_v,prepend_outer_v=True,x0 = X)
+               #print(time.time()-a)
 
                kappap[m,q] = -np.dot(self.kappa_mask,X)
                
@@ -444,7 +453,7 @@ class Solver(object):
               if kk < self.max_bte_iter and error > self.max_bte_error:
                 Jp += np.outer(X,self.sigma[m,q])*1e-18
 
-              del X
+              #del X
            
            #BALLISTIC               
            ballistic = False
@@ -464,6 +473,7 @@ class Solver(object):
                  lu[(m,q)] = lu_loc
                else: lu_loc   = lu[(m,q)]
                X = lu_loc.solve(DeltaT  + self.mfp_sampled[m]*(P[n] + Bm[m,n]))  if self.keep_lu else umfpack.solve(um.UMFPACK_A,Master,DeltaT  + self.mfp_sampled[m]*(P[n] + Bm[m,n]), autoTranspose = False)
+
                #----------------------------------------------------------------------
                kappap[m,q] = -np.dot(self.kappa_mask,X)
                if abs(kappap[m,q] - kappa_balp[q])/abs(kappap[m,q]) < self.error_multiscale :
@@ -481,7 +491,7 @@ class Solver(object):
               if kk < self.max_bte_iter and error > self.max_bte_error:
                 Jp += np.outer(X,self.sigma[m,q])*1e-18
 
-              del X
+              #del X
               
         Mp[0] = diffusive
         Mp[1] = bal
@@ -508,14 +518,14 @@ class Solver(object):
         if self.verbose and comm.rank == 0:   
          print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error))
 
-     if comm.rank == 0:
-          plot(self.mfp_bulk,Sup,color='b',marker='o')
-          if self.multiscale:
-           plot(self.mfp_bulk,Supd,color='r',marker='o')
-           plot(self.mfp_bulk,Supb,color='g',marker='o')
-          ylim([0,1])
-          xscale('log')
-          show()
+     #if comm.rank == 0:
+     #     plot(self.mfp_bulk,Sup,color='b',marker='o')
+     #     if self.multiscale:
+     #      plot(self.mfp_bulk,Supd,color='r',marker='o')
+     #      plot(self.mfp_bulk,Supb,color='g',marker='o')
+     #     ylim([0,1])
+     #     xscale('log')
+     #     show()
         #-----------------------------------------------
 
 

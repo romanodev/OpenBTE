@@ -312,6 +312,8 @@ class Mesher(object):
   #CREATE BULK SURFACE------------------------------------
   store = open('mesh.geo', 'w+')
   store.write('h='+str(mesh_ext) + ';\n')
+  store.write('lx='+str(argv['lx']) + ';\n')
+  store.write('ly='+str(argv['ly']) + ';\n')
   points = []
   lines = []
   loops = 1000
@@ -322,8 +324,8 @@ class Mesher(object):
    polypores.append(Polygon(poly))
 
   #Get boundary wall
-  lx = abs(frame[0][0])*2.0
-  ly = abs(frame[0][1])*2.0
+  self.lx = abs(frame[0][0])*2.0
+  self.ly = abs(frame[0][1])*2.0
   pore_wall = []
   delta = 1e-2
   #-------------------------
@@ -399,10 +401,10 @@ class Mesher(object):
   upper = []
   lower = []
 
-  pul = np.array([-lx/2.0,ly/2.0])
-  pur = np.array([lx/2.0,ly/2.0])
-  pll = np.array([-lx/2.0,-ly/2.0])
-  plr = np.array([lx/2.0,-ly/2.0])
+  pul = np.array([-self.lx/2.0,self.ly/2.0])
+  pur = np.array([self.lx/2.0,self.ly/2.0])
+  pll = np.array([-self.lx/2.0,-self.ly/2.0])
+  plr = np.array([self.lx/2.0,-self.ly/2.0])
 
 
   delta = 1e-12
@@ -888,7 +890,8 @@ class Mesher(object):
     tmp = self.already_included_old(points,p)
     if tmp == -1:
      points.append(p)
-     store.write( 'Point('+str(len(points)-1) +') = {' + str(p[0]) +','+ str(p[1])+',0,h};\n')
+     #store.write( 'Point('+str(len(points)-1) +') = {' + str(p[0]) +','+ str(p[1])+',0,h};\n')
+     store.write( 'Point('+str(len(points)-1) +') = {' + str(p[0]/self.lx) +'*lx,'+ str(p[1]/self.ly)+'*ly,0,h};\n')
      p_list.append(len(points)-1)
     else:
      p_list.append(tmp)
