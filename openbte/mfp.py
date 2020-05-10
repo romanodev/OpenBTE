@@ -51,6 +51,7 @@ def generate_mfp(**argv):
    n_mfp = len(mfp_sampled)
    temp_coeff = np.zeros(nm) 
    kappa_directional = np.zeros((n_mfp,n_theta*n_phi,3)) 
+   suppression = np.zeros((n_mfp,n_phi*n_theta,n_mfp_bulk,3)) 
    temp_coeff = np.zeros((n_mfp,n_theta*n_phi))
    kappa_m = np.zeros(n_mfp)
    for m in range(n_mfp_bulk):
@@ -59,25 +60,18 @@ def generate_mfp(**argv):
     kappa_m[m2] += a2*kappa_bulk[m] 
     for t in range(n_theta): 
      for p in range(n_phi): 
-      index_1 = t * n_phi + p
-      index_2 = t * n_phi + p 
+      index = t * n_phi + p
       factor = kappa_bulk[m]/4.0/np.pi*domega[t,p]
-      kappa_directional[m1,index_1] += 3 * a1 * factor/mfp_bulk[m]*direction_ave[t,p]*sym
-      kappa_directional[m2,index_2] += 3 * a2 * factor/mfp_bulk[m]*direction_ave[t,p]*sym
-      temp_coeff[m1,index_1] += a1 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]*sym
-      temp_coeff[m2,index_2] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]*sym
+      kappa_directional[m1,index] += 3 * a1 * factor/mfp_bulk[m]*direction_ave[t,p]*sym
+      kappa_directional[m2,index] += 3 * a2 * factor/mfp_bulk[m]*direction_ave[t,p]*sym
+      temp_coeff[m1,index] += a1 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]*sym
+      temp_coeff[m2,index] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]*sym
 
-   #kappa = np.zeros((3,3))
+      suppression[m1,index,m] += 3 * a1 /mfp_bulk[m]*direction_ave[t,p]*sym*domega[t,p]/4.0/np.pi
+      suppression[m2,index,m] += 3 * a2 /mfp_bulk[m]*direction_ave[t,p]*sym*domega[t,p]/4.0/np.pi
+
    direction = direction_ave.reshape((n_theta * n_phi,3))
-   #direction = np.array([np.repeat(direction[:,i],n_mfp) for i in range(3)]).T
-   #mfp = np.tile(mfp_sampled,n_phi*n_theta)  
-   #F = np.einsum('i,ij->ij',mfp,direction)
-
-   #Build multiscale directions---
-   #F = np.einsum('m,dj->mdj',np.flip(mfp_sampled),direction)
    F = np.einsum('m,dj->mdj',mfp_sampled,direction)
-   #temp_coeff = np.flip(temp_coeff,axis=0)
-   #kappa_directional = np.flip(kappa_directional,axis=0)
 
    #this is for Fourier----
    angular_average = np.zeros((3,3))
@@ -85,8 +79,7 @@ def generate_mfp(**argv):
     for p in range(n_phi):
      angular_average += np.einsum('i,j->ij',direction_ave[t,p],direction_ave[t,p])*domega[t,p]/4.0/np.pi
 
-   kappa_average = np.einsum('l,ij->lij',3*kappa_m,angular_average)
-   rhs_average = mfp_sampled*mfp_sampled/3
+   rhs_average = np.einsum('m,ij->mij',mfp_sampled*mfp_sampled,angular_average)
    #-----------------------------
 
    #replicate bulk values---
@@ -97,10 +90,20 @@ def generate_mfp(**argv):
         index = t * n_phi + p 
         tmp = kappa_directional[m,index]
         kappa += np.outer(tmp,direction_ave[t,p])*mfp_sampled[m]
-   #------------------
-   #-----------------------------
+
    tc = temp_coeff/np.sum(temp_coeff)
 
-   return {'temp':tc,'B':[],'F':direction,'G':kappa_directional,'kappa':kappa,'scale':np.ones((n_mfp,n_theta*n_phi)),'ac':tc,'mfp_average':rhs_average,'kappa_average':kappa_average,'mfp_sampled':mfp_sampled}
+   return {'temp':tc,\
+           'B':[],\
+           'F':direction,\
+           'G':kappa_directional,\
+           'kappa':kappa,\
+           'scale':np.ones((n_mfp,n_theta*n_phi)),\
+           'ac':tc,\
+           'mfp_average':rhs_average,\
+           'mfp_sampled':mfp_sampled,\
+           'suppression':suppression,\
+           'kappam':kappa_bulk,\
+           'mfp_bulk':mfp_bulk}
 
 

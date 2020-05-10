@@ -27,6 +27,8 @@ requirements:
     - termcolor
     - unittest2
     - googledrivedownloader
+    - libsuitesparse
+    - scikit-umfpack
   run:
     - deepdish
     - future
@@ -43,6 +45,8 @@ requirements:
     - unittest2
     - gmsh==3.0.6
     - pyqt
+    - libsuitesparse
+    - scikit-umfpack
 
 test:
   imports:

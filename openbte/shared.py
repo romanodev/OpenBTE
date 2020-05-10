@@ -23,7 +23,8 @@ class Solver(object):
         self.tt = np.float64
         self.state = {}
         self.multiscale = argv.setdefault('multiscale',False)
-        self.error_multiscale = argv.setdefault('multiscale_error',0.1)
+        self.multiscale_ballistic = argv.setdefault('multiscale_ballistic',False)
+        self.error_multiscale = argv.setdefault('multiscale_error',1e-10)
         self.verbose = argv.setdefault('verbose',True)
         self.alpha = argv.setdefault('alpha',1.0)
         self.keep_lu = argv.setdefault('keep_lu',True)
@@ -108,13 +109,16 @@ class Solver(object):
             self.n_serial = self.tc.shape[0]  
             self.n_parallel = self.tc.shape[1]  
             self.meta = np.array([self.n_serial,self.n_parallel,0])
-            self.mfp_average = self.mat['mfp_average']
+            self.mfp_average = self.mat['mfp_average']*1e18
+            self.suppression = self.mat['suppression']
+            self.kappam = self.mat['kappam']
             self.mfp_sampled = self.mat['mfp_sampled']*1e9
+            self.mfp_bulk = self.mat['mfp_bulk']
             self.mfp_info()
 
         else: self.ddd = None
         self.ddd = comm.bcast(self.ddd,root=0)
-        self.create_shared_memory(['sigma','tc','meta','BM','mfp_average','kappa','mfp_sampled','VMFP'])
+        self.create_shared_memory(['sigma','tc','meta','BM','mfp_average','kappa','mfp_sampled','VMFP','kappam','suppression','mfp_bulk'])
         self.n_serial = self.meta[0]           
         self.n_parallel = self.meta[1]           
         self.coll = bool(self.meta[2])
@@ -279,26 +283,12 @@ class Solver(object):
            tfgp[m] = dataf['grad']
            for q in range(self.n_parallel): 
             kappafp[m,q] = -np.dot(self.kappa_mask,dataf['temperature'] - self.mfp_sampled[m]*np.dot(self.VMFP[q],dataf['grad'].T))
+
          comm.Allreduce([kappafp,MPI.DOUBLE],[kappaf,MPI.DOUBLE],op=MPI.SUM)
          comm.Allreduce([tfp,MPI.DOUBLE],[tf,MPI.DOUBLE],op=MPI.SUM)
          comm.Allreduce([tfgp,MPI.DOUBLE],[tfg,MPI.DOUBLE],op=MPI.SUM)
 
          return kappaf,tf,tfg 
-
-
-  def solve(self,m,n,q):
-
-                        
-        Master.data = np.concatenate((self.Gm[m,n],self.D[m,n]))[self.conversion]
-        lu_loc = sp.linalg.splu(Master)
-        if self.keep_lu: lu[(m,q)] = lu_loc
-        else: lu_loc   = lu[(m,q)]
-        P = np.zeros(self.n_elems)
-        for ss,v in self.pp: P[self.i[int(ss)]] -= Gm[m,n,int(ss)]*v
-        RHS = DeltaT + P
-        for c,i in enumerate(self.eb): RHS[i] += Bm[m,q,c]
-        return  lu_loc.solve(RHS)
-               #---------------------------------------------------------
 
 
 
@@ -354,6 +344,9 @@ class Solver(object):
      lu =  {}
      DeltaT = self.temperature_fourier
 
+     Sup = np.zeros_like(self.kappam)
+     Supd = np.zeros_like(self.kappam)
+     Supb = np.zeros_like(self.kappam)
      kappa_vec = list(self.kappa_fourier)
 
      kappa_old = kappa_vec[-1]
@@ -376,19 +369,22 @@ class Solver(object):
 
         if self.multiscale:
          (kappaf,tf,tfg) = self.solve_modified_fourier(DeltaT)
-
         #Multiscale scheme-----------------------------
         diffusive = 0
         bal = 0
         DeltaTp = np.zeros_like(DeltaT)
         TBp = np.zeros_like(TB)
-
+        Supp = np.zeros_like(self.kappam)
+        Supdp = np.zeros_like(self.kappam)
+        Supbp = np.zeros_like(self.kappam)
         Jp = np.zeros((self.n_elems,3))
         J = np.zeros((self.n_elems,3))
         Bmp = np.zeros_like(Bm)
+        kappa_balp = np.zeros(self.n_parallel)
+        kappa_bal = np.zeros(self.n_parallel)
         for n,q in enumerate(self.rr):
            #COMPUTE BALLISTIC----------------------- 
-           if self.multiscale:
+           if self.multiscale_ballistic:
             if not (-1,q) in lu.keys() :
               Master.data = np.concatenate((self.mfp_sampled[-1]*Gm[n],self.mfp_sampled[-1]*D[n]+np.ones(self.n_elems)))[conversion]
               if not self.keep_lu:
@@ -398,17 +394,19 @@ class Solver(object):
                  lu[(-1,q)] = lu_loc
             else: lu_loc   = lu[(-1,q)]
             X_bal = lu_loc.solve(DeltaT  + self.mfp_sampled[-1]*(P[n] + Bm[-1,n]))  if self.keep_lu else umfpack.solve(um.UMFPACK_A,Master,DeltaT  + self.mfp_sampled[-1]*(P[n] + Bm[-1,n]), autoTranspose = False)
+            Supbp -= np.dot(self.kappa_mask,X_bal)*self.suppression[-1,q,:,0]*self.kappa_factor*1e-9
                #----------------------------------------------------------------------
-
-            kappa_bal = -np.dot(self.kappa_mask,X_bal)
-            idx  = np.argwhere(np.diff(np.sign(kappaf[:,q] - kappa_bal*np.ones(self.n_serial)))).flatten()
+            kappa_balp[q] = -np.dot(self.kappa_mask,X_bal)
+            idx  = np.argwhere(np.diff(np.sign(kappaf[:,q] - kappa_balp[q]*np.ones(self.n_serial)))).flatten()
             if len(idx) == 0: idx = [self.n_serial-1]
            else: idx = [self.n_serial-1]
-           #----------------------------------------
            #idx = [self.n_serial-1]
+           #----------------------------------------
            fourier = False
+
            for m in range(self.n_serial)[idx[0]::-1]:
-              a = time.time()
+              if self.multiscale:
+               Xd = tf[m] - self.mfp_sampled[m]*np.dot(self.VMFP[q],tfg[m].T)
               if fourier:
                kappap[m,q] = kappaf[m,q]
                X = tf[m] - self.mfp_sampled[m]*np.dot(self.VMFP[q],tfg[m].T)
@@ -427,6 +425,7 @@ class Solver(object):
                #----------------------------------------------------------------------
 
                kappap[m,q] = -np.dot(self.kappa_mask,X)
+               
                if self.multiscale:
                 if abs(kappap[m,q] - kappaf[m,q])/abs(kappap[m,q]) < self.error_multiscale :
                   kappap[m,q] = kappaf[m,q]
@@ -434,6 +433,11 @@ class Solver(object):
                   fourier=True
                #---------------------------------------------------------
               DeltaTp += X*self.ddd[m,q]
+              Supp -= np.dot(self.kappa_mask,X)*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
+              if self.multiscale:
+               Supdp -= np.dot(self.kappa_mask,Xd)*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
+              if self.multiscale_ballistic:
+               Supbp -= np.dot(self.kappa_mask,X_bal)*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
 
               if len(self.db) > 0: TBp[m,:] += np.einsum('se,e,s->s',eb,X,self.GG[m,q])
 
@@ -445,8 +449,9 @@ class Solver(object):
            #BALLISTIC               
            ballistic = False
            for m in range(self.n_serial)[idx[0]+1:]:
+              Xd = tf[m] - self.mfp_sampled[m]*np.dot(self.VMFP[q],tfg[m].T)
               if ballistic:
-               kappap[m,q] = kappa_bal
+               kappap[m,q] = kappa_balp[q]
                X = X_bal
                bal +=1
               else: 
@@ -461,29 +466,37 @@ class Solver(object):
                X = lu_loc.solve(DeltaT  + self.mfp_sampled[m]*(P[n] + Bm[m,n]))  if self.keep_lu else umfpack.solve(um.UMFPACK_A,Master,DeltaT  + self.mfp_sampled[m]*(P[n] + Bm[m,n]), autoTranspose = False)
                #----------------------------------------------------------------------
                kappap[m,q] = -np.dot(self.kappa_mask,X)
-               if abs(kappap[m,q] - kappa_bal)/abs(kappap[m,q]) < self.error_multiscale :
-                   kappap[m,q] = kappa_bal
+               if abs(kappap[m,q] - kappa_balp[q])/abs(kappap[m,q]) < self.error_multiscale :
+                   kappap[m,q] = kappa_balp[q]
                    bal +=1
                    ballistic=True
                #--------------------------
-
+              Supp -= np.dot(self.kappa_mask,X)*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
+              if self.multiscale:
+               Supdp -= np.dot(self.kappa_mask,Xd)*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
+              if self.multiscale_ballistic:
+               Supbp -= np.dot(self.kappa_mask,X_bal)*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
               DeltaTp += X*self.ddd[m,q]
               if len(self.db) > 0: TBp[m,:] += np.einsum('se,e,s->s',eb,X,self.GG[m,q])
               if kk < self.max_bte_iter and error > self.max_bte_error:
                 Jp += np.outer(X,self.sigma[m,q])*1e-18
-                
 
               del X
+              
         Mp[0] = diffusive
         Mp[1] = bal
 
         comm.Barrier()
         comm.Allreduce([DeltaTp,MPI.DOUBLE],[DeltaT,MPI.DOUBLE],op=MPI.SUM)
+        comm.Allreduce([Supp,MPI.DOUBLE],[Sup,MPI.DOUBLE],op=MPI.SUM)
+        comm.Allreduce([Supdp,MPI.DOUBLE],[Supd,MPI.DOUBLE],op=MPI.SUM)
+        comm.Allreduce([Supbp,MPI.DOUBLE],[Supb,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([kappap,MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([Mp,MPI.DOUBLE],[MM,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([TBp,MPI.DOUBLE],[TB,MPI.DOUBLE],op=MPI.SUM)
-        #-----------------------------------------------
+        comm.Allreduce([kappa_balp,MPI.DOUBLE],[kappa_bal,MPI.DOUBLE],op=MPI.SUM)
+
         Bm = np.einsum('ms,qs,se->mqe',TB,Gbm2,eb)
         kappa_totp = np.array([np.einsum('mq,mq->',self.sigma[:,self.rr,0],kappa[:,self.rr])])*self.kappa_factor*1e-18
         comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
@@ -495,9 +508,19 @@ class Solver(object):
         if self.verbose and comm.rank == 0:   
          print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error))
 
+     if comm.rank == 0:
+          plot(self.mfp_bulk,Sup,color='b',marker='o')
+          if self.multiscale:
+           plot(self.mfp_bulk,Supd,color='r',marker='o')
+           plot(self.mfp_bulk,Supb,color='g',marker='o')
+          ylim([0,1])
+          xscale('log')
+          show()
+        #-----------------------------------------------
+
+
      if self.verbose and comm.rank == 0:
       print(colored(' -----------------------------------------------------------','green'))
-
 
      if self.multiscale and comm.rank == 0:
         print()
@@ -512,7 +535,7 @@ class Solver(object):
         print(colored(' Full termination: ','green') + str(termination) )
         print(colored(' -----------------------------------------------------------','green'))
 
-     return {'kappa_vec':kappa_vec,'temperature':DeltaT,'flux':J}
+     return {'kappa_vec':kappa_vec,'temperature':DeltaT,'flux':J,'suppression':Sup,'suppression_diffusive':Supd,'suppression_ballistic':Supb}
 
 
   def solve_bte(self,**argv):
@@ -563,7 +586,6 @@ class Solver(object):
      
      Master = sp.csc_matrix((np.arange(len(self.im))+1,(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)
      conversion = np.asarray(Master.data-1,np.int) 
-
 
      lu =  {}
 
@@ -682,8 +704,6 @@ class Solver(object):
        scale = self.MF[m]['scale']
        B = self.MF[m]['B'] + argv['pseudo']
    else:   
-
-
 
     F = sp.dok_matrix((self.n_elems,self.n_elems))
     B = np.zeros(self.n_elems)

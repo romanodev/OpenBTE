@@ -183,6 +183,10 @@ def get_linear_indexes(mfp,value,scale,extent):
 
    n = len(mfp)
 
+   if scale == 'log':
+     mfp = np.log10(mfp.copy())
+     value = np.log10(value.copy())
+
    found = False
    beyond = False
    if extent:
@@ -207,7 +211,6 @@ def get_linear_indexes(mfp,value,scale,extent):
    else:  
     aj = (value-mfp[i])/(mfp[j]-mfp[i]) #OK.
     ai = 1-aj
-
     if scale=='inverse':
      ai *=mfp[i]/value
      aj *=mfp[j]/value

@@ -69,8 +69,8 @@ def generate_mfp2DSym(**argv):
  n_mfp = len(mfp)
  temp_coeff = np.zeros((n_mfp,n_phi))
  kappa_directional = np.zeros((n_mfp,n_phi,3)) 
- #kappa_directional_not_int = np.zeros((n_mfp*n_phi,3)) 
-   
+ suppression = np.zeros((n_mfp,n_phi,n_mfp_bulk,3)) 
+  
  for p in range(n_phi): 
   for t in range(n_theta): 
     for m in range(n_mfp_bulk):
@@ -81,15 +81,13 @@ def generate_mfp2DSym(**argv):
       if mfp_bulk[m] > 0:
        kappa_directional[m1,p]         += 3 * a1 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]
        kappa_directional[m2,p]         += 3 * a2 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]
+       suppression[m1,p,m]         += 3 * a1 * 2 * 1/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]
+       suppression[m2,p,m]         += 3 * a2 * 2 * 1/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]
        temp_coeff[m1,p] += a1 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
        temp_coeff[m2,p] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
 
 
- 
-
  #replicate bulk values---
- #mfp = np.tile(mfp,n_phi)  
- #-----------------------
 
  tc = temp_coeff/np.sum(temp_coeff)
  Wod = np.tile(tc,(nm,1))
@@ -104,6 +102,6 @@ def generate_mfp2DSym(**argv):
  rhs_average = mfp_sampled*mfp_sampled/2
  
  #Final----
- return {'temp':tc,'B':[],'G':kappa_directional,'kappa':kappa,'scale':np.ones((n_mfp,n_phi)),'ac':tc,'mfp_average':rhs_average,'F':polar_ave,'mfp_sampled':mfp}
+ return {'temp':tc,'B':[],'G':kappa_directional,'kappa':kappa,'scale':np.ones((n_mfp,n_phi)),'ac':tc,'mfp_average':rhs_average,'F':polar_ave,'mfp_sampled':mfp,'suppression':suppression,'kappam':kappa_bulk,'mfp_bulk':mfp_bulk}
 
 
