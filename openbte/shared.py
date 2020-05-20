@@ -53,6 +53,7 @@ class Solver(object):
          self.k = self.mesh['k']
          self.db = self.mesh['db']
          self.eb = self.mesh['eb']
+         self.sb = self.mesh['sb']
          self.kappa_mask = self.mesh['kappa_mask']
          self.weigths = self.mesh['weigths_vec']
          self.interp_weigths = self.mesh['interp_weigths']
@@ -73,7 +74,7 @@ class Solver(object):
          self.periodic_side_values = self.mesh['periodic_side_values']
          self.im = np.concatenate((self.mesh['i'],list(np.arange(self.mesh['meta'][0]))))
          self.jm = np.concatenate((self.mesh['j'],list(np.arange(self.mesh['meta'][0]))))
-        self.create_shared_memory(['i','j','im','jm','db','k','eb','kappa_mask','dists','flux_sides',\
+        self.create_shared_memory(['sb','i','j','im','jm','db','k','eb','kappa_mask','dists','flux_sides',\
                                    'pp','meta','active_sides','areas','side_elem_map_vec','volumes','periodic_sides','weigths',\
                                     'periodic_side_values','n_side_per_elems','centroids','boundary_sides','elem_side_map_vec','interp_weigths','face_normals'])
         self.n_elems = int(self.meta[0])
@@ -87,13 +88,12 @@ class Solver(object):
         if comm.rank == 0:
           self.mat = dd.io.load('material.h5')
           self.kappa = self.mat['kappa']
-          if not self.only_fourier:
-           self.tc = np.array(self.mat['temp'])
-           self.ddd = self.tc
-           self.sigma = self.mat['G']*1e9
-           self.VMFP = self.mat['F']
-           self.BM = np.zeros(1)
-           if self.tc.ndim == 1:
+          self.tc = np.array(self.mat['temp'])
+          self.ddd = self.tc
+          self.sigma = self.mat['G']*1e9
+          self.VMFP = self.mat['F']
+          self.BM = np.zeros(1)
+          if self.tc.ndim == 1:
             self.coll = True
             self.meta = np.array([1,len(self.tc),1])
             self.n_parallel = len(self.tc)
@@ -105,7 +105,7 @@ class Solver(object):
             self.VMFP = np.array([self.VMFP]) 
             self.mfp_average = np.zeros(1)
             self.full_info() 
-           else: 
+          else: 
             self.n_serial = self.tc.shape[0]  
             self.n_parallel = self.tc.shape[1]  
             self.meta = np.array([self.n_serial,self.n_parallel,0])
@@ -132,7 +132,7 @@ class Solver(object):
         if comm.rank == 0:
           data = self.solve_fourier(self.kappa)
           variables = {0:{'name':'Temperature Fourier','units':'K',        'data':data['temperature']},\
-                     1:{'name':'Flux Fourier'       ,'units':'W/m/m/K','data':data['flux']}}
+                       1:{'name':'Flux Fourier'       ,'units':'W/m/m/K','data':data['flux']}}
           self.state.update({'variables':variables,\
                            'kappa_fourier':data['kappa']})
           self.temperature_fourier = data['temperature']
@@ -146,38 +146,43 @@ class Solver(object):
         self.create_shared_memory(['kappa_fourier'])
         #----------------------------------------------------------------
        
-
-        #-------SET Parallel info----------------------------------------------
-        block =  self.n_parallel//comm.size
-        if comm.rank == comm.size-1: 
-          self.rr = range(block*comm.rank,self.n_parallel)
-        else: 
-          self.rr = range(block*comm.rank,block*(comm.rank+1))
+        if not self.only_fourier:
+         #-------SET Parallel info----------------------------------------------
+         block =  self.n_parallel//comm.size
+         if comm.rank == comm.size-1: 
+           self.rr = range(block*comm.rank,self.n_parallel)
+         else: 
+           self.rr = range(block*comm.rank,block*(comm.rank+1))
   
-        #--------------------------------     
-        block =  self.n_serial//comm.size
-        if comm.rank == comm.size-1: 
-          self.ff = range(block*comm.rank,self.n_serial)
-        else: 
-          self.ff = range(block*comm.rank,block*(comm.rank+1))
+         #--------------------------------     
+         block =  self.n_serial//comm.size
+         if comm.rank == comm.size-1: 
+           self.ff = range(block*comm.rank,self.n_serial)
+         else: 
+           self.ff = range(block*comm.rank,block*(comm.rank+1))
         #-------------------------------
 
-        #SOLVE BTE-------
-        if self.coll:    
-          data = self.solve_bte(**argv)
-        else:
-          data = self.solve_mfp(**argv)
+         #SOLVE BTE-------
+         if self.coll:    
+           data = self.solve_bte(**argv)
+         else:
+           data = self.solve_mfp(**argv)
         #-----
 
         #Saving-----------------------------------------------------------------------
         if comm.rank == 0:
           variables = self.state['variables']
 
-          variables[2]    = {'name':'Temperature BTE','units':'K'             ,'data':data['temperature']}
-          variables[3]    = {'name':'Flux BTE'       ,'units':'W/m/m/K'       ,'data':data['flux']}
+          if not self.only_fourier:
+           variables[2]    = {'name':'Temperature BTE','units':'K'             ,'data':data['temperature']}
+           variables[3]    = {'name':'Flux BTE'       ,'units':'W/m/m/K'       ,'data':data['flux']}
 
-          self.state.update({'variables':variables,\
-                           'kappa':data['kappa_vec']})
+          self.state.update({'variables':variables})#,\
+                           #'kappa':data['kappa_vec'],\
+                           #'suppression':data['suppression'],\
+                           #'suppression_diffusive':data['suppression_diffusive']})
+
+          
 
           if argv.setdefault('save',True):
            dd.io.save('solver.h5',self.state)
@@ -324,16 +329,22 @@ class Solver(object):
      Gp = G.clip(min=0); Gm = G.clip(max=0)
      D = np.zeros((len(self.rr),self.n_elems))
      for n,i in enumerate(self.i):  D[:,i] += Gp[:,n]
+
+     DeltaT = self.temperature_fourier
+     #---boundary----------------------
+     TB = np.zeros((self.n_serial,len(self.eb)))   
      if len(self.db) > 0: #boundary
-      Gbp2 = np.einsum('qj,jn->qn',self.VMFP[self.rr],self.db,optimize=True).clip(min=0)
-      for n,i in enumerate(self.eb): D[:,i]  += Gbp2[:,n]
+      tmp = np.einsum('rj,jn->rn',self.VMFP[self.rr],self.db,optimize=True)  
+      Gbp2 = tmp.clip(min=0); Gbm2 = tmp.clip(max=0);
+      for n,i in enumerate(self.eb):
+          D[:, i]  += Gbp2[:,n]
+          TB[:,n]  = DeltaT[i]  
+     #----------------------------------
 
      #Periodic---
      P = np.zeros((len(self.rr),self.n_elems))
      for ss,v in self.pp: P[:,self.i[int(ss)]] -= Gm[:,int(ss)]*v
-
-     Gbm2 = np.einsum('qj,jn->qn',self.VMFP[self.rr],self.db,optimize=True).clip(max=0)
-     del Gbp2,G,Gp
+     del G,Gp
      #--------------------------
     
      Master = sp.csc_matrix((np.arange(len(self.im))+1,(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)
@@ -342,7 +353,6 @@ class Solver(object):
       umfpack.symbolic(Master)
 
      lu =  {}
-     DeltaT = self.temperature_fourier
      X = DeltaT.copy()
 
      Sup = np.zeros_like(self.kappam)
@@ -360,14 +370,24 @@ class Solver(object):
      kappap = np.zeros((self.n_serial,self.n_parallel))
      kappa = np.zeros((self.n_serial,self.n_parallel))
      termination = True
-     Bm = np.zeros((self.n_serial,len(self.rr),self.n_elems))   
-     if len(self.db) > 0: 
-        TB = np.zeros((self.n_serial,len(self.eb)))   
-        for c,i in enumerate(self.eb): TB[:,c] = DeltaT[i]   
-        for n,i in enumerate(self.eb): Bm[:,:,i] -= np.einsum('m,q->mq' ,TB[:,n],Gbm2[:,n])
-
+    
+     #if comm.rank == 0:
+     # _,counts = np.unique(self.eb,return_counts= True)
 
      while kk < self.data.setdefault('max_bte_iter',100) and error > self.data.setdefault('max_bte_error',1e-2):
+
+        #a = time.time()  
+        #Bm = np.einsum('mn,rn,ne->mre',TB,Gbm2,eb)
+        #Bm = np.zeros((self.n_serial,len(self.rr),self.n_elems))   
+        #for n,i in enumerate(self.eb): 
+        # Bm[:,:,i] -= np.einsum('m,r->mr',TB[:,n],Gbm2[:,n])
+         
+         #if i == 711 and comm.rank == 0:
+         #   print(Gbm2[:,n]) 
+             #Boundary-----   
+         #for n,i in enumerate(self.mesh['eb']): i
+         #@ Bm[:,i] +=np.einsum('u,u,q->q',X[:,i],data['Gbp'][:,n],data['SS'][self.rr,n],optimize=True)
+
 
         if self.multiscale:
          (kappaf,tf,tfg) = self.solve_modified_fourier(DeltaT)
@@ -381,7 +401,7 @@ class Solver(object):
         Supbp = np.zeros_like(self.kappam)
         Jp = np.zeros((self.n_elems,3))
         J = np.zeros((self.n_elems,3))
-        Bmp = np.zeros_like(Bm)
+        #Bmp = np.zeros_like(Bm)
         kappa_balp = np.zeros(self.n_parallel)
         kappa_bal = np.zeros(self.n_parallel)
         for n,q in enumerate(self.rr):
@@ -415,8 +435,22 @@ class Solver(object):
                diffusive +=1
               else:
                #----------------------------SOLVE BTE---------------------------------- 
-               
-               B = DeltaT  + self.mfp_sampled[m]*(P[n] + Bm[m,n])
+
+               #BB = np.zeros(self.n_elems)   
+               #for c,i in enumerate(self.eb): 
+               # BB[i] = -DeltaT[i] * Gbm2[n,c] * self.mfp_sampled[m]
+
+
+               #Bm = np.zeros((self.n_serial,len(self.rr),self.n_elems))   
+              #for n,i in enumerate(self.eb): 
+              # Bm[:,:,i] -= np.einsum('m,r->mr',TB[:,n],Gbm2[:,n])
+
+               RHS = np.zeros(self.n_elems)
+               for c,i in enumerate(self.eb): 
+                 RHS[i] -= TB[m,n]*Gbm2[n,c]  
+
+               B = DeltaT  + self.mfp_sampled[m]*(P[n] + RHS)
+               #B = DeltaT #+ self.mfp_sampled[m]*P[n]+ BB
                if not (m,q) in lu.keys() :
                 Master.data = np.concatenate((self.mfp_sampled[m]*Gm[n],self.mfp_sampled[m]*D[n]+np.ones(self.n_elems)))[conversion]
                 if not self.keep_lu:
@@ -427,7 +461,15 @@ class Solver(object):
                  lu[(m,q)] = lu_loc
                else: lu_loc   = lu[(m,q)]
                #X = lu_loc.solve(DeltaT  + self.mfp_sampled[m]*(P[n] + Bm[m,n]))  if self.keep_lu else umfpack.solve(um.UMFPACK_A,Master,DeltaT  + self.mfp_sampled[m]*(P[n] + Bm[m,n]), autoTranspose = False)
-               X = lu_loc.solve(DeltaT  + self.mfp_sampled[m]*(P[n] + Bm[m,n]))  if self.keep_lu else umfpack.solve(um.UMFPACK_A,Master,B, autoTranspose = False)
+               #X = lu_loc.solve(B)  if self.keep_lu else umfpack.solve(um.UMFPACK_A,Master,B, autoTranspose = False)
+               if self.keep_lu:
+                X = lu_loc.solve(B)
+               else:    
+                X = umfpack.solve(um.UMFPACK_A,Master,B, autoTranspose = False)
+
+               #X = lu_loc.solve(B)  if self.keep_lu else umfpack.solve(um.UMFPACK_A,Master,B, autoTranspose = False)
+
+               #X = X - (max(X)+min(X))/2.0
                #----------------------------------------------------------------------
                #a = time.time()
                #X,_ = lgmres(Master,X,outer_v=outer_v,prepend_outer_v=True,x0 = X)
@@ -447,10 +489,18 @@ class Solver(object):
                Supdp -= np.dot(self.kappa_mask,Xd)*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
               if self.multiscale_ballistic:
                Supbp -= np.dot(self.kappa_mask,X_bal)*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
-
-              if len(self.db) > 0: TBp[m,:] += np.einsum('se,e,s->s',eb,X,self.GG[m,q])
+  
+              if len(self.db) > 0:
+                  #if comm.rank == 0: 
+                  # if (abs(np.min(X)) > 100) or (abs(np.max(X)) > 100):
+                  #    print(np.min(X),np.max(X))
+                  #TBp[m,:] += np.einsum('se,e,s->s',eb,X,self.GG[m,q])
+                  for c,i in enumerate(self.eb):  
+                    TBp[m,c] -= X[i]*self.GG[m,q,c]
 
               if kk < self.max_bte_iter and error > self.max_bte_error:
+                #if comm.rank == 4:  
+                #    print(m,min(X),max(X))  
                 Jp += np.outer(X,self.sigma[m,q])*1e-18
 
               #del X
@@ -487,7 +537,8 @@ class Solver(object):
               if self.multiscale_ballistic:
                Supbp -= np.dot(self.kappa_mask,X_bal)*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
               DeltaTp += X*self.ddd[m,q]
-              if len(self.db) > 0: TBp[m,:] += np.einsum('se,e,s->s',eb,X,self.GG[m,q])
+              TBp[m,:] += np.einsum('se,e,s->s',eb,X,self.GG[m,q])
+
               if kk < self.max_bte_iter and error > self.max_bte_error:
                 Jp += np.outer(X,self.sigma[m,q])*1e-18
 
@@ -506,8 +557,12 @@ class Solver(object):
         comm.Allreduce([Mp,MPI.DOUBLE],[MM,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([TBp,MPI.DOUBLE],[TB,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([kappa_balp,MPI.DOUBLE],[kappa_bal,MPI.DOUBLE],op=MPI.SUM)
-
-        Bm = np.einsum('ms,qs,se->mqe',TB,Gbm2,eb)
+        #if comm.rank == 0:
+        # for m in range(self.n_serial):
+        #  for i in TB[m]:
+        #      if abs(i) > 0.7:
+        #          print(m,i)
+        #Bm = np.einsum('ms,qs,se->mqe',TB,Gbm2,eb)
         kappa_totp = np.array([np.einsum('mq,mq->',self.sigma[:,self.rr,0],kappa[:,self.rr])])*self.kappa_factor*1e-18
         comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
         kk +=1
@@ -518,15 +573,23 @@ class Solver(object):
         if self.verbose and comm.rank == 0:   
          print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error))
 
-     #if comm.rank == 0:
-     #     plot(self.mfp_bulk,Sup,color='b',marker='o')
-     #     if self.multiscale:
-     #      plot(self.mfp_bulk,Supd,color='r',marker='o')
-     #      plot(self.mfp_bulk,Supb,color='g',marker='o')
-     #     ylim([0,1])
-     #     xscale('log')
-     #     show()
+        #if comm.rank == 0:
+        #  diff = int(MM[0])/self.n_serial/self.n_parallel 
+        #  bal = int(MM[1])/self.n_serial/self.n_parallel 
+        #  print(colored(' BTE:              ','green') + str(round((1-diff-bal)*100,2)) + ' %' )
+        #  print(colored(' FOURIER:          ','green') + str(round(diff*100,2)) + ' %' )
+        #  print(colored(' BALLISTIC:          ','green') + str(round(bal*100,2)) + ' %' )
+        #  print(colored(' Full termination: ','green') + str(termination) )
+        #  print(colored(' -----------------------------------------------------------','green'))
+        #  plot(self.mfp_bulk,Sup,color='b',marker='o')
+        #  if self.multiscale:
+        #   plot(self.mfp_bulk,Supd,color='r',marker='o')
+        #   plot(self.mfp_bulk,Supb,color='g',marker='o')
+        #  ylim([0,1])
+        #  xscale('log')
+        #  show()
         #-----------------------------------------------
+
 
 
      if self.verbose and comm.rank == 0:
@@ -666,15 +729,13 @@ class Solver(object):
 
 
 
-  def get_decomposed_directions(self,i,j,ll,rot=np.eye(3)):
+  def get_decomposed_directions(self,ll,rot=np.eye(3)):
 
-     #normal = self.mesh['normals'][i][j]
      normal = self.face_normals[ll]
-     #dist   = self.mesh['dists'][i][j]
      dist   = self.dists[ll]
-
      v_orth = np.dot(normal,np.dot(rot,normal))/np.dot(normal,dist)
      v_non_orth = np.dot(rot,normal) - dist*v_orth
+     
      return v_orth,v_non_orth
 
   def get_kappa(self,i,j,ll,kappa):
@@ -725,7 +786,7 @@ class Solver(object):
       vj = self.volumes[j]
       kappa_loc = self.get_kappa(i,j,ll,kappa)
       if not i == j:
-       (v_orth,dummy) = self.get_decomposed_directions(i,j,ll,rot=kappa_loc)
+       (v_orth,dummy) = self.get_decomposed_directions(ll,rot=kappa_loc)
        F[i,i] += v_orth/vi*area
        F[i,j] -= v_orth/vi*area
        F[j,j] += v_orth/vj*area
@@ -775,6 +836,7 @@ class Solver(object):
         kappa_old = kappa_eff
         n_iter +=1
         grad = self.compute_grad(temp)
+        print(np.shape(grad))
         C = self.compute_non_orth_contribution(grad,kappa)
    flux = -np.einsum('cij,cj->ci',kappa,grad)
 
@@ -806,6 +868,7 @@ class Solver(object):
      
      diff_temp[kc1][ind1]  = diff_t
      diff_temp[kc2][ind2]  = -diff_t
+
  
    for k in range(self.n_elems) :
     #tmp = np.dot(self.mesh['weigths'][k],diff_temp[k])
@@ -833,13 +896,15 @@ class Solver(object):
       #w  = self.mesh['interp_weigths'][ll][0]
       w = self.interp_weigths[ll]
       #F_ave = w*np.dot(gradT[i],self.mat['kappa']) + (1.0-w)*np.dot(gradT[j],self.mat['kappa'])
-      F_ave = w*np.dot(gradT[i],kappa[i]) + (1.0-w)*np.dot(gradT[j],kappa[j])
+      #F_ave = w*np.dot(gradT[i],kappa[i]) + (1.0-w)*np.dot(gradT[j],kappa[j])
       grad_ave = w*gradT[i] + (1.0-w)*gradT[j]
 
-      (_,v_non_orth) = self.get_decomposed_directions(i,j,ll)#,rot=self.mat['kappa'])
+      (_,v_non_orth) = self.get_decomposed_directions(ll,rot=self.mat['kappa'])
 
-      C[i] += np.dot(F_ave,v_non_orth)/2.0/self.volumes[i]*area
-      C[j] -= np.dot(F_ave,v_non_orth)/2.0/self.volumes[j]*area
+      C[i] += np.dot(grad_ave,v_non_orth)/2.0/self.volumes[i]*area
+      C[j] -= np.dot(grad_ave,v_non_orth)/2.0/self.volumes[j]*area
+
+
 
     return C
 
@@ -851,7 +916,7 @@ class Solver(object):
 
     (i,j) = self.side_elem_map_vec[l]
     #(v_orth,v_non_orth) = self.get_decomposed_directions(i,j,rot=self.mat['kappa'])
-    (v_orth,v_non_orth) = self.get_decomposed_directions(i,j,l,rot=self.get_kappa(i,j,l,kappa))
+    (v_orth,v_non_orth) = self.get_decomposed_directions(l,rot=self.get_kappa(i,j,l,kappa))
 
     deltaT = temp[i] - (temp[j] + 1) 
     kappa_eff -= v_orth *  deltaT * self.areas[l]

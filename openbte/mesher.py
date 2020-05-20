@@ -843,7 +843,8 @@ class Mesher(object):
 
 
    with open(os.devnull, 'w') as devnull:
-    output = subprocess.check_output("gmsh -format msh2 -3 mesh.geo -o mesh.msh".split(), stderr=devnull)
+    output = subprocess.check_output("gmsh -optimize_netgen -format msh2 -3 mesh.geo -o mesh.msh".split(), stderr=devnull)
+    #output = subprocess.check_output("gmsh -format msh2 -3 mesh.geo -o mesh.msh".split(), stderr=devnull)
 
 
  def line_exists_ordered(self,p1,p2):

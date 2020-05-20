@@ -97,7 +97,8 @@ def generate_mfp(**argv):
            'B':[],\
            'F':direction,\
            'G':kappa_directional,\
-           'kappa':kappa,\
+           #'kappa':kappa,\
+           'kappa':np.eye(3),\
            'scale':np.ones((n_mfp,n_theta*n_phi)),\
            'ac':tc,\
            'mfp_average':rhs_average,\

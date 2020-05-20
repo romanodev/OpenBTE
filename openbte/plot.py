@@ -23,7 +23,7 @@ class Plot(object):
    else: 
     if os.path.isfile('geometry.h5') :   
      self.mesh = dd.io.load('geometry.h5')
-
+   
    if 'solver' in argv.keys():
     self.solver = argv['solver'].state
    else: 
@@ -46,7 +46,37 @@ class Plot(object):
     self.plot_maps(**argv)
 
    elif model == 'vtk':
-    self.write_vtk(**argv)   
+    self.write_cell_vtk(**argv)   
+
+ def write_cell_vtk(self,**argv):
+
+
+   output = []
+   strc = 'CellData('
+   for n,(key, value) in enumerate(self.solver['variables'].items()):
+
+     if  value['data'].shape[0] == 1:  value['data'] =  value['data'][0] #band-aid solution
+     output.append(value['data'])
+     name = value['name'] + '[' + value['units'] + ']'
+     if value['data'].ndim == 1:
+       strc += r'''Scalars(output[''' + str(n) + r'''],name =' ''' + name +  r''' ')'''
+    
+     if value['data'].ndim == 2:
+       strc += r'''Vectors(output[''' + str(n) + r'''],name =' ''' + name +  r''' ')'''
+
+     if n == len(self.solver['variables'])-1:
+      strc += ')'
+     else:
+      strc += ','
+   data = eval(strc)
+
+   if self.mesh['dim'] == 3:
+    vtk = VtkData(UnstructuredGrid(self.mesh['nodes'],tetra=self.mesh['elems']),data)
+   else :
+    vtk = VtkData(UnstructuredGrid(self.mesh['nodes'],triangle=self.mesh['elems']),data)
+
+   vtk.tofile('output.vtk','ascii')
+
 
 
  def write_vtk(self,**argv):
@@ -57,7 +87,8 @@ class Plot(object):
    output = []
    strc = 'PointData('
    for n,(key, value) in enumerate(self.solver['variables'].items()):
-       
+      
+     if  value['data'].shape[0] == 1:  value['data'] =  value['data'][0] #band-aid solution
      output.append(value['data'])
      name = value['name'] + '[' + value['units'] + ']'
      if value['data'].ndim == 1:
@@ -102,9 +133,9 @@ class Plot(object):
 
      triangles = []
      nodes = []
-     for l in list(self.mesh['side_list']['Boundary']) + \
-               list(self.mesh['side_list']['Periodic']) + \
-               list(self.mesh['side_list']['Inactive']) :
+     for l in list(self.mesh['boundary_sides']) : #+ \
+               #list(self.mesh['periodic_sides']) + \
+               #list(self.mesh['inactive_sides']) :
           tmp = []
           for i in self.mesh['sides'][l]:
               #if i in nodes:  

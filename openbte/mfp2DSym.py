@@ -102,6 +102,7 @@ def generate_mfp2DSym(**argv):
  rhs_average = mfp_sampled*mfp_sampled/2
  
  #Final----
+ kappa = np.eye(3)
  return {'temp':tc,'B':[],'G':kappa_directional,'kappa':kappa,'scale':np.ones((n_mfp,n_phi)),'ac':tc,'mfp_average':rhs_average,'F':polar_ave,'mfp_sampled':mfp,'suppression':suppression,'kappam':kappa_bulk,'mfp_bulk':mfp_bulk}
 
 
