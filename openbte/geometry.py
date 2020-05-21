@@ -92,13 +92,13 @@ class Geometry(object):
     
     return {
           'size':self.size,\
-          'lx':argv['lx'],\
+          #'lx':argv['lx'],\
           'conn':self.conn,\
           'elems':self.elems,\
-          'n_elems':len(self.elems),\
-          'ly':argv['ly'],\
+          #'n_elems':len(self.elems),\
+          #'ly':argv['ly'],\
           'dim':np.array([self.dim]),\
-          'weigths_vec': weigths_vec,\
+          'weigths': weigths_vec,\
           'bconn': np.array(self.bconn),\
           'areas':np.array(self.side_areas),\
           'face_normals':np.array(self.face_normals),\
@@ -117,6 +117,8 @@ class Geometry(object):
           'frame':frame,\
           'i':np.array(self.i),\
           'j':np.array(self.j),\
+          'im': np.concatenate((self.i,list(np.arange(self.n_elems)))),\
+          'jm': np.concatenate((self.j,list(np.arange(self.n_elems)))),\
           'k':self.k,\
           'eb':np.array(self.eb),\
           'sb':np.array(self.sb),\
@@ -127,7 +129,7 @@ class Geometry(object):
           'boundary_sides':np.array(self.side_list['Boundary']),
           'n_side_per_elem': np.array([len(i)  for i in self.elems]),
           'pp':np.array(self.pp),\
-          'meta':np.asarray([self.n_elems,self.kappa_factor,self.dim],np.float64)}
+          'meta':np.asarray([self.n_elems,self.kappa_factor,self.dim,len(self.nodes),len(self.side_list['active'])],np.float64)}
 
 
 

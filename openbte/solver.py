@@ -43,6 +43,7 @@ class Solver(object):
          self.print_options()
 
         #-----IMPORT MESH--------------------------------------------------------------
+         '''
          if 'geometry' in argv.keys():
           self.mesh = argv['geometry'].data
          else: 
@@ -79,6 +80,22 @@ class Solver(object):
         self.create_shared_memory(['sb','bconn','i','j','im','jm','db','k','eb','kappa_mask','dists','flux_sides',\
                                    'pp','meta','active_sides','areas','side_elem_map_vec','volumes','periodic_sides','weigths',\
                                     'periodic_side_values','n_side_per_elems','centroids','boundary_sides','elem_side_map_vec','interp_weigths','face_normals','side_centroids'])
+        #---------------------------------------
+        '''
+        #-----IMPORT MESH--------------------------------------------------------------
+        if comm.rank == 0:
+         data = argv['geometry'].data if 'geometry' in argv.keys() else dd.io.load('geometry.h5')
+        else: data = None
+        self.__dict__.update(create_shared_memory_dict(data,comm))
+        self.n_elems = int(self.meta[0])
+        self.kappa_factor = self.meta[1]
+        self.dim = int(self.meta[2])
+        self.n_nodes = int(self.meta[3])
+        self.n_active_sides = int(self.meta[4])
+        if comm.rank == 0 and self.verbose: self.mesh_info() 
+        #------------------------------------------------------------------------------
+
+
 
 
         self.n_elems = int(self.meta[0])
@@ -238,8 +255,8 @@ class Solver(object):
           #print(colored(' -----------------------------------------------------------','green'))
           print(colored('  Dimension:                               ','green') + str(self.dim))
           print(colored('  Number of Elements:                      ','green') + str(self.n_elems))
-          print(colored('  Number of Sides:                         ','green') + str(len(self.mesh['active_sides'])))
-          print(colored('  Number of Nodes:                         ','green') + str(len(self.mesh['nodes'])))
+          print(colored('  Number of Sides:                         ','green') + str(len(self.active_sides)))
+          print(colored('  Number of Nodes:                         ','green') + str(len(self.nodes)))
           #print(colored(' -----------------------------------------------------------','green'))
           #print(" ")
 
@@ -315,7 +332,7 @@ class Solver(object):
 
      #---------------------------------------------
      if comm.rank == 0:   
-      if len(self.mesh['db']) > 0:
+      if len(self.db) > 0:
        Gb   = np.einsum('mqj,jn->mqn',self.sigma,self.db,optimize=True)
        Gbp2 = Gb.clip(min=0);
        with np.errstate(divide='ignore', invalid='ignore'):
@@ -893,7 +910,7 @@ class Solver(object):
 
    diff_temp = self.n_elems*[None]
    for i in range(len(diff_temp)):
-      diff_temp[i] = self.n_side_per_elems[i]*[0] 
+      diff_temp[i] = self.n_side_per_elem[i]*[0] 
 
    for ll in self.active_sides :
     elems = self.side_elem_map_vec[ll]

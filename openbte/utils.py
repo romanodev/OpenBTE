@@ -1,4 +1,4 @@
-#import h5py
+from mpi4py import MPI
 from google_drive_downloader import GoogleDriveDownloader as gdd
 import numpy as np
 from shapely.geometry import Polygon
@@ -215,4 +215,79 @@ def get_linear_indexes(mfp,value,scale,extent):
      ai *=mfp[i]/value
      aj *=mfp[j]/value
    return i,ai,j,aj  
+
+def create_shared_memory_dict(varss,comm):
+
+       dict_output = {}
+       if comm.Get_rank() == 0:
+          var_meta = {} 
+          for var,value in varss.items():
+
+           if type(value) == list: value = np.array(value)   
+           
+           if value.dtype == np.int64:
+              data_type = 0
+              itemsize = MPI.INT.Get_size()
+           elif value.dtype == np.float64:
+              data_type = 1
+              itemsize = MPI.DOUBLE.Get_size() 
+           else:
+              print('data type for shared memory not supported')
+              quit()
+
+           size = np.prod(value.shape)
+           nbytes = size * itemsize
+           var_meta[var] = [value.shape,data_type,itemsize,nbytes]
+
+       else: nbytes = 0; var_meta = None
+       var_meta = comm.bcast(var_meta,root=0)
+
+       #ALLOCATING MEMORY---------------
+       for n,(var,meta) in enumerate(var_meta.items()):
+        win = MPI.Win.Allocate_shared(meta[3],meta[2], comm=comm) 
+        buf,itemsize = win.Shared_query(0)
+        assert itemsize == meta[2]
+        dt = 'i' if meta[1] == 0 else 'd'
+        output = np.ndarray(buffer=buf,dtype=dt,shape=meta[0]) 
+        if comm.rank == 0: output[:] = varss[var]
+        dict_output[var] = output
+
+       del varss
+       return dict_output
+
+
+        
+
+def create_shared_memory(varss):
+       for var in varss:
+         #--------------------------------------
+         if comm.Get_rank() == 0: 
+          tmp = eval('self.' + var)
+          if tmp.dtype == np.int64:
+              data_type = 0
+              itemsize = MPI.INT.Get_size() 
+          elif tmp.dtype == np.float64:
+              data_type = 1
+              itemsize = MPI.DOUBLE.Get_size() 
+          else:
+              print('data type for shared memory not supported')
+              quit()
+          size = np.prod(tmp.shape)
+          nbytes = size * itemsize
+          meta = [tmp.shape,data_type,itemsize]
+         else: nbytes = 0; meta = None
+         meta = comm.bcast(meta,root=0)
+
+         #ALLOCATING MEMORY---------------
+         win = MPI.Win.Allocate_shared(nbytes,meta[2], comm=comm) 
+         buf,itemsize = win.Shared_query(0)
+         assert itemsize == meta[2]
+         dt = 'i' if meta[1] == 0 else 'd'
+         output = np.ndarray(buffer=buf,dtype=dt,shape=meta[0]) 
+
+         if comm.rank == 0:
+             output[:] = tmp  
+
+         exec('self.' + var + '=output')
+
 
