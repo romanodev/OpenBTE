@@ -93,15 +93,17 @@ def generate_mfp(**argv):
 
    tc = temp_coeff/np.sum(temp_coeff)
 
-   return {'temp':tc,\
+
+  
+
+   return {'tc':tc,\
            'B':[],\
-           'F':direction,\
-           'G':kappa_directional,\
-           #'kappa':kappa,\
-           'kappa':np.eye(3),\
+           'VMFP':direction*1e9,\
+           'sigma':kappa_directional*1e9,\
+           'kappa':kappa,\
            'scale':np.ones((n_mfp,n_theta*n_phi)),\
            'ac':tc,\
-           'mfp_average':rhs_average,\
+           'mfp_average':rhs_average*1e18,\
            'mfp_sampled':mfp_sampled,\
            'suppression':suppression,\
            'kappam':kappa_bulk,\

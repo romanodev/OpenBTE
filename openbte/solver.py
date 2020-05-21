@@ -43,46 +43,6 @@ class Solver(object):
          self.print_options()
 
         #-----IMPORT MESH--------------------------------------------------------------
-         '''
-         if 'geometry' in argv.keys():
-          self.mesh = argv['geometry'].data
-         else: 
-          self.mesh = dd.io.load('geometry.h5')
-         #-----------------
-         self.i  = self.mesh['i']
-         self.j  = self.mesh['j']
-         self.k = self.mesh['k']
-         self.db = self.mesh['db']
-         self.eb = self.mesh['eb']
-         self.sb = self.mesh['sb']
-         self.kappa_mask = self.mesh['kappa_mask']
-         self.weigths = self.mesh['weigths_vec']
-         self.interp_weigths = self.mesh['interp_weigths']
-         self.pp = self.mesh['pp']
-         self.meta = self.mesh['meta']
-         self.flux_sides = self.mesh['flux_sides']
-         self.volumes = self.mesh['volumes']
-         self.centroids = self.mesh['centroids']
-         self.side_centroids = self.mesh['side_centroids']
-         self.areas = self.mesh['areas']
-         self.dists = self.mesh['dists']
-         self.side_elem_map_vec = self.mesh['side_elem_map_vec']
-         self.elem_side_map_vec = self.mesh['elem_side_map_vec']
-         self.active_sides = self.mesh['active_sides']
-         self.face_normals = self.mesh['face_normals']
-         self.boundary_sides = self.mesh['boundary_sides']
-         self.periodic_sides = self.mesh['periodic_sides']
-         self.n_side_per_elems = self.mesh['n_side_per_elem']
-         self.bconn = self.mesh['bconn']
-         self.periodic_side_values = self.mesh['periodic_side_values']
-         self.im = np.concatenate((self.mesh['i'],list(np.arange(self.mesh['meta'][0]))))
-         self.jm = np.concatenate((self.mesh['j'],list(np.arange(self.mesh['meta'][0]))))
-        self.create_shared_memory(['sb','bconn','i','j','im','jm','db','k','eb','kappa_mask','dists','flux_sides',\
-                                   'pp','meta','active_sides','areas','side_elem_map_vec','volumes','periodic_sides','weigths',\
-                                    'periodic_side_values','n_side_per_elems','centroids','boundary_sides','elem_side_map_vec','interp_weigths','face_normals','side_centroids'])
-        #---------------------------------------
-        '''
-        #-----IMPORT MESH--------------------------------------------------------------
         if comm.rank == 0:
          data = argv['geometry'].data if 'geometry' in argv.keys() else dd.io.load('geometry.h5')
         else: data = None
@@ -95,76 +55,31 @@ class Solver(object):
         if comm.rank == 0 and self.verbose: self.mesh_info() 
         #------------------------------------------------------------------------------
 
-
-
-
-        self.n_elems = int(self.meta[0])
-        self.kappa_factor = self.meta[1]
-        self.dim = int(self.meta[2])
-        if comm.rank == 0 and self.verbose: self.mesh_info()
-        #------------------------------------------------------------------------------
-    
-
-        #IMPORT MATERIAL-----------------------------------------
+        #IMPORT MATERIAL---------------------------
         if comm.rank == 0:
-          self.mat = dd.io.load('material.h5')
-          self.kappa = self.mat['kappa']
-          self.tc = np.array(self.mat['temp'])
-          self.ddd = self.tc
-          self.sigma = self.mat['G']*1e9
-          self.VMFP = self.mat['F']
-          self.BM = np.zeros(1)
-          if self.tc.ndim == 1:
-            self.coll = True
-            self.meta = np.array([1,len(self.tc),1])
-            self.n_parallel = len(self.tc)
-            self.tc = np.array([self.tc])
-            B = self.mat['B']
-            B += B.T - 0.5*np.diag(np.diag(B))
-            self.BM = np.einsum('i,ij->ij',self.mat['scale'],B)
-            self.sigma = np.array([self.sigma])
-            self.VMFP = np.array([self.VMFP]) 
-            self.mfp_average = np.zeros(1)
-            self.full_info() 
-          else: 
-            self.n_serial = self.tc.shape[0]  
-            self.n_parallel = self.tc.shape[1]  
-            self.meta = np.array([self.n_serial,self.n_parallel,0])
-            self.mfp_average = self.mat['mfp_average']*1e18
-            self.suppression = self.mat['suppression']
-            self.kappam = self.mat['kappam']
-            self.mfp_sampled = self.mat['mfp_sampled']*1e9
-            self.mfp_bulk = self.mat['mfp_bulk']
-          self.bulk_info()
-
-        else: self.ddd = None
-        self.ddd = comm.bcast(self.ddd,root=0)
-        self.create_shared_memory(['sigma','tc','meta','BM','mfp_average','kappa','mfp_sampled','VMFP','kappam','suppression','mfp_bulk'])
-        self.n_serial = self.meta[0]           
-        self.n_parallel = self.meta[1]           
-        self.coll = bool(self.meta[2])
-        #-----------------------------------------------------
+         data = argv['material'].data if 'material' in argv.keys() else dd.io.load('material.h5')
+        else: data = None
+        self.__dict__.update(create_shared_memory_dict(data,comm))
+        self.n_serial = self.tc.shape[0]  
+        self.n_parallel = self.tc.shape[1]  
+        if comm.rank == 0 and self.verbose: self.mfp_info() 
+        #------------------------------------------
 
         if comm.rank == 0:
             print(colored(' -----------------------------------------------------------','green'))
             print(" ")
 
-        #-------SOLVE FOURIER----------------------------------------------
         if comm.rank == 0:
           data = self.solve_fourier(self.kappa)
-          variables = {0:{'name':'Temperature Fourier','units':'K',        'data':data['temperature']},\
-                       1:{'name':'Flux Fourier'       ,'units':'W/m/m/K','data':data['flux']}}
-          self.state.update({'variables':variables,\
-                           'kappa_fourier':data['kappa']})
-          self.temperature_fourier = data['temperature']
-          self.kappa_fourier = np.array([data['kappa']])
-          self.fourier_error = np.array([data['error']])
-          self.fourier_iter  = np.array([data['n_iter']])
-          self.fourier_info()
-        else: self.temperature_fourier = None
-        self.temperature_fourier = comm.bcast(self.temperature_fourier,root=0)
 
-        self.create_shared_memory(['kappa_fourier'])
+          variables = {0:{'name':'Temperature Fourier','units':'K',        'data':data['temperature_fourier']},\
+                       1:{'name':'Flux Fourier'       ,'units':'W/m/m/K','data':data['flux_fourier']}}
+          self.state.update({'variables':variables,\
+                           'kappa_fourier':data['meta'][0]})
+          self.fourier_info(data)
+        else: data = None
+        self.__dict__.update(create_shared_memory_dict(data,comm))
+       
         #----------------------------------------------------------------
        
         if not self.only_fourier:
@@ -184,10 +99,11 @@ class Solver(object):
         #-------------------------------
 
          #SOLVE BTE-------
-         if self.coll:    
-           data = self.solve_bte(**argv)
-         else:
-           data = self.solve_mfp(**argv)
+         #if self.coll:    
+
+           #data = self.solve_bte(**argv)
+         #else:
+         data = self.solve_mfp(**argv)
         #-----
 
         #Saving-----------------------------------------------------------------------
@@ -213,16 +129,30 @@ class Solver(object):
            print(' ')  
 
 
+          #if self.tc.ndim == 1:
+          #  self.coll = True
+          #  self.meta = np.array([1,len(self.tc),1])
+          #  self.n_parallel = len(self.tc)
+          #  self.tc = np.array([self.tc])
+          #  B = self.mat['B']
+          #  B += B.T - 0.5*np.diag(np.diag(B))
+          #  self.BM = np.einsum('i,ij->ij',self.mat['scale'],B)
+          #  self.sigma = np.array([self.sigma])
+          #  self.VMFP = np.array([self.VMFP]) 
+          #  self.mfp_average = np.zeros(1)
+          #  self.full_info() 
+          #else: 
+  def fourier_info(self,data):
 
-  def fourier_info(self):
 
           print('                        FOURIER                 ')   
           print(colored(' -----------------------------------------------------------','green'))
-          print(colored('  Iterations:                              ','green') + str(self.fourier_iter[0]))
-          print(colored('  Relative error:                          ','green') + '%.1E' % (self.fourier_error[0]))
-          print(colored('  Fourier Thermal Conductivity [W/m/K]:    ','green') + str(round(self.kappa_fourier[0],3)))
+          print(colored('  Iterations:                              ','green') + str(data['meta'][2]))
+          print(colored('  Relative error:                          ','green') + '%.1E' % (data['meta'][1]))
+          print(colored('  Fourier Thermal Conductivity [W/m/K]:    ','green') + str(round(data['meta'][0],3)))
           print(colored(' -----------------------------------------------------------','green'))
           print(" ")
+
 
 
   def print_options(self):
@@ -262,39 +192,6 @@ class Solver(object):
 
 
 
-  def create_shared_memory(self,varss):
-       for var in varss:
-         #--------------------------------------
-         if comm.Get_rank() == 0: 
-          tmp = eval('self.' + var)
-          if tmp.dtype == np.int64:
-              data_type = 0
-              itemsize = MPI.INT.Get_size() 
-          elif tmp.dtype == np.float64:
-              data_type = 1
-              itemsize = MPI.DOUBLE.Get_size() 
-          else:
-              print('data type for shared memory not supported')
-              quit()
-          size = np.prod(tmp.shape)
-          nbytes = size * itemsize
-          meta = [tmp.shape,data_type,itemsize]
-         else: nbytes = 0; meta = None
-         meta = comm.bcast(meta,root=0)
-
-         #ALLOCATING MEMORY---------------
-         win = MPI.Win.Allocate_shared(nbytes,meta[2], comm=comm) 
-         buf,itemsize = win.Shared_query(0)
-         assert itemsize == meta[2]
-         dt = 'i' if meta[1] == 0 else 'd'
-         output = np.ndarray(buffer=buf,dtype=dt,shape=meta[0]) 
-
-         if comm.rank == 0:
-             output[:] = tmp  
-
-         exec('self.' + var + '=output')
-
-
   def solve_modified_fourier(self,DeltaT):
 
          kappafp = np.zeros((self.n_serial,self.n_parallel))   
@@ -330,18 +227,20 @@ class Solver(object):
            print('      Iter    Thermal Conductivity [W/m/K]      Error ''')
            print(colored(' -----------------------------------------------------------','green'))   
 
-     #---------------------------------------------
+     #---------------------------------------------i
      if comm.rank == 0:   
       if len(self.db) > 0:
        Gb   = np.einsum('mqj,jn->mqn',self.sigma,self.db,optimize=True)
        Gbp2 = Gb.clip(min=0);
        with np.errstate(divide='ignore', invalid='ignore'):
          tot = 1/Gb.clip(max=0).sum(axis=1); tot[np.isinf(tot)] = 0
-       self.GG = np.einsum('mqs,ms->mqs',Gbp2,tot)
+       data = {'GG': np.einsum('mqs,ms->mqs',Gbp2,tot)}
        del tot, Gbp2
       else: self.GG = np.zeros(1)
-     self.create_shared_memory(['GG'])
+     else: data = None
+     self.__dict__.update(create_shared_memory_dict(data,comm))
 
+     #---------------------------------------------
      #------------------------------------------------
      eb = sp.csc_matrix((np.ones(len(self.eb)),(np.arange(len(self.eb)),self.eb)),shape=(len(self.eb),self.n_elems),dtype=np.int).toarray()
 
@@ -351,7 +250,7 @@ class Solver(object):
      D = np.zeros((len(self.rr),self.n_elems))
      for n,i in enumerate(self.i):  D[:,i] += Gp[:,n]
 
-     DeltaT = self.temperature_fourier
+     DeltaT = self.temperature_fourier.copy()
      #---boundary----------------------
      TB = np.zeros((self.n_serial,len(self.eb)))   
      if len(self.db) > 0: #boundary
@@ -379,7 +278,7 @@ class Solver(object):
      Sup = np.zeros_like(self.kappam)
      Supd = np.zeros_like(self.kappam)
      Supb = np.zeros_like(self.kappam)
-     kappa_vec = list(self.kappa_fourier)
+     kappa_vec = [self.meta[0]]
 
      kappa_old = kappa_vec[-1]
      error = 1
@@ -392,23 +291,8 @@ class Solver(object):
      kappa = np.zeros((self.n_serial,self.n_parallel))
      termination = True
     
-     #if comm.rank == 0:
-     # _,counts = np.unique(self.eb,return_counts= True)
 
      while kk < self.data.setdefault('max_bte_iter',100) and error > self.data.setdefault('max_bte_error',1e-2):
-
-        #a = time.time()  
-        #Bm = np.einsum('mn,rn,ne->mre',TB,Gbm2,eb)
-        #Bm = np.zeros((self.n_serial,len(self.rr),self.n_elems))   
-        #for n,i in enumerate(self.eb): 
-        # Bm[:,:,i] -= np.einsum('m,r->mr',TB[:,n],Gbm2[:,n])
-         
-         #if i == 711 and comm.rank == 0:
-         #   print(Gbm2[:,n]) 
-             #Boundary-----   
-         #for n,i in enumerate(self.mesh['eb']): i
-         #@ Bm[:,i] +=np.einsum('u,u,q->q',X[:,i],data['Gbp'][:,n],data['SS'][self.rr,n],optimize=True)
-
 
         if self.multiscale:
          (kappaf,tf,tfg) = self.solve_modified_fourier(DeltaT)
@@ -508,7 +392,7 @@ class Solver(object):
                #   diffusive +=1
                #   fourier=True
                #---------------------------------------------------------
-               DeltaTp += X*self.ddd[m,q]
+               DeltaTp += X*self.tc[m,q]
               #Supp -= np.dot(self.kappa_mask,X)*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
               #if self.multiscale:
               # Supdp -= np.dot(self.kappa_mask,Xd)*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
@@ -904,7 +788,11 @@ class Solver(object):
         C = self.compute_non_orth_contribution(grad,kappa)
    flux = -np.einsum('cij,cj->ci',kappa,grad)
 
-   return {'flux':flux,'temperature':temp,'kappa':kappa_eff,'grad':grad,'error':error,'n_iter':n_iter}
+ 
+   meta = [kappa_eff,error,n_iter] 
+   return {'flux_fourier':flux,'temperature_fourier':temp,'meta':np.array(meta)}
+
+   #return {'flux':flux,'temperature':temp,'kappa':kappa_eff,'grad':grad,'error':error,'n_iter':n_iter}
 
   def compute_grad(self,temp,gradT):
 

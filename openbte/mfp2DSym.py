@@ -103,6 +103,10 @@ def generate_mfp2DSym(**argv):
  
  #Final----
  kappa = np.eye(3)
- return {'temp':tc,'B':[],'G':kappa_directional,'kappa':kappa,'scale':np.ones((n_mfp,n_phi)),'ac':tc,'mfp_average':rhs_average,'F':polar_ave,'mfp_sampled':mfp,'suppression':suppression,'kappam':kappa_bulk,'mfp_bulk':mfp_bulk}
+ 
+
+
+
+ return {'tc':tc,'B':[],'sigma':kappa_directional*1e9,'kappa':kappa,'scale':np.ones((n_mfp,n_phi)),'ac':tc,'mfp_average':rhs_average*1e18,'VMFP':polar_ave,'mfp_sampled':mfp*1e9,'suppression':suppression,'kappam':kappa_bulk,'mfp_bulk':mfp_bulk}
 
 
