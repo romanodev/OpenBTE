@@ -133,9 +133,9 @@ class Plot(object):
 
      triangles = []
      nodes = []
-     for l in list(self.mesh['boundary_sides']) : #+ \
-               #list(self.mesh['periodic_sides']) + \
-               #list(self.mesh['inactive_sides']) :
+     for l in list(self.mesh['boundary_sides']) + \
+               list(self.mesh['periodic_sides']) + \
+               list(self.mesh['inactive_sides']) :
           tmp = []
           for i in self.mesh['sides'][l]:
               #if i in nodes:  

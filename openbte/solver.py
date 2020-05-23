@@ -164,7 +164,9 @@ class Solver(object):
 
 
   def print_options(self):
-          print(colored('  Multiscale:                              ','green')+ str(self.multiscale))
+          print(colored('  Multiscale Diffusive:                    ','green')+ str(self.multiscale))
+          print(colored('  Multiscale Ballistic:                    ','green')+ str(self.multiscale_ballistic))
+          print(colored('  Multiscale Error:                        ','green')+ str(self.error_multiscale))
           print(colored('  Only Fourier:                            ','green')+ str(self.only_fourier))
           print(colored('  Max Fourier Error:                       ','green')+ '%.1E' % (self.max_fourier_error))
           print(colored('  Max Fourier Iter:                        ','green')+ str(self.max_fourier_iter))
@@ -329,7 +331,6 @@ class Solver(object):
      for ss,v in self.pp: self.P[:,self.i[int(ss)]] -= self.Gm[:,int(ss)].copy()*v
      del G,Gp
      #--------------------------
-    
 
      lu =  {}
      X = DeltaT.copy()
@@ -426,7 +427,6 @@ class Solver(object):
         comm.Allreduce([kappap,MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([Mp,MPI.DOUBLE],[MM,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([TBp,MPI.DOUBLE],[TB,MPI.DOUBLE],op=MPI.SUM)
-        #comm.Allreduce([kappa_balp,MPI.DOUBLE],[kappa_bal,MPI.DOUBLE],op=MPI.SUM)
         kappa_totp = np.array([np.einsum('mq,mq->',self.sigma[:,self.rr,0],kappa[:,self.rr])])*self.kappa_factor*1e-18
         comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
         kk +=1
@@ -445,14 +445,14 @@ class Solver(object):
           print(colored(' BALLISTIC:          ','green') + str(round(bal*100,2)) + ' %' )
           print(colored(' Full termination: ','green') + str(termination) )
           print(colored(' -----------------------------------------------------------','green'))
-          plot(self.mfp_bulk,Sup,color='b',marker='o')
-          if self.multiscale:
-           plot(self.mfp_bulk,Supd,color='r',marker='o')
-          if self.multiscale_ballistic:
-           plot(self.mfp_bulk,Supb,color='g',marker='o')
-          ylim([0,1])
-          xscale('log')
-          show()
+          #plot(self.mfp_bulk,Sup,color='b',marker='o')
+          #if self.multiscale:
+          # plot(self.mfp_bulk,Supd,color='r',marker='o')
+          #if self.multiscale_ballistic:
+          # plot(self.mfp_bulk,Supb,color='g',marker='o')
+          #ylim([0,1])
+          #xscale('log')
+          #show()
         #-----------------------------------------------
 
 

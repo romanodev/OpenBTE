@@ -13,6 +13,9 @@ class Mesher(object):
 
  def __init__(self,argv):
   argv['base'] = np.array(argv['base'])
+  self.add_symmetry(argv)
+
+
   if argv.setdefault('model','lattice') == 'lattice':   
    #create polygons-----
    base = argv.setdefault('base',[[0,0]])
@@ -186,7 +189,27 @@ class Mesher(object):
   with open(os.devnull, 'w') as devnull:
     output = subprocess.check_output("gmsh -optimize_netgen -format msh2 -3 mesh.geo -o mesh.msh".split(), stderr=devnull)
 
- 
+
+ def add_symmetry(self,argv):
+
+  if argv.setdefault('invariance',False):
+      argv['base'] =  np.append(argv['base'],[[0,0]],axis=0)
+
+  if argv.setdefault('reflection',False):
+      
+      base = argv['base'].copy()
+      tmp = base/2 + np.array([0.25,0.25])
+      base = argv['base'].copy()
+      tmp =  np.append(tmp,-base/2 - [0.25,0.25],axis=0)
+      base = argv['base'].copy()
+      base[:,1] = -base[:,1]
+      tmp =  np.append(tmp,base/2 - [-0.25,0.25],axis=0)
+      base = argv['base'].copy()
+      base[:,0] = -base[:,0]
+      tmp =  np.append(tmp,base/2 - [0.25,-0.25],axis=0)
+      argv['base'] = tmp
+
+
 
  def generate_bulk_2D(self,argv):
 
