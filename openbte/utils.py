@@ -92,7 +92,8 @@ def repeat_merge_scale(argv):
        for t in tmp:
         final.append(t)
       else:
-        final.append(thin)
+        #final.append(thin)
+        final.append(p1)
 
   #Create bulk surface---get only the exterior to avoid holes
   MP = MultiPolygon(final) 
@@ -107,7 +108,6 @@ def repeat_merge_scale(argv):
        polygons_final.append(list(conso.exterior.coords))
   
 
-  
 
   #cut redundant points (probably unnecessary)
   new_poly = []

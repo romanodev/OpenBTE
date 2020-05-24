@@ -8,15 +8,16 @@ from .shape import *
 from .utils import *
 import subprocess
 import os
-import time
-#import matplotlib.pylab as plt
+
+from matplotlib.pylab import *
 
 class Mesher(object):
 
  def __init__(self,argv):
-  argv['base'] = np.array(argv['base'])
+  #argv['base'] = np.array(argv['base'])
+  argv['base'] = np.load('test.npy',allow_pickle=True)
 
-  self.add_symmetry(argv)
+ # self.add_symmetry(argv)
 
   if argv.setdefault('model','lattice') == 'lattice':   
    #create polygons-----
@@ -27,13 +28,9 @@ class Mesher(object):
      return self.generate_bulk_2D(argv)
     else :
      return self.generate_bulk_3D(argv)
+   shape = get_shape(argv)
 
-   a = time.time()
-   shapes = get_shape(argv)
-
-
-   polygons = [translate_shape(shapes[n],i) for n,i in enumerate(base)]
-
+   polygons = [translate_shape(shape,i) for i in base]
 
    argv.update({'polygons':np.array(polygons)})
 
@@ -215,6 +212,9 @@ class Mesher(object):
       tmp =  np.append(tmp,base/2 - [0.25,-0.25],axis=0)
       argv['base'] = tmp
 
+      #tmp.dump('test.npy')
+      #quit()
+
 
 
  def generate_bulk_2D(self,argv):
@@ -358,32 +358,27 @@ class Mesher(object):
   pore_wall = []
   delta = 1e-2
   #-------------------------
+  #---
 
-
-  #for pore in polygons:
-  #    for p in pore:
-  #      plt.scatter(p[0],p[1])  
-  #plt.show()
-
-  
   bulk = Frame.difference(cascaded_union(polypores))
   if not (isinstance(bulk, shapely.geometry.multipolygon.MultiPolygon)):
    bulk = [bulk]
 
   bulk_surface = []
   inclusions = []
- 
+
   for r,region in enumerate(bulk):
    
     pp = list(region.exterior.coords)[:-1]
     line_list = self.create_line_list(pp,points,lines,store)
 
-    #for l in lines:
-    #  p1 = points[l[0]]
-    #  p2 = points[l[1]]
-    #  plt.plot([p1[0],p2[0]],[p1[1],p2[1]])
-    #plt.show()
-    #quit()
+        
+    for line in line_list:
+       p1 = points[line[0]] 
+       p2 = points[line[1]]
+       plot([p1[0],p2[0]],[p1[1],p2[1]])
+    show()   
+    quit()
     loops +=1
     local_loops = [loops]
     self.create_loop(loops,line_list,store)
@@ -391,6 +386,7 @@ class Mesher(object):
     #Create internal loops-------------
     for interior in region.interiors:
 
+     print( list(interior.coords)[:-1])   
      pp = list(interior.coords)[:-1]
      line_list = self.create_line_list(pp,points,lines,store)
      loops +=1
@@ -449,7 +445,7 @@ class Mesher(object):
   plr = np.array([self.lx/2.0,-self.ly/2.0])
 
 
-  delta = 1e-12
+  delta = 1e-6
   pore_wall = []
   for l,line in enumerate(lines):
  
@@ -471,7 +467,6 @@ class Mesher(object):
    if self.compute_line_point_distance(pll,pul,pl) < delta:
      hot.append(l+1)
      is_on_boundary = False   
-     
 
    if is_on_boundary:
     pore_wall.append(l+1)

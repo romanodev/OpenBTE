@@ -68,9 +68,21 @@ class Solver(object):
          data = argv['material'].data if 'material' in argv.keys() else dd.io.load('material.h5')
         else: data = None
         self.__dict__.update(create_shared_memory_dict(data,comm))
-        self.n_serial = self.tc.shape[0]  
-        self.n_parallel = self.tc.shape[1]  
-        if comm.rank == 0 and self.verbose: self.mfp_info() 
+        if comm.rank == 0 and self.verbose: self.bulk_info()
+
+        if len(self.tc.shape) == 2:
+         self.n_serial = self.tc.shape[0]  
+         self.n_parallel = self.tc.shape[1]  
+         self.model = 'rta'
+         block =  self.n_serial//comm.size
+         self.ff = range(block*comm.rank,self.n_serial) if comm.rank == comm.size-1 else range(block*comm.rank,block*(comm.rank+1))
+         if comm.rank == 0 and self.verbose: self.mfp_info() 
+        else: 
+         self.n_parallel = len(self.tc)
+         self.B = np.einsum('i,ij->ij',self.scale,self.B.T - 0.5*np.diag(np.diag(self.B)))
+         self.model = 'full'
+         if comm.rank == 0 and self.verbose: self.full_info() 
+         
         #------------------------------------------
 
         if comm.rank == 0:
@@ -93,26 +105,14 @@ class Solver(object):
         if not self.only_fourier:
          #-------SET Parallel info----------------------------------------------
          block =  self.n_parallel//comm.size
-         if comm.rank == comm.size-1: 
-           self.rr = range(block*comm.rank,self.n_parallel)
-         else: 
-           self.rr = range(block*comm.rank,block*(comm.rank+1))
+         if comm.rank == comm.size-1: self.rr = range(block*comm.rank,self.n_parallel) if comm.rank == comm.size-1 else range(block*comm.rank,block*(comm.rank+1))
   
          #--------------------------------     
-         block =  self.n_serial//comm.size
-         if comm.rank == comm.size-1: 
-           self.ff = range(block*comm.rank,self.n_serial)
-         else: 
-           self.ff = range(block*comm.rank,block*(comm.rank+1))
         #-------------------------------
 
-         #SOLVE BTE-------
-         #if self.coll:    
-
-           #data = self.solve_bte(**argv)
-         #else:
-         data = self.solve_mfp(**argv)
-        #-----
+         #-------SOLVE BTE-------
+         data = self.solve_mfp(**argv) if self.model == 'rta' else self.solve_bte(**argv)
+         #-----------------------
 
         #Saving-----------------------------------------------------------------------
         if comm.rank == 0:
@@ -138,13 +138,7 @@ class Solver(object):
 
 
           #if self.tc.ndim == 1:
-          #  self.coll = True
-          #  self.meta = np.array([1,len(self.tc),1])
-          #  self.n_parallel = len(self.tc)
-          #  self.tc = np.array([self.tc])
           #  B = self.mat['B']
-          #  B += B.T - 0.5*np.diag(np.diag(B))
-          #  self.BM = np.einsum('i,ij->ij',self.mat['scale'],B)
           #  self.sigma = np.array([self.sigma])
           #  self.VMFP = np.array([self.VMFP]) 
           #  self.mfp_average = np.zeros(1)
@@ -166,6 +160,7 @@ class Solver(object):
   def print_options(self):
           print(colored('  Multiscale Diffusive:                    ','green')+ str(self.multiscale))
           print(colored('  Multiscale Ballistic:                    ','green')+ str(self.multiscale_ballistic))
+          print(colored('  Keep LU                                  ','green')+ str(self.keep_lu))
           print(colored('  Multiscale Error:                        ','green')+ str(self.error_multiscale))
           print(colored('  Only Fourier:                            ','green')+ str(self.only_fourier))
           print(colored('  Max Fourier Error:                       ','green')+ '%.1E' % (self.max_fourier_error))
@@ -193,6 +188,10 @@ class Solver(object):
 
           #print('                        SPACE GRID                 ')   
           #print(colored(' -----------------------------------------------------------','green'))
+          print(colored('  Size along X [nm]:                       ','green')+ str(self.size[0]))
+          print(colored('  Size along y [nm]:                       ','green')+ str(self.size[1]))
+          if self.dim == 3:
+           print(colored('  Size along z [nm]:                       ','green')+ str(self.size[0]))
           print(colored('  Dimension:                               ','green') + str(self.dim))
           print(colored('  Number of Elements:                      ','green') + str(self.n_elems))
           print(colored('  Number of Sides:                         ','green') + str(len(self.active_sides)))
@@ -437,14 +436,14 @@ class Solver(object):
         if self.verbose and comm.rank == 0:   
          print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error))
 
-        if comm.rank == 0:
-          diff = int(MM[0])/self.n_serial/self.n_parallel 
-          bal = int(MM[1])/self.n_serial/self.n_parallel 
-          print(colored(' BTE:              ','green') + str(round((1-diff-bal)*100,2)) + ' %' )
-          print(colored(' FOURIER:          ','green') + str(round(diff*100,2)) + ' %' )
-          print(colored(' BALLISTIC:          ','green') + str(round(bal*100,2)) + ' %' )
-          print(colored(' Full termination: ','green') + str(termination) )
-          print(colored(' -----------------------------------------------------------','green'))
+        #if comm.rank == 0:
+        #  diff = int(MM[0])/self.n_serial/self.n_parallel 
+        #  bal = int(MM[1])/self.n_serial/self.n_parallel 
+        #  print(colored(' BTE:              ','green') + str(round((1-diff-bal)*100,2)) + ' %' )
+        #  print(colored(' FOURIER:          ','green') + str(round(diff*100,2)) + ' %' )
+        #  print(colored(' BALLISTIC:          ','green') + str(round(bal*100,2)) + ' %' )
+        #  print(colored(' Full termination: ','green') + str(termination) )
+        #  print(colored(' -----------------------------------------------------------','green'))
           #plot(self.mfp_bulk,Sup,color='b',marker='o')
           #if self.multiscale:
           # plot(self.mfp_bulk,Supd,color='r',marker='o')
@@ -479,10 +478,12 @@ class Solver(object):
 
   def solve_bte(self,**argv):
 
+
      if comm.rank == 0:
            print()
            print('      Iter    Thermal Conductivity [W/m/K]      Error ''')
            print(colored(' -----------------------------------------------------------','green'))   
+
 
      if comm.rank == 0:   
       SS = np.zeros(1)

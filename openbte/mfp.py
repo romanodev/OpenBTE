@@ -97,12 +97,9 @@ def generate_mfp(**argv):
   
 
    return {'tc':tc,\
-           'B':[],\
            'VMFP':direction*1e9,\
            'sigma':kappa_directional*1e9,\
            'kappa':kappa,\
-           'scale':np.ones((n_mfp,n_theta*n_phi)),\
-           'ac':tc,\
            'mfp_average':rhs_average*1e18,\
            'mfp_sampled':mfp_sampled,\
            'suppression':suppression,\

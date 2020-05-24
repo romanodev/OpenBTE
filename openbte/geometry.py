@@ -92,11 +92,8 @@ class Geometry(object):
     
     return {
           'size':self.size,\
-          #'lx':argv['lx'],\
           'conn':self.conn,\
           'elems':self.elems,\
-          #'n_elems':len(self.elems),\
-          #'ly':argv['ly'],\
           'dim':np.array([self.dim]),\
           'weigths': weigths_vec,\
           'bconn': np.array(self.bconn),\

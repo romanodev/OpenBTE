@@ -6,19 +6,47 @@ import math
 def get_shape(argv):
 
 
-    area  = argv.setdefault('porosity')/len(argv['base'])
     
     shape = argv.setdefault('shape','square')
-    if shape == 'square':
-       return np.array(make_polygon(4,area))
+   
+    if type(shape) == list:
+     assert(len(shape)==len(argv['base']))
+     shapes_str = shape
+    else:
+     shapes_str = len(argv['base'])*[shape]   
 
-    elif shape == 'circle':
-       return np.array(make_polygon(24,area))
 
-    elif shape == 'custom':
+    #compute area weigths
+    argv.setdefault('area_ratios',np.ones(len(argv['base'])))
+    areas =  [argv.setdefault('porosity')* i /sum(argv['area_ratios'])  for i in argv['area_ratios']]
+    
+
+    #-------------------
+
+    shapes = []
+    for n,shape in enumerate(shapes_str):
+
+     #area  = argv.setdefault('porosity')/len(argv['base'])
+     area= areas[n]
+     #print(area,area2)
+     #quit()
+
+     if shape == 'square':
+       shapes.append(np.array(make_polygon(4,area)))
+
+     if shape == 'triangle':
+       shapes.append(np.array(make_polygon(3,area)))
+
+     elif shape == 'circle':
+       shapes.append(np.array(make_polygon(24,area)))
+
+     elif shape == 'custom':
       options = argv.setdefault('shape_options',{})
       options.update({'area':area})
-      return argv['shape_function'](options)
+
+      shapes.append(argv['shape_function'](options))
+
+    return shapes  
 
 
 
