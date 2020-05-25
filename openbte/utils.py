@@ -7,7 +7,7 @@ import shapely
 from shapely.ops import cascaded_union
 import os
 import functools
-
+comm = MPI.COMM_WORLD
 
 def periodic_kernel(x1, x2, p,l,variance):
     return variance*np.exp(-2/l/l * np.sin(np.pi*abs(x1-x2)/p) ** 2)
@@ -216,7 +216,16 @@ def get_linear_indexes(mfp,value,scale,extent):
      aj *=mfp[j]/value
    return i,ai,j,aj  
 
-def create_shared_memory_dict(varss,comm):
+def shared_array(value):
+
+    data = {'dummy':value}
+    return create_shared_memory_dict(data)['dummy']
+
+
+            
+
+
+def create_shared_memory_dict(varss):
 
        dict_output = {}
        if comm.Get_rank() == 0:
@@ -253,6 +262,7 @@ def create_shared_memory_dict(varss,comm):
         dict_output[var] = output
 
        del varss
+       comm.Barrier()
        return dict_output
 
 

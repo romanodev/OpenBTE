@@ -107,9 +107,9 @@ def generate_mfp2DSym(**argv):
          'sigma':kappa_directional,\
          'kappa':kappa,\
          'scale':np.ones((n_mfp,n_phi)),\
-         'mfp_average':rhs_average,\
+         'mfp_average':rhs_average*1e18,\
          'VMFP':polar_ave,\
-         'mfp_sampled':mfp*1e9,\
+         'mfp_sampled':mfp,\
          'suppression':suppression,\
          'kappam':kappa_bulk,\
          'mfp_bulk':mfp_bulk}
