@@ -104,10 +104,10 @@ def generate_mfp2DSym(**argv):
  #Final----
 
  return {'tc':tc,\
-         'sigma':kappa_directional*1e9,\
+         'sigma':kappa_directional,\
          'kappa':kappa,\
          'scale':np.ones((n_mfp,n_phi)),\
-         'mfp_average':rhs_average*1e18,\
+         'mfp_average':rhs_average,\
          'VMFP':polar_ave,\
          'mfp_sampled':mfp*1e9,\
          'suppression':suppression,\

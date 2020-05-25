@@ -149,33 +149,52 @@ def generate_full(**argv):
  print('... done')
  print(' ')
  print('Computing kappa bulk ...')
-
-
  print(' done')
  print(' ')
 
  kappa = compute_kappa(W,sigma)
 
-
  print('... done')
  print(' ')
 
- Wod = np.empty_like(W)
- for i in range(nm):
-  for j in range(0,i):
-   Wod[i,j] = -W[i,j]
- for i in range(nm):
-   Wod[i,i] = 0
+ #a = np.diag(W)
+ #Wod = np.empty_like(W)
+ #for i in range(nm):
+ # for j in range(0,i):
+ #  Wod[i,j] = -W[i,j]
+ #for i in range(nm):
+ #  Wod[i,i] = 0
+
+ #Wod += Wod.T - 0.5*np.diag(np.diag(Wod)) 
+ #B2 = np.einsum('i,ij->ij',1/a,Wod)
+ B = -np.einsum('i,ij->ij',1/np.diag(W),W-np.diag(np.diag(W)))
+
+
+ Wod = -(W-np.diag(np.diag(W)))
+
+ Wd = np.tril(Wod)
+
+ B = np.empty_like(Wd)
+ B[Wd.nonzero()] = Wd[Wd.nonzero()]
+ #Wod = np.empty_like(B2)
+ #for i in range(nm):
+ # for j in range(0,i):
+ #  Wod[i,j] = -B2[i,j]
+ #for i in range(nm):
+ #  Wod[i,i] = 0
+
+
+ #print(B.sum(axis=1))
+
+ #quit()
 
  tc = C/sum(C)
 
- a = np.diag(W)
- F = np.einsum('i,ij->ij',1/a,sigma)
+ F = np.einsum('i,ij->ij',1/np.diag(W),sigma)
 
  kappa_initial = data['kappa'] 
 
-
- data = {'tc':tc,'B':Wod,'F':F,'G':sigma,'kappa':kappa,'scale':1/a}
+ data = {'tc':tc,'VMFP':F,'sigma':sigma,'kappa':kappa,'B':B,'scale':1/np.diag(W)}
 
  return data
 

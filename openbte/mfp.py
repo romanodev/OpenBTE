@@ -97,8 +97,8 @@ def generate_mfp(**argv):
   
 
    return {'tc':tc,\
-           'VMFP':direction*1e9,\
-           'sigma':kappa_directional*1e9,\
+           'VMFP':direction,\
+           'sigma':kappa_directional,\
            'kappa':kappa,\
            'mfp_average':rhs_average*1e18,\
            'mfp_sampled':mfp_sampled,\
