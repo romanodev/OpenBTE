@@ -7,6 +7,16 @@ Welcome to OpenBTE's documentation!
     :alt: my-picture1
 
 
+Install:
+
+.. code-block:: bash
+
+  conda create -n openbte
+ 
+  source activate openbte
+  
+  conda install -c gromano openbte
+
 Here is a quick example:
 
 .. code-block:: python
