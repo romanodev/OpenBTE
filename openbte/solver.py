@@ -7,7 +7,7 @@ import deepdish as dd
 from mpi4py import MPI
 import scipy.sparse as sp
 import time
-from matplotlib.pylab import *
+#from matplotlib.pylab import *
 import scikits.umfpack as um
 from scipy.sparse.linalg import lgmres
 import scikits.umfpack as um
@@ -507,20 +507,20 @@ class Solver(object):
         print(colored(' Full termination: ','green') + str(termination) )
         print(colored(' -----------------------------------------------------------','green'))
 
-        plot(self.mfp_bulk,Sup,color='b',marker='o')
-        if self.multiscale:
-         plot(self.mfp_bulk,Supd,color='r',marker='o')
-        if self.multiscale_ballistic:
-         plot(self.mfp_bulk,Supb,color='g',marker='o')
-        ylim([0,1])
-        xscale('log')
-        show()
+        #plot(self.mfp_bulk,Sup,color='b',marker='o')
+        #if self.multiscale:
+        # plot(self.mfp_bulk,Supd,color='r',marker='o')
+        #if self.multiscale_ballistic:
+        # plot(self.mfp_bulk,Supb,color='g',marker='o')
+        #ylim([0,1])
+        #xscale('log')
+        #show()
         #-----------------------------------------------
 
 
 
      #return {'kappa_vec':kappa_vec,'temperature':DeltaT,'flux':J,'suppression':Sup,'suppression_diffusive':supd,'suppression_ballistic':Supb}
-     return {'kappa_vec':kappa_vec,'temperature':DeltaT,'flux':J,'suppression':Sup,'suppression_ballistic':Supb}
+     return {'kappa_vec':kappa_vec,'temperature':DeltaT,'flux':J,'suppression':Sup,'suppression_ballistic':Supb,'suppression_diffusive':Supd}
 
 
   def solve_bte(self,**argv):
@@ -576,37 +576,39 @@ class Solver(object):
      termination = True
      alpha = 1
 
-     #X = np.tile(self.temperature_fourier,(self.n_parallel,1))
-     #X_old = X.copy()
-     Xs = shared_array(np.tile(self.temperature_fourier,(self.n_parallel,1)) if comm.rank == 0 else None)
-     Xs_old = Xs.copy()
+     X = np.tile(self.temperature_fourier,(self.n_parallel,1))
+     X_old = X.copy()
+     #Xs = shared_array(np.tile(self.temperature_fourier,(self.n_parallel,1)) if comm.rank == 0 else None)
+     #Xs_old = shared_array(np.tile(self.temperature_fourier,(self.n_parallel,1)) if comm.rank == 0 else None)
+     #Xs_old[:,:] = Xs[:,:].copy()
 
      while kk < self.max_bte_iter and error > self.max_bte_error:
 
-      #DeltaT = np.matmul(self.B[self.rr],alpha*X+(1-alpha)*X_old)
-      DeltaTs = np.matmul(self.B[self.rr],alpha*Xs+(1-alpha)*Xs_old)
+      DeltaT = np.matmul(self.B[self.rr],alpha*X+(1-alpha)*X_old)
+      X_old = X.copy()
+      #DeltaTs = np.matmul(self.B[self.rr],alpha*Xs+(1-alpha)*Xs_old)
 
       TBp = np.zeros_like(TB)
-      #Xp = np.zeros_like(X)
-      #J,Jp = np.zeros((2,self.n_elems,3))
+      Xp = np.zeros_like(X)
+      J,Jp = np.zeros((2,self.n_elems,3))
       kappa,kappap = np.zeros((2,self.n_parallel))
       for n,q in enumerate(self.rr):
-         #Xp[q] = self.get_X_full(n,TB,DeltaT)
-         #for c,i in enumerate(self.eb): TBp[c] -= Xp[q,i]*self.GG[q,c]
-         #kappap[q] -= np.dot(self.kappa_mask,Xp[q])
+         Xp[q] = self.get_X_full(n,TB,DeltaT)
+         for c,i in enumerate(self.eb): TBp[c] -= Xp[q,i]*self.GG[q,c]
+         kappap[q] -= np.dot(self.kappa_mask,Xp[q])
 
-         Xs[q,:] = self.get_X_full(n,TB,DeltaTs)
-         for c,i in enumerate(self.eb): TBp[c] -= Xs[q,i]*self.GG[q,c]
-         kappap[q] -= np.dot(self.kappa_mask,Xs[q])
+         #Xs[q,:] = self.get_X_full(n,TB,DeltaTs)
+         #for c,i in enumerate(self.eb): TBp[c] -= Xs[q,i]*self.GG[q,c]
+         #kappap[q] -= np.dot(self.kappa_mask,Xs[q])
        
       comm.Allreduce([kappap,MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
-      #comm.Allreduce([Xp,MPI.DOUBLE],[X,MPI.DOUBLE],op=MPI.SUM)
+      comm.Allreduce([Xp,MPI.DOUBLE],[X,MPI.DOUBLE],op=MPI.SUM)
       comm.Allreduce([TBp,MPI.DOUBLE],[TB,MPI.DOUBLE],op=MPI.SUM)
       kappa_totp = np.array([np.einsum('q,q->',self.sigma[self.rr,0],kappa[self.rr])])*self.kappa_factor*1e-18
       comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
       comm.Barrier()
-      Xs_old = Xs.copy()
 
+     
       error = abs(kappa_old-kappa_tot[0])/abs(kappa_tot[0])
       kappa_old = kappa_tot[0]
       kappa_vec.append(kappa_tot[0])
@@ -618,10 +620,10 @@ class Solver(object):
       print(colored(' -----------------------------------------------------------','green'))
 
      
-     T = np.einsum('qc,q->c',Xs,self.tc)
-     J = np.einsum('qj,qc->cj',self.sigma,Xs)*1e-18
-     #T = np.einsum('qc,q->c',X,self.tc)
-     #J = np.einsum('qj,qc->cj',self.sigma,X)*1e-18
+     #T = np.einsum('qc,q->c',Xs,self.tc)
+     #J = np.einsum('qj,qc->cj',self.sigma,Xs)*1e-18
+     T = np.einsum('qc,q->c',X,self.tc)
+     J = np.einsum('qj,qc->cj',self.sigma,X)*1e-18
      return {'kappa_vec':kappa_vec,'temperature':T,'flux':J}
 
 

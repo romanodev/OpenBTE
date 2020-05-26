@@ -1,10 +1,10 @@
 
 package:
   name: "openbte"
-  version: "0.99"
+  version: "1.5"
 
 source:
-  url: ../dist/openbte-0.99.tar.gz
+  url: ../dist/openbte-1.6.tar.gz
 build:
         
   number: 1
@@ -27,7 +27,7 @@ requirements:
     - termcolor
     - unittest2
     - googledrivedownloader
-    - libsuitesparse
+    - suitesparse
     - scikit-umfpack
   run:
     - deepdish
@@ -45,7 +45,7 @@ requirements:
     - unittest2
     - gmsh==3.0.6
     - pyqt
-    - libsuitesparse
+    - suitesparse
     - scikit-umfpack
 
 test:
