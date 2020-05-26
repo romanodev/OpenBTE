@@ -520,7 +520,8 @@ class Solver(object):
 
 
      #return {'kappa_vec':kappa_vec,'temperature':DeltaT,'flux':J,'suppression':Sup,'suppression_diffusive':supd,'suppression_ballistic':Supb}
-     return {'kappa_vec':kappa_vec,'temperature':DeltaT,'flux':J,'suppression':Sup,'suppression_ballistic':Supb,'suppression_diffusive':Supd}
+     return {'kappa_vec':kappa_vec,'temperature':DeltaT,'flux':J}#,'suppression':Sup)
+     #,'suppression_ballistic':Supb,'suppression_diffusive':Supd}
 
 
   def solve_bte(self,**argv):

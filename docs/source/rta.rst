@@ -1,5 +1,0 @@
-Relaxation Time Approximation
-===================================
-
-
-iri
