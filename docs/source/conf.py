@@ -40,7 +40,6 @@ nbsphinx_execute = 'auto'
 
 extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.autosummary',\
-    'cloud_sptheme',\
     'sphinx.ext.intersphinx',\
     'sphinx.ext.mathjax',\
     'sphinxcontrib.bibtex',\
