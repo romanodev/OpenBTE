@@ -27,6 +27,7 @@ class Solver(object):
         self.umfpack = argv.setdefault('umfpack',False)
         self.multiscale_ballistic = argv.setdefault('multiscale_ballistic',False)
         self.error_multiscale = argv.setdefault('multiscale_error',1e-10)
+        self.bundle = argv.setdefault('bundle',False)
         self.verbose = argv.setdefault('verbose',True)
         self.alpha = argv.setdefault('alpha',1.0)
         self.keep_lu = argv.setdefault('keep_lu',True)
@@ -61,6 +62,7 @@ class Solver(object):
         self.n_nodes = int(self.meta[3])
         self.n_active_sides = int(self.meta[4])
         if comm.rank == 0 and self.verbose: self.mesh_info() 
+        if comm.rank == 0 and self.verbose: self.mpi_info() 
         #------------------------------------------------------------------------------
 
         #IMPORT MATERIAL---------------------------
@@ -128,14 +130,12 @@ class Solver(object):
            variables[2]    = {'name':'Temperature BTE','units':'K'             ,'data':data['temperature']}
            variables[3]    = {'name':'Flux BTE'       ,'units':'W/m/m/K'       ,'data':data['flux']}
 
-          self.state.update({'variables':variables})#,\
-                           #'kappa':data['kappa_vec'],\
-                           #'suppression':data['suppression'],\
-                           #'suppression_diffusive':data['suppression_diffusive']})
-
-          
+          self.state.update({'variables':variables})
 
           if argv.setdefault('save',True):
+           if self.bundle:
+             self.state['geometry'] = self.mesh
+             self.state['material'] = self.mat
            dd.io.save('solver.h5',self.state)
           if self.verbose:
            print(' ')   
@@ -143,8 +143,12 @@ class Solver(object):
            print(' ')  
 
 
-  def fourier_info(self,data):
+  def mpi_info(self):
 
+          print(colored('  vCPUs:                                   ','green') + str(comm.size))
+
+
+  def fourier_info(self,data):
 
           print('                        FOURIER                 ')   
           print(colored(' -----------------------------------------------------------','green'))
@@ -153,7 +157,6 @@ class Solver(object):
           print(colored('  Fourier Thermal Conductivity [W/m/K]:    ','green') + str(round(data['meta'][0],3)))
           print(colored(' -----------------------------------------------------------','green'))
           print(" ")
-
 
 
   def print_options(self):
@@ -191,13 +194,12 @@ class Solver(object):
           print(colored('  Size along X [nm]:                       ','green')+ str(self.size[0]))
           print(colored('  Size along y [nm]:                       ','green')+ str(self.size[1]))
           if self.dim == 3:
-           print(colored('  Size along z [nm]:                       ','green')+ str(self.size[0]))
+           print(colored('  Size along z [nm]:                       ','green')+ str(self.size[2]))
           print(colored('  Number of Elements:                      ','green') + str(self.n_elems))
           print(colored('  Number of Sides:                         ','green') + str(len(self.active_sides)))
           print(colored('  Number of Nodes:                         ','green') + str(len(self.nodes)))
           #print(colored(' -----------------------------------------------------------','green'))
           #print(" ")
-
 
 
   def solve_modified_fourier(self,DeltaT):
@@ -326,7 +328,6 @@ class Solver(object):
     return X
 
   def solve_mfp(self,**argv):
-
 
      if comm.rank == 0:
            print()
@@ -489,8 +490,6 @@ class Solver(object):
           #show()
         #-----------------------------------------------
 
-
-
      if self.verbose and comm.rank == 0:
       print(colored(' -----------------------------------------------------------','green'))
 
@@ -520,8 +519,12 @@ class Solver(object):
 
 
      #return {'kappa_vec':kappa_vec,'temperature':DeltaT,'flux':J,'suppression':Sup,'suppression_diffusive':supd,'suppression_ballistic':Supb}
-     return {'kappa_vec':kappa_vec,'temperature':DeltaT,'flux':J}#,'suppression':Sup)
-     #,'suppression_ballistic':Supb,'suppression_diffusive':Supd}
+     output =  {'kappa_vec':kappa_vec,'temperature':DeltaT,'flux':J}
+     
+     if self.multiscale:           output.update({'suppression_diffusive':Supd})
+     if self.multiscale_ballistic: output.update({'suppression_ballistic':Supb})
+
+     return output
 
 
   def solve_bte(self,**argv):

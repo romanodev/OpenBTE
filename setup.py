@@ -2,7 +2,7 @@ from setuptools import setup,find_packages
 import os
 
 setup(name='openbte',
-      version='1.6',
+      version='1.9',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',
@@ -18,8 +18,8 @@ setup(name='openbte',
                         'alabaster',
                         'deepdish',
                         'mpi4py',
-                        'scikit-umfpack',
                         'plotly==4.6.0',
+                        'scikit-umfpack',
                         'nbsphinx',
                         'recommonmark',
                         'sphinx>=1.4.6',
@@ -29,6 +29,6 @@ setup(name='openbte',
       packages = ['openbte'],
       package_data = {'openbte':['materials/*.dat','fonts/*.ttf']},
       entry_points = {
-     'console_scripts': ['AlmaBTE2OpenBTE=openbte.almabte2openbte:main'],
+     'console_scripts': ['AlmaBTE2OpenBTE=openbte.almabte2openbte:main','Phono3py2OpenBTE=openbte.phono3py:main'],
       },
       zip_safe=False)

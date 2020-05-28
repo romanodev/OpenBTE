@@ -30,25 +30,34 @@ nbsphinx_execute = 'auto'
 
 #extensions = ["sphinx.ext.mathjax","nbsphinx"]
 
+#source_suffix = {
+#    '.txt': 'markdown',
+#    '.md': 'markdown',
+#}
+
+
+
 
 extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.autosummary',\
+    'cloud_sptheme',\
     'sphinx.ext.intersphinx',\
     'sphinx.ext.mathjax',\
+    'sphinxcontrib.bibtex',\
     'recommonmark',\
     'sphinx.ext.napoleon',\
     'sphinx.ext.viewcode',\
     'nbsphinx']
 
 
-nbsphinx_prolog = r"""
-.. raw:: html
+#nbsphinx_prolog = r"""
+#.. raw:: html
 
-    <script src='http://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js'></script>
-    <script>require=requirejs;</script>
+#    <script src='http://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js'></script>
+#    <script>require=requirejs;</script>
 
 
-"""
+#"""
 
 
 

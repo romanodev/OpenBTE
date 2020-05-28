@@ -1,21 +1,10 @@
 Welcome to OpenBTE's documentation!
 ===================================
 
-
     
 .. image:: https://docs.google.com/drawings/d/e/2PACX-1vRqrihU3IHGVNRaNN7sc2r5CMphXVz6iT8jesHsX0blyj7GPh5KyiUiOFw8WMH9bHHNZYMzBTIgLPNo/pub?w=1230&h=504
     :alt: my-picture1
 
-
-Install:
-
-.. code-block:: bash
-
-  conda create -n openbte
- 
-  source activate openbte
-  
-  conda install -c gromano openbte
 
 Here is a quick example:
 
@@ -27,6 +16,12 @@ Here is a quick example:
  
   sol = Solver(max_bte_iter = 20,max_bte_error = 1e-4,geometry=geo)
 
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Getting Started
+
+   install
 
 .. toctree::
    :maxdepth: 2

@@ -2,7 +2,7 @@ import numpy as np
 import os
 import math
 from .database import *
-from .full_model2 import generate_full
+from .full_model import generate_full
 from .utils import *
 from .mfp2DSym import *
 from .mfp import *
