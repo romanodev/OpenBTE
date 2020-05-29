@@ -34,7 +34,30 @@ DOCKER
 .. code-block:: bash
 
    sudo docker run -i -t romanodev/openbte /bin/bash
+
+Once you pulled the image, you can run OpenBTE.
+
+.. code-block:: bash
+
+   sudo docker  run  -v `pwd`:`pwd` -w `pwd` -i -t romanodev/openbte mpiexec -np 8 --use-hwthread-cpus python input.py
+  
+where we assumed you have 8 virtual CPUs.   
+
+If you frequently use Docker, you may want to add your ``user`` to the Docker group. 
+
+.. code-block:: bash
+
+   sudo service docker start
+   sudo usermod -a -G docker username
+   sudo chkconfig docker on
+
+Execute the following command to make it sure you are added to the Docker group 
+
+.. code-block:: bash
+
+   docker info
    
+
 
 WINDOWS
 ##################################################

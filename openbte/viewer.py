@@ -2,8 +2,17 @@ import plotly.offline as py
 import plotly.graph_objs as go
 import numpy as np
 import plotly.io as pio
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+import webbrowser
+from threading import Timer
+
 py.renderer='jupyterlab'
 
+
+def open_browser():
+      webbrowser.open_new('http://0.0.0.0:8050/')
 
 def plotly_trisurf(nodes, simplices, data,name,units,visible=False):
 
@@ -36,6 +45,8 @@ def add_data(nodes,elems,name,data,units,buttons,fig,nv):
 
 
 def plot_results(data,nodes,elems,**argv):
+
+
 
        
    size = [ max(nodes[:,i]) - min(nodes[:,i])  for i in range(3)] 
@@ -125,8 +136,14 @@ def plot_results(data,nodes,elems,**argv):
    fig.update_layout(scene_camera=camera)
    #show_in_window(fig)
 
-   #fig.show()
-   #py.plot(fig, filename='OpenBTE.html',auto_open=False)
-   py.plot(fig, filename=argv.setdefault('html_file','index.html'),auto_open =argv.setdefault('auto_open',True))
-   #py_online.plot(fig, filename='OpenBTE',sharing='public')
+   
+   external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+   app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+   app.layout = html.Div(children=[html.H1(children='OpenBTE'),html.Div(children=''''''),dcc.Graph(figure=fig)])
+
+   if argv['show']:
+    Timer(1, open_browser).start()
+   app.run_server(host='0.0.0.0',port=8050)
+
+   #py.plot(fig, filename=argv.setdefault('html_file','index.html'),auto_open =argv.setdefault('auto_open',True))
 
