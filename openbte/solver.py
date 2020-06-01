@@ -121,6 +121,7 @@ class Solver(object):
 
          #-------SOLVE BTE-------
          data = self.solve_mfp(**argv) if self.model == 'rta' else self.solve_bte(**argv)
+         self.state.update({'kappa':data['kappa_vec']})
          #-----------------------
 
         #Saving-----------------------------------------------------------------------
@@ -131,7 +132,7 @@ class Solver(object):
            variables[2]    = {'name':'Temperature BTE','units':'K'             ,'data':data['temperature']}
            variables[3]    = {'name':'Flux BTE'       ,'units':'W/m/m/K'       ,'data':data['flux']}
 
-          self.state.update({'variables':variables})
+          self.state.update({'kappa':data['kappa_vec']})
 
           if argv.setdefault('save',True):
            if self.bundle:
@@ -460,7 +461,6 @@ class Solver(object):
         comm.Allreduce([TBp,MPI.DOUBLE],[TB,MPI.DOUBLE],op=MPI.SUM)
         kappa_totp = np.array([np.einsum('mq,mq->',self.sigma[:,self.rr,0],kappa[:,self.rr])])*self.kappa_factor*1e-18
         comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
-        print(time.time()-a)
         kk +=1
 
         error = abs(kappa_old-kappa_tot[0])/abs(kappa_tot[0])

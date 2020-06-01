@@ -79,7 +79,8 @@ def generate_mfp(**argv):
     for p in range(n_phi):
      angular_average += np.einsum('i,j->ij',direction_ave[t,p],direction_ave[t,p])*domega[t,p]/4.0/np.pi
 
-   rhs_average = np.einsum('m,ij->mij',mfp_sampled*mfp_sampled,angular_average)
+   #rhs_average = np.einsum('m,ij->mij',mfp_sampled*mfp_sampled,angular_average)
+   rhs_average = mfp_sampled*mfp_sampled/3
    #-----------------------------
 
    #replicate bulk values---

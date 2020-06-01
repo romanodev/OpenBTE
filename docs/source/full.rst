@@ -1,7 +1,7 @@
 Full Collision Operator
 ===================================
 
-In many cases the relaxation time apprimxation (RTA) is not enough and the full scattering operator must be used. OpenBTE employes the following iterative scheme
+In many cases the relaxation time approximation (RTA) is not enough and the full scattering operator must be used. OpenBTE employes the following iterative scheme
 
 .. math::
 
