@@ -14,7 +14,7 @@ build:
 requirements:
   host:
     - deepdish
-    - mpi4py==2.0.0
+    - mpi4py
     - numpy
     - pip
     - plotly==4.6.0  
@@ -34,7 +34,7 @@ requirements:
     - deepdish
     - future
     - pandas  
-    - mpi4py==2.0.0
+    - mpi4py
     - plotly==4.6.0  
     - numpy
     - googledrivedownloader
