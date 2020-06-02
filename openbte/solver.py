@@ -204,6 +204,56 @@ class Solver(object):
           #print(" ")
 
 
+  def solve_serial_fourier(self,DeltaT):
+
+
+        #tf = shared_array(np.zeros((self.n_serial,self.n_elems)) if comm.rank == 0 else None)
+        #tfg = shared_array(np.zeros((self.n_serial,self.n_elems,3)) if comm.rank == 0 else None)
+        #kappaf = shared_array(np.zeros((self.n_serial,self.n_elems)) if comm.rank == 0 else None)
+        #Supd = shared_array(np.zeros(len(self.kappam)) if comm.rank == 0 else None)
+
+
+        if comm.rank == 0:
+         #kappaf = np.zeros((self.n_serial,self.n_parallel))
+         #tf = np.zeros((self.n_serial,self.n_elems))
+         #tfg = np.zeros((self.n_serial,self.n_elems,3))
+         #Supd  = np.zeros(len(self.kappam))
+         base_old = 0
+         #base = 1
+         fourier = False
+         for m in range(len(self.mfp_sampled)):
+
+           if not fourier:
+
+            #a = time.time()   
+            #dataf = self.solve_fourier_scalar(self.mfp_average[m],pseudo=DeltaT,m=m,guess = np.zeros(self.n_elems) if m == 0 else dataf['guess'].copy()/self.mfp_average[m-1]*self.mfp_average[m])
+
+            dataf = self.solve_fourier_scalar(self.mfp_average[m],pseudo=DeltaT,m=m,guess = np.zeros(self.n_elems))
+            #print(time.time()-a)
+            temp  = dataf['temperature_fourier'] 
+            grad  = dataf['grad'] 
+            base  = np.dot(self.kappa_mask,temp)
+            error = abs(base-base_old)/abs(base)
+            if error < 1e-3 : fourier = True
+            base_old = base
+         
+           #---------------------------------
+           self.tf[m,:] = temp[:]#.copy()
+           self.tfg[m,:,:] = grad[:,:]#.copy()
+           for q in range(self.n_parallel): 
+            self.kappaf[m,q] = -base + np.dot(self.kappa_mask,self.mfp_sampled[m]*np.dot(self.VMFP[q],grad.T))
+            self.Supd[:] += self.kappaf[m,q]*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
+
+         #data = {'tf':tf,'tfg':tfg,'kappaf':kappaf,'Supd':Supd} 
+        #else: data = None    
+        #data = comm.bcast(data,root=0)
+
+        comm.Barrier()
+
+        #return data['kappaf'],data['tf'],data['tfg'],data['Supd']
+        return self.kappaf,self.tf,self.tfg,self.Supd
+
+
   def solve_modified_fourier(self,DeltaT):
 
          kappaf,kappafp = np.zeros((2,self.n_serial,self.n_parallel))   
@@ -213,17 +263,18 @@ class Solver(object):
 
          for m in self.ff:
            #dataf = self.solve_fourier(self.mfp_average[m],pseudo=DeltaT,m=m)
-           dataf = self.solve_fourier_scalar(self.mfp_average[m],pseudo=DeltaT,m=m)
+           dataf = self.solve_fourier_scalar(self.mfp_average[m],pseudo=DeltaT,m=m,guess = np.zeros(self.n_elems))
+
            tfp[m] = dataf['temperature_fourier']
            tfgp[m] = dataf['grad']
            for q in range(self.n_parallel): 
             kappafp[m,q] = -np.dot(self.kappa_mask,dataf['temperature_fourier'] - self.mfp_sampled[m]*np.dot(self.VMFP[q],dataf['grad'].T))
             Supdp += kappafp[m,q]*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
-
          comm.Allreduce([kappafp,MPI.DOUBLE],[kappaf,MPI.DOUBLE],op=MPI.SUM)
          comm.Allreduce([tfp,MPI.DOUBLE],[tf,MPI.DOUBLE],op=MPI.SUM)
          comm.Allreduce([tfgp,MPI.DOUBLE],[tfg,MPI.DOUBLE],op=MPI.SUM)
          comm.Allreduce([Supdp,MPI.DOUBLE],[Supd,MPI.DOUBLE],op=MPI.SUM)
+
 
          return kappaf,tf,tfg,Supd
 
@@ -375,13 +426,19 @@ class Solver(object):
      kappa = np.zeros((self.n_serial,self.n_parallel))
      termination = True
 
+     self.tf = shared_array(np.zeros((self.n_serial,self.n_elems)) if comm.rank == 0 else None)
+     self.tfg = shared_array(np.zeros((self.n_serial,self.n_elems,3)) if comm.rank == 0 else None)
+     self.kappaf = shared_array(np.zeros((self.n_serial,self.n_elems)) if comm.rank == 0 else None)
+     self.Supd = shared_array(np.zeros(len(self.kappam)) if comm.rank == 0 else None)
+
      while kk < self.max_bte_iter and error > self.max_bte_error:
         
         if self.multiscale  : 
-            #a = time.time()
-            (kappaf,tf,tfg,Supd) = self.solve_modified_fourier(DeltaT)
+            a = time.time()
+            #(kappaf,tf,tfg,Supd) = self.solve_modified_fourier(DeltaT)
+            (kappaf,tf,tfg,Supd) = self.solve_serial_fourier(DeltaT)
             #(kappaf,tf,tfg,Supd) = self.solve_modified_fourier_shared(DeltaT)
-            #print(time.time()-a,'FF',comm.rank)
+            print(time.time()-a,'FF',comm.rank)
 
         a = time.time()
         #Multiscale scheme-----------------------------
@@ -404,10 +461,10 @@ class Solver(object):
               idx  = np.argwhere(np.diff(np.sign(kappaf[:,q] - kappa_bal*np.ones(self.n_serial)))).flatten()
               if len(idx) == 0: idx = [self.n_serial-1]
            else: idx = [self.n_serial-1]
-
          
            fourier = False
            for m in range(self.n_serial)[idx[0]::-1]:
+             a = time.time()  
 
              #----------------------------------   
              if fourier:
@@ -447,7 +504,7 @@ class Solver(object):
               for c,i in enumerate(self.eb): TBp[m,c] -= X[i]*self.GG[m,q,c]
               Jp += np.einsum('c,j->cj',X,self.sigma[m,q])*1e-18
               Supp += kappap[m,q]*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
-
+           
         Mp[0] = diffusive
         Mp[1] = bal
 
@@ -719,8 +776,9 @@ class Solver(object):
        scale = 1/F.max(axis=0).toarray()[0]
        F.data = F.data * scale[F.indices]
        SU = splu(F)
-       B = kappa*self.RHS_FOURIER.copy() + argv['pseudo']
-       self.MF[m] = {'SU':SU,'scale':scale,'B':B}
+       B = kappa*self.RHS_FOURIER.copy()
+       self.MF[m] = {'SU':SU,'scale':scale,'B':B.copy()}
+       B = B + argv['pseudo']
      else:  
       F *= kappa   
       B = self.RHS_FOURIER.copy()
@@ -734,6 +792,7 @@ class Solver(object):
 
     #--------------
     C = np.zeros(self.n_elems)
+    #C = argv['guess']
     n_iter = 0
     kappa_old = 0
     error = 1  
@@ -754,9 +813,8 @@ class Solver(object):
         grad = self.compute_grad(temp,grad)
         C = self.compute_non_orth_contribution(grad,kappa)
     flux = -kappa*grad
- 
     meta = [kappa_eff,error,n_iter] 
-    return {'flux_fourier':flux,'temperature_fourier':temp,'meta':np.array(meta),'grad':grad}
+    return {'flux_fourier':flux,'temperature_fourier':temp,'meta':np.array(meta),'grad':grad,'guess':C}
 
 
   def solve_fourier(self,kappa,**argv):
