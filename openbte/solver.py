@@ -25,12 +25,12 @@ class Solver(object):
         self.state = {}
         self.multiscale = argv.setdefault('multiscale',False)
         self.umfpack = argv.setdefault('umfpack',False)
-        self.multiscale_ballistic = argv.setdefault('multiscale_ballistic',False)
+        #self.multiscale_ballistic = argv.setdefault('multiscale_ballistic',False)
         self.error_multiscale = argv.setdefault('multiscale_error',1e-10)
         self.bundle = argv.setdefault('bundle',False)
         self.verbose = argv.setdefault('verbose',True)
         self.alpha = argv.setdefault('alpha',1.0)
-        self.keep_lu = argv.setdefault('keep_lu',True)
+        #self.keep_lu = argv.setdefault('keep_lu',True)
         self.only_fourier = argv.setdefault('only_fourier',False)
         self.max_bte_iter = argv.setdefault('max_bte_iter',20)
         self.max_bte_error = argv.setdefault('max_bte_error',1e-3)
@@ -105,7 +105,7 @@ class Solver(object):
 
         if comm.rank == 0:
           #data = self.solve_fourier(self.kappa)
-          data = self.solve_fourier_scalar(142)
+          data = self.solve_fourier_scalar(self.kappa[0,0])
 
 
           variables = {0:{'name':'Temperature Fourier','units':'K',        'data':data['temperature_fourier']},\
@@ -166,9 +166,9 @@ class Solver(object):
 
 
   def print_options(self):
-          print(colored('  Multiscale Diffusive:                    ','green')+ str(self.multiscale))
-          print(colored('  Multiscale Ballistic:                    ','green')+ str(self.multiscale_ballistic))
-          print(colored('  Keep LU                                  ','green')+ str(self.keep_lu))
+          print(colored('  Multiscale:                              ','green')+ str(self.multiscale))
+          #print(colored('  Multiscale Ballistic:                    ','green')+ str(self.multiscale_ballistic))
+          print(colored('  Use umfpack                              ','green')+ str(self.umfpack))
           print(colored('  Multiscale Error:                        ','green')+ str(self.error_multiscale))
           print(colored('  Only Fourier:                            ','green')+ str(self.only_fourier))
           print(colored('  Max Fourier Error:                       ','green')+ '%.1E' % (self.max_fourier_error))
@@ -323,6 +323,8 @@ class Solver(object):
 
     return X
 
+
+
   def get_X(self,m,n,TB,DeltaT):  
 
     if self.init == False:
@@ -330,33 +332,34 @@ class Solver(object):
      self.conversion = np.asarray(self.Master.data-1,np.int) 
      self.init = True
      self.lu = {}
-     if self.umfpack:
-      self.umfpack = um.UmfpackContext()
-      self.umfpack.symbolic(self.Master)
+     #if self.umfpack:
+     # self.umfpack = um.UmfpackContext()
+     # self.umfpack.symbolic(self.Master)
 
-    if not self.umfpack:
-      if self.keep_lu:
+    if not self.umfpack :
+      #if self.keep_lu:
        if not (m,n) in self.lu.keys():
         self.Master.data = np.concatenate((self.mfp_sampled[m]*self.Gm[n],self.mfp_sampled[m]*self.D[n]+np.ones(self.n_elems)))[self.conversion]
         lu_loc = sp.linalg.splu(self.Master)
         self.lu[(m,n)] = lu_loc
        else: lu_loc = self.lu[(m,n)]  
-      else: 
-        self.Master.data = np.concatenate((self.mfp_sampled[m]*self.Gm[n],self.mfp_sampled[m]*self.D[n]+np.ones(self.n_elems)))[self.conversion]
-        lu_loc = sp.linalg.splu(self.Master)
+      #else: 
+      #  self.Master.data = np.concatenate((self.mfp_sampled[m]*self.Gm[n],self.mfp_sampled[m]*self.D[n]+np.ones(self.n_elems)))[self.conversion]
+      #  lu_loc = sp.linalg.splu(self.Master)
 
-      RHS = np.zeros(self.n_elems)
-      for c,i in enumerate(self.eb): RHS[i] -= TB[m,c]*self.Gbm2[n,c]
-      X = lu_loc.solve(DeltaT + self.mfp_sampled[m]*(self.P[n] + RHS)) 
+       RHS = np.zeros(self.n_elems)
+       for c,i in enumerate(self.eb): RHS[i] -= TB[m,c]*self.Gbm2[n,c]
+       X = lu_loc.solve(DeltaT + self.mfp_sampled[m]*(self.P[n] + RHS)) 
 
     else:  
        self.Master.data = np.concatenate((self.mfp_sampled[m]*self.Gm[n],self.mfp_sampled[m]*self.D[n]+np.ones(self.n_elems)))[self.conversion]
-       self.umfpack = um.UmfpackContext()
-       self.umfpack.numeric(self.Master)
-
+       #self.umfpack = um.UmfpackContext()
+       #self.umfpack.numeric(self.Master)
        RHS = np.zeros(self.n_elems)
        for c,i in enumerate(self.eb): RHS[i] -= TB[m,c]*self.Gbm2[n,c] 
-       X = self.umfpack.solve(um.UMFPACK_A,self.Master,DeltaT  + self.mfp_sampled[m]*(self.P[n] + RHS), autoTranspose = False)
+       #X = self.umfpack.solve(um.UMFPACK_A,self.Master,DeltaT  + self.mfp_sampled[m]*(self.P[n] + RHS), autoTranspose = False)
+       X = sp.solve(self.Master,RHS)
+       
 
     return X
 
@@ -421,15 +424,15 @@ class Solver(object):
      self.Supd = shared_array(np.zeros(len(self.kappam)) if comm.rank == 0 else None)
 
      while kk < self.max_bte_iter and error > self.max_bte_error:
-        
+        a = time.time()
+        self.x_old = DeltaT.copy()
         if self.multiscale  : 
             a = time.time()
             #(kappaf,tf,tfg,Supd) = self.solve_modified_fourier(DeltaT)
             (kappaf,tf,tfg,Supd) = self.solve_serial_fourier(DeltaT)
             #(kappaf,tf,tfg,Supd) = self.solve_modified_fourier_shared(DeltaT)
-            print(time.time()-a,'FF',comm.rank)
+            #print(time.time()-a,'FF',comm.rank)
 
-        a = time.time()
         #Multiscale scheme-----------------------------
         diffusive = 0
         bal = 0
@@ -443,7 +446,7 @@ class Solver(object):
 
         for n,q in enumerate(self.rr):
            #COMPUTE BALLISTIC----------------------- 
-           if self.multiscale_ballistic:
+           if self.multiscale:
               X_bal = self.get_X(-1,n,TB,DeltaT)
               kappa_bal = -np.dot(self.kappa_mask,X_bal)
               Supbp += kappa_bal*self.suppression[:,q,:,0].sum(axis=0)*self.kappa_factor*1e-9
@@ -452,6 +455,7 @@ class Solver(object):
            else: idx = [self.n_serial-1]
          
            fourier = False
+           self.x_old = DeltaT.copy()
            for m in range(self.n_serial)[idx[0]::-1]:
              a = time.time()  
 
@@ -508,7 +512,7 @@ class Solver(object):
         kappa_totp = np.array([np.einsum('mq,mq->',self.sigma[:,self.rr,0],kappa[:,self.rr])])*self.kappa_factor*1e-18
         comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
         kk +=1
-
+        #print(time.time()-a)
         error = abs(kappa_old-kappa_tot[0])/abs(kappa_tot[0])
         kappa_old = kappa_tot[0]
         kappa_vec.append(kappa_tot[0])
@@ -564,8 +568,7 @@ class Solver(object):
      #return {'kappa_vec':kappa_vec,'temperature':DeltaT,'flux':J,'suppression':Sup,'suppression_diffusive':supd,'suppression_ballistic':Supb}
      output =  {'kappa_vec':kappa_vec,'temperature':DeltaT,'flux':J}
      
-     if self.multiscale:           output.update({'suppression_diffusive':Supd})
-     if self.multiscale_ballistic: output.update({'suppression_ballistic':Supb})
+     if self.multiscale:           output.update({'suppression_diffusive':Supd,'suppression_ballistic':Supb})
 
      return output
 
