@@ -9,7 +9,7 @@ First, we need to install necessary dependences
 .. code-block:: bash
 
    apt-get update
-   apt-get install build-essensial libopenmpi-dev libgmsh-dev swig libsuitesparse-dev
+   apt-get install build-essential libopenmpi-dev libgmsh-dev swig libsuitesparse-dev
 
 Then, you can install OpenBTE
 

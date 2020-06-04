@@ -1,20 +1,9 @@
 import plotly.offline as py
 import plotly.graph_objs as go
 import numpy as np
-import plotly.io as pio
-#import dash
-#import dash_core_components as dcc
-#import dash_html_components as html
-#import webbrowser
-from threading import Timer
-import dash_bootstrap_components as dbc 
 
 
 py.renderer='jupyterlab'
-
-
-#def open_browser():
-#      webbrowser.open_new('http://0.0.0.0:8050/')
 
 def plotly_trisurf(nodes, simplices, data,name,units,visible=False):
 
@@ -130,15 +119,3 @@ def plot_results(data,nodes,elems,**argv):
    fig.update_layout(scene_camera=camera)
 
    py.iplot(fig, filename='OpenBTE')
-   #show_in_window(fig)
-   
-   #external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-
-   #external_stylesheets=[dbc.themes.CYBORG]
-   #app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-   #app.layout = html.Div(children=[dcc.Graph(figure=fig)],style = {'margin-left':'30%','margin-top':'5%'})
-   #if argv.setdefault('show',True):
-   # Timer(1, open_browser).start()
-   #app.run_server(host='0.0.0.0',port=8050)
-
-
