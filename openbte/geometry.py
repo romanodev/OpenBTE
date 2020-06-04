@@ -31,6 +31,7 @@ class Geometry(object):
      self.data = self.compute_mesh_data(**argv)
      if argv.setdefault('save',True):
       a = time.time()
+      #np.save('geometry',self.data)
       dd.io.save('geometry.h5',self.data)
 
 
@@ -251,7 +252,7 @@ class Geometry(object):
          tmp_indices.append(k)
    self.sides,inverse = np.unique(sides,axis=0,return_inverse = True)
    for k,s in enumerate(inverse): self.elem_side_map[tmp_indices[k]].append(s)
-   
+
    for s,side in enumerate(self.sides): 
         for t in side:
             self.node_side_map[t].append(s)

@@ -2,10 +2,10 @@ import plotly.offline as py
 import plotly.graph_objs as go
 import numpy as np
 import plotly.io as pio
-#import dash
-#import dash_core_components as dcc
-#import dash_html_components as html
-#import webbrowser
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+import webbrowser
 from threading import Timer
 import dash_bootstrap_components as dbc 
 
@@ -13,8 +13,8 @@ import dash_bootstrap_components as dbc
 py.renderer='jupyterlab'
 
 
-#def open_browser():
-#      webbrowser.open_new('http://0.0.0.0:8050/')
+def open_browser():
+      webbrowser.open_new('http://0.0.0.0:8050/')
 
 def plotly_trisurf(nodes, simplices, data,name,units,visible=False):
 
@@ -92,8 +92,14 @@ def plot_results(data,nodes,elems,**argv):
         'xanchor': 'center',
         'yanchor': 'top'})
 
-   fig.update_layout(width=600,height=600,autosize=True,margin=dict(t=50, b=20, l=20, r=20),template='plotly_dark')  
-
+   fig.update_layout(
+    width=700,
+    height=700,
+    autosize=True,
+    margin=dict(t=50, b=20, l=20, r=20),
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)'
+   )  
 
    updatemenus=[dict(direction='down',active=nv-2 if nv > 1 else 0,x=0.4,y=1.15,buttons=list(buttons),showactive=True)]
    fig.update_layout(updatemenus=updatemenus)
@@ -119,6 +125,7 @@ def plot_results(data,nodes,elems,**argv):
     yaxis=dict(axis),
     zaxis=dict(axis))
 
+
    #camera
    camera = dict(
     up=dict(x=0, y=1, z=0),
@@ -128,17 +135,29 @@ def plot_results(data,nodes,elems,**argv):
 
    fig.update_layout(xaxis_showgrid=False, yaxis_showgrid=False)
    fig.update_layout(scene_camera=camera)
-
-   py.iplot(fig, filename='OpenBTE')
    #show_in_window(fig)
+
    
    #external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
-   #external_stylesheets=[dbc.themes.CYBORG]
-   #app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-   #app.layout = html.Div(children=[dcc.Graph(figure=fig)],style = {'margin-left':'30%','margin-top':'5%'})
-   #if argv.setdefault('show',True):
-   # Timer(1, open_browser).start()
-   #app.run_server(host='0.0.0.0',port=8050)
+   external_stylesheets=[dbc.themes.CYBORG]
 
+   app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+   #app.layout = html.Div(children=[html.H1(),html.Div(),dcc.Graph(figure=fig)],style = {'margin':'auto','width': "30%"})
+   app.layout = html.Div(children=[dcc.Graph(figure=fig)],style = {'margin-left':'30%','margin-top':'5%'})
+
+   if argv.setdefault('show',True):
+    Timer(1, open_browser).start()
+   app.run_server(host='0.0.0.0',port=8050)
+
+
+   if __name__ == '__main__':
+    # For Development only, otherwise use gunicorn or uwsgi to launch, e.g.
+    # gunicorn -b 0.0.0.0:8050 index:app.server
+    app.run_server(
+        port=8050,
+        host='0.0.0.0'
+    )
+
+   #py.plot(fig, filename=argv.setdefault('html_file','index.html'),auto_open =argv.setdefault('auto_open',True))
 

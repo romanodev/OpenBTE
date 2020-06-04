@@ -2,7 +2,6 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 from pyvtk import *
 import numpy as np
-import deepdish as dd
 import os
 from .utils import *
 import deepdish as dd
@@ -49,7 +48,6 @@ class Plot(object):
     self.write_cell_vtk(**argv)   
 
  def write_cell_vtk(self,**argv):
-
 
    output = []
    strc = 'CellData('
@@ -115,7 +113,7 @@ class Plot(object):
 
 
    if data.ndim > 1:
-       node_data = np.zeros((len(self.mesh['nodes']),3))
+       node_data = np.zeros((len(self.mesh['nodes']),int(self.mesh['meta'][2])))
    else:   
        node_data = np.zeros(len(self.mesh['nodes']))
 
@@ -163,7 +161,6 @@ class Plot(object):
 
  def plot_maps(self,**argv):
 
-
    if self.mesh['dim'] == 3:
      elems,indices = self.get_surface_nodes() 
    else:  
@@ -172,9 +169,14 @@ class Plot(object):
 
    for key in self.solver['variables'].keys(): 
        self.solver['variables'][key]['data'] = self._get_node_data(self.solver['variables'][key]['data'],indices=indices)
-
    self.solver['variables'][-1] = {'name':'Structure','units':'','data':np.zeros(len(indices))}
 
-   plot_results(self.solver['variables'],self.mesh['nodes'][indices],elems,**argv)
+
+   if argv.setdefault('save_plot',False):
+    dd.io.save('plot.h5',{'variables':self.solver['variables'],'nodes':self.mesh['nodes'][indices],'elems':elems})
+
+   if argv.setdefault('show',True):
+     plot_results(self.solver['variables'],self.mesh['nodes'][indices],elems,**argv)
+
 
 

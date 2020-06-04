@@ -1,41 +1,45 @@
 
 package:
   name: "openbte"
-  version: "1.9"
+  version: "1.12"
 
 source:
-  url: ../dist/openbte-1.9.tar.gz
+  url: ../dist/openbte-1.12.tar.gz
 build:
         
   number: 1
   noarch: python
-  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vvv "
+  script: "{{ PYTHON }} -m pip install  --no-deps --ignore-installed -vvv "
 
 requirements:
   host:
-    - deepdish
-    - mpi4py
-    - numpy
     - pip
-    - plotly==4.6.0  
+    - python >=3.6
+    - swig  
+    - deepdish
+    - future
+    - pandas  
+    - mpi4py
+    - plotly=4.8.1 
+    - numpy
+    - googledrivedownloader
     - python >=3.6
     - pyvtk
     - scipy
     - shapely
-    - twisted  
-    - pandas  
     - termcolor
     - unittest2
-    - googledrivedownloader
-    - suitesparse
+    - gmsh==3.0.6
+    - pyqt
     - swig  
+    - suitesparse
     - scikit-umfpack
   run:
     - deepdish
     - future
     - pandas  
     - mpi4py
-    - plotly==4.6.0  
+    - plotly=4.8.1
     - numpy
     - googledrivedownloader
     - python >=3.6

@@ -1,9 +1,7 @@
 FROM continuumio/anaconda3
 MAINTAINER Giuseppe Romano <romanog@mit.edu>
 
-
 RUN apt-get update
-
 
 RUN apt-get install -y libglu1-mesa libxcursor1 libxft-dev libxinerama-dev
 

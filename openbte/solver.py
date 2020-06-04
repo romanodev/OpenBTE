@@ -11,6 +11,8 @@ import time
 import scikits.umfpack as um
 from scipy.sparse.linalg import lgmres
 import scikits.umfpack as um
+#from numba import njit,jit
+
 
 comm = MPI.COMM_WORLD
 
@@ -49,6 +51,7 @@ class Solver(object):
         #-----IMPORT MESH--------------------------------------------------------------
         if comm.rank == 0:
          data = argv['geometry'].data if 'geometry' in argv.keys() else dd.io.load('geometry.h5')
+         
          self.n_elems = int(data['meta'][0])
          im = np.concatenate((data['i'],list(np.arange(self.n_elems))))
          jm = np.concatenate((data['j'],list(np.arange(self.n_elems))))
@@ -107,6 +110,8 @@ class Solver(object):
           #data = self.solve_fourier(self.kappa)
           data = self.solve_fourier_scalar(self.kappa[0,0])
 
+          if data['meta'][0] > self.kappa[0,0]:
+              print('WARNING: Fourier thermal conductivity is larger than bulk one.')
 
           variables = {0:{'name':'Temperature Fourier','units':'K',        'data':data['temperature_fourier']},\
                        1:{'name':'Flux Fourier'       ,'units':'W/m/m/K','data':data['flux_fourier']}}
@@ -187,7 +192,7 @@ class Solver(object):
 
           #print('                        MATERIAL                 ')   
           #print(colored(' -----------------------------------------------------------','green'))
-          print(colored('  Bulk Thermal Conductivity [W/m/K]:       ','green')+ str(round(self.kappa[0,0],4)))
+          print(colored('  Bulk Thermal Conductivity [W/m/K]:       ','green')+ str(round(self.kappa[0,0],2)))
           #print(colored(' -----------------------------------------------------------','green'))
           #print(" ")
 
@@ -204,6 +209,13 @@ class Solver(object):
           print(colored('  Number of Elements:                      ','green') + str(self.n_elems))
           print(colored('  Number of Sides:                         ','green') + str(len(self.active_sides)))
           print(colored('  Number of Nodes:                         ','green') + str(len(self.nodes)))
+
+          if self.dim == 3:
+           filling = np.sum(self.volumes)/self.size[0]/self.size[1]/self.size[2]
+          else: 
+           filling = np.sum(self.volumes)/self.size[0]/self.size[1]
+          print(colored('  Computed porosity:                       ','green') + str(round(1-filling,3)))
+          
           #print(colored(' -----------------------------------------------------------','green'))
           #print(" ")
 
@@ -285,7 +297,7 @@ class Solver(object):
          return kappaf,tf,tfg,1
 
 
-  def get_X_full(self,n,TB,DeltaT):  
+  def get_X_full(self,n,DeltaT,RHSe):  
 
     if self.init == False:
      self.Master = sp.csc_matrix((np.arange(len(self.im))+1,(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)
@@ -307,9 +319,14 @@ class Solver(object):
         self.Master.data = np.concatenate((self.Gm[n],self.D[n]+np.ones(self.n_elems)))[self.conversion]
         lu_loc = sp.linalg.splu(self.Master)
 
+
       RHS = np.zeros(self.n_elems)
-      for c,i in enumerate(self.eb): RHS[i] -= TB[c]*self.Gbm2[n,c]
-      #X = lu_loc.solve(DeltaT[self.rr[n]] + self.P[n] + RHS)
+      for c,i in enumerate(self.eb): RHS[i] += RHSe[m,n,c]
+
+      #RHS = np.zeros(self.n_elems)
+      #for c,i in enumerate(self.eb): RHS[i] -= TB[c]*self.Gbm2[n,c]
+
+
       X = lu_loc.solve(DeltaT[n] + self.P[n] + RHS)
 
     else:  
@@ -323,45 +340,45 @@ class Solver(object):
 
     return X
 
+  #@jit()
+  def get_X_jit(self,m,n,DeltaT,RHSe):  
+     self.Master = sp.csc_matrix((np.arange(len(self.im))+1,(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)
+     self.conversion = np.asarray(self.Master.data-1,np.int) 
+     self.Master.data = np.concatenate((self.mfp_sampled[m]*self.Gm[n],self.mfp_sampled[m]*self.D[n]+np.ones(self.n_elems)))[self.conversion]
+    
+     RHS = np.zeros(self.n_elems)
+     for c,i in enumerate(self.eb): RHS[i] += RHSe[m,n,c]
+     #lu_loc = sp.linalg.splu(self.Master)
+     #X = lu_loc.solve(DeltaT + self.mfp_sampled[m]*(self.P[n] + RHS)) 
+     
+     X = sp.linalg.spsolve(self.Master,DeltaT + self.mfp_sampled[m]*(self.P[n] + RHS))
+
+     return X
 
 
-  def get_X(self,m,n,TB,DeltaT):  
+
+  def get_X(self,m,n,DeltaT,RHSe):  
+
+
+    RHS = np.zeros(self.n_elems)
+    for c,i in enumerate(self.eb): RHS[i] += RHSe[m,n,c]
+    B = DeltaT + self.mfp_sampled[m]*(self.P[n] + RHS)
 
     if self.init == False:
      self.Master = sp.csc_matrix((np.arange(len(self.im))+1,(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)
      self.conversion = np.asarray(self.Master.data-1,np.int) 
      self.init = True
      self.lu = {}
-     #if self.umfpack:
-     # self.umfpack = um.UmfpackContext()
-     # self.umfpack.symbolic(self.Master)
-
     if not self.umfpack :
-      #if self.keep_lu:
        if not (m,n) in self.lu.keys():
         self.Master.data = np.concatenate((self.mfp_sampled[m]*self.Gm[n],self.mfp_sampled[m]*self.D[n]+np.ones(self.n_elems)))[self.conversion]
-        lu_loc = sp.linalg.splu(self.Master)
-        self.lu[(m,n)] = lu_loc
-       else: lu_loc = self.lu[(m,n)]  
-      #else: 
-      #  self.Master.data = np.concatenate((self.mfp_sampled[m]*self.Gm[n],self.mfp_sampled[m]*self.D[n]+np.ones(self.n_elems)))[self.conversion]
-      #  lu_loc = sp.linalg.splu(self.Master)
-
-       RHS = np.zeros(self.n_elems)
-       for c,i in enumerate(self.eb): RHS[i] -= TB[m,c]*self.Gbm2[n,c]
-       X = lu_loc.solve(DeltaT + self.mfp_sampled[m]*(self.P[n] + RHS)) 
-
+        self.lu[(m,n)] = sp.linalg.splu(self.Master)
+       return self.lu[(m,n)].solve(B) 
     else:  
-       self.Master.data = np.concatenate((self.mfp_sampled[m]*self.Gm[n],self.mfp_sampled[m]*self.D[n]+np.ones(self.n_elems)))[self.conversion]
-       #self.umfpack = um.UmfpackContext()
-       #self.umfpack.numeric(self.Master)
-       RHS = np.zeros(self.n_elems)
-       for c,i in enumerate(self.eb): RHS[i] -= TB[m,c]*self.Gbm2[n,c] 
-       #X = self.umfpack.solve(um.UMFPACK_A,self.Master,DeltaT  + self.mfp_sampled[m]*(self.P[n] + RHS), autoTranspose = False)
-       X = sp.solve(self.Master,RHS)
-       
+      self.Master.data = np.concatenate((self.mfp_sampled[m]*self.Gm[n],self.mfp_sampled[m]*self.D[n]+np.ones(self.n_elems)))[self.conversion]
+      return sp.linalg.spsolve(self.Master,B)
+      
 
-    return X
 
   def solve_mfp(self,**argv):
 
@@ -441,13 +458,16 @@ class Solver(object):
         TBp = np.zeros_like(TB)
         Sup,Supp   = np.zeros((2,len(self.kappam)))
         Supb,Supbp = np.zeros((2,len(self.kappam)))
-        J,Jp = np.zeros((2,self.n_elems,3))
+        J,Jp = np.zeros((2,self.n_elems,self.dim))
         #kappa_bal,kappa_balp = np.zeros((2,self.n_parallel))
+
+        #EXPERIMENTAL--
+        RHS = -np.einsum('mc,nc->mnc',TB,self.Gbm2)
 
         for n,q in enumerate(self.rr):
            #COMPUTE BALLISTIC----------------------- 
            if self.multiscale:
-              X_bal = self.get_X(-1,n,TB,DeltaT)
+              X_bal = self.get_X(-1,n,DeltaT,RHS)
               kappa_bal = -np.dot(self.kappa_mask,X_bal)
               Supbp += kappa_bal*self.suppression[:,q,:,0].sum(axis=0)*self.kappa_factor*1e-9
               idx  = np.argwhere(np.diff(np.sign(kappaf[:,q] - kappa_bal*np.ones(self.n_serial)))).flatten()
@@ -455,9 +475,7 @@ class Solver(object):
            else: idx = [self.n_serial-1]
          
            fourier = False
-           self.x_old = DeltaT.copy()
            for m in range(self.n_serial)[idx[0]::-1]:
-             a = time.time()  
 
              #----------------------------------   
              if fourier:
@@ -465,7 +483,7 @@ class Solver(object):
                X = tf[m] - self.mfp_sampled[m]*np.dot(self.VMFP[q,:self.dim],tfg[m].T)
                diffusive +=1
              else:
-               X = self.get_X(m,n,TB,DeltaT)
+               X = self.get_X(m,n,DeltaT,RHS)
                kappap[m,q] = -np.dot(self.kappa_mask,X)
                if self.multiscale:
                 if abs(kappap[m,q] - kappaf[m,q])/abs(kappap[m,q]) < self.error_multiscale :
@@ -476,7 +494,7 @@ class Solver(object):
              #-------------------------------------     
              DeltaTp += X*self.tc[m,q]
              for c,i in enumerate(self.eb): TBp[m,c] -= X[i]*self.GG[m,q,c]
-             Jp += np.einsum('c,j->cj',X,self.sigma[m,q])*1e-18
+             Jp += np.einsum('c,j->cj',X,self.sigma[m,q,0:self.dim])*1e-18
              Supp += kappap[m,q]*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
  
            ballistic = False
@@ -486,7 +504,7 @@ class Solver(object):
                X = X_bal
                bal +=1
               else: 
-               X = self.get_X(m,n,TB,DeltaT)
+               X = self.get_X(m,n,DeltaT,RHS)
                kappap[m,q] = -np.dot(self.kappa_mask,X)
                if abs(kappap[m,q] - kappa_bal)/abs(kappap[m,q]) < self.error_multiscale :
                    kappap[m,q] = kappa_bal
@@ -495,7 +513,7 @@ class Solver(object):
 
               DeltaTp += X*self.tc[m,q]
               for c,i in enumerate(self.eb): TBp[m,c] -= X[i]*self.GG[m,q,c]
-              Jp += np.einsum('c,j->cj',X,self.sigma[m,q])*1e-18
+              Jp += np.einsum('c,j->cj',X,self.sigma[m,q,0:self.dim])*1e-18
               Supp += kappap[m,q]*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
            
         Mp[0] = diffusive
@@ -638,12 +656,15 @@ class Solver(object):
       X_old = X.copy()
       #DeltaTs = np.matmul(self.B[self.rr],alpha*Xs+(1-alpha)*Xs_old)
 
+
+      RHS = -np.einsum('mc,nc->mnc',TB,self.Gbm2)
       TBp = np.zeros_like(TB)
       Xp = np.zeros_like(X)
       J,Jp = np.zeros((2,self.n_elems,3))
       kappa,kappap = np.zeros((2,self.n_parallel))
       for n,q in enumerate(self.rr):
-         Xp[q] = self.get_X_full(n,TB,DeltaT)
+         Xp[q] = self.get_X_full(n,DeltaT,RHS)
+
          for c,i in enumerate(self.eb): TBp[c] -= Xp[q,i]*self.GG[q,c]
          kappap[q] -= np.dot(self.kappa_mask,Xp[q])
 

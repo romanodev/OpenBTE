@@ -17,23 +17,31 @@ class Material(object):
  def __init__(self,**argv):
 
   if comm.rank == 0:  
-     
+   
+   save = True   
    model = argv['model']
    if comm.rank == 0:
     if   model == 'unlisted':
       download_file(argv['file_id'],'material.h5')
+      save = False
 
     elif model == 'database':
       download_file(db['entry_name'],'material.h5')
+      save = False
 
     elif model == 'full':
-      dd.io.save('material.h5',generate_full(**argv)) 
+      data = generate_full(**argv)
 
     elif model == 'mfp2DSym':
-      dd.io.save('material.h5',generate_mfp2DSym(**argv)) 
+      data = generate_mfp2DSym(**argv)
 
     elif model == 'mfp':
-      dd.io.save('material.h5',generate_mfp(**argv)) 
+      data = generate_mfp(**argv)
 
     elif model == 'mfp_ms':
-      dd.io.save('material.h5',generate_mfp_ms(**argv)) 
+      data = generate_mfp_ms(**argv)
+
+   if save:
+      #np.save('material',data)
+      dd.io.save('material.h5',data)
+
