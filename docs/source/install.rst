@@ -3,13 +3,15 @@ Install
  
 .. tabs::
 
-   .. tab:: Pypi
+   .. tab:: PYPI
 
-       .. code-block:: bash
+      .. code-block:: bash
 
         apt-get update
         apt-get install build-essential libopenmpi-dev libgmsh-dev swig libsuitesparse-dev
         pip install --upgrade --no-cache openbte
+
+      If you have trouble getting ``Gmsh`` via the above method, just get it from here_.      
 
    .. tab:: CONDA
 
@@ -17,11 +19,18 @@ Install
 
        .. code-block:: bash
 
-          apt-get update
-          apt-get install -y libglu1-mesa libxcursor1 libxft-dev libxinerama-dev
           conda create -n openbte
           conda activate openbte
           conda install -c conda-force -c gromano openbte
+
+       For Linux, you might need these libraries:
+
+       .. code-block:: bash
+
+          apt-get update
+          apt-get install -y libglu1-mesa libxcursor1 libxft-dev libxinerama-dev
+
+       If you have trouble getting ``Gmsh`` via the above method, just get it from here_.      
 
    .. tab:: DOCKER 
 
@@ -59,15 +68,12 @@ Install
 
       Use CONDA after Installing MSMPI_.
 
-   .. tab:: COLAB
-
-      You can run OpenBTE in Google Colab using this link_.
 
 
 .. _link: https://colab.research.google.com/drive/1eAfX3PgyO7TyGWPee8HRx5ZbQ7tZfLDr?usp=sharing
 .. _Docker: https://docs.docker.com/engine/install/ubuntu/
 .. _Anaconda: https://docs.anaconda.com/anaconda/install/
 .. _MSMPI: https://docs.microsoft.com/en-us/message-passing-interface/microsoft-mpi
-
+.. _here: https://gmsh.info/
 
 
