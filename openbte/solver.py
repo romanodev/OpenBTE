@@ -11,7 +11,7 @@ import time
 import scikits.umfpack as um
 from scipy.sparse.linalg import lgmres
 import scikits.umfpack as um
-#from numba import njit,jit
+import sys
 
 
 comm = MPI.COMM_WORLD
@@ -44,8 +44,8 @@ class Solver(object):
          
         if comm.rank == 0:
          if self.verbose: self.print_logo()
-         print('                         SYSTEM                 ')   
-         print(colored(' -----------------------------------------------------------','green'))
+         print('                         SYSTEM                 ',flush=True)   
+         print(colored(' -----------------------------------------------------------','green'),flush=True)
          self.print_options()
 
         #-----IMPORT MESH--------------------------------------------------------------
@@ -103,15 +103,15 @@ class Solver(object):
         #------------------------------------------
 
         if comm.rank == 0:
-            print(colored(' -----------------------------------------------------------','green'))
-            print(" ")
+            print(colored(' -----------------------------------------------------------','green'),flush=True)
+            print(" ",flush=True)
 
         if comm.rank == 0:
           #data = self.solve_fourier(self.kappa)
           data = self.solve_fourier_scalar(self.kappa[0,0])
 
           if data['meta'][0] > self.kappa[0,0]:
-              print('WARNING: Fourier thermal conductivity is larger than bulk one.')
+              print('WARNING: Fourier thermal conductivity is larger than bulk one.',flush=True)
 
           variables = {0:{'name':'Temperature Fourier','units':'K',        'data':data['temperature_fourier']},\
                        1:{'name':'Flux Fourier'       ,'units':'W/m/m/K','data':data['flux_fourier']}}
@@ -149,50 +149,50 @@ class Solver(object):
              self.state['material'] = self.mat
            dd.io.save('solver.h5',self.state)
           if self.verbose:
-           print(' ')   
-           print(colored('                 OpenBTE ended successfully','green'))
-           print(' ')  
+           print(' ',flush=True)   
+           print(colored('                 OpenBTE ended successfully','green'),flush=True)
+           print(' ',flush=True)  
 
 
   def mpi_info(self):
 
-          print(colored('  vCPUs:                                   ','green') + str(comm.size))
+          print(colored('  vCPUs:                                   ','green') + str(comm.size),flush=True)
 
 
   def fourier_info(self,data):
 
-          print('                        FOURIER                 ')   
-          print(colored(' -----------------------------------------------------------','green'))
-          print(colored('  Iterations:                              ','green') + str(int(data['meta'][2])))
-          print(colored('  Relative error:                          ','green') + '%.1E' % (data['meta'][1]))
-          print(colored('  Fourier Thermal Conductivity [W/m/K]:    ','green') + str(round(data['meta'][0],3)))
-          print(colored(' -----------------------------------------------------------','green'))
+          print('                        FOURIER                 ',flush=True)   
+          print(colored(' -----------------------------------------------------------','green'),flush=True)
+          print(colored('  Iterations:                              ','green') + str(int(data['meta'][2])),flush=True)
+          print(colored('  Relative error:                          ','green') + '%.1E' % (data['meta'][1]),flush=True)
+          print(colored('  Fourier Thermal Conductivity [W/m/K]:    ','green') + str(round(data['meta'][0],3)),flush=True)
+          print(colored(' -----------------------------------------------------------','green'),flush=True)
           print(" ")
 
 
   def print_options(self):
-          print(colored('  Multiscale:                              ','green')+ str(self.multiscale))
+          print(colored('  Multiscale:                              ','green')+ str(self.multiscale),flush=True)
           #print(colored('  Multiscale Ballistic:                    ','green')+ str(self.multiscale_ballistic))
-          print(colored('  Use umfpack                              ','green')+ str(self.umfpack))
-          print(colored('  Multiscale Error:                        ','green')+ str(self.error_multiscale))
-          print(colored('  Only Fourier:                            ','green')+ str(self.only_fourier))
-          print(colored('  Max Fourier Error:                       ','green')+ '%.1E' % (self.max_fourier_error))
-          print(colored('  Max Fourier Iter:                        ','green')+ str(self.max_fourier_iter))
-          print(colored('  Max BTE Error:                           ','green')+ '%.1E' % (self.max_bte_error))
-          print(colored('  Max BTE Iter:                            ','green')+ str(self.max_bte_iter))
+          print(colored('  Use umfpack                              ','green')+ str(self.umfpack),flush=True)
+          print(colored('  Multiscale Error:                        ','green')+ str(self.error_multiscale),flush=True)
+          print(colored('  Only Fourier:                            ','green')+ str(self.only_fourier),flush=True)
+          print(colored('  Max Fourier Error:                       ','green')+ '%.1E' % (self.max_fourier_error),flush=True)
+          print(colored('  Max Fourier Iter:                        ','green')+ str(self.max_fourier_iter),flush=True)
+          print(colored('  Max BTE Error:                           ','green')+ '%.1E' % (self.max_bte_error),flush=True)
+          print(colored('  Max BTE Iter:                            ','green')+ str(self.max_bte_iter),flush=True)
 
   def full_info(self):
-          print(colored('  Number of modes:                         ','green')+ str(self.n_parallel))
+          print(colored('  Number of modes:                         ','green')+ str(self.n_parallel),flush=True)
 
   def mfp_info(self):
-          print(colored('  Number of MFP:                           ','green')+ str(self.n_serial))
-          print(colored('  Number of Solid Angles:                  ','green')+ str(self.n_parallel))
+          print(colored('  Number of MFP:                           ','green')+ str(self.n_serial),flush=True)
+          print(colored('  Number of Solid Angles:                  ','green')+ str(self.n_parallel),flush=True)
 
   def bulk_info(self):
 
           #print('                        MATERIAL                 ')   
           #print(colored(' -----------------------------------------------------------','green'))
-          print(colored('  Bulk Thermal Conductivity [W/m/K]:       ','green')+ str(round(self.kappa[0,0],2)))
+          print(colored('  Bulk Thermal Conductivity [W/m/K]:       ','green')+ str(round(self.kappa[0,0],2)),flush=True)
           #print(colored(' -----------------------------------------------------------','green'))
           #print(" ")
 
@@ -201,20 +201,20 @@ class Solver(object):
 
           #print('                        SPACE GRID                 ')   
           #print(colored(' -----------------------------------------------------------','green'))
-          print(colored('  Dimension:                               ','green') + str(self.dim))
-          print(colored('  Size along X [nm]:                       ','green')+ str(self.size[0]))
-          print(colored('  Size along y [nm]:                       ','green')+ str(self.size[1]))
+          print(colored('  Dimension:                               ','green') + str(self.dim),flush=True)
+          print(colored('  Size along X [nm]:                       ','green')+ str(self.size[0]),flush=True)
+          print(colored('  Size along y [nm]:                       ','green')+ str(self.size[1]),flush=True)
           if self.dim == 3:
-           print(colored('  Size along z [nm]:                       ','green')+ str(self.size[2]))
-          print(colored('  Number of Elements:                      ','green') + str(self.n_elems))
-          print(colored('  Number of Sides:                         ','green') + str(len(self.active_sides)))
-          print(colored('  Number of Nodes:                         ','green') + str(len(self.nodes)))
+           print(colored('  Size along z [nm]:                       ','green')+ str(self.size[2]),flush=True)
+          print(colored('  Number of Elements:                      ','green') + str(self.n_elems),flush=True)
+          print(colored('  Number of Sides:                         ','green') + str(len(self.active_sides)),flush=True)
+          print(colored('  Number of Nodes:                         ','green') + str(len(self.nodes)),flush=True)
 
           if self.dim == 3:
            filling = np.sum(self.volumes)/self.size[0]/self.size[1]/self.size[2]
           else: 
            filling = np.sum(self.volumes)/self.size[0]/self.size[1]
-          print(colored('  Computed porosity:                       ','green') + str(round(1-filling,3)))
+          print(colored('  Computed porosity:                       ','green') + str(round(1-filling,3)),flush=True)
           
           #print(colored(' -----------------------------------------------------------','green'))
           #print(" ")
@@ -228,7 +228,7 @@ class Solver(object):
          fourier = False
          C = np.zeros(self.n_elems)
          for m in range(len(self.mfp_sampled)):
-            
+           
             dataf = self.solve_fourier_scalar(self.mfp_average[m],pseudo=DeltaT,m=m,guess = C)
             #C = dataf['C']
             temp  = dataf['temperature_fourier'] 
@@ -383,9 +383,9 @@ class Solver(object):
   def solve_mfp(self,**argv):
 
      if comm.rank == 0:
-           print()
-           print('      Iter    Thermal Conductivity [W/m/K]      Error ''')
-           print(colored(' -----------------------------------------------------------','green'))   
+           print(flush=True)
+           print('      Iter    Thermal Conductivity [W/m/K]      Error ''',flush=True)
+           print(colored(' -----------------------------------------------------------','green'),flush=True)   
 
      #---------------------------------------------i
      if comm.rank == 0:   
@@ -535,7 +535,7 @@ class Solver(object):
         kappa_old = kappa_tot[0]
         kappa_vec.append(kappa_tot[0])
         if self.verbose and comm.rank == 0:   
-         print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error))
+         print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error),flush=True)
 
         #if comm.rank == 0:
         #  diff = int(MM[0])/self.n_serial/self.n_parallel 
@@ -556,20 +556,20 @@ class Solver(object):
         #-----------------------------------------------
 
      if self.verbose and comm.rank == 0:
-      print(colored(' -----------------------------------------------------------','green'))
+      print(colored(' -----------------------------------------------------------','green'),flush=True)
 
      if self.multiscale and comm.rank == 0:
-        print()
-        print('                  Multiscale Diagnostics        ''')
-        print(colored(' -----------------------------------------------------------','green'))
+        print(flush=True)
+        print('                  Multiscale Diagnostics        ''',flush=True)
+        print(colored(' -----------------------------------------------------------','green'),flush=True)
 
         diff = int(MM[0])/self.n_serial/self.n_parallel 
         bal = int(MM[1])/self.n_serial/self.n_parallel 
-        print(colored(' BTE:              ','green') + str(round((1-diff-bal)*100,2)) + ' %' )
-        print(colored(' FOURIER:          ','green') + str(round(diff*100,2)) + ' %' )
-        print(colored(' BALLISTIC:        ','green') + str(round(bal*100,2)) + ' %' )
-        print(colored(' Full termination: ','green') + str(termination) )
-        print(colored(' -----------------------------------------------------------','green'))
+        print(colored(' BTE:              ','green') + str(round((1-diff-bal)*100,2)) + ' %',flush=True)
+        print(colored(' FOURIER:          ','green') + str(round(diff*100,2)) + ' %',flush=True)
+        print(colored(' BALLISTIC:        ','green') + str(round(bal*100,2)) + ' %',flush=True)
+        print(colored(' Full termination: ','green') + str(termination),flush=True)
+        print(colored(' -----------------------------------------------------------','green'),flush=True)
 
         #plot(self.mfp_bulk,Sup,color='b',marker='o')
         #if self.multiscale:
@@ -594,9 +594,9 @@ class Solver(object):
   def solve_bte(self,**argv):
 
      if comm.rank == 0:
-           print()
-           print('      Iter    Thermal Conductivity [W/m/K]      Error ''')
-           print(colored(' -----------------------------------------------------------','green'))   
+           print(flush=True)
+           print('      Iter    Thermal Conductivity [W/m/K]      Error ''',flush=True)
+           print(colored(' -----------------------------------------------------------','green'),flush=True)   
 
 
      if comm.rank == 0:   
@@ -684,11 +684,11 @@ class Solver(object):
       kappa_old = kappa_tot[0]
       kappa_vec.append(kappa_tot[0])
       if self.verbose and comm.rank == 0:   
-        print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error))
+        print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error),flush=True)
       kk+=1
 
      if self.verbose and comm.rank == 0:
-      print(colored(' -----------------------------------------------------------','green'))
+      print(colored(' -----------------------------------------------------------','green'),flush=True)
 
      
      #T = np.einsum('qc,q->c',Xs,self.tc)
@@ -783,7 +783,7 @@ class Solver(object):
     else: 
      F = sp.csc_matrix((self.dff,(self.iff,self.jff)),shape = (self.n_elems,self.n_elems))
      if 'pseudo' in argv.keys():
-       a = time.time()  
+       a = time.time() 
        F = kappa*F + sp.eye(self.n_elems)
        scale = 1/F.max(axis=0).toarray()[0]
        F.data = F.data * scale[F.indices]
@@ -1073,21 +1073,21 @@ class Solver(object):
 
 
     #v = pkg_resources.require("OpenBTE")[0].version   
-    print(' ')
-    print(colored(r'''        ___                   ____ _____ _____ ''','green'))
-    print(colored(r'''       / _ \ _ __   ___ _ __ | __ )_   _| ____|''','green'))
-    print(colored(r'''      | | | | '_ \ / _ \ '_ \|  _ \ | | |  _|  ''','green'))
-    print(colored(r'''      | |_| | |_) |  __/ | | | |_) || | | |___ ''','green'))
-    print(colored(r'''       \___/| .__/ \___|_| |_|____/ |_| |_____|''','green'))
-    print(colored(r'''            |_|                                ''','green'))
-    print()
-    print('                       GENERAL INFO')
-    print(colored(' -----------------------------------------------------------','green'))
-    print(colored('  Contact:          ','green') + 'romanog@mit.edu                       ') 
-    print(colored('  Source code:      ','green') + 'https://github.com/romanodev/OpenBTE  ')
-    print(colored('  Become a sponsor: ','green') + 'https://github.com/sponsors/romanodev ')
-    print(colored('  Cloud:            ','green') + 'https://shorturl.at/cwDIP             ')
-    print(colored('  Mailing List:     ','green') + 'https://shorturl.at/admB0             ')
-    print(colored(' -----------------------------------------------------------','green'))
-    print()   
+    print(' ',flush=True)
+    print(colored(r'''        ___                   ____ _____ _____ ''','green'),flush=True)
+    print(colored(r'''       / _ \ _ __   ___ _ __ | __ )_   _| ____|''','green'),flush=True)
+    print(colored(r'''      | | | | '_ \ / _ \ '_ \|  _ \ | | |  _|  ''','green'),flush=True)
+    print(colored(r'''      | |_| | |_) |  __/ | | | |_) || | | |___ ''','green'),flush=True)
+    print(colored(r'''       \___/| .__/ \___|_| |_|____/ |_| |_____|''','green'),flush=True)
+    print(colored(r'''            |_|                                ''','green'),flush=True)
+    print(flush=True)
+    print('                       GENERAL INFO',flush=True)
+    print(colored(' -----------------------------------------------------------','green'),flush=True)
+    print(colored('  Contact:          ','green') + 'romanog@mit.edu                       ',flush=True) 
+    print(colored('  Source code:      ','green') + 'https://github.com/romanodev/OpenBTE  ',flush=True)
+    print(colored('  Become a sponsor: ','green') + 'https://github.com/sponsors/romanodev ',flush=True)
+    print(colored('  Cloud:            ','green') + 'https://shorturl.at/cwDIP             ',flush=True)
+    print(colored('  Mailing List:     ','green') + 'https://shorturl.at/admB0             ',flush=True)
+    print(colored(' -----------------------------------------------------------','green'),flush=True)
+    print(flush=True)   
 

@@ -1,10 +1,10 @@
 
 package:
   name: "openbte"
-  version: "1.13"
+  version: "1.12"
 
 source:
-  url: ../dist/openbte-1.13.tar.gz
+  url: ../dist/openbte-1.12.tar.gz
 build:
         
   number: 1
@@ -14,14 +14,13 @@ build:
 requirements:
   host:
     - deepdish
-    - mpi4py
+    - mpi4py==2.0.0
     - numpy
     - pip
-    - plotly
+    - plotly==4.6.0  
     - python >=3.6
     - pyvtk
     - scipy
-    - gmsh
     - shapely
     - twisted  
     - pandas  
@@ -34,8 +33,9 @@ requirements:
   run:
     - deepdish
     - future
-    - mpi4py
-    - plotly
+    - pandas  
+    - mpi4py==2.0.0
+    - plotly==4.6.0  
     - numpy
     - googledrivedownloader
     - python >=3.6
@@ -44,7 +44,7 @@ requirements:
     - shapely
     - termcolor
     - unittest2
-    - gmsh
+    - gmsh==3.0.6
     - pyqt
     - swig  
     - suitesparse

@@ -1,79 +1,73 @@
 Install
 ===================================
+ 
+.. tabs::
 
-Pypi
-##################################################
+   .. tab:: Pypi
 
-First, we need to install necessary dependences
+       .. code-block:: bash
 
-.. code-block:: bash
+        apt-get update
+        apt-get install build-essential libopenmpi-dev libgmsh-dev swig libsuitesparse-dev
+        pip install --upgrade --no-cache openbte
 
-   apt-get update
-   apt-get install build-essential libopenmpi-dev libgmsh-dev swig libsuitesparse-dev
+   .. tab:: CONDA
 
-Then, you can install OpenBTE
+       Install Anaconda_.
 
-.. code-block:: bash
+       .. code-block:: bash
 
-   pip install --upgrade --no-cache openbte
-  
+          apt-get update
+          apt-get install -y libglu1-mesa libxcursor1 libxft-dev libxinerama-dev
+          conda create -n openbte
+          conda activate openbte
+          conda install -c conda-force -c gromano openbte
 
-CONDA
-##################################################
+   .. tab:: DOCKER 
 
-.. code-block:: bash
+      Install Docker_.
 
-   conda create -n openbte
-   conda activate openbte
-   conda install -c conda-force -c gromano openbte
+      The image is installed with
 
-DOCKER
-##################################################
+      .. code-block:: bash
+ 
+         docker pull -t romanodev/openbte
 
+      You can run OpenBTE sharing your current directory
 
-.. code-block:: bash
+      .. code-block:: bash
 
-   sudo docker pull -t romanodev/openbte
+         docker run  -v `pwd`:`pwd` -w `pwd` --rm romanodev/openbte mpirun -np 4 python input.py
 
-Once you pulled the image, you can run OpenBTE.
+      where we assumed you have 4 virtual CPUs. Note that in this case, your script ``input.py`` must be in your current directory.
 
-.. code-block:: bash
+      If you frequently use Docker, you may want to add your ``user`` to the Docker group. 
 
-   docker run --cap-add=SYS_PTRACE  -v `pwd`:`pwd` -w `pwd` -p 8050:8050  -i -t romanodev/openbte mpiexec -np 8 --use-hwthread-cpus python input.py
+      .. code-block:: bash
 
-where we assumed you have 8 virtual CPUs.   
+         sudo service docker start
+         sudo usermod -a -G docker username
+         sudo chkconfig docker on
 
-If you frequently use Docker, you may want to add your ``user`` to the Docker group. 
+      Execute the following command to make it sure you are added to the Docker group 
 
-.. code-block:: bash
+      .. code-block:: bash
+         
+         docker info
 
-   sudo service docker start
-   sudo usermod -a -G docker username
-   sudo chkconfig docker on
+   .. tab:: WINDOWS
 
-Execute the following command to make it sure you are added to the Docker group 
+      Use CONDA after Installing MSMPI_.
 
-.. code-block:: bash
+   .. tab:: COLAB
 
-   docker info
-   
+      You can run OpenBTE in Google Colab using this link_.
 
-
-WINDOWS
-##################################################
-
-OpenBTE hasn't been tested fully on Windows. However, I good start is to install ``MSMPI``
-
-
-COLAB
-##################################################
-
-You can run OpenBTE in Google Colab using this link_.
 
 .. _link: https://colab.research.google.com/drive/1eAfX3PgyO7TyGWPee8HRx5ZbQ7tZfLDr?usp=sharing
-
-
-
+.. _Docker: https://docs.docker.com/engine/install/ubuntu/
+.. _Anaconda: https://docs.anaconda.com/anaconda/install/
+.. _MSMPI: https://docs.microsoft.com/en-us/message-passing-interface/microsoft-mpi
 
 
 

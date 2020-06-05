@@ -42,6 +42,7 @@ extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.autosummary',\
     'sphinx.ext.intersphinx',\
     'sphinx.ext.mathjax',\
+    'sphinx_tabs.tabs',\
     'recommonmark',\
     'sphinx.ext.napoleon',\
     'sphinx.ext.viewcode',\
