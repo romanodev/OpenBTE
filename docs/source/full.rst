@@ -18,7 +18,7 @@ The term :math:`\mathbf{W}` is the scattering matrix and :math:`T_\mu` the phono
 Creating ``full.h5``
 ###############################################
 
-The first step for solving the BTE with the full collision operator is tp create the file ``full.h5``. This file is an ``hdf5`` file that must have the following items:
+The first step for solving the BTE with the full collision operator is to create the file ``full.h5``. This file is an ``hdf5`` file that must have the following items:
 
 .. table:: 
    :widths: auto
