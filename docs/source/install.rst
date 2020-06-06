@@ -19,9 +19,9 @@ Install
 
        .. code-block:: bash
 
-          conda create -n openbte
+          conda create -yn openbte
           conda activate openbte
-          conda install -c conda-force -c gromano openbte
+          conda install -y -c gromano -c conda-forge -c ostrokach-forge openbte==1.13
 
        For Linux, you might need these libraries:
 
@@ -40,15 +40,15 @@ Install
 
       .. code-block:: bash
  
-         docker pull -t romanodev/openbte
+         docker pull romanodev/openbte:latest
 
       You can run OpenBTE sharing your current directory
 
       .. code-block:: bash
 
-         docker run  -v `pwd`:`pwd` -w `pwd` --rm romanodev/openbte mpirun -np 4 python input.py
+         docker run --shm-size=10g -v `pwd`:`pwd` -w `pwd` --user "$(id -u):$(id -g)" -rm romanodev/openbte mpirun -np 4 python input.py
 
-      where we assumed you have 4 virtual CPUs. Note that in this case, your script ``input.py`` must be in your current directory.
+      where we assumed you have 4 virtual CPUs. Note that in this case, your script ``input.py`` must be in your current directory. Also, for intensive calculations, you might want to increase the size of the used shared memory (here is ``1g``). Keep in mind that the above command will allow docker to write in your current directory. 
 
       If you frequently use Docker, you may want to add your ``user`` to the Docker group. 
 

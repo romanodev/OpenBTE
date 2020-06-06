@@ -1,41 +1,41 @@
 Relaxation time approximation
 ===================================
 
-In many cases the relaxation time apprimxation (RTA) is not enough and the full scattering operator must be used. OpenBTE employes the following iterative scheme
+
+Within the temperature formulation, the BTE under th relaxation time approximation reads as
 
 .. math::
 
-   \mathbf{v}_\mu\cdot\nabla T_\mu^{(n)} + T_\mu^{(n)} = \sum_\nu B_{\mu\nu}T_\nu^{(n-1)}
+   \mathbf{v}_\mu\cdot\nabla T_\mu^{(n)} + T_\mu^{(n)} = T_L
 
 where
 
 .. math::
     
-   B_{\mu\nu} = \delta_{\mu\nu} - W_{\mu\nu}W_{\mu\mu}^{-1}.
+   T_L = \sum_l\left[ \frac{C_l}{\tau_l} \right]^{-1} \sum_\nu \frac{C_\nu}{\tau_\nu} T_\nu.
 
-The term :math:`\mathbf{W}` is the scattering matrix and :math:`T_\mu` the phonon pseudo temperatures. Upon convergence, the heat flux is computed with :math:`\mathbf{J} = \mathcal{V}^{-1} N^{-1} \sum_\mu C_\mu \mathbf{v}_\mu T_\mu`, where :math:`\mathbf{v}_\mu` is the group velocity and :math:`C_\mu` is the heat capacity; the latter is defined as :math:`C_\mu = k_B \eta_\mu \left(\sinh \eta_\mu \right)^{-2}`, where :math:`\eta_\mu = \hbar \omega_\mu/k_B/T_0/2`. Adiabatic boundary conditions are generally applied with :math:`T_{\mu^-} = \sum_{\nu^+} R_{\mu^-\nu^+} T_{\nu^+}`, where :math:`R_{\mu^-\nu^+}` is a reflection matrix, :math:`T_{\mu^-}` (:math:`T_{\mu^+}`) is related to incomng (outgoing) phonons. Currently, OpenBTE employes a crude approximation, i.e. all phonons thermalize to a boundary temperature, whose values is obtained by ensuring zero total incident flux [`Landon (2014)`_]. Within this approach, the reflection matrix reads as :math:`R_{\mu^-\nu^+}=-C_\nu\mathbf{v}_\nu \cdot \hat{\mathbf{n}} \left[\sum_{k^-} C_{k^-} \mathbf{v}_{k^-}\cdot \hat{\mathbf{n}} \right]^{-1}`.
+The scattering times are defined as  :math:`\tau_\nu^{-1} = W_{\nu\nu}`, where :math:`\mathbf{W}` is the scattering matrix. Terms :math:`T_\mu`  are the phonon pseudo temperatures. Upon convergence, the heat flux is computed with :math:`\mathbf{J} = \mathcal{V}^{-1} N^{-1} \sum_\mu C_\mu \mathbf{v}_\mu T_\mu`, where :math:`\mathbf{v}_\mu` is the group velocity and :math:`C_\mu` is the heat capacity; the latter is defined as :math:`C_\mu = k_B \eta_\mu \left(\sinh \eta_\mu \right)^{-2}`, where :math:`\eta_\mu = \hbar \omega_\mu/k_B/T_0/2`. Adiabatic boundary conditions are generally applied with :math:`T_{\mu^-} = \sum_{\nu^+} R_{\mu^-\nu^+} T_{\nu^+}`, where :math:`R_{\mu^-\nu^+}` is a reflection matrix, :math:`T_{\mu^-}` (:math:`T_{\mu^+}`) is related to incoming (outgoing) phonons. Currently, OpenBTE employes a crude approximation, i.e. all phonons thermalize to a boundary temperature, whose values is obtained by ensuring zero total incident flux [`Landon (2014)`_]. Within this approach, the reflection matrix reads as :math:`R_{\mu^-\nu^+}=-C_\nu\mathbf{v}_\nu \cdot \hat{\mathbf{n}} \left[\sum_{k^-} C_{k^-} \mathbf{v}_{k^-}\cdot \hat{\mathbf{n}} \right]^{-1}`.
 
 Creating ``full.h5``
 ###############################################
 
-The first step for solving the BTE with the full collision operator is create the file ``full.h5``. This file is an ``hdf5`` file that must have the following items:
+The first step for solving the RTA-BTE is to create the file ``rta.h5``. This file is an ``hdf5`` file that must have the following items:
 
 .. table:: 
    :widths: auto
    :align: center
 
-   +--------------------+-------------+---------------------------------------------------+---------------------+
-   | **Item**           | **Shape**   |       **Units**                                   |    **Name**         |
-   +--------------------+-------------+---------------------------------------------------+---------------------+
-   | :math:`W`          |  N x N      |  :math:`\textrm{W}\textrm{K}^{-1}\textrm{m}^3`    | Scattering operator |
-   +--------------------+-------------+---------------------------------------------------+---------------------+
-   | :math:`C`          |  N          |  :math:`\mathrm{W}\textrm{K}^{-1}\textrm{s}`      | Heat capacity       |
-   +--------------------+-------------+---------------------------------------------------+---------------------+
-   | :math:`\mathbf{v}` |  N x 3      |  :math:`\mathrm{m}\textrm{s}^{-1}`                | Group velocity      |
-   +--------------------+-------------+---------------------------------------------------+---------------------+
-   | :math:`\kappa`     |  3 x 3      |  :math:`\mathrm{W}\textrm{K}^{-1}\textrm{m}^{-1}` | Thermal conductivity|
-   +--------------------+-------------+---------------------------------------------------+---------------------+
-
+   +----------------+-------------+-----------------------------------------------------------------------+---------------------+
+   | **Item**       | **Shape**   |       **Symbol [Units]**                                              |    **Name**         |
+   +----------------+-------------+-----------------------------------------------------------------------+---------------------+
+   | ``w``          |  N          |   :math:`\tau^{-1}` [:math:`s^{-1}`]                                  | Scattering rate     |
+   +----------------+-------------+-----------------------------------------------------------------------+---------------------+
+   | ``C``          |  N          |   :math:`C` [:math:`\mathrm{W}\textrm{K}^{-1}\textrm{s}`]             | Heat capacity       |
+   +----------------+-------------+---------------------------------------------------+-------------------+---------------------+
+   | ``v``          |  N x 3      |   :math:`\mathbf{v}` [:math:`\mathrm{m}\textrm{s}^{-1}`]              | Group velocity      |
+   +----------------+-------------+---------------------------------------------------+-------------------+---------------------+
+   | ``kappa``      |  3 x 3      |   :math:`\kappa` [:math:`\mathrm{W}\textrm{K}^{-1}\textrm{m}^{-1}`]   | Thermal conductivity|
+   +----------------+-------------+---------------------------------------------------+-------------------+---------------------+
 
 
 Each item must be a ``numpy`` array with the prescribed ``shape``. We recommend using the package Deepdish_ for IO ``hdf5`` operations. Within this formalism the thermal conductivity tensor is given by :math:`\langle S^{\alpha}|W^{\sim1}|S^{\beta}\rangle`, where :math:`S^\alpha_\mu = C_\mu v^\alpha_\mu` and :math:`\sim1` is the Moore-Penrose inverse. To check the consistencty of the data populating ``full.h5``, you may want to run this script:

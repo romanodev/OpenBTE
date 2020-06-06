@@ -140,8 +140,7 @@ class Solver(object):
           if not self.only_fourier:
            variables[2]    = {'name':'Temperature BTE','units':'K'             ,'data':data['temperature']}
            variables[3]    = {'name':'Flux BTE'       ,'units':'W/m/m/K'       ,'data':data['flux']}
-
-          self.state.update({'kappa':data['kappa_vec']})
+           self.state.update({'kappa':data['kappa_vec']})
 
           if argv.setdefault('save',True):
            if self.bundle:

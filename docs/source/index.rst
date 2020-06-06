@@ -6,7 +6,6 @@ Welcome to OpenBTE's documentation!
     :alt: my-picture1
 
 
-
 .. toctree::
    :maxdepth: 2
    :caption: Getting Started
@@ -17,6 +16,7 @@ Welcome to OpenBTE's documentation!
    :maxdepth: 2
    :caption: Material
 
+   rta
    full
   
 .. toctree::

@@ -1,0 +1,35 @@
+FROM continuumio/anaconda3
+MAINTAINER Giuseppe Romano <romanog@mit.edu>
+
+RUN apt-get update
+
+#RUN apt-get install -y libglu1-mesa libxcursor1 libxft-dev libxinerama-dev
+
+RUN apt-get install -y vim
+
+
+RUN conda update -n base -c defaults conda
+
+RUN apt-get install -y build-essential libopenmpi-dev libgmsh-dev swig libsuitesparse-dev
+
+RUN wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.3.tar.gz
+
+RUN tar -xzf openmpi-4.0.3.tar.gz
+
+RUN cd openmpi-4.0.3 && ./configure --prefix=/usr/local/openmpi && make all && make install && rm -f openmpi-4.0.3.tar.gz 
+
+
+#RUN conda create -n openbte -c gromano -c conda-forge -c ostrokach-forge openbte==1.13 
+
+#RUN echo "source activate openbte" > ~/.bashrc
+#ENV PATH /opt/conda/envs/openbte/bin:$PATH
+
+
+EXPOSE 8050
+
+
+
+
+
+
+
