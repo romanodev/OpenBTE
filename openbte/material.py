@@ -6,6 +6,7 @@ from .full_model import generate_full
 from .utils import *
 from .mfp2DSym import *
 from .mfp import *
+from .rta2DSym import *
 import deepdish as dd
 from mpi4py import MPI
 
@@ -37,6 +38,9 @@ class Material(object):
 
     elif model == 'mfp':
       data = generate_mfp(**argv)
+
+    elif model == 'rta2DSym':
+      data = generate_rta2DSym(**argv)
 
     elif model == 'mfp_ms':
       data = generate_mfp_ms(**argv)

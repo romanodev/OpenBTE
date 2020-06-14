@@ -5,7 +5,7 @@ In many cases the relaxation time approximation (RTA) is not enough and the full
 
 .. math::
 
-   \mathbf{v}_\mu\cdot\nabla T_\mu^{(n)} + T_\mu^{(n)} = \sum_\nu B_{\mu\nu}T_\nu^{(n-1)}
+   \mathbf{F}_\mu\cdot\nabla T_\mu^{(n)} + T_\mu^{(n)} = \sum_\nu B_{\mu\nu}T_\nu^{(n-1)}
 
 where
 
@@ -27,18 +27,20 @@ The first step for solving the BTE with the full collision operator is to create
    +---------------+-------------+-------------------------------------------------------------------+---------------------+
    | **Item**      | **Shape**   |       **Symbol [Units]**                                          |    **Name**         |
    +---------------+-------------+-------------------------------------------------------------------+---------------------+
-   | ``W``         |  N x N      |  :math:`W` [:math:`\textrm{W}\textrm{K}^{-1}\textrm{m}^3`]        | Scattering operator |
+   | ``W``         |  N x N      |  :math:`W` [:math:`\textrm{W}\textrm{K}^{-1}`]                    | Scattering operator |
    +---------------+-------------+-------------------------------------------------------------------+---------------------+
    | ``C``         |  N          | :math:`C` [:math:`\mathrm{W}\textrm{K}^{-1}\textrm{s}`]           | Heat capacity       |
    +---------------+-------------+-------------------------------------------------------------------+---------------------+
    | ``v``         |  N x 3      | :math:`\mathbf{v}` [:math:`\mathrm{m}\textrm{s}^{-1}`]            | Group velocity      |
+   +---------------+-------------+-------------------------------------------------------------------+---------------------+
+   | ``alpha``     |  1 x 1      | :math:`\mathcal{V} N` [:math:`\mathrm{m}^{3}`]                    | Normalization factor|
    +---------------+-------------+-------------------------------------------------------------------+---------------------+
    | ``kappa``     |  3 x 3      | :math:`\kappa` [:math:`\mathrm{W}\textrm{K}^{-1}\textrm{m}^{-1}`] | Thermal conductivity|
    +---------------+-------------+-------------------------------------------------------------------+---------------------+
 
 
 
-Each item must be a ``numpy`` array with prescribed ``shape``. We recommend using the package Deepdish_ for IO ``hdf5`` operations. Within this formalism the thermal conductivity tensor is given by :math:`\langle S^{\alpha}|W^{\sim1}|S^{\beta}\rangle`, where :math:`S^\alpha_\mu = C_\mu v^\alpha_\mu` and :math:`\sim1` is the Moore-Penrose inverse. To check the consistencty of the data populating ``full.h5``, you may want to run this script:
+Each item must be a ``numpy`` array with prescribed ``shape``. We recommend using the package Deepdish_ for IO ``hdf5`` operations. Within this formalism the thermal conductivity tensor is given by :math:`\langle S^{\alpha}|W^{\sim1}|S^{\beta}\rangle`, where :math:`S^\alpha_\mu = C_\mu v^\alpha_\mu` and :math:`\sim1` is the Moore-Penrose inverse. Note that we use the notation :math:`< f | g | f > = N^{-1} \mathcal{V}^{-1} \sum_{\mu\nu} f_\mu g_{\mu\nu} f_\nu` .To check the consistencty of the data populating ``full.h5``, you may want to run this script:
 
 .. code-block:: python
 
@@ -47,7 +49,7 @@ Each item must be a ``numpy`` array with prescribed ``shape``. We recommend usin
 
    data = dd.io.load('full.h5')
    S = np.einsum('i,ij->ij',data['C'],data['v'])
-   kappa = np.einsum('i,ij,j->ij',S,np.linalg.pinv(data['W']),S)
+   kappa = np.einsum('i,ij,j->ij',S,np.linalg.pinv(data['W']),S)/data['alpha']
 
    assert(np.allclose(kappa,data['kappa']))
 
@@ -74,7 +76,7 @@ Phono3py_ calculates the bulk thermal conductivity using the full scattering mat
 
 .. code-block:: bash
 
-   phono3pytoOpenBTE unitcell_name nx ny nz
+   phono3pytoOpenBTE unitcell_name nx ny nz 
 
 where ``unitcell_name`` is the file of your unit cell and ``nx ny nz`` is the reciprical space discretization.
 
@@ -90,12 +92,12 @@ Here is an example assuming you have a working installation of Phono3py:
 
    phono3py --dim="2 2 2" --pa="0 1/2 1/2 1/2 0 1/2 1/2 1/2 0" -c POSCAR-unitcell --mesh="8 8 8"  --reducible-colmat --write-lbte-solution  --fc3 --fc2 --lbte --ts=100
 
-   phono3py2OpenBTE POSCAR-unitcell 8 8 8 100
+   Phono3py2OpenBTE POSCAR-unitcell 8 8 8 
 
 Conversion from other collision matrix definitions
 ##################################################
 
-If you are familiar with the form of the scattering operator, :math:`A` (in :math:`\textrm{s}^{-1}`), given by Eq. 13 in [`Fugallo et al. (2013)`_] , you may use the following conversion :math:`W_{\mu\nu} = A_{\mu\nu}\hbar\omega_\mu \hbar\omega_\nu \mathcal{V} N  k_B^{-1}T_0^{-2}` [`Romano (2020)`_], where :math:`\hbar\omega_\mu` is the energy of the :math:`\mu`-labelled phonons (:math:`\mu` colectively represents wave vector and polatization), :math:`k_B` is the Boltzmann constant, :math:`T_0` is the reference temperature, and :math:`\mathcal{V}` is the volume of the unit cell. Another definition of the scattering matrix, which we refer to as :math:`\mathbf{W}^v`, can be found in [`Vazrik et al. (2017)`_]. In this case the conversion is :math:`W_{\mu\nu} = W^v_{\mu\nu}C_\nu \mathcal{V} N`. Lastly, from the symmetrized matrix :math:`\tilde{\Omega}` defined in [`Cepellotti et al. (2016)`_], we have :math:`W_{\mu\nu}=\tilde{\Omega}_{\mu\nu}\sqrt{C_\nu}\sqrt{C_\mu}\mathcal{V}N`. This symmetrized matrix concides with the one defined here [`Chaput (2013)`_].
+If you are familiar with the form of the scattering operator, :math:`A` (in :math:`\textrm{s}^{-1}`), given by Eq. 13 in [`Fugallo et al. (2013)`_] , you may use the following conversion :math:`W_{\mu\nu} = A_{\mu\nu}\hbar\omega_\mu \hbar\omega_\nu  k_B^{-1}T_0^{-2}` [`Romano (2020)`_], where :math:`\hbar\omega_\mu` is the energy of the :math:`\mu`-labelled phonons (:math:`\mu` colectively represents wave vector and polatization), :math:`k_B` is the Boltzmann constant, :math:`T_0` is the reference temperature. Another definition of the scattering matrix, which we refer to as :math:`\mathbf{W}^v`, can be found in [`Vazrik et al. (2017)`_]. In this case the conversion is :math:`W_{\mu\nu} = W^v_{\mu\nu}C_\nu`. Lastly, from the symmetrized matrix :math:`\tilde{\Omega}` defined in [`Cepellotti et al. (2016)`_], we have :math:`W_{\mu\nu}=\tilde{\Omega}_{\mu\nu}\sqrt{C_\nu}\sqrt{C_\mu}`. This symmetrized matrix concides with the one defined here [`Chaput (2013)`_].
 
 Two-dimensional materials
 ###############################################

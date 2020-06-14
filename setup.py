@@ -31,6 +31,8 @@ setup(name='openbte',
       packages = ['openbte'],
       package_data = {'openbte':['materials/*.dat','fonts/*.ttf']},
       entry_points = {
-     'console_scripts': ['AlmaBTE2OpenBTE=openbte.almabte2openbte:main','Phono3py2OpenBTE=openbte.phono3py:main'],
+     'console_scripts': ['AlmaBTE2OpenBTE=openbte.almabte2openbte:main',\
+                         'Phono3py2OpenBTE=openbte.phono3py2openbte:main',\
+                         'OpenBTE=openbte.openbte:main'],
       },
       zip_safe=False)

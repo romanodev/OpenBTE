@@ -44,10 +44,10 @@ class Plot(object):
    elif model == 'maps':
     self.plot_maps(**argv)
 
-   elif model == 'vtk':
-    self.write_cell_vtk(**argv)   
+   elif model == 'vtu':
+    self.write_vtu(**argv)   
 
- def write_cell_vtk(self,**argv):
+ def write_cell_vtu(self,**argv):
 
    output = []
    strc = 'CellData('
@@ -73,11 +73,11 @@ class Plot(object):
    else :
     vtk = VtkData(UnstructuredGrid(self.mesh['nodes'],triangle=self.mesh['elems']),data)
 
-   vtk.tofile('output.vtk','ascii')
+   vtk.tofile('output','ascii')
 
 
 
- def write_vtk(self,**argv):
+ def write_vtu(self,**argv):
 
    for key in self.solver['variables'].keys(): 
        self.solver['variables'][key]['data'] = self._get_node_data(self.solver['variables'][key]['data'])
@@ -85,7 +85,7 @@ class Plot(object):
    output = []
    strc = 'PointData('
    for n,(key, value) in enumerate(self.solver['variables'].items()):
-      
+
      if  value['data'].shape[0] == 1:  value['data'] =  value['data'][0] #band-aid solution
      output.append(value['data'])
      name = value['name'] + '[' + value['units'] + ']'
@@ -99,6 +99,7 @@ class Plot(object):
       strc += ')'
      else:
       strc += ','
+
    data = eval(strc)
 
    if self.mesh['dim'] == 3:
@@ -106,7 +107,7 @@ class Plot(object):
    else :
     vtk = VtkData(UnstructuredGrid(self.mesh['nodes'],triangle=self.mesh['elems']),data)
 
-   vtk.tofile('output.vtk','ascii')
+   vtk.tofile('output','ascii')
 
 
  def _get_node_data(self,data,indices=None):
@@ -118,7 +119,7 @@ class Plot(object):
        node_data = np.zeros(len(self.mesh['nodes']))
 
    for k,e in enumerate(self.mesh['elems']):
-     for n in e:
+     for n in e:   
       node_data[n] += data[k]/self.mesh['conn'][n]
 
    node_data = node_data[indices]

@@ -11,6 +11,7 @@ Welcome to OpenBTE's documentation!
    :caption: Getting Started
 
    install
+   run
 
 .. toctree::
    :maxdepth: 2

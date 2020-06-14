@@ -30,7 +30,7 @@ def generate_mfp2DSym(**argv):
  #Polar Angle---------
  Dphi = 2*np.pi/n_phi
  phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
- #--------------------
+#--------------------
 
  #Get coeff matrix---
  #coeff = np.zeros((n_mfp,n_mfp_bulk))
@@ -64,7 +64,7 @@ def generate_mfp2DSym(**argv):
 
  n_mfp_bulk = len(mfp_bulk) 
  n_mfp = argv.setdefault('n_mfp',100)
- mfp = np.logspace(min([-2,np.log10(min(mfp_bulk)*0.99)]),np.log10(max(mfp_bulk)*1.01),n_mfp)#min MFP = 1e-2 
+ mfp = np.logspace(min([-2,np.log10(min(mfp_bulk)*0.99)]),np.log10(max(mfp_bulk)*1.01),n_mfp) 
 
  n_mfp = len(mfp)
  temp_coeff = np.zeros((n_mfp,n_phi))
@@ -103,6 +103,7 @@ def generate_mfp2DSym(**argv):
  
  #Final----
 
+
  return {'tc':tc,\
          'sigma':kappa_directional,\
          'kappa':kappa,\
@@ -110,6 +111,7 @@ def generate_mfp2DSym(**argv):
          'mfp_average':rhs_average*1e18,\
          'VMFP':polar_ave,\
          'mfp_sampled':mfp,\
+         'model':np.array([5]),\
          'suppression':suppression,\
          'kappam':kappa_bulk,\
          'mfp_bulk':mfp_bulk}

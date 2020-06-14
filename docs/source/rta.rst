@@ -12,11 +12,11 @@ where
 
 .. math::
     
-   T_L = \sum_l\left[ \frac{C_l}{\tau_l} \right]^{-1} \sum_\nu \frac{C_\nu}{\tau_\nu} T_\nu.
+   T_L = \left[ \sum_l \frac{C_l}{\tau_l} \right]^{-1} \sum_\nu \frac{C_\nu}{\tau_\nu} T_\nu.
 
 The scattering times are defined as  :math:`\tau_\nu^{-1} = W_{\nu\nu}`, where :math:`\mathbf{W}` is the scattering matrix. Terms :math:`T_\mu`  are the phonon pseudo temperatures. Upon convergence, the heat flux is computed with :math:`\mathbf{J} = \mathcal{V}^{-1} N^{-1} \sum_\mu C_\mu \mathbf{v}_\mu T_\mu`, where :math:`\mathbf{v}_\mu` is the group velocity and :math:`C_\mu` is the heat capacity; the latter is defined as :math:`C_\mu = k_B \eta_\mu \left(\sinh \eta_\mu \right)^{-2}`, where :math:`\eta_\mu = \hbar \omega_\mu/k_B/T_0/2`. Adiabatic boundary conditions are generally applied with :math:`T_{\mu^-} = \sum_{\nu^+} R_{\mu^-\nu^+} T_{\nu^+}`, where :math:`R_{\mu^-\nu^+}` is a reflection matrix, :math:`T_{\mu^-}` (:math:`T_{\mu^+}`) is related to incoming (outgoing) phonons. Currently, OpenBTE employes a crude approximation, i.e. all phonons thermalize to a boundary temperature, whose values is obtained by ensuring zero total incident flux [`Landon (2014)`_]. Within this approach, the reflection matrix reads as :math:`R_{\mu^-\nu^+}=-C_\nu\mathbf{v}_\nu \cdot \hat{\mathbf{n}} \left[\sum_{k^-} C_{k^-} \mathbf{v}_{k^-}\cdot \hat{\mathbf{n}} \right]^{-1}`.
 
-Creating ``full.h5``
+Creating ``rta.h5``
 ###############################################
 
 The first step for solving the RTA-BTE is to create the file ``rta.h5``. This file is an ``hdf5`` file that must have the following items:
@@ -25,39 +25,33 @@ The first step for solving the RTA-BTE is to create the file ``rta.h5``. This fi
    :widths: auto
    :align: center
 
-   +----------------+-------------+-----------------------------------------------------------------------+---------------------+
-   | **Item**       | **Shape**   |       **Symbol [Units]**                                              |    **Name**         |
-   +----------------+-------------+-----------------------------------------------------------------------+---------------------+
-   | ``w``          |  N          |   :math:`\tau^{-1}` [:math:`s^{-1}`]                                  | Scattering rate     |
-   +----------------+-------------+-----------------------------------------------------------------------+---------------------+
-   | ``C``          |  N          |   :math:`C` [:math:`\mathrm{W}\textrm{K}^{-1}\textrm{s}`]             | Heat capacity       |
-   +----------------+-------------+---------------------------------------------------+-------------------+---------------------+
-   | ``v``          |  N x 3      |   :math:`\mathbf{v}` [:math:`\mathrm{m}\textrm{s}^{-1}`]              | Group velocity      |
-   +----------------+-------------+---------------------------------------------------+-------------------+---------------------+
-   | ``kappa``      |  3 x 3      |   :math:`\kappa` [:math:`\mathrm{W}\textrm{K}^{-1}\textrm{m}^{-1}`]   | Thermal conductivity|
-   +----------------+-------------+---------------------------------------------------+-------------------+---------------------+
+   +----------------+-------------+--------------------------------------------------------------------------+--------------------------+
+   | **Item**       | **Shape**   |       **Symbol [Units]**                                                 |    **Name**              |
+   +----------------+-------------+--------------------------------------------------------------------------+--------------------------+
+   | ``tau``        |  N          |   :math:`\tau` [:math:`s`]                                               | Scattering time          |
+   +----------------+-------------+--------------------------------------------------------------------------+--------------------------+
+   | ``C``          |  N          |   :math:`C` [:math:`\mathrm{W}\mathrm{s}\textrm{K}^{-1}\textrm{m}^{-3}`] | Specific Heat capacity   |
+   +----------------+-------------+--------------------------------------------------------------------------+--------------------------+
+   | ``v``          |  N x 3      |   :math:`\mathbf{v}` [:math:`\mathrm{m}\textrm{s}^{-1}`]                 | Group velocity           |
+   +----------------+-------------+--------------------------------------------------------------------------+--------------------------+
+   | ``kappa``      |  3 x 3      |   :math:`\kappa` [:math:`\mathrm{W}\textrm{K}^{-1}\textrm{m}^{-1}`]      | Thermal conductivity     |
+   +----------------+-------------+--------------------------------------------------------------------------+--------------------------+
 
 
-Each item must be a ``numpy`` array with the prescribed ``shape``. We recommend using the package Deepdish_ for IO ``hdf5`` operations. Within this formalism the thermal conductivity tensor is given by :math:`\langle S^{\alpha}|W^{\sim1}|S^{\beta}\rangle`, where :math:`S^\alpha_\mu = C_\mu v^\alpha_\mu` and :math:`\sim1` is the Moore-Penrose inverse. To check the consistencty of the data populating ``full.h5``, you may want to run this script:
+Each item must be a ``numpy`` array with the prescribed ``shape``. We recommend using the package Deepdish_ for IO ``hdf5`` operations. The thermal conductivity tensor is given by :math:`\kappa^{\alpha\beta} = \mathcal{V}^{-1}N^{-1}\sum_{\mu} C_\mu  v_\mu^{\alpha} v_\mu^{\beta} \tau_\mu`, where :math:`\mathcal{V}` is the volume of the unit cell and :math:`N` is the numbre of wave vectors. To check the consistencty of the data populating ``rta.h5``, you may want to run this script:
 
 .. code-block:: python
 
    import numpy as np
    import deepdish as dd
 
-   data = dd.io.load('full.h5')
-   S = np.einsum('i,ij->ij',data['C'],data['v'])
-   kappa = np.einsum('i,ij,j->ij',S,np.linalg.pinv(data['W']),S)
+   data = dd.io.load('rta.h5')
+   kappa = data['alpha']*np.einsum('k,ki,kj,k->ij',data['C'],data['v'],data['v'],data['tau'])
 
    assert(np.allclose(kappa,data['kappa']))
 
-Of course, the best practice is to have the ``kappa`` populating ``full.h5`` generated by the other items and compare it with the intended value.
+Of course, the best practice is to have the ``kappa`` populating ``rta.h5`` generated by the other items and compare it with the intended value.
 
-
-Conversion from other collision matrix definitions
-##################################################
-
-If you are familiar with the form of the scattering operator, :math:`A` (in :math:`\textrm{s}^{-1}`), given by Eq. 13 in [`Fugallo et al. (2013)`_] , you may use the following conversion :math:`W_{\mu\nu} = A_{\mu\nu}\hbar\omega_\mu \hbar\omega_\nu \mathcal{V} N  k_B^{-1}T_0^{-2}` [`Romano (2020)`_], where :math:`\hbar\omega_\mu` is the energy of the :math:`\mu`-labelled phonons (:math:`\mu` colectively represents wave vector and polatization), :math:`k_B` is the Boltzmann constant, :math:`T_0` is the reference temperature, and :math:`\mathcal{V}` is the volume of the unit cell. Another definition of the scattering matrix, which we refer to as :math:`\mathbf{W}^v`, can be found in [`Vazrik et al. (2017)`_]. In this case the conversion is :math:`W_{\mu\nu} = W^v_{\mu\nu}C_\nu \mathcal{V} N`. Lastly, from the symmetrized matrix :math:`\tilde{\Omega}` defined in [`Cepellotti et al. (2016)`_], we have :math:`W_{\mu\nu}=\tilde{\Omega}_{\mu\nu}\sqrt{C_\nu}\sqrt{C_\mu}\mathcal{V}N`. This symmetrized matrix concides with the one defined here [`Chaput (2013)`_].
 
 Two-dimensional materials
 ###############################################
@@ -67,40 +61,92 @@ For two-dimensional materials, a thickness :math:`L_c` is used for first-princip
 Creating ``material.f5``
 ###############################################
 
-With ``full.h5`` in your current directory, ``material.h5`` can be generated simply with
+With ``rta.h5`` in your current directory, ``material.h5`` can be generated simply with
 
 .. code-block:: python
 
-   Material(model='full')
+   Material(model='rta',submodel=<('3D'),'2DSym','2D'>)
 
-The ``Material`` will ensure that the scattering operator :math:`W` is energy conserving, i.e. :math:`\sum_\mu W_{\mu\nu} = \sum_\mu W_{\mu\nu} = 0`. This condition is applied by using the method of Lagrange multipliers [`Romano (2020)`_]
+The ``Material`` object will perform MFP interpolation. In fact, due to the fact that :math:`T_{\mu}` is a smooth function of :math:`\mathbf{v}_\mu \tau_mu`, the BTE can be cast into
 
-Interface with Phono3py (Experimental)
+:math:`\mathbf{F}_k \cdot \nabla T_k + T_k = \sum_{k'} a_{k'} T_{k'}`,
+
+where :math:`\mathbf{F}_k` uniformnly span a sphere or a disk, depending on our problem. The coefficients :math:`a_{k'}` arise from the linear interpolation. As outlined below, submodels (specified with ``submodel``) may enhance computational efficiency.
+
+
+.. tabs::
+
+   .. tab:: ``submodel='3D'``
+
+    This is the case where an actual 3D simulation is performed. The coefficients are:
+     
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\mathbf{F}_k = \Lambda_k (\sin{\phi_k}\sin{\theta_k}\mathbf{\hat{x}} +\cos{\phi_k}\sin{\theta_k}\mathbf{\hat{y}} +\cos\theta_k \mathbf{\hat{z}} )`  | 
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\alpha_k = \left[\sum_l  C_l/\tau_l \right]^{-1} \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu/\tau_{\mu}`                     | 
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\mathbf{G}_k = \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu \mathbf{v}_\mu`                                                   | 
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+  
+
+   .. tab:: ``submodel='2DSym'``
+
+    This is the case where the simulation domain has translational invariance along :math:`z`. In this case each bulk MFP :math:`\mathbf{v}_\mu\tau_\mu` can be mapped onto the :math:`z=0` plane. 
+
+    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\mathbf{F}_k = \chi_k (\sin{\phi_k}\mathbf{\hat{x}} +\cos{\phi_k}\mathbf{\hat{y}})`                                                                                                                                        | 
+    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\alpha_k = \left[\sum_l  C_l/\tau_l \right]^{-1} \sum_\mu \left[\mathcal{M}( \mathbf{S}_z\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) + \delta(\mathbf{v}_\mu\cdot\mathbf{\hat{z}}-|\mathbf{v}_\mu|)   \right] C_\mu/\tau_\mu`  |  
+    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\mathbf{G}_k = \sum_\mu \mathcal{M}(\mathbf{v}_\mu^{\mathrm{2D}} \tau_\mu,\mathbf{F}_{k}) C_\mu \mathbf{v}_\mu`                                                                                                            | 
+    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+  
+    where :math:`\mathbf{S}_z` is a projection operator onto the plane :math:`z=0`.
+
+
+   .. tab:: ``submodel='2D'``
+
+    An actual 2D material is being simulated. 
+
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\mathbf{F}_k = \Lambda_k (\sin{\phi_k}\mathbf{\hat{x}} +\cos{\phi_k}\mathbf{\hat{y}})`                                                              | 
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\alpha_k = \left[\sum_l  C_l/\tau_l \right]^{-1} \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu/\tau_\mu`                       |      
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\mathbf{G}_k = \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu \mathbf{v}_\mu`                                                   | 
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+Interface with AlmaBTE
 ###############################################
 
-Phono3py_ calculates the bulk thermal conductivity using the full scattering matrix defined here [`Chaput (2013)`_]. In order to be used in tandem with OpenBTE, Phono3py must be run with the following options ``--reducible-colmat --write-lbte-solution --lbte``. Once Phono3py is solved, the ``full.h5`` is created by
+AlmaBTE_ is a popular package that compute the thermal conductivity of bulk materials, thin films and superlattices. OpenBTE is interfaced with AlmaBTE for RTA calculations via the script ``almabte2openbte.py``. 
 
+Assuming you have ``AlmaBTE`` in your current ``PATH``, this an example for ``Si``.
 
-.. code-block:: bash
+- Download Silicon force constants from AlmaBTE's database_.
 
-   phono3pytoOpenBTE unitcell_name nx ny nz
+  .. code-block:: bash
 
-where ``unitcell_name`` is the file of your unit cell and ``nx ny nz`` is the reciprical space discretization.
+   https://almabte.bitbucket.io/database/Si.tar.xz   
+   tar -xf Si.tar.xz && rm -rf Si.tar.xz  
 
-Here is an example assuming you have a working installation of Phono3py:
+- Compute bulk scattering time with AlmaBTE.
 
-.. code-block:: bash
+  .. code-block:: bash
 
-   git clone https://github.com/phonopy/phono3py.git
+   echo "<singlecrystal> 
+   <compound name='Si'/>
+   <gridDensity A='8' B='8' C='8'/>
+   </singlecrystal>" > inputfile.xml
+   
+   VCAbuilder inputfile.xml
+   phononinfo Si/Si_8_8_8.h5
+    
+- A file named ``Si_8_8_8_300K.phononinfo`` is in your current directory. The file ``rta.h5`` can then be created with 
 
-   cd phono3py/examples/Si-PBEsol
+  .. code-block:: bash
 
-   phono3py --dim="2 2 2" --sym-fc -c POSCAR-unitcell
-
-   phono3py --dim="2 2 2" --pa="0 1/2 1/2 1/2 0 1/2 1/2 1/2 0" -c POSCAR-unitcell --mesh="8 8 8"  --reducible-colmat --write-lbte-solution  --fc3 --fc2 --lbte --ts=100
-
-   phono3py2OpenBTE POSCAR-unitcell 8 8 8 100
-
+     AlmaBTE2OpenBTE Si_8_8_8_300K.phononinfo
 
 
 .. _Deepdish: https://deepdish.readthedocs.io/
@@ -112,6 +158,8 @@ Here is an example assuming you have a working installation of Phono3py:
 .. _`Landon (2014)`: https://dspace.mit.edu/handle/1721.1/92161
 .. _`Vazrik et al. (2017)` : https://arxiv.org/pdf/1711.07151.pdf
 .. _`Cepellotti et al. (2016)` : https://journals.aps.org/prx/abstract/10.1103/PhysRevX.6.041013
+.. _AlmaBTE: https://almabte.bitbucket.io/
+.. _database: https://almabte.bitbucket.io/database/
 
 
 

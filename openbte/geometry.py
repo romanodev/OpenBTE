@@ -34,7 +34,6 @@ class Geometry(object):
       #np.save('geometry',self.data)
       dd.io.save('geometry.h5',self.data)
 
-
  def compute_node_map(self,**argv):
 
    self.conn = np.zeros(len(self.nodes))

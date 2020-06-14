@@ -176,6 +176,54 @@ def check_distances(new_poly):
   return dmin
 
 
+
+def interpolate(vector,value,bounds='extent',period = None):
+
+
+   n = len(vector)
+
+   if value > vector[0] and value < vector[-1]:
+     
+    for m in range(n-1):
+      if (value <= vector[m+1]) and (value >= vector[m]) :
+        i = m; j = m + 1 
+        break
+    aj = (value-vector[i])/(vector[j]-vector[i]) 
+    ai = 1-aj
+    return i,ai,j,aj  
+
+   else:
+
+    if bounds == 'extent':  
+
+     if value < vector[0]:
+       i=0;j=1;
+     elif value > vector[-1]:
+       i=n-2;j=n-1;
+     aj = (value-vector[i])/(vector[j]-vector[i]) 
+     ai = 1-aj
+     return i,ai,j,aj 
+
+    elif bounds == 'periodic':     
+     i=n-1;j=0;
+     if value < vector[0]:
+       aj = (value + period -vector[i])/(vector[j] + period -vector[i]) 
+     elif value > vector[-1]:
+       aj = (value + period)/(vector[j] + period - vector[i]) 
+
+     ai = 1-aj
+     return i,ai,j,aj 
+
+
+     
+
+
+
+
+
+
+
+
 def get_linear_indexes(mfp,value,scale,extent):
 
    if value == 0:
@@ -198,18 +246,18 @@ def get_linear_indexes(mfp,value,scale,extent):
       i=n-2;j=n-1;
       beyond = True
       found = True
+
    if beyond == False:
     for m in range(n-1):
-
       if (value <= mfp[m+1]) and (value >= mfp[m]) :
-        i = m; j= m+1 
+        i = m; j = m + 1 
         found = True
         break
   
    if found == False:
       print('no interpolation found')
    else:  
-    aj = (value-mfp[i])/(mfp[j]-mfp[i]) #OK.
+    aj = (value-mfp[i])/(mfp[j]-mfp[i]) 
     ai = 1-aj
     if scale=='inverse':
      ai *=mfp[i]/value
@@ -221,8 +269,6 @@ def shared_array(value):
     data = {'dummy':value}
     return create_shared_memory_dict(data)['dummy']
 
-
-            
 
 
 def create_shared_memory_dict(varss):

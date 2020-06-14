@@ -11,7 +11,6 @@ import deepdish as dd
 
 
 
-
 def energy_conserving(W):
 
  bottom = np.sum(np.absolute(W))
@@ -49,7 +48,6 @@ def generate_full(**argv):
 
  filename = 'full.h5'
 
-
  print(' ')
  print('Importing ' + filename + ' ... ',end= '')
  data = dd.io.load(filename)
@@ -74,10 +72,25 @@ def generate_full(**argv):
  print('... done')
  print(' ')
  print('Computing kappa bulk ...')
- kappa = np.einsum('ui,uq,qj->ij',sigma,np.linalg.pinv(W),sigma)
+ kappa = np.einsum('ui,uq,qj->ij',sigma,np.linalg.pinv(W),sigma)/data['alpha']
  print(kappa)
  print(' done')
  print(' ')
+ #----------
+ #test
+ #Adinv = np.diag(1/np.diag(W))
+ #Aod = W - np.diag(np.diag(W))
+ #Add = np.einsum('ij,i->ij',Aod,1/np.diag(W))
+ #x0 = np.einsum('lk,kj->lj',Adinv,sigma)
+ #x_old = np.zeros_like(x0)
+ #for n in range(40):
+ #    print(n) 
+ #    x = x0 - np.einsum('kl,lj->kj',Add,x_old)
+ #    print(np.einsum('li,lj->ij',sigma,x)/data['alpha'])
+ #    x_old = x.copy()
+ #quit()
+ #----------
+
 
  #postprocessing----
  B = -np.einsum('i,ij->ij',1/np.diag(W),W-np.diag(np.diag(W)))
@@ -91,7 +104,7 @@ def generate_full(**argv):
 
  F = np.einsum('i,ij->ij',1/np.diag(W),sigma)
 
- data = {'tc':tc,'VMFP':F,'sigma':sigma,'kappa':kappa,'B':B,'scale':1/np.diag(W)}
+ data = {'tc':tc,'VMFP':F,'sigma':sigma,'kappa':kappa,'B':B,'scale':1/np.diag(W),'model':[10],'alpha':data['alpha']}
 
  return data
 
