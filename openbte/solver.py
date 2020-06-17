@@ -104,11 +104,13 @@ class Solver(object):
           #data = self.solve_fourier(self.kappa)
           data = self.solve_fourier_scalar(self.kappa[0,0])
 
+
           if  data['meta'][0] - self.kappa[0,0] > self.kappa[0,0]*1e-3:
               print('WARNING: Fourier thermal conductivity is larger than bulk one.',flush=True)
 
-          variables = {0:{'name':'Temperature Fourier','units':'K',        'data':data['temperature_fourier']},\
-                       1:{'name':'Flux Fourier'       ,'units':'W/m/m/K','data':data['flux_fourier']}}
+          variables = {0:{'name':'Temperature Fourier','units':'K','data':data['temperature_fourier'],'increment':[-1,0,0]},\
+                       1:{'name':'Flux Fourier'       ,'units':'W/m/m','data':data['flux_fourier'],'increment':[0,0,0]}}
+
           self.state.update({'variables':variables,\
                            'kappa_fourier':data['meta'][0]})
           self.fourier_info(data)
@@ -140,8 +142,8 @@ class Solver(object):
           variables = self.state['variables']
 
           if not self.only_fourier:
-           variables[2]    = {'name':'Temperature BTE','units':'K'             ,'data':data['temperature']}
-           variables[3]    = {'name':'Flux BTE'       ,'units':'W/m/m/K'       ,'data':data['flux']}
+           variables[2]    = {'name':'Temperature BTE','units':'K','data':data['temperature'],'increment':[-1,0,0]}
+           variables[3]    = {'name':'Flux BTE'       ,'units':'W/m/m','data':data['flux'],'increment':[0,0,0]}
            self.state.update({'kappa':data['kappa_vec']})
 
           if argv.setdefault('save',True):
@@ -206,10 +208,10 @@ class Solver(object):
           #print('                        SPACE GRID                 ')   
           #print(colored(' -----------------------------------------------------------','green'))
           print(colored('  Dimension:                               ','green') + str(self.dim),flush=True)
-          print(colored('  Size along X [nm]:                       ','green')+ str(self.size[0]),flush=True)
-          print(colored('  Size along y [nm]:                       ','green')+ str(self.size[1]),flush=True)
+          print(colored('  Size along X [nm]:                       ','green')+ str(round(self.size[0],2)),flush=True)
+          print(colored('  Size along y [nm]:                       ','green')+ str(round(self.size[1],2)),flush=True)
           if self.dim == 3:
-           print(colored('  Size along z [nm]:                       ','green')+ str(self.size[2]),flush=True)
+           print(colored('  Size along z [nm]:                       ','green')+ str(round(self.size[2],2)),flush=True)
           print(colored('  Number of Elements:                      ','green') + str(self.n_elems),flush=True)
           print(colored('  Number of Sides:                         ','green') + str(len(self.active_sides)),flush=True)
           print(colored('  Number of Nodes:                         ','green') + str(len(self.nodes)),flush=True)
@@ -789,17 +791,17 @@ class Solver(object):
      if self.verbose and comm.rank == 0:
       print(colored(' -----------------------------------------------------------','green'),flush=True)
 
-     if comm.rank == 0:
-      import matplotlib.pylab as plt
-      plt.plot(error_vec)
-      plt.yscale('log')
-      plt.show()
+     #if comm.rank == 0:
+     # import matplotlib.pylab as plt
+     # plt.plot(error_vec)
+     # plt.yscale('log')
+     # plt.show()
      # plt.plot(Sup,color='b')
      # plt.plot(Supd,color='r')
      # plt.xscale('log')
      # plt.show()
 
-
+     
      if self.multiscale and comm.rank == 0: self.print_multiscale(MM,self.n_serial*self.n_parallel,termination) 
 
      output =  {'kappa_vec':kappa_vec,'temperature':DeltaT,'flux':J}
@@ -1081,7 +1083,8 @@ class Solver(object):
         C,grad = self.compute_secondary_flux(temp,kappa)
         #print(np.allclose(C2,C))
 
-    flux = -grad
+    
+    flux = -grad*kappa
 
     meta = [kappa_eff,error,n_iter] 
     return {'flux_fourier':flux,'temperature_fourier':temp,'meta':np.array(meta),'grad':grad,'C':C}
@@ -1114,6 +1117,7 @@ class Solver(object):
      diff_temp[kc2][ind2]  = -diff_t
 
    gradT = np.einsum('kjs,ks->kj',self.weigths,diff_temp)
+
 
    #-----------------------------------------------------
    F_ave = np.zeros((len(self.sides),self.dim))

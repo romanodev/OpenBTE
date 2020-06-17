@@ -14,30 +14,36 @@ import time
 class Mesher(object):
 
  def __init__(self,argv):
-  argv['base'] = np.array(argv['base'])
 
-  self.add_symmetry(argv)
+  argv['dmin'] = 0
+  model = argv.setdefault('model','lattice')
 
-  if argv.setdefault('model','lattice') == 'lattice':   
+  if model == 'lattice':   
    #create polygons-----
-   base = argv.setdefault('base',[[0,0]])
-   if len(base) == 0 :
-    argv['dmin'] = 1e5
+   self.add_symmetry(argv) 
+   shapes = get_shape(argv)
+   polygons = [translate_shape(shapes[n],i) for n,i in enumerate(argv['base'])]
+   argv.update({'polygons':np.array(polygons)})
+   repeat_merge_scale(argv)
+
+  elif model == 'custom':
+    repeat_merge_scale(argv)
+
+  elif model =='bulk':
+
     if argv.setdefault('lz',0) == 0:
      return self.generate_bulk_2D(argv)
     else :
      return self.generate_bulk_3D(argv)
 
-   a = time.time()
-   shapes = get_shape(argv)
+  elif model == 'random':
+      while argv['dmin'] < argv.setdefault('dmin_prescribed',0.02):  
+       argv['base'] = np.random.rand(argv.setdefault('Np',5),2)-0.5 
 
-
-   polygons = [translate_shape(shapes[n],i) for n,i in enumerate(base)]
-
-
-   argv.update({'polygons':np.array(polygons)})
-
-  repeat_merge_scale(argv)
+       self.add_symmetry(argv) 
+       self.add_polygons(argv)
+       repeat_merge_scale(argv)
+       print(argv['dmin'])
   #---------------------
 
   if argv.setdefault('lz',0) == 0:
@@ -194,6 +200,13 @@ class Mesher(object):
   store.close()
   with open(os.devnull, 'w') as devnull:
     output = subprocess.check_output("gmsh -optimize_netgen -format msh2 -3 mesh.geo -o mesh.msh".split(), stderr=devnull)
+
+
+ def add_polygons(self,argv):
+
+   shapes = get_shape(argv)
+   polygons = [translate_shape(shapes[n],i) for n,i in enumerate(argv['base'])]
+   argv.update({'polygons':np.array(polygons)})
 
 
  def add_symmetry(self,argv):

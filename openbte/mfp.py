@@ -94,8 +94,6 @@ def generate_mfp(**argv):
    tc = temp_coeff/np.sum(temp_coeff)
 
 
-  
-
    return {'tc':tc,\
            'VMFP':direction,\
            'sigma':kappa_directional,\

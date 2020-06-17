@@ -68,7 +68,7 @@ def plot_results(data,nodes,elems,**argv):
         family="Courier New, monospace",
         size=12,
         #color="#7f7f7f"
-        color="gray"
+        color="black"
     )
    )
 
@@ -89,10 +89,11 @@ def plot_results(data,nodes,elems,**argv):
 
 
    #update axes---------------
-   axis = dict(
-          backgroundcolor="rgb(230, 230,230)",
+   axis = dict( 
+          backgroundcolor="rgb(255, 255,255)",
           gridcolor="rgb(255, 255, 255)",
           zerolinecolor="rgb(255, 255, 255)",
+          visible=False,
           showbackground=False
          )
 

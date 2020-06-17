@@ -22,6 +22,8 @@ class Plot(object):
    else: 
     if os.path.isfile('geometry.h5') :   
      self.mesh = dd.io.load('geometry.h5')
+     self.dim = int(self.mesh['meta'][2])
+
    
    if 'solver' in argv.keys():
     self.solver = argv['solver'].state
@@ -39,13 +41,126 @@ class Plot(object):
    model = argv['model'].split('/')[0]
 
    if model == 'structure':
+    self.duplicate_cells(**argv)
     self.plot_structure(**argv)
 
    elif model == 'maps':
+    self.duplicate_cells(**argv)
     self.plot_maps(**argv)
 
    elif model == 'vtu':
-    self.write_vtu(**argv)   
+    self.duplicate_cells(**argv)
+    self.write_cell_vtu(**argv)   
+    #self.write_vtu(**argv)   
+
+
+ def duplicate_cells(self,**argv):
+
+   #Compute periodic_nodes
+   
+   nodes = np.round(self.mesh['nodes'],4)
+   pnodes = []
+   for s in list(self.mesh['periodic_sides'])+ list(self.mesh['inactive_sides']):
+     pnodes += list(self.mesh['sides'][s])
+   pnodes = list(np.unique(np.array(pnodes)))
+
+   #---------------------------
+   size = self.mesh['size']
+   n_nodes = len(nodes)
+   repeat = argv.setdefault('repeat',[1,1,1])
+   Nx = repeat[0] 
+   Ny = repeat[1] 
+   Nz = repeat[2] 
+   new_nodes = list(nodes.copy())
+   corr = np.zeros(n_nodes*Nx*Ny*Nz,dtype=int)
+   corr[:n_nodes] = range(n_nodes)
+   for nx in range(Nx):
+    for ny in range(Ny):
+     for nz in range(Nz):
+      P = [size[0]*nx,size[1]*ny,size[2]*nz]
+      index = nx * Ny * Nz * n_nodes +  ny *  Nz * n_nodes + nz * n_nodes
+      if index > 0:
+       for n in range(n_nodes):
+        node_trial = [nodes[n,0] + P[0],\
+                      nodes[n,1] + P[1],\
+                      nodes[n,2] + P[2]]
+ 
+        if n in pnodes:
+         a = np.where(np.linalg.norm(np.array(new_nodes)[pnodes]-node_trial,axis=1)<1e-3)[0]
+         if len(a) > 0:
+           corr[index+n] = pnodes[a[0]]
+         else:    
+           new_nodes.append(node_trial)
+           pnodes.append(len(new_nodes)-1)
+           corr[index+n] = len(new_nodes)-1
+        else:  
+         new_nodes.append(node_trial)
+         corr[index+n] = len(new_nodes)-1
+
+   new_nodes = np.array(new_nodes)
+   #pnodes = np.array(pnodes)
+   #new_nodes = np.array(new_nodes)
+   #from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 unused import
+   #import matplotlib.pyplot as plt
+   #fig = plt.figure()
+   #ax = fig.add_subplot(111, projection='3d')
+   #ax.scatter(new_nodes[pnodes,0], new_nodes[pnodes,1], new_nodes[pnodes,2])
+   #plt.show()
+
+   #Duplicate Elements
+   cells = []
+   mapp = {}
+   for nx in range(Nx):
+    for ny in range(Ny):
+     for nz in range(Nz):
+      index = nx * Ny * Nz * n_nodes +  ny *  Nz * n_nodes + nz * n_nodes
+      for k,gg in enumerate(self.mesh['elems']):
+        tmp = []
+        for n in gg:
+         tmp.append(corr[n+index])
+        cells.append(tmp)
+        mapp.setdefault(k,[]).append(len(cells)-1)
+
+   #Duplicate sides---------------------------------
+   self.surface_sides = []
+   self.surface_nodes = []
+   self.indices = []
+   for nx in range(Nx):
+    for ny in range(Ny):
+     for nz in range(Nz):
+      index = nx * Ny * Nz * n_nodes +  ny *  Nz * n_nodes + nz * n_nodes
+      for s in list(self.mesh['boundary_sides']) + list(self.mesh['periodic_sides']) + list(self.mesh['inactive_sides']):
+        nodes = self.mesh['sides'][s]  
+        tmp = []
+        for n in nodes:
+         self.surface_nodes.append(new_nodes[corr[n+index]])   
+         self.indices.append(corr[n+index])
+         tmp.append(len(self.surface_nodes)-1)
+        self.surface_sides.append(tmp)
+
+   self.surface_sides = np.array(self.surface_sides)     
+   self.surface_nodes = np.array(self.surface_nodes)     
+   self.indices = np.array(self.indices)     
+   #-------------------------------------------------
+
+   #duplicate variables---
+   for n,(key, value) in enumerate(self.solver['variables'].items()):
+
+
+     if value['data'].ndim == 1:
+      tmp = np.zeros(len(self.mesh['elems'])*np.prod(argv['repeat']))
+     else: 
+      tmp = np.zeros((len(self.mesh['elems'])*np.prod(argv['repeat']),self.dim))
+
+     for k,v in mapp.items():
+       for vv in v: tmp[vv] = value['data'][k]  
+
+     self.solver['variables'][key]['data'] = tmp
+
+   self.mesh['nodes'] = new_nodes
+   self.mesh['elems'] = cells
+
+
 
  def write_cell_vtu(self,**argv):
 
@@ -53,7 +168,18 @@ class Plot(object):
    strc = 'CellData('
    for n,(key, value) in enumerate(self.solver['variables'].items()):
 
-     if  value['data'].shape[0] == 1:  value['data'] =  value['data'][0] #band-aid solution
+     #if  value['data'].shape[0] == 1:  value['data'] =  value['data'][0] #band-aid solution
+
+     #if value['data'].ndim == 1:
+     # tmp = np.zeros(len(self.mesh['elems'])*np.prod(argv['repeat']))
+     #else: 
+     # tmp = np.zeros((len(self.mesh['elems'])*np.prod(argv['repeat']),3))
+     #for k,v in mapp.items():
+     #  for vv in v:
+     #    tmp[vv] = value['data'][k]  
+
+     #output.append(tmp)
+
      output.append(value['data'])
      name = value['name'] + '[' + value['units'] + ']'
      if value['data'].ndim == 1:
@@ -66,6 +192,7 @@ class Plot(object):
       strc += ')'
      else:
       strc += ','
+
    data = eval(strc)
 
    if self.mesh['dim'] == 3:
@@ -76,11 +203,13 @@ class Plot(object):
    vtk.tofile('output','ascii')
 
 
-
  def write_vtu(self,**argv):
+
+   self.duplicate_cells(**argv)
 
    for key in self.solver['variables'].keys(): 
        self.solver['variables'][key]['data'] = self._get_node_data(self.solver['variables'][key]['data'])
+
 
    output = []
    strc = 'PointData('
@@ -110,29 +239,35 @@ class Plot(object):
    vtk.tofile('output','ascii')
 
 
- def _get_node_data(self,data,indices=None):
+ def _get_node_data(self,data,indices=[]):
 
 
    if data.ndim > 1:
-       node_data = np.zeros((len(self.mesh['nodes']),int(self.mesh['meta'][2])))
+       node_data = np.zeros((len(self.mesh['nodes']),int(self.dim)))
    else:   
        node_data = np.zeros(len(self.mesh['nodes']))
 
+   conn = np.zeros(len(self.mesh['nodes']))
    for k,e in enumerate(self.mesh['elems']):
      for n in e:   
-      node_data[n] += data[k]/self.mesh['conn'][n]
+      node_data[n] += data[k]
+      conn[n] +=1
+   for n in range(len(self.mesh['nodes'])):   
+    node_data[n] /= conn[n]
 
-   node_data = node_data[indices]
+
+   if len(indices) > 0: 
+    node_data = node_data[indices]
+
 
    return node_data
 
 
  def get_surface_nodes(self):
 
-
      triangles = []
      nodes = []
-     for l in list(self.mesh['boundary_sides']) + \
+     for l in  list(self.mesh['boundary_sides']) + \
                list(self.mesh['periodic_sides']) + \
                list(self.mesh['inactive_sides']) :
           tmp = []
@@ -145,39 +280,31 @@ class Plot(object):
                tmp.append(k)
           triangles.append(tmp)
 
+
      return np.array(triangles),nodes
 
  
  def plot_structure(self,**argv):
 
-   if self.mesh['dim'] == 2:   
-    data = {0:{'name':'Structure','units':'','data':np.zeros(len(self.mesh['nodes']))}}
-    plot_results(data,self.mesh['nodes'],np.array(self.mesh['elems']))
-   else: 
-    if self.mesh['dim'] == 3:
-     triangles,indices = self.get_surface_nodes()   
-     data = {0:{'name':'Structure','units':'','data':np.zeros(len(indices))}}
-     plot_results(data,self.mesh['nodes'][indices],triangles)
-     
+    data = {0:{'name':'Structure','units':'','data':np.zeros(len(self.mesh['nodes'] if self.dim == 2 else self.indices))}}
+
+    plot_results(data,self.mesh['nodes'] if self.dim == 2 else self.surface_nodes,\
+                                        self.mesh['elems'] if self.dim == 2 else self.surface_sides,**argv)
 
  def plot_maps(self,**argv):
 
-   if self.mesh['dim'] == 3:
-     elems,indices = self.get_surface_nodes() 
-   else:  
-     elems = np.array(self.mesh['elems'])
-     indices = np.arange(len(self.mesh['nodes']))
+   for key in self.solver['variables'].keys():
+        self.solver['variables'][key]['data'] = self._get_node_data(self.solver['variables'][key]['data'],\
+                indices= self.indices if self.dim == 3 else range(len(self.mesh['nodes'])))
+   
 
-   for key in self.solver['variables'].keys(): 
-       self.solver['variables'][key]['data'] = self._get_node_data(self.solver['variables'][key]['data'],indices=indices)
-   self.solver['variables'][-1] = {'name':'Structure','units':'','data':np.zeros(len(indices))}
-
+   self.solver['variables'][-1] = {'name':'Structure','units':'','data':np.zeros(len(self.mesh['nodes'] if self.dim == 2 else self.indices))}
 
    if argv.setdefault('save_plot',False):
-    dd.io.save('plot.h5',{'variables':self.solver['variables'],'nodes':self.mesh['nodes'][indices],'elems':elems})
+    dd.io.save('plot.h5',{'variables':self.solver['variables'],'nodes':self.mesh['nodes'] if self.dim == 2 else self.surface_nodes,\
+                                                               'elems':self.mesh['elems'] if self.dim == 2 else self.surface_sides})
 
    if argv.setdefault('show',True):
-     plot_results(self.solver['variables'],self.mesh['nodes'][indices],elems,**argv)
-
-
+    plot_results(self.solver['variables'],self.mesh['nodes'] if self.dim == 2 else self.surface_nodes,\
+                                        self.mesh['elems'] if self.dim == 2 else self.surface_sides,**argv)
 

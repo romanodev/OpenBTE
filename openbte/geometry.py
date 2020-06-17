@@ -34,12 +34,12 @@ class Geometry(object):
       #np.save('geometry',self.data)
       dd.io.save('geometry.h5',self.data)
 
- def compute_node_map(self,**argv):
+ #def compute_node_map(self,**argv):
 
-   self.conn = np.zeros(len(self.nodes))
-   for k,e in enumerate(self.elems):
-     for n in e:
-      self.conn[n] +=1
+ #  self.conn = np.zeros(len(self.nodes))
+ #  for k,e in enumerate(self.elems):
+ #    for n in e:
+ #     self.conn[n] +=1
 
 
  def compute_boundary_connection(self):
@@ -65,7 +65,7 @@ class Geometry(object):
     self.compute_interpolation_weigths()
     self.compute_dists()
     self.compute_boundary_condition_data(argv)
-    self.compute_node_map()
+    #self.compute_node_map()
 
     self.n_elems = len(self.elems)
 
@@ -92,7 +92,7 @@ class Geometry(object):
     
     return {
           'size':self.size,\
-          'conn':self.conn,\
+          #'conn':self.conn,\
           'elems':self.elems,\
           'dim':np.array([self.dim]),\
           'weigths': weigths_vec,\

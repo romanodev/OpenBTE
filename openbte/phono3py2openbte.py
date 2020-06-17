@@ -50,8 +50,13 @@ def main():
  alpha = V*nq
  v = np.array(f['group_velocity'])*1e2 #m/2
  w = np.array(f['frequency'])*1e12 #1/s
- q = 1.60218e-19
- C = np.array(f['heat_capacity'])[0]*q
+ q = 1.60218e-19 #C
+ kb = 1.380641e-23 #j/K
+ h = 6.626070151e-34 #Js
+ T = 300
+ eta = w*h/T/kb/2
+ C = kb*np.power(eta,2)*np.power(np.sinh(eta),-2) #J/K
+
  f = gg.reshape(nm)
  I = np.where(f > 0.0)
  tau = np.zeros(nm)
@@ -89,6 +94,9 @@ def main():
  print(kappa)
  data = {'W':W,'v':v,'C':C,'kappa':kappa,'alpha':np.array([alpha])}
  dd.io.save('full.h5',data)
+
+ data = {'C':C/alpha,'tau':tau,'v':v,'kappa':kappa}
+ dd.io.save('rta.h5',data)
  #---------------------------------------------
 
 if __name__ == '__main__':

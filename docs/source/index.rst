@@ -13,13 +13,16 @@ Welcome to OpenBTE's documentation!
    install
    run
 
+
 .. toctree::
    :maxdepth: 2
-   :caption: Material
+   :caption: Modules
 
-   rta
-   full
-  
+   Geometry
+   Material
+   Solver
+   Plot
+   
 .. toctree::
    :maxdepth: 2
    :caption: Reference

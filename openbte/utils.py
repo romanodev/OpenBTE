@@ -312,6 +312,49 @@ def create_shared_memory_dict(varss):
        return dict_output
 
 
+def repeat_nodes_and_data(data_uc,nodes_uc,increment,repeat,size,cells_uc):
+
+   Nx = repeat[0] 
+   Ny = repeat[1] 
+   Nz = repeat[2] 
+
+   #----------------------------------------------
+   n_nodes = len(nodes_uc)
+
+   nodes = []
+   data = []
+   #add nodes---
+   corr = np.zeros(n_nodes*Nx*Ny*Nz,dtype=np.int)
+   index = 0
+   for nx in range(Nx):
+    for ny in range(Ny):
+     for nz in range(Nz):
+      dd = nx*increment[0] + ny*increment[1] + nz*increment[2]
+      index = nx * Ny * Nz * n_nodes +  ny *  Nz * n_nodes + nz * n_nodes
+      P = [round(size[0]*nx,3),round(size[1]*ny,3),round(size[2]*nz,3)]
+      for n in range(n_nodes):
+       node_trial = [round(nodes_uc[n,0],4) + P[0]-(Nx-1)*0.5*size[0],\
+                     round(nodes_uc[n,1],4) + P[1]-(Nx-1)*0.5*size[1],\
+                     round(nodes_uc[n,2],4) + P[2]-(Nx-1)*0.5*size[2]]
+
+       nodes.append(node_trial)
+       data.append(data_uc[n]-dd)
+       corr[index+n] = len(nodes)-1
+
+   cells = []
+   for nx in range(Nx):
+    for ny in range(Ny):
+     for nz in range(Nz):
+      P = [size[0]*nx,size[1]*ny,size[2]*nz]
+      index = nx * Ny * Nz * n_nodes +  ny *  Nz * n_nodes + nz * n_nodes
+      #add cells
+      for gg in cells_uc:
+       tmp = []
+       for n in gg:
+        tmp.append(corr[n+index])
+       cells.append(tmp)
+
+   return np.array(nodes),np.array(cells),np.array(data)
         
 
 def create_shared_memory(varss):

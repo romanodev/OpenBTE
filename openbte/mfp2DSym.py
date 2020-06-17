@@ -102,8 +102,6 @@ def generate_mfp2DSym(**argv):
  rhs_average = mfp_sampled*mfp_sampled/2
  
  #Final----
-
-
  return {'tc':tc,\
          'sigma':kappa_directional,\
          'kappa':kappa,\
