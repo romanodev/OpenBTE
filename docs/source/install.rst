@@ -46,7 +46,7 @@ Install
 
       .. code-block:: bash
 
-         docker run --shm-size=10g -v `pwd`:`pwd` -w `pwd` --user "$(id -u):$(id -g)" -rm romanodev/openbte mpirun -np 4 python input.py
+         docker run --shm-size=10g -v `pwd`:`pwd` -w `pwd` --user "$(id -u):$(id -g)"  romanodev/openbte mpirun -np 4 python input.py
 
       where we assumed you have 4 virtual CPUs. Note that in this case, your script ``input.py`` must be in your current directory. Also, for intensive calculations, you might want to increase the size of the used shared memory (here is ``1g``). Keep in mind that the above command will allow docker to write in your current directory. 
 

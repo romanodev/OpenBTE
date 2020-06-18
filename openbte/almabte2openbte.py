@@ -7,7 +7,6 @@ import deepdish as dd
 def main():
 
  filename = sys.argv[1]
- T = float(filename.split('.')[0].split('_')[-1].split('K')[0])
  tmp = np.loadtxt(filename,skiprows=1,delimiter=',')
  nq = int(np.max(tmp[:,0]))+1
  nb = int(np.max(tmp[:,1]))+1

@@ -288,8 +288,8 @@ class Plot(object):
 
     data = {0:{'name':'Structure','units':'','data':np.zeros(len(self.mesh['nodes'] if self.dim == 2 else self.indices))}}
 
-    plot_results(data,self.mesh['nodes'] if self.dim == 2 else self.surface_nodes,\
-                                        self.mesh['elems'] if self.dim == 2 else self.surface_sides,**argv)
+    plot_results(data,np.array(self.mesh['nodes']) if self.dim == 2 else self.surface_nodes,\
+                                        np.array(self.mesh['elems']) if self.dim == 2 else self.surface_sides,**argv)
 
  def plot_maps(self,**argv):
 
@@ -305,6 +305,6 @@ class Plot(object):
                                                                'elems':self.mesh['elems'] if self.dim == 2 else self.surface_sides})
 
    if argv.setdefault('show',True):
-    plot_results(self.solver['variables'],self.mesh['nodes'] if self.dim == 2 else self.surface_nodes,\
-                                        self.mesh['elems'] if self.dim == 2 else self.surface_sides,**argv)
+    plot_results(self.solver['variables'],np.array(self.mesh['nodes']) if self.dim == 2 else self.surface_nodes,\
+                                          np.array(self.mesh['elems']) if self.dim == 2 else self.surface_sides,**argv)
 
