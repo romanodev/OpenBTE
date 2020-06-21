@@ -24,6 +24,13 @@ Alternatively, it is possible to write results in the ``vtu`` format
 
    Plot(model='vtu',repeat=[2,2,1])
 
+Note that the external viewer can also be run with
+
+.. code:: bash
+
+   gui
+
+where ``repeat=[2,2,1]`` is assumed.   
 
 The created file ``output.vtk`` can be read by Paraview_
 

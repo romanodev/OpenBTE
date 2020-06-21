@@ -2,7 +2,7 @@ from setuptools import setup,find_packages
 import os
 
 setup(name='openbte',
-      version='1.16',
+      version='1.20',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',
@@ -13,6 +13,9 @@ setup(name='openbte',
                         'googledrivedownloader',
                         'unittest2',
                         'nbsphinx',
+                        'dash',
+                        'dash-core-components',
+                        'dash-html-components',
                         'future',
                         'pytest',
                         'termcolor',
@@ -34,6 +37,7 @@ setup(name='openbte',
       entry_points = {
      'console_scripts': ['AlmaBTE2OpenBTE=openbte.almabte2openbte:main',\
                          'Phono3py2OpenBTE=openbte.phono3py2openbte:main',\
+                         'gui=openbte.gui:main',\
                          'OpenBTE=openbte.openbte:main'],
       },
       zip_safe=False)

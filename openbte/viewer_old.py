@@ -2,10 +2,6 @@ import plotly.offline as py
 import plotly.graph_objs as go
 import numpy as np
 import plotly.io as pio
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
-#import dash_bootstrap_components as dbc 
 pio.renderers.default = "browser"
 
 
@@ -85,9 +81,7 @@ def plot_results(data,nodes,elems,**argv):
         'xanchor': 'center',
         'yanchor': 'top'})
 
-   #fig.update_layout(width=600,height=600,autosize=True,margin=dict(t=50, b=20, l=20, r=20),template='plotly_dark',paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
-   fig.update_layout(width=600,height=600,autosize=True,margin=dict(t=50, b=20, l=20, r=20),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
-   #fig.update_layout(width=600,height=600,autosize=True,margin=dict(t=50, b=20, l=20, r=20),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
+   fig.update_layout(width=600,height=600,autosize=True,margin=dict(t=50, b=20, l=20, r=20),template='plotly_dark')  
 
 
    updatemenus=[dict(direction='down',active=nv-2 if nv > 1 else 0,x=0.4,y=1.15,buttons=list(buttons),showactive=True)]
@@ -124,12 +118,6 @@ def plot_results(data,nodes,elems,**argv):
 
    fig.update_layout(xaxis_showgrid=False, yaxis_showgrid=False)
    fig.update_layout(scene_camera=camera)
-   
-   #if argv.setdefault('show',False):
-   #  fig.show()
-   #else:
-   app = dash.Dash(__name__, external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css'])
-   app.layout = html.Div(children=[dcc.Graph(figure=fig)])
-   app.run_server(debug=True)
 
+   fig.show()
 
