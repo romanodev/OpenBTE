@@ -15,6 +15,15 @@ OpenBTE features its own viewer, based on plotly_. This experimental feature can
 
 where ``repeat`` is used to plot the supercell. Nodes, that OpenBTE includes the periodic boundary conditions in translating cell data to node data. 
 
+Note that the external viewer can also be run with
+
+.. code:: bash
+
+   gui
+
+where ``repeat=[2,2,1]`` is assumed.   
+
+
 External Viewer
 ----------------------------------
 
@@ -23,14 +32,6 @@ Alternatively, it is possible to write results in the ``vtu`` format
 .. code:: python
 
    Plot(model='vtu',repeat=[2,2,1])
-
-Note that the external viewer can also be run with
-
-.. code:: bash
-
-   gui
-
-where ``repeat=[2,2,1]`` is assumed.   
 
 The created file ``output.vtk`` can be read by Paraview_
 
