@@ -11,6 +11,7 @@ __pycache__/
 # app specific
 *.hdf5
 *.vtk
+*.tar.gz
 *.swp
 examples/Si/tmp/
 
