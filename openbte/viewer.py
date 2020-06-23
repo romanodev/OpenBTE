@@ -3,8 +3,8 @@ import plotly.graph_objs as go
 import numpy as np
 import plotly.io as pio
 import dash
-import dash_core_components as dcc
-import dash_html_components as html
+#import dash_core_components as dcc
+#import dash_html_components as html
 #import dash_bootstrap_components as dbc 
 pio.renderers.default = "browser"
 
