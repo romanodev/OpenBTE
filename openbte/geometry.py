@@ -207,7 +207,6 @@ class Geometry(object):
    lines = [l.split()  for l in lines]
    nb = int(lines[4][0])
    current_line = 5
-   #Get physical regions
    self.blabels = {int(lines[current_line+i][1]) : lines[current_line+i][2].replace('"',r'') for i in range(nb)}
 
    current_line += nb+2
@@ -215,13 +214,10 @@ class Geometry(object):
    current_line += 1
    self.nodes = np.array([lines[current_line + n][1:4] for n in range(n_nodes)],float)
    current_line += n_nodes+1 
-   #Get size
    self.size = [ np.max(self.nodes[:,i]) - np.min(self.nodes[:,i])   for i in range(3)]
    self.dim = 2 if self.size[2] == 0 else 3
    current_line += 1
-   #load elements----
    n_elem_tot = int(lines[current_line][0])
-
    current_line += 1
 
    #type of elements
@@ -231,9 +227,7 @@ class Geometry(object):
 
    bulk_tags = [n for n in range(n_elem_tot) if int(lines[current_line + n][1]) in bulk_type[self.dim]] 
    face_tags = [n for n in range(n_elem_tot) if int(lines[current_line + n][1]) in face_type[self.dim]]
-
    self.elems = [list(np.array(lines[current_line + n][5:],dtype=int)-1) for n in bulk_tags] 
-
    self.n_elems = len(self.elems)
    boundary_sides = np.array([ sorted(np.array(lines[current_line + n][5:],dtype=int)) for n in face_tags] ) -1
 

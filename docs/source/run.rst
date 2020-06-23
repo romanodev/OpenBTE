@@ -72,7 +72,7 @@ OpenBTE can be run either via API or through a properly-formatted ``yaml`` file.
 
    .. tab:: Command Line
 
-      For whe command line version we feed OpenBTE directly with the contect of the ``YAML`` file instead of the file itself. For example:
+      For whe command line version we feed OpenBTE directly with the contents of the ``YAML`` file instead of the file itself. For example:
       
       .. code-block:: bash
 
