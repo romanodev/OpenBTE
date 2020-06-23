@@ -120,7 +120,7 @@ def plot_results(data,nodes,elems,**argv):
    fig.update_layout(xaxis_showgrid=False, yaxis_showgrid=False)
    fig.update_layout(scene_camera=camera)
 
-   if 'google.colab' in sys.module:
+   if 'google.colab' in sys.modules:
     fig.show(renderer='colab')
    else:
     fig.show(renderer='browser')
