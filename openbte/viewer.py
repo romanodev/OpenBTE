@@ -126,10 +126,10 @@ def plot_results(data,nodes,elems,**argv):
    fig.update_layout(scene_camera=camera)
    
    #if argv.setdefault('show',False):
-   #  fig.show()
+   fig.show()
    #else:
-   app = dash.Dash(__name__, external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css'])
-   app.layout = html.Div(children=[dcc.Graph(figure=fig)])
-   app.run_server()
+   #app = dash.Dash(__name__, external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css'])
+   #app.layout = html.Div(children=[dcc.Graph(figure=fig)])
+   #app.run_server()
 
 
