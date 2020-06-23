@@ -1,12 +1,7 @@
 import plotly.offline as py
 import plotly.graph_objs as go
 import numpy as np
-import plotly.io as pio
-import dash
-#import dash_core_components as dcc
-#import dash_html_components as html
-#import dash_bootstrap_components as dbc 
-pio.renderers.default = "browser"
+import sys
 
 
 def plotly_trisurf(nodes, simplices, data,name,units,visible=False):
@@ -124,9 +119,13 @@ def plot_results(data,nodes,elems,**argv):
 
    fig.update_layout(xaxis_showgrid=False, yaxis_showgrid=False)
    fig.update_layout(scene_camera=camera)
-   
+
+   if is_colab = 'google.colab' in sys.module:
+    fig.show(renderer='colab')
+   else:
+    fig.show(renderer='browser')
+
    #if argv.setdefault('show',False):
-   fig.show()
    #else:
    #app = dash.Dash(__name__, external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css'])
    #app.layout = html.Div(children=[dcc.Graph(figure=fig)])
