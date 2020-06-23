@@ -130,6 +130,6 @@ def plot_results(data,nodes,elems,**argv):
    #else:
    app = dash.Dash(__name__, external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css'])
    app.layout = html.Div(children=[dcc.Graph(figure=fig)])
-   app.run_server(debug=True)
+   app.run_server()
 
 

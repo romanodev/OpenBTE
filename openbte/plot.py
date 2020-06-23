@@ -22,7 +22,7 @@ class Plot(object):
    else: 
     if os.path.isfile('geometry.h5') :   
      self.mesh = dd.io.load('geometry.h5')
-     self.dim = int(self.mesh['meta'][2])
+   self.dim = int(self.mesh['meta'][2])
 
    
    if 'solver' in argv.keys():
