@@ -133,7 +133,7 @@ class Geometry(object):
           'boundary_sides':np.array(self.side_list['Boundary']),
           'n_side_per_elem': np.array([len(i)  for i in self.elems]),
           'pp':np.array(self.pp),\
-          'meta':np.asarray([self.n_elems,self.kappa_factor,self.dim,len(self.nodes),len(self.side_list['active']),self.computed_porosity],np.float64)}
+          'meta':np.asarray([self.n_elems,self.kappa_factor,self.dim,len(self.nodes),len(self.side_list['active'])],np.float64)}
 
 
 
