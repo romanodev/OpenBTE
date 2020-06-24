@@ -73,7 +73,7 @@ class Geometry(object):
      filling = np.sum(self.elem_volumes)/self.size[0]/self.size[1]/self.size[2]
     else: 
      filling = np.sum(self.elem_volumes)/self.size[0]/self.size[1]
-    self.compute_porosity = 1-filling
+    self.computed_porosity = 1-filling
 
 
     #generate_elem_mat_map
