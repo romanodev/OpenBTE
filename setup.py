@@ -30,7 +30,7 @@ setup(name='openbte',
                          ],
       license='GPLv2',\
       packages = ['openbte'],
-      package_data = {'openbte':['materials/*.dat','fonts/*.ttf']},
+      package_data = {'openbte':['materials/*.h5']},
       entry_points = {
      'console_scripts': ['AlmaBTE2OpenBTE=openbte.almabte2openbte:main',\
                          'Phono3py2OpenBTE=openbte.phono3py2openbte:main',\

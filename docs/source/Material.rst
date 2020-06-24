@@ -146,6 +146,12 @@ Assuming you have ``AlmaBTE`` in your current ``PATH``, this an example for ``Si
 
      AlmaBTE2OpenBTE Si_8_8_8_300K.phononinfo
 
+- Using OpenBTE command line interface, the ``material`` may be created with
+
+  .. code-block:: bash
+
+     OpenBTE $'Material:\n model: rta2DSym'
+
 
 .. _Deepdish: https://deepdish.readthedocs.io/
 .. _`Wu et al.`: https://www.sciencedirect.com/science/article/pii/S0009261416310193?via%3Dihub

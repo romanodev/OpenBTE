@@ -108,7 +108,6 @@ def repeat_merge_scale(argv):
        polygons_final.append(list(conso.exterior.coords))
   
 
-
   #cut redundant points (probably unnecessary)
   new_poly = []
   for poly in polygons_final:
@@ -148,7 +147,8 @@ def check_distances(new_poly):
   dmin = 1e4
   move = {}
   for p1 in range(len(Pores)):
-   #check if intersect   
+   #check if intersect  
+   
    for p2 in range(p1+1,len(Pores)):
        d = Pores[p1].distance(Pores[p2])
        if d > 0 and d < dmin : dmin = d

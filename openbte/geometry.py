@@ -69,6 +69,13 @@ class Geometry(object):
 
     self.n_elems = len(self.elems)
 
+    if self.dim == 3:
+     filling = np.sum(self.elem_volumes)/self.size[0]/self.size[1]/self.size[2]
+    else: 
+     filling = np.sum(self.elem_volumes)/self.size[0]/self.size[1]
+    self.compute_porosity = 1-filling
+
+
     #generate_elem_mat_map
 
     #generate_frame
@@ -126,7 +133,7 @@ class Geometry(object):
           'boundary_sides':np.array(self.side_list['Boundary']),
           'n_side_per_elem': np.array([len(i)  for i in self.elems]),
           'pp':np.array(self.pp),\
-          'meta':np.asarray([self.n_elems,self.kappa_factor,self.dim,len(self.nodes),len(self.side_list['active'])],np.float64)}
+          'meta':np.asarray([self.n_elems,self.kappa_factor,self.dim,len(self.nodes),len(self.side_list['active']),self.compute_porosity],np.float64)}
 
 
 
@@ -349,6 +356,7 @@ class Geometry(object):
 
    self.elem_kappa_map = {}
    self.elem_mat_map = { ne:0 for ne in list(range(len(self.elems)))}
+
 
     
 

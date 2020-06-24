@@ -76,7 +76,7 @@ OpenBTE can be run either via API or through a properly-formatted ``yaml`` file.
       
       .. code-block:: bash
 
-         OpenBTE $Material:\n model: rta2Sym\n n_phi: 48$
+         OpenBTE $'Material:\n model: rta2Sym'
 
       This is exactly like running ``OpenBTE`` with the yaml file:  
    

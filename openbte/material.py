@@ -9,6 +9,8 @@ from .mfp import *
 from .rta2DSym import *
 import deepdish as dd
 from mpi4py import MPI
+import shutil
+
 
 comm = MPI.COMM_WORLD
 
@@ -27,7 +29,9 @@ class Material(object):
       save = False
 
     elif model == 'database':
-      download_file(db['entry_name'],'material.h5')
+      #download_file(db['entry_name'],'material.h5')
+      source = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/openbte/materials/' + argv['filename'] + '_' + str(argv['temperature']) +'.h5'
+      shutil.copyfile(source,os.getcwd() + '/material.h5')
       save = False
 
     elif model == 'full':

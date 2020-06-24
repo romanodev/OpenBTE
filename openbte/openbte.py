@@ -4,7 +4,9 @@ import yaml
 import re,os
 
 def main():
- 
+
+
+
  if len(os.sys.argv) == 1:
    name = 'input.yaml'  
    with open(name) as f:
@@ -13,6 +15,7 @@ def main():
   a = os.sys.argv[1]
   if ':' in a:
    data = yaml.safe_load(a)
+
   else: 
    name = os.sys.argv[1]   
    with open(name) as f:

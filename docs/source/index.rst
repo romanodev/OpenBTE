@@ -22,7 +22,14 @@ Welcome to OpenBTE's documentation!
    Material
    Solver
    Plot
-   
+
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Database
+
+   database
+
 .. toctree::
    :maxdepth: 2
    :caption: Reference
