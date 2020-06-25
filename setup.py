@@ -34,6 +34,7 @@ setup(name='openbte',
       entry_points = {
      'console_scripts': ['AlmaBTE2OpenBTE=openbte.almabte2openbte:main',\
                          'Phono3py2OpenBTE=openbte.phono3py2openbte:main',\
+                         'rta2mfp=openbte.rta2mfp:main',\
                          'gui=openbte.gui:main',\
                          'OpenBTE=openbte.openbte:main'],
       },
