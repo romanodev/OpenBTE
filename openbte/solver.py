@@ -50,7 +50,7 @@ class Solver(object):
             self.print_logo()
             print('                         SYSTEM                 ',flush=True)   
             print(colored(' -----------------------------------------------------------','green'),flush=True)
-            self.verbose: self.print_options()
+            self.print_options()
 
         #-----IMPORT MESH--------------------------------------------------------------
         if comm.rank == 0:
@@ -503,7 +503,7 @@ class Solver(object):
      self.tf = shared_array(np.zeros((self.n_serial,self.n_elems)) if comm.rank == 0 else None)
      self.tfg = shared_array(np.zeros((self.n_serial,self.n_elems,self.dim)) if comm.rank == 0 else None)
      self.kappaf = shared_array(np.zeros((self.n_serial,self.n_parallel)) if comm.rank == 0 else None)
-     self.Supd = shared_array(np.zeros(len(self.kappam)) if comm.rank == 0 else None)
+     #self.Supd = shared_array(np.zeros(len(self.kappam)) if comm.rank == 0 else None)
      transitionp = np.zeros(self.n_parallel)
      transition = 1e4*np.ones(self.n_parallel)
 
@@ -730,7 +730,7 @@ class Solver(object):
                kappap[m,q] = -np.dot(self.kappa_mask,X)
                if self.multiscale:
                 error = abs(kappap[m,q] - kappaf[m,q])/abs(kappap[m,q]) 
-                if error < self.error_multiscale:# and m <= transition[q]:
+                if error < self.error_multiscale and m <= transition[q]:
                   transitionp[q] = m  
                   kappap[m,q] = kappaf[m,q]
                   diffusive +=1

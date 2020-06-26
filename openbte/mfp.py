@@ -50,7 +50,7 @@ def generate_mfp(**argv):
    n_mfp = len(mfp_sampled)
    temp_coeff = np.zeros(nm) 
    kappa_directional = np.zeros((n_mfp,n_theta*n_phi,3)) 
-   suppression = np.zeros((n_mfp,n_phi*n_theta,n_mfp_bulk,3)) 
+   suppression = np.zeros((n_mfp,n_phi*n_theta,n_mfp_bulk)) 
    temp_coeff = np.zeros((n_mfp,n_theta*n_phi))
    kappa_m = np.zeros(n_mfp)
    for m in range(n_mfp_bulk):
@@ -66,8 +66,8 @@ def generate_mfp(**argv):
       temp_coeff[m1,index] += a1 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]*sym
       temp_coeff[m2,index] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]*sym
 
-      suppression[m1,index,m] += 3 * a1 /mfp_bulk[m]*direction_ave[t,p]*sym*domega[t,p]/4.0/np.pi
-      suppression[m2,index,m] += 3 * a2 /mfp_bulk[m]*direction_ave[t,p]*sym*domega[t,p]/4.0/np.pi
+      suppression[m1,index,m] += 3 * a1 /mfp_bulk[m]*direction_ave[t,p,0]*sym*domega[t,p]/4.0/np.pi
+      suppression[m2,index,m] += 3 * a2 /mfp_bulk[m]*direction_ave[t,p,0]*sym*domega[t,p]/4.0/np.pi
 
    direction = direction_ave.reshape((n_theta * n_phi,3))
    F = np.einsum('m,dj->mdj',mfp_sampled,direction)

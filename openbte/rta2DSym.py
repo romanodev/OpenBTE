@@ -88,15 +88,12 @@ def generate_rta2DSym(**argv):
 
  rhs_average = mfp_sampled*mfp_sampled/2
 
- print(kappa)
  return {'tc':temp_coeff,\
          'sigma':kappa_directional,\
          'kappa':kappa,\
          'mfp_average':rhs_average*1e18,\
          'VMFP':polar_ave,\
          'mfp_sampled':mfp_sampled,\
-         'suppression':suppression,\
-         'kappam':kappam,\
          'model':np.array([8])}
 
 
