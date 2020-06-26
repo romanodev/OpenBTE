@@ -32,11 +32,12 @@ class Solver(object):
         self.error_multiscale = argv.setdefault('multiscale_error',1e-2)
         self.bundle = argv.setdefault('bundle',False)
         self.verbose = argv.setdefault('verbose',True)
+
         self.relaxation_factor = argv.setdefault('alpha',1.0)
         self.keep_lu = argv.setdefault('keep_lu',True)
         self.only_fourier = argv.setdefault('only_fourier',False)
-        self.max_bte_iter = argv.setdefault('max_bte_iter',20)
-        self.min_bte_iter = argv.setdefault('min_bte_iter',0)
+        self.max_bte_iter = argv.setdefault('max_bte_iter',10)
+        self.min_bte_iter = argv.setdefault('min_bte_iter',20)
         self.max_bte_error = argv.setdefault('max_bte_error',1e-3)
         self.max_fourier_iter = argv.setdefault('max_fourier_iter',20)
         self.max_fourier_error = argv.setdefault('max_fourier_error',1e-5)
@@ -45,14 +46,19 @@ class Solver(object):
         #----------------------------
          
         if comm.rank == 0:
-         if self.verbose: self.print_logo()
-         print('                         SYSTEM                 ',flush=True)   
-         print(colored(' -----------------------------------------------------------','green'),flush=True)
-         self.print_options()
+         if self.verbose: 
+            self.print_logo()
+            print('                         SYSTEM                 ',flush=True)   
+            print(colored(' -----------------------------------------------------------','green'),flush=True)
+            self.verbose: self.print_options()
 
         #-----IMPORT MESH--------------------------------------------------------------
         if comm.rank == 0:
-         data = argv['geometry'].data if 'geometry' in argv.keys() else dd.io.load('geometry.h5')
+         if 'geometry' in argv.keys() :
+          data = argv['geometry'].data 
+         else: 
+          a = np.load('geometry.npz',allow_pickle=True)
+          data = {key:a[key].item() for key in a}['arr_0']
          
          self.n_elems = int(data['meta'][0])
          im = np.concatenate((data['i'],list(np.arange(self.n_elems))))
@@ -97,8 +103,9 @@ class Solver(object):
         #------------------------------------------
 
         if comm.rank == 0:
-            print(colored(' -----------------------------------------------------------','green'),flush=True)
-            print(" ",flush=True)
+            if self.verbose: 
+                print(colored(' -----------------------------------------------------------','green'),flush=True)
+                print(" ",flush=True)
 
         if comm.rank == 0:
           #data = self.solve_fourier(self.kappa)
@@ -113,7 +120,7 @@ class Solver(object):
 
           self.state.update({'variables':variables,\
                            'kappa_fourier':data['meta'][0]})
-          self.fourier_info(data)
+          if self.verbose: self.fourier_info(data)
         else: data = None
         self.__dict__.update(create_shared_memory_dict(data))
        
@@ -152,7 +159,6 @@ class Solver(object):
            #  self.state['geometry'] = self.mesh
            #  self.state['material'] = self.mat
            #dd.io.save('solver.h5',self.state)
-           print('g')
            np.savez_compressed('solver.npz',self.state)   
 
           if self.verbose:
@@ -441,7 +447,7 @@ class Solver(object):
       
   def solve_rta(self,**argv):
 
-     if comm.rank == 0:
+     if comm.rank == 0 and self.verbose:
            print(flush=True)
            print('      Iter    Thermal Conductivity [W/m/K]      Error ''',flush=True)
            print(colored(' -----------------------------------------------------------','green'),flush=True)   
@@ -612,7 +618,7 @@ class Solver(object):
 
   def solve_mfp(self,**argv):
 
-     if comm.rank == 0:
+     if comm.rank == 0 and self.verbose:
            print(flush=True)
            print('      Iter    Thermal Conductivity [W/m/K]      Error ''',flush=True)
            print(colored(' -----------------------------------------------------------','green'),flush=True)   
@@ -835,7 +841,7 @@ class Solver(object):
 
   def solve_full(self,**argv):
 
-     if comm.rank == 0:
+     if comm.rank == 0 and self.verbose:
            print(flush=True)
            print('      Iter    Thermal Conductivity [W/m/K]      Error ''',flush=True)
            print(colored(' -----------------------------------------------------------','green'),flush=True)   
