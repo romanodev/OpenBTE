@@ -148,10 +148,13 @@ class Solver(object):
            self.state.update(data)
 
           if argv.setdefault('save',True):
-           if self.bundle:
-             self.state['geometry'] = self.mesh
-             self.state['material'] = self.mat
-           dd.io.save('solver.h5',self.state)
+           #if self.bundle:
+           #  self.state['geometry'] = self.mesh
+           #  self.state['material'] = self.mat
+           #dd.io.save('solver.h5',self.state)
+           print('g')
+           np.savez_compressed('solver.npz',self.state)   
+
           if self.verbose:
            print(' ',flush=True)   
            print(colored('                 OpenBTE ended successfully','green'),flush=True)

@@ -21,7 +21,6 @@ class Plot(object):
     self.mesh = argv['geometry'].data
    else: 
      #self.mesh = dd.io.load('geometry.h5')
-
      a = np.load('geometry.npz',allow_pickle=True)
      self.mesh = {key:a[key].item() for key in a}['arr_0']
      #tmp = np.load('geometry.npy',allow_pickle=True)
@@ -33,8 +32,9 @@ class Plot(object):
    if 'solver' in argv.keys():
     self.solver = argv['solver'].state
    else: 
-       if os.path.isfile('solver.h5') :
-        self.solver = dd.io.load('solver.h5')
+     a = np.load('solver.npz',allow_pickle=True)
+     self.solver = {key:a[key].item() for key in a}['arr_0']
+     #self.solver = dd.io.load('solver.h5')
 
    #if 'material' in argv.keys():
    # self.solver = argv['material']
