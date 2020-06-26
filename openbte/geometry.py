@@ -13,6 +13,7 @@ import time
 #from matplotlib.pylab import *
 import numpy.testing as npt
 from statistics import mean
+import pickle
 #from matplotlib.pylab import *
 
 comm = MPI.COMM_WORLD
@@ -30,9 +31,9 @@ class Geometry(object):
      self.import_mesh(**argv)
      self.data = self.compute_mesh_data(**argv)
      if argv.setdefault('save',True):
-      a = time.time()
+      np.savez_compressed('geometry',self.data)   
       #np.save('geometry',self.data)
-      dd.io.save('geometry.h5',self.data)
+      #dd.io.save('geometry.h5',self.data)
 
  #def compute_node_map(self,**argv):
 

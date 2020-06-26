@@ -20,8 +20,13 @@ class Plot(object):
    if 'geometry' in argv.keys():
     self.mesh = argv['geometry'].data
    else: 
-    if os.path.isfile('geometry.h5') :   
-     self.mesh = dd.io.load('geometry.h5')
+     #self.mesh = dd.io.load('geometry.h5')
+
+     a = np.load('geometry.npz',allow_pickle=True)
+     self.mesh = {key:a[key].item() for key in a}['arr_0']
+     #tmp = np.load('geometry.npy',allow_pickle=True)
+     #self.mesh = {  for  d1.get('key1')}
+
    self.dim = int(self.mesh['meta'][2])
 
    
