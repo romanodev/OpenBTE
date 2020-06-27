@@ -50,7 +50,6 @@ nbsphinx_execute = 'auto'
 extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.autosummary',\
     'sphinx.ext.intersphinx',\
-    'jupyter_sphinx',\
     'sphinx.ext.mathjax',\
     'sphinx_tabs.tabs',\
     'recommonmark',\
