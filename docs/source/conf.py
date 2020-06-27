@@ -8,6 +8,8 @@
 
 import os
 import sys
+import plotly
+
 
 sys.path.insert(0, os.path.abspath("../.."))
 
@@ -36,11 +38,20 @@ nbsphinx_execute = 'auto'
 #}
 
 
+#nbsphinx_prolog = r"""
+#.. raw:: html
+
+#    <script src='http://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js'></script>
+#    <script>require=requirejs;</script>
+
+#"""
+
 
 
 extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.autosummary',\
     'sphinx.ext.intersphinx',\
+    'jupyter_sphinx',\
     'sphinx.ext.mathjax',\
     'sphinx_tabs.tabs',\
     'recommonmark',\
@@ -59,8 +70,8 @@ extensions = ['sphinx.ext.autodoc',
 #"""
 
 
-
 html_theme = 'sphinx_rtd_theme'
+
 
 html_theme_options = {
     'logo_only': True,
@@ -71,4 +82,8 @@ exclude_patterns = ['**.ipynb_checkpoints']
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
-#html_static_path = ['_static']
+html_static_path = ['_static']
+
+
+
+

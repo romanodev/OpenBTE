@@ -623,9 +623,6 @@ class Solver(object):
            print('      Iter    Thermal Conductivity [W/m/K]      Error ''',flush=True)
            print(colored(' -----------------------------------------------------------','green'),flush=True)   
 
-       #with np.errstate(divide='ignore', invalid='ignore'):
-       #  tot = 1/Gb.clip(max=0).sum(axis=0).sum(axis=0); tot[np.isinf(tot)] = 0
-       #data = {'GG': np.einsum('mqs,s->mqs',Gbp2,tot)}
      #---------------------------------------------i
      if comm.rank == 0:   
       if len(self.db) > 0:
@@ -804,11 +801,11 @@ class Solver(object):
      if self.verbose and comm.rank == 0:
       print(colored(' -----------------------------------------------------------','green'),flush=True)
 
-     #if comm.rank == 0:
-     # import matplotlib.pylab as plt
-     # plt.plot(error_vec)
-     # plt.yscale('log')
-     # plt.show()
+     if comm.rank == 0:
+      import matplotlib.pylab as plt
+      plt.plot(error_vec)
+      plt.yscale('log')
+      plt.show()
      # plt.plot(Sup,color='b')
      # plt.plot(Supd,color='r')
      # plt.xscale('log')

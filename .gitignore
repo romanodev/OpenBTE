@@ -10,6 +10,7 @@ __pycache__/
 
 # app specific
 *.hdf5
+*.npz
 *.vtk
 *.tar.gz
 *.swp

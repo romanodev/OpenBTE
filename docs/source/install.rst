@@ -66,7 +66,11 @@ Install
 
    .. tab:: WINDOWS
 
-      Use CONDA after Installing MSMPI_.
+      Use Docker after Installing MSMPI_.
+
+   .. tab:: CLOUD
+       
+      You can run OpenBTE in Google Colab (Example_). 
 
 
 
@@ -75,5 +79,6 @@ Install
 .. _Anaconda: https://docs.anaconda.com/anaconda/install/
 .. _MSMPI: https://docs.microsoft.com/en-us/message-passing-interface/microsoft-mpi
 .. _here: https://gmsh.info/
+.. _Example: https://colab.research.google.com/drive/1jBXpOagmO1SK554sdxCTUkXDt5EHo2rp?usp=sharing
 
 

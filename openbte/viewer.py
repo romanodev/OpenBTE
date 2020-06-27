@@ -4,6 +4,7 @@ import numpy as np
 import sys
 
 
+
 def plotly_trisurf(nodes, simplices, data,name,units,visible=False):
 
 
@@ -80,9 +81,10 @@ def plot_results(data,nodes,elems,**argv):
         'xanchor': 'center',
         'yanchor': 'top'})
 
-   #fig.update_layout(width=600,height=600,autosize=True,margin=dict(t=50, b=20, l=20, r=20),template='plotly_dark',paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
-   fig.update_layout(width=600,height=600,autosize=True,margin=dict(t=50, b=20, l=20, r=20),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
    #fig.update_layout(width=600,height=600,autosize=True,margin=dict(t=50, b=20, l=20, r=20),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
+   #fig.update_layout(width=500,height=500,autosize=True,margin=dict(t=10, b=10, l=20, r=20),paper_bgcolor='LightSteelBlue')  
+   fig.update_layout(width=400,height=400,autosize=True,margin=dict(t=50, b=10, l=20, r=20),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
+   #fig.update_layout(width=500,height=500,autosize=True,margin=dict(t=50, b=20, l=20, r=20),template='plotly')#,plot_bgcolor='rgba(0,0,0,0)')  
 
 
    updatemenus=[dict(direction='down',active=nv-2 if nv > 1 else 0,x=0.4,y=1.15,buttons=list(buttons),showactive=True)]
@@ -95,7 +97,7 @@ def plot_results(data,nodes,elems,**argv):
           gridcolor="rgb(255, 255, 255)",
           zerolinecolor="rgb(255, 255, 255)",
           visible=False,
-          showbackground=False
+          showbackground=True
          )
 
    #axis = dict(ticktext=[],tickvals= [],showbackground=False)
@@ -119,6 +121,10 @@ def plot_results(data,nodes,elems,**argv):
 
    fig.update_layout(xaxis_showgrid=False, yaxis_showgrid=False)
    fig.update_layout(scene_camera=camera)
+
+   #if argv.setdefault('write',False):
+   # fig.update_layout(width=200,height=200)  
+   fig.write_html("plotly.html")
 
    if 'google.colab' in sys.modules:
     fig.show(renderer='colab')
