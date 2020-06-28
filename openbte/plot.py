@@ -103,14 +103,6 @@ class Plot(object):
          corr[index+n] = len(new_nodes)-1
 
    new_nodes = np.array(new_nodes)
-   #pnodes = np.array(pnodes)
-   #new_nodes = np.array(new_nodes)
-   #from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 unused import
-   #import matplotlib.pyplot as plt
-   #fig = plt.figure()
-   #ax = fig.add_subplot(111, projection='3d')
-   #ax.scatter(new_nodes[pnodes,0], new_nodes[pnodes,1], new_nodes[pnodes,2])
-   #plt.show()
 
    #Duplicate Elements
    cells = []
@@ -150,15 +142,24 @@ class Plot(object):
 
    #duplicate variables---
    for n,(key, value) in enumerate(self.solver['variables'].items()):
-
-
      if value['data'].ndim == 1:
       tmp = np.zeros(len(self.mesh['elems'])*np.prod(argv['repeat']))
      else: 
       tmp = np.zeros((len(self.mesh['elems'])*np.prod(argv['repeat']),self.dim))
 
-     for k,v in mapp.items():
-       for vv in v: tmp[vv] = value['data'][k]  
+     #NEW
+     g = 0
+     for nx in range(Nx):
+      for ny in range(Ny):
+       for nz in range(Nz):
+        inc = value['increment'][0]*nx + value['increment'][1]*ny + value['increment'][2]*nz
+        for k,gg in enumerate(self.mesh['elems']):
+          tmp[g] = value['data'][k] - inc
+          g +=1
+
+     #OLD
+     #for k,v in mapp.items():
+     #  for vv in v: tmp[vv] = value['data'][k]  
 
      self.solver['variables'][key]['data'] = tmp
 

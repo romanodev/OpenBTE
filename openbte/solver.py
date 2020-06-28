@@ -111,7 +111,6 @@ class Solver(object):
           #data = self.solve_fourier(self.kappa)
           data = self.solve_fourier_scalar(self.kappa[0,0])
 
-
           if  data['meta'][0] - self.kappa[0,0] > self.kappa[0,0]*1e-3:
               print('WARNING: Fourier thermal conductivity is larger than bulk one.',flush=True)
 

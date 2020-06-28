@@ -5,9 +5,10 @@ OpenBTE documentation
     
 OpenBTE is an open-source solver for the first-principles Boltzmann transport equation, with a focus on phonon transport. Here is an example to calculate the effective thermal conductivity of nanoporous silicon:
 
+
 .. raw:: html
 
-   <a href="https://colab.research.google.com/drive/1jBXpOagmO1SK554sdxCTUkXDt5EHo2rp?usp=sharing"><img  src="https://colab.research.google.com/assets/colab-badge.svg" style="vertical-align:text-bottom"></a>
+     <a href="https://colab.research.google.com/drive/1jBXpOagmO1SK554sdxCTUkXDt5EHo2rp?usp=sharing"><img  src="https://colab.research.google.com/assets/colab-badge.svg" style="vertical-align:text-bottom"></a>
 
 
 .. code-block:: python
@@ -29,7 +30,7 @@ OpenBTE is an open-source solver for the first-principles Boltzmann transport eq
 
 .. raw:: html
 
-    <iframe src="_static/plotly.html" height="420px" width="80%"  display= inline-block  ></iframe>
+    <iframe src="_static/plotly.html" height="475px" width="65%"  display= inline-block  ></iframe>
 
 
 .. toctree::
