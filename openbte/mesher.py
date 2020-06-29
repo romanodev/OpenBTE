@@ -47,7 +47,7 @@ class Mesher(object):
   #---------------------
 
   if argv.setdefault('lz',0) == 0:
-     self.generate_mesh_2D(argv)
+    self.generate_mesh_2D(argv)
   else:   
      self.generate_mesh_3D(argv)
 

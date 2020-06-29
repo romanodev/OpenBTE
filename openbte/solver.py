@@ -15,9 +15,7 @@ import sys
 from shapely.geometry import LineString
 import profile
 
-
 comm = MPI.COMM_WORLD
-
 
 class Solver(object):
 
@@ -131,7 +129,6 @@ class Solver(object):
          self.rr = range(block*comm.rank,self.n_parallel) if comm.rank == comm.size-1 else range(block*comm.rank,block*(comm.rank+1))
 
          #-------SOLVE BTE-------
-
          if self.model[0:3] == 'mfp':
             data = self.solve_mfp(**argv) 
          elif self.model[0:3] == 'rta':
@@ -235,7 +232,7 @@ class Solver(object):
           #print(" ")
 
 
-  def solve_serial_fourier(self,DeltaT):
+  def solve_serial_fourier(self,DeltaT,compute_sup = True):
 
 
 
@@ -244,7 +241,9 @@ class Solver(object):
          self.tf[:,:] = np.zeros((self.n_serial,self.n_elems))
          self.tfg[:,:,:] = np.zeros((self.n_serial,self.n_elems,self.dim))
          self.kappaf[:,:] = np.zeros((self.n_serial,self.n_parallel))
-         self.Supd[:] = np.zeros(len(self.kappam))
+         
+         if compute_sup:
+          self.Supd[:] = np.zeros(len(self.kappam))
          base_old = 0
          fourier = False
          C = np.zeros(self.n_elems)
@@ -258,7 +257,8 @@ class Solver(object):
 
             if error < 1e-3 and m > int(len(self.mfp_sampled)/4):
              self.kappaf[m:,:] = -base + np.einsum('m,c,qj,cj->mq',self.mfp_sampled[m:],self.kappa_mask,self.VMFP[:,0:self.dim],grad)
-             self.Supd[:] += np.einsum('gq,gqm->m',self.kappaf[m:,:],self.suppression[m:,:,:])*self.kappa_factor*1e-9
+             if compute_sup:
+              self.Supd[:] += np.einsum('gq,gqm->m',self.kappaf[m:,:],self.suppression[m:,:,:])*self.kappa_factor*1e-9
              self.tf[m:,:] = temp[:]
              self.tfg[m:,:,:] = grad[:,:]
              break
@@ -266,14 +266,18 @@ class Solver(object):
             #else:    
             base_old = base
             self.kappaf[m,:] = -base + self.mfp_sampled[m] * np.einsum('c,qj,cj->q',self.kappa_mask,self.VMFP[:,0:self.dim],grad)
-            self.Supd[:] += np.einsum('q,qm->m',self.kappaf[m,:],self.suppression[m,:,:])*self.kappa_factor*1e-9
+            if compute_sup:
+             self.Supd[:] += np.einsum('q,qm->m',self.kappaf[m,:],self.suppression[m,:,:])*self.kappa_factor*1e-9
             self.tf[m,:] = temp[:]
             self.tfg[m,:,:] = grad[:,:]
            #---------------------------------
 
         comm.Barrier()
 
-        return self.kappaf,self.tf,self.tfg,self.Supd
+        if compute_sup:
+         return self.kappaf,self.tf,self.tfg,self.Supd
+        else:
+         return self.kappaf,self.tf,self.tfg,0
 
   def set_model(self,m):
 
@@ -512,7 +516,7 @@ class Solver(object):
         self.x_old = DeltaT.copy()
         if self.multiscale  : 
             a = time.time()
-            (kappaf,tf,tfg,Supd) = self.solve_serial_fourier(DeltaT)
+            (kappaf,tf,tfg,Supd) = self.solve_serial_fourier(DeltaT,compute_sup=False)
 
         #Multiscale scheme-----------------------------
         diffusive = 0
@@ -522,7 +526,11 @@ class Solver(object):
         J,Jp = np.zeros((2,self.n_elems,self.dim))
         #kappa_bal,kappa_balp = np.zeros((2,self.n_parallel))
 
-        RHS = -np.einsum('c,nc->nc',TB,self.Gbm2)
+        #EXPERIMENTAL--
+        if len(self.db) > 0: #boundary
+         RHS = -np.einsum('c,nc->nc',TB,self.Gbm2)
+        else: 
+         RHS = np.zeros(1)   
 
         for n,q in enumerate(self.rr):
 

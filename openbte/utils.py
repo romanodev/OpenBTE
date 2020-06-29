@@ -179,10 +179,9 @@ def check_distances(new_poly):
 
 def interpolate(vector,value,bounds='extent',period = None):
 
-
    n = len(vector)
 
-   if value > vector[0] and value < vector[-1]:
+   if value >= vector[0] and value <= vector[-1]:
      
     for m in range(n-1):
       if (value <= vector[m+1]) and (value >= vector[m]) :

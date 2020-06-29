@@ -10,7 +10,6 @@ from .utils import *
 def generate_rta2DSym(**argv):
 
  #Import data----
- data = dd.io.load('rta.h5')
  #Get options----
  n_phi = int(argv.setdefault('n_phi',48))
  n_mfp = int(argv.setdefault('n_mfp',50))
@@ -39,12 +38,10 @@ def generate_rta2DSym(**argv):
  phi_bulk[np.where(phi_bulk < 0) ] = 2*np.pi + phi_bulk[np.where(phi_bulk <0)]
  kappa = data['kappa']
 
-
  mfp_sampled = np.logspace(-10,np.log10(max(r)*1.01),n_mfp)#min MFP = 1e-1 nm
 
  #-----------------------
  n_mfp_bulk = len(mfp_bulk) 
- n_mfp = argv.setdefault('n_mfp',100)
  mfp = np.logspace(-1,np.log10(max(r)*1.01),n_mfp)#min MFP = 1e-2 
 
  n_mfp = len(mfp)

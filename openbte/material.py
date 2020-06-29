@@ -7,6 +7,7 @@ from .utils import *
 from .mfp2DSym import *
 from .mfp import *
 from .rta2DSym import *
+from .rta3D import *
 import deepdish as dd
 from mpi4py import MPI
 import shutil
@@ -15,7 +16,6 @@ import shutil
 comm = MPI.COMM_WORLD
 
 class Material(object):
-
 
  def __init__(self,**argv):
 
@@ -45,6 +45,9 @@ class Material(object):
 
     elif model == 'rta2DSym':
       data = generate_rta2DSym(**argv)
+
+    elif model == 'rta3D':
+      data = generate_rta3D(**argv)
 
     elif model == 'mfp_ms':
       data = generate_mfp_ms(**argv)

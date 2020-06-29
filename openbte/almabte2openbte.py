@@ -13,7 +13,7 @@ def main():
  ntot = nq*nb
 
  tau = tmp[:,7]
- v   = tmp[:,8:10]
+ v   = tmp[:,8:]
  C   = tmp[:,6]
 
  kappa =  np.einsum('ki,kj,k,k',v,v,tau,C) 
