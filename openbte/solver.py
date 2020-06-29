@@ -322,9 +322,6 @@ class Solver(object):
 
 
 
-
-
-
   def solve_modified_fourier(self,DeltaT):
 
          kappaf,kappafp = np.zeros((2,self.n_serial,self.n_parallel))   
@@ -791,6 +788,7 @@ class Solver(object):
         comm.Allreduce([kappap,MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([Mp,MPI.DOUBLE],[MM,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([TBp,MPI.DOUBLE],[TB,MPI.DOUBLE],op=MPI.SUM)
+
         kappa_totp = np.array([np.einsum('mq,mq->',self.sigma[:,self.rr,0],kappa[:,self.rr])])*self.kappa_factor*1e-18
         comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
         #print(transition_bal)

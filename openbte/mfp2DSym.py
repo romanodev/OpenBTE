@@ -14,6 +14,7 @@ def generate_mfp2DSym(**argv):
  kappa_bulk = data['K']
  mfp_bulk = data['mfp']
 
+
  kappa= np.eye(3) * np.sum(kappa_bulk)
  #Get options----
  n_phi = int(argv.setdefault('n_phi',48))

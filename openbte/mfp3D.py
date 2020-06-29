@@ -5,7 +5,7 @@ import scipy
 import deepdish as dd
 from .utils import *
 
-def generate_mfp(**argv): 
+def generate_mfp3D(**argv): 
 
    #Polar Angle-----
    n_phi = int(argv.setdefault('n_phi',48)); Dphi = 2.0*np.pi/n_phi
@@ -45,8 +45,12 @@ def generate_mfp(**argv):
    kappa = data['kappa']
    #-----------------------
 
-   n_mfp_bulk = len(mfp_bulk) 
-   mfp_sampled = np.logspace(min([-2,np.log10(min(mfp_bulk)*0.99)]),np.log10(max(mfp_bulk)*1.01),n_mfp)#min MFP = 1e-2 nm 
+   n_mfp_bulk = len(mfp_bulk)
+   if argv.setdefault('natural',False):
+     mfp_sampled = mfp_bulk
+   else:  
+     mfp_sampled = np.logspace(min([-2,np.log10(min(mfp_bulk)*0.99)]),np.log10(max(mfp_bulk)*1.01),n_mfp)#min MFP = 1e-2 nm 
+
    n_mfp = len(mfp_sampled)
    temp_coeff = np.zeros(nm) 
    kappa_directional = np.zeros((n_mfp,n_theta*n_phi,3)) 

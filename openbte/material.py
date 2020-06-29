@@ -5,7 +5,7 @@ from .database import *
 from .full_model import generate_full
 from .utils import *
 from .mfp2DSym import *
-from .mfp import *
+from .mfp3D import *
 from .rta2DSym import *
 from .rta3D import *
 import deepdish as dd
@@ -40,8 +40,8 @@ class Material(object):
     elif model == 'mfp2DSym':
       data = generate_mfp2DSym(**argv)
 
-    elif model == 'mfp':
-      data = generate_mfp(**argv)
+    elif model == 'mfp3D':
+      data = generate_mfp3D(**argv)
 
     elif model == 'rta2DSym':
       data = generate_rta2DSym(**argv)
