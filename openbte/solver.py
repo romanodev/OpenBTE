@@ -430,6 +430,7 @@ class Solver(object):
          RHS[i] += RHSe[n,c]
          
     B = DeltaT + self.mfp_sampled[m]*(self.P[n] + RHS)
+    #B = self.mfp_sampled[m]*(self.gradient[n]+RHS)
 
     if self.init == False:
      self.Master = sp.csc_matrix((np.arange(len(self.im))+1,(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)
@@ -439,9 +440,10 @@ class Solver(object):
     if not self.umfpack :
        if not (m,n) in self.lu.keys():
         self.Master.data = np.concatenate((self.mfp_sampled[m]*self.Gm[n],self.mfp_sampled[m]*self.D[n]+np.ones(self.n_elems)))[self.conversion]
-        self.lu[(m,n)] = sp.linalg.splu(self.Master) 
+        self.lu[(m,n)] = sp.linalg.splu(self.Master)
+       #return self.lu[(m,n)].solve(B) + self.Tloc
        return self.lu[(m,n)].solve(B) 
-    else:  
+    else: 
       self.Master.data = np.concatenate((self.mfp_sampled[m]*self.Gm[n],self.mfp_sampled[m]*self.D[n]+np.ones(self.n_elems)))[self.conversion]
       return sp.linalg.spsolve(self.Master,B)
       
@@ -628,20 +630,22 @@ class Solver(object):
            print(colored(' -----------------------------------------------------------','green'),flush=True)   
 
      #---------------------------------------------i
-     if comm.rank == 0:   
-      if len(self.db) > 0:
+     if len(self.db) > 0:
+      if comm.rank == 0:   
        Gb   = np.einsum('mqj,jn->mqn',self.sigma,self.db,optimize=True)
        Gbp2 = Gb.clip(min=0);
        with np.errstate(divide='ignore', invalid='ignore'):
           tot = 1/Gb.clip(max=0).sum(axis=1); tot[np.isinf(tot)] = 0
        data = {'GG': np.einsum('mqs,ms->mqs',Gbp2,tot)}
        del tot, Gbp2
-     else: data = None
-     self.__dict__.update(create_shared_memory_dict(data))
+      else: data = None
+      self.__dict__.update(create_shared_memory_dict(data))
 
      #---------------------------------------------
      #------------------------------------------------
      #Main matrix----
+     self.gradient = -self.VMFP[self.rr,0]/100.0
+
      G = np.einsum('qj,jn->qn',self.VMFP[self.rr],self.k,optimize=True)
      Gp = G.clip(min=0); self.Gm = G.clip(max=0)
      self.D = np.zeros((len(self.rr),self.n_elems))
@@ -682,7 +686,12 @@ class Solver(object):
      error_vec = []
      transitionp = np.zeros(self.n_parallel)
      transition = 1e4 * np.ones(self.n_parallel)
-        
+      
+     self.Tloc = np.zeros(self.n_elems)
+     for i in range(self.n_elems):
+      cx = self.centroids[i,0]
+      self.Tloc[i] = -0.5 + (cx + 50)/100
+
 
      while kk < self.max_bte_iter and error > self.max_bte_error:
         a = time.time()
@@ -706,7 +715,7 @@ class Solver(object):
         if len(self.db) > 0: #boundary
          RHS = -np.einsum('mc,nc->mnc',TB,self.Gbm2)
         else: 
-         RHS = np.zeros(1)   
+         RHS = np.zeros(self.n_serial)   
 
         for n,q in enumerate(self.rr):
            #COMPUTE BALLISTIC----------------------- 
@@ -726,7 +735,7 @@ class Solver(object):
                kappap[m,q] = kappaf[m,q]
                X = tf[m] - self.mfp_sampled[m]*np.dot(self.VMFP[q,:self.dim],tfg[m].T)
                diffusive +=1
-             else:
+             else:  
                X = self.get_X(m,n,DeltaT,RHS[m])
                kappap[m,q] = -np.dot(self.kappa_mask,X)
                if self.multiscale:
@@ -739,6 +748,7 @@ class Solver(object):
 
              #-------------------------------------     
              DeltaTp += X*self.tc[m,q]
+             #for c,i in enumerate(self.eb): TBp[m,c] -= X[i]*self.GG[m,q,c]
              for c,i in enumerate(self.eb): TBp[m,c] -= X[i]*self.GG[m,q,c]
              Jp += np.einsum('c,j->cj',X,self.sigma[m,q,0:self.dim])*1e-18
              Supp += kappap[m,q]*self.suppression[m,q,:]*self.kappa_factor*1e-9
