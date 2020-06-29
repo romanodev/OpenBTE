@@ -103,7 +103,8 @@ With the custom model, the structured is defined a series of polygons defining t
 
    Geometry(model='custom',lx=100,ly=100,step=5,polygons = [poly1,poly2])
 
-
+.. image:: carved.png
+   :width: 500 px
 
 
 

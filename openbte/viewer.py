@@ -1,4 +1,5 @@
 import plotly.offline as py
+import plotly
 import plotly.graph_objs as go
 import numpy as np
 import sys
@@ -124,6 +125,7 @@ def plot_results(data,nodes,elems,**argv):
 
    if argv.setdefault('write',False):
     fig.write_html("plotly.html")
+    plotly.io.to_image(fig,format='png')
 
    if 'google.colab' in sys.modules:
     fig.show(renderer='colab')

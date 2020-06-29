@@ -10,6 +10,9 @@ import os
 import sys
 
 
+#def setup(app):
+ #   app.add_css_file('style.css')
+
 sys.path.insert(0, os.path.abspath("../.."))
 
 #import jupyter_sphinx
@@ -70,9 +73,11 @@ extensions = ['sphinx.ext.autodoc',
 
 html_theme = 'sphinx_rtd_theme'
 
+html_logo = '_static/openbte_logo.png'
 
 html_theme_options = {
-    'logo_only': True,
+    'logo_only': True,\
+    'style_nav_header_background': 'white'
 }
 
 exclude_patterns = ['**.ipynb_checkpoints']
