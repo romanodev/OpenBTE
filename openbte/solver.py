@@ -38,7 +38,7 @@ class Solver(object):
         self.min_bte_iter = argv.setdefault('min_bte_iter',20)
         self.max_bte_error = argv.setdefault('max_bte_error',1e-3)
         self.max_fourier_iter = argv.setdefault('max_fourier_iter',20)
-        self.constant_gradient = argv.setdefault('constant_gradient',False)
+        self.deviational = argv.setdefault('deviational',False)
         self.max_fourier_error = argv.setdefault('max_fourier_error',1e-5)
         self.init = False
         self.MF = {}
@@ -185,7 +185,7 @@ class Solver(object):
           print(colored('  Relaxation:                              ','green')+ str(self.relaxation_factor),flush=True)
           print(colored('  Keep Lu:                                 ','green')+ str(self.keep_lu),flush=True)
           print(colored('  Use umfpack                              ','green')+ str(self.umfpack),flush=True)
-          print(colored('  Constant gradient                        ','green')+ str(self.constant_gradient),flush=True)
+          print(colored('  Deviational                              ','green')+ str(self.deviational),flush=True)
           print(colored('  Multiscale Error:                        ','green')+ str(self.error_multiscale),flush=True)
           print(colored('  Only Fourier:                            ','green')+ str(self.only_fourier),flush=True)
           print(colored('  Max Fourier Error:                       ','green')+ '%.1E' % (self.max_fourier_error),flush=True)
@@ -250,7 +250,7 @@ class Solver(object):
          fourier = False
          C = np.zeros(self.n_elems)
          for m in range(len(self.mfp_sampled)):
-           
+
             dataf = self.solve_fourier_scalar(self.mfp_average[m],pseudo=DeltaT,m=m,guess = C)
             temp  = dataf['temperature_fourier'] 
             grad  = dataf['grad'] 
@@ -431,10 +431,10 @@ class Solver(object):
      for c,i in enumerate(self.eb):
          RHS[i] += RHSe[n,c]
   
-    if not self.constant_gradient:
+    if not self.deviational:
      B = DeltaT + self.mfp_sampled[m]*(self.P[n] + RHS)
     else: 
-     B = self.mfp_sampled[m]*(self.gradient[n]+RHS)
+     B = DeltaT + self.mfp_sampled[m]*(-self.gradient[n]+RHS)
 
     if self.init == False:
      self.Master = sp.csc_matrix((np.arange(len(self.im))+1,(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)
@@ -446,14 +446,14 @@ class Solver(object):
         self.Master.data = np.concatenate((self.mfp_sampled[m]*self.Gm[n],self.mfp_sampled[m]*self.D[n]+np.ones(self.n_elems)))[self.conversion]
         self.lu[(m,n)] = sp.linalg.splu(self.Master)
 
-       if not self.constant_gradient:
+       if not self.deviational:
         return self.lu[(m,n)].solve(B) 
        else: 
-        return self.lu[(m,n)].solve(B) + self.Tloc
+        return self.lu[(m,n)].solve(B) #this is the deviational
 
     else: 
       self.Master.data = np.concatenate((self.mfp_sampled[m]*self.Gm[n],self.mfp_sampled[m]*self.D[n]+np.ones(self.n_elems)))[self.conversion]
-      if not self.constant_gradient:
+      if not self.deviational:
        return sp.linalg.spsolve(self.Master,B)
       else:
        return sp.linalg.spsolve(self.Master,B) + self.Tloc
@@ -655,8 +655,6 @@ class Solver(object):
 
      #---------------------------------------------
      #------------------------------------------------
-     #Main matrix----
-     self.gradient = -self.VMFP[self.rr,0]/100.0
 
      G = np.einsum('qj,jn->qn',self.VMFP[self.rr],self.k,optimize=True)
      Gp = G.clip(min=0); self.Gm = G.clip(max=0)
@@ -698,11 +696,19 @@ class Solver(object):
      error_vec = []
      transitionp = np.zeros(self.n_parallel)
      transition = 1e4 * np.ones(self.n_parallel)
-      
-     self.Tloc = np.zeros(self.n_elems)
-     for i in range(self.n_elems):
-      cx = self.centroids[i,0]
-      self.Tloc[i] = -0.5 + (cx + self.size[0]/2)/self.size[0]
+     
+     if self.deviational:
+      self.gradient = self.VMFP[self.rr,0]/self.size[0]
+      self.Tloc = np.zeros(self.n_elems)
+      for i in range(self.n_elems):
+       cx = self.centroids[i,0]
+       self.Tloc[i] = -0.5 + (cx + self.size[0]/2)/self.size[0]
+      if len(self.db) > 0: #boundary
+       tmp = np.einsum('rj,jn->rn',self.VMFP[self.rr],self.db,optimize=True)  
+       Gbp2 = tmp.clip(min=0); self.Gbm2 = tmp.clip(max=0);
+       for n,i in enumerate(self.eb):
+          TB[:,n]  = DeltaT[i] - self.Tloc[i]
+       DeltaT -= self.Tloc 
 
 
      while kk < self.max_bte_iter and error > self.max_bte_error:
@@ -760,8 +766,8 @@ class Solver(object):
 
              #-------------------------------------     
              DeltaTp += X*self.tc[m,q]
-             #for c,i in enumerate(self.eb): TBp[m,c] -= X[i]*self.GG[m,q,c]
              for c,i in enumerate(self.eb): TBp[m,c] -= X[i]*self.GG[m,q,c]
+
              Jp += np.einsum('c,j->cj',X,self.sigma[m,q,0:self.dim])*1e-18
              Supp += kappap[m,q]*self.suppression[m,q,:]*self.kappa_factor*1e-9
  
@@ -828,11 +834,11 @@ class Solver(object):
      if self.verbose and comm.rank == 0:
       print(colored(' -----------------------------------------------------------','green'),flush=True)
 
-     if comm.rank == 0:
-      import matplotlib.pylab as plt
-      plt.plot(error_vec)
-      plt.yscale('log')
-      plt.show()
+     #if comm.rank == 0:
+     # import matplotlib.pylab as plt
+     # plt.plot(error_vec)
+     # plt.yscale('log')
+     # plt.show()
      # plt.plot(Sup,color='b')
      # plt.plot(Supd,color='r')
      # plt.xscale('log')
