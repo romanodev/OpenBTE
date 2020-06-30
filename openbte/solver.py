@@ -38,6 +38,7 @@ class Solver(object):
         self.min_bte_iter = argv.setdefault('min_bte_iter',20)
         self.max_bte_error = argv.setdefault('max_bte_error',1e-3)
         self.max_fourier_iter = argv.setdefault('max_fourier_iter',20)
+        self.constant_gradient = argv.setdefault('constant_gradient',False)
         self.max_fourier_error = argv.setdefault('max_fourier_error',1e-5)
         self.init = False
         self.MF = {}
@@ -184,6 +185,7 @@ class Solver(object):
           print(colored('  Relaxation:                              ','green')+ str(self.relaxation_factor),flush=True)
           print(colored('  Keep Lu:                                 ','green')+ str(self.keep_lu),flush=True)
           print(colored('  Use umfpack                              ','green')+ str(self.umfpack),flush=True)
+          print(colored('  Constant gradient                        ','green')+ str(self.constant_gradient),flush=True)
           print(colored('  Multiscale Error:                        ','green')+ str(self.error_multiscale),flush=True)
           print(colored('  Only Fourier:                            ','green')+ str(self.only_fourier),flush=True)
           print(colored('  Max Fourier Error:                       ','green')+ '%.1E' % (self.max_fourier_error),flush=True)
@@ -428,9 +430,11 @@ class Solver(object):
     if len(self.db) > 0: #boundary
      for c,i in enumerate(self.eb):
          RHS[i] += RHSe[n,c]
-         
-    B = DeltaT + self.mfp_sampled[m]*(self.P[n] + RHS)
-    #B = self.mfp_sampled[m]*(self.gradient[n]+RHS)
+  
+    if not self.constant_gradient:
+     B = DeltaT + self.mfp_sampled[m]*(self.P[n] + RHS)
+    else: 
+     B = self.mfp_sampled[m]*(self.gradient[n]+RHS)
 
     if self.init == False:
      self.Master = sp.csc_matrix((np.arange(len(self.im))+1,(self.im,self.jm)),shape=(self.n_elems,self.n_elems),dtype=self.tt)
@@ -441,11 +445,19 @@ class Solver(object):
        if not (m,n) in self.lu.keys():
         self.Master.data = np.concatenate((self.mfp_sampled[m]*self.Gm[n],self.mfp_sampled[m]*self.D[n]+np.ones(self.n_elems)))[self.conversion]
         self.lu[(m,n)] = sp.linalg.splu(self.Master)
-       #return self.lu[(m,n)].solve(B) + self.Tloc
-       return self.lu[(m,n)].solve(B) 
+
+       if not self.constant_gradient:
+        return self.lu[(m,n)].solve(B) 
+       else: 
+        return self.lu[(m,n)].solve(B) + self.Tloc
+
     else: 
       self.Master.data = np.concatenate((self.mfp_sampled[m]*self.Gm[n],self.mfp_sampled[m]*self.D[n]+np.ones(self.n_elems)))[self.conversion]
-      return sp.linalg.spsolve(self.Master,B)
+      if not self.constant_gradient:
+       return sp.linalg.spsolve(self.Master,B)
+      else:
+       return sp.linalg.spsolve(self.Master,B) + self.Tloc
+
       
   def solve_rta(self,**argv):
 
@@ -690,7 +702,7 @@ class Solver(object):
      self.Tloc = np.zeros(self.n_elems)
      for i in range(self.n_elems):
       cx = self.centroids[i,0]
-      self.Tloc[i] = -0.5 + (cx + 50)/100
+      self.Tloc[i] = -0.5 + (cx + self.size[0]/2)/self.size[0]
 
 
      while kk < self.max_bte_iter and error > self.max_bte_error:

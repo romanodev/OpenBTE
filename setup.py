@@ -2,7 +2,7 @@ from setuptools import setup,find_packages
 import os
 
 setup(name='openbte',
-      version='1.24',
+      version='1.27',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',
