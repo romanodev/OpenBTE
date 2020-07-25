@@ -263,6 +263,7 @@ def get_linear_indexes(mfp,value,scale,extent):
      aj *=mfp[j]/value
    return i,ai,j,aj  
 
+
 def shared_array(value):
 
     data = {'dummy':value}
@@ -286,7 +287,7 @@ def create_shared_memory_dict(varss):
               data_type = 1
               itemsize = MPI.DOUBLE.Get_size() 
            else:
-              print('data type for shared memory not supported')
+              print('data type for shared memory not supported for ' + var)
               quit()
 
            size = np.prod(value.shape)
@@ -298,6 +299,7 @@ def create_shared_memory_dict(varss):
 
        #ALLOCATING MEMORY---------------
        for n,(var,meta) in enumerate(var_meta.items()):
+       
         win = MPI.Win.Allocate_shared(meta[3],meta[2], comm=comm) 
         buf,itemsize = win.Shared_query(0)
         assert itemsize == meta[2]

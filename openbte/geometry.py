@@ -5,7 +5,7 @@ from .mesher import *
 from .utils import *
 import time
 import scipy.sparse as sp
-import deepdish as dd
+#import deepdish as dd
 import itertools
 from .GenerateInterface import *
 from mpi4py import MPI
@@ -14,6 +14,7 @@ import time
 import numpy.testing as npt
 from statistics import mean
 import pickle
+
 #from matplotlib.pylab import *
 
 comm = MPI.COMM_WORLD
@@ -24,16 +25,21 @@ class Geometry(object):
 
   if comm.rank == 0:
    if argv.setdefault('model','lattice') == 'interface':
-     GenerateInterface(**argv) 
+     GenerateInterface(**argv) #this create mesh.msh 
+     self.import_mesh(**argv)
+     argv.update({'centroids':self.elem_centroids})
+     self.elem_mat_map = CreateCorrelation(**argv)
+     self.update_side_interface()
+     self.data = self.compute_mesh_data(**argv)
    else:
      Mesher(argv) #this create mesh.msh
      self.dmin = argv['dmin']
      self.import_mesh(**argv)
+     self.elem_mat_map = np.zeros(len(self.elems)) #omhogeneous material
      self.data = self.compute_mesh_data(**argv)
-     if argv.setdefault('save',True):
-      np.savez_compressed('geometry',self.data)   
-      #np.save('geometry',self.data)
-      #dd.io.save('geometry.h5',self.data)
+   self.update_side_interface()
+   if argv.setdefault('save',True):
+    np.savez_compressed('geometry',self.data)   
 
  #def compute_node_map(self,**argv):
 
@@ -53,6 +59,16 @@ class Geometry(object):
         normal = self.face_normals[s]
         d1 = normal * np.dot(normal,d)
         self.bconn.append(d1)
+
+ def update_side_interface(self):
+
+  interface_sides = []
+  for ll in self.side_list['active']:
+     (k1,k2) = self.side_elem_map[ll]
+     if not self.elem_mat_map[k1] == self.elem_mat_map[k2]:
+             interface_sides.append(ll)
+  interface_sides = np.array(interface_sides)
+  self.side_list['Interface'] = interface_sides  
 
 
  def compute_mesh_data(self,**argv):
@@ -82,26 +98,34 @@ class Geometry(object):
     #generate_frame
     frame = generate_frame(**argv)
     #-----------
-    #argv.update({'centroids':self.elem_centroids})
-    #self.elem_mat_map = CreateCorrelation(**argv)
-    self.elem_mat_map = { i:[0] for i in range(len(self.elems))}
 
     periodic_side_values_vec = []
     for ll in self.side_list['Periodic']:
       periodic_side_values_vec.append(self.periodic_side_values[ll])
       
-    weigths_vec = np.zeros((self.n_elems,self.dim,len(self.elems[0])))  
-    for value,items in self.weigths.items(): 
-     weigths_vec[value] = items
+    weigths_vec = np.zeros((self.n_elems,self.dim,max(self.side_per_elem)))  
+    for value,items in self.weigths.items():
+        weigths_vec[value,:,:np.shape(items)[1]] = items
 
     interp_weigths = np.zeros(len(self.sides))
     for value,items in self.interp_weigths.items():
       interp_weigths[value] = items[0]
-    
+   
+    #Fill with -1 the missing connectivity
+    ms = max(self.side_per_elem)
+    for n,e in enumerate(self.elems):
+        if len(e) < ms:
+            e.append(-1)
+            self.elem_side_map[n].append(-1)
+
+
+
+
     return {
           'size':self.size,\
           #'conn':self.conn,\
-          'elems':self.elems,\
+          'elems':np.array(self.elems),\
+          'boundary_element': np.array([self.side_elem_map[ll][0] for ll in self.side_list['Boundary']],dtype=np.int),\
           'dim':np.array([self.dim]),\
           'weigths': weigths_vec,\
           'bconn': np.array(self.bconn),\
@@ -116,12 +140,16 @@ class Geometry(object):
           'centroids':np.array(self.elem_centroids),\
           'side_centroids':np.array(self.side_centroids),\
           'volumes':self.elem_volumes,\
-          'kappa_mask':np.array(np.sum(self.B_with_area_old.todense(),axis=0))[0],\
+          'elem_mat_map':self.elem_mat_map,\
+          'kappa_mask':-np.array(np.sum(self.B_with_area_old.todense(),axis=0))[0]*self.kappa_factor*1e-18,\
           'dists':np.array(self.dists_side),\
           'flux_sides':np.array(self.flux_sides),\
           'frame':frame,\
           'i':np.array(self.i),\
           'j':np.array(self.j),\
+          'inti':np.array(self.inti),\
+          'intj':np.array(self.intj),\
+          'intk':np.array(self.intk),\
           'im': np.concatenate((self.i,list(np.arange(self.n_elems)))),\
           'jm': np.concatenate((self.j,list(np.arange(self.n_elems)))),\
           'k':self.k,\
@@ -130,10 +158,12 @@ class Geometry(object):
           'db':self.db,\
           'active_sides':np.array(self.side_list['active']),
           'inactive_sides':np.array(self.side_list['Inactive']),
+          'interface_sides':np.array(self.side_list['Interface']),
           'periodic_sides':np.array(self.side_list['Periodic']),
           'boundary_sides':np.array(self.side_list['Boundary']),
           'n_side_per_elem': np.array([len(i)  for i in self.elems]),
           'pp':np.array(self.pp),\
+          'side_per_elem':np.array(self.side_per_elem),\
           'meta':np.asarray([self.n_elems,self.kappa_factor,self.dim,len(self.nodes),len(self.side_list['active'])],np.float64)}
 
 
@@ -160,7 +190,8 @@ class Geometry(object):
    nc = len(self.elems)
    ns = len(self.elem_side_map[0])
    self.i = [];self.j = [];self.k = []
-   self.eb = [];self.sb = []; self.db = []; self.dbp = []
+   self.eb = [];self.sb = []; self.db = []; #self.dbp = []
+   self.inti = [];self.intj = []; self.intk = []; 
 
    data = []
  
@@ -170,24 +201,33 @@ class Geometry(object):
      vol1 = self.elem_volumes[l1]
      vol2 = self.elem_volumes[l2]
      area = self.side_areas[ll]
-     normal = self.face_normals[ll]
+     normal = self.face_normals[ll][:self.dim]
+
+     if ll in self.side_list['Interface']:
+      self.inti.append(l1)   
+      self.intj.append(l2)   
+      self.inti.append(l2)   
+      self.intj.append(l1)   
+      self.intk.append(normal*area/vol1)
+      self.intk.append(-normal*area/vol2)
+
      if not l1 == l2:
-      self.i.append(l1)   
-      self.j.append(l2)   
-      self.i.append(l2)   
-      self.j.append(l1)   
-      ij.append([l1,l2])
-      ij.append([l2,l1])
-      self.k.append(normal*area/vol1)
-      self.k.append(-normal*area/vol2)
+       self.i.append(l1)   
+       self.j.append(l2)   
+       self.i.append(l2)   
+       self.j.append(l1)   
+       ij.append([l1,l2])
+       ij.append([l2,l1])
+       self.k.append(normal*area/vol1)
+       self.k.append(-normal*area/vol2)
      else:
-       #s = np.where(np.array(self.elem_side_map[l1])==ll)[0][0]
        self.eb.append(l1)
        self.sb.append(ll)
        self.db.append(normal*area/vol1)
    
    self.k = np.array(self.k).T
    self.db = np.array(self.db).T
+   self.intk = np.array(self.intk).T
 
    self.ij = ij
 
@@ -235,7 +275,8 @@ class Geometry(object):
 
    bulk_tags = [n for n in range(n_elem_tot) if int(lines[current_line + n][1]) in bulk_type[self.dim]] 
    face_tags = [n for n in range(n_elem_tot) if int(lines[current_line + n][1]) in face_type[self.dim]]
-   self.elems = [list(np.array(lines[current_line + n][5:],dtype=int)-1) for n in bulk_tags] 
+   self.elems = [list(np.array(lines[current_line + n][5:],dtype=int)-1) for n in bulk_tags]
+   self.side_per_elem = np.array([len(e) for e in self.elems])
    self.n_elems = len(self.elems)
    boundary_sides = np.array([ sorted(np.array(lines[current_line + n][5:],dtype=int)) for n in face_tags] ) -1
 
@@ -355,8 +396,9 @@ class Geometry(object):
    for side in self.side_list['Boundary'] :# + self.side_list['Hot'] + self.side_list['Cold']:
     self.side_elem_map[side].append(self.side_elem_map[side][0])
 
-   self.elem_kappa_map = {}
-   self.elem_mat_map = { ne:0 for ne in list(range(len(self.elems)))}
+   #self.elem_kappa_map = {}
+   #self.elem_mat_map = { ne:0 for ne in list(range(len(self.elems)))}
+
 
 
     
@@ -398,8 +440,17 @@ class Geometry(object):
 
    M = np.ones((3,3))
    for i,e in enumerate(self.elems):
-    M[:,:2] = self.nodes[e,0:2]
-    self.elem_volumes[i] = abs(0.5*np.linalg.det(M))
+    if len(e) == 3:     
+     M[:,:2] = self.nodes[e,0:2]
+     self.elem_volumes[i] = abs(0.5*np.linalg.det(M))
+    else:
+
+     points = self.nodes[e]
+     x = points[:,0]
+     y = points[:,1]
+     self.elem_volumes[i] = 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
+
+
 
 
 
@@ -556,6 +607,7 @@ class Geometry(object):
 
       if abs(side_value[side[1]]) > 0:
        self.pp += ((self.ij.index([j,i]),side_value[side[1]]),)
+       #self.pp.append(self.ij.index([j,i]))
        self.ip.append(j); self.jp.append(i); self.dp.append(side_value[side[1]]); self.pv.append(-normal*area/volj)
 
       if np.linalg.norm(np.cross(self.face_normals[side[0]],applied_grad)) < 1e-12:
@@ -570,14 +622,14 @@ class Geometry(object):
      normal = self.face_normals[ll]   
      tmp = np.abs(np.dot(normal,flux_dir))
      if tmp > delta : #either negative or positive
-       if normal[0] == 1:
+       if abs(normal[0]) == 1:
            if self.dim == 2:  
             area_flux = self.size[1]
            else: 
             area_flux = self.size[1]*self.size[2]
            total_area += self.side_areas[ll]
 
-       elif normal[1] == 1:
+       elif abs(normal[1]) == 1:
            if self.dim == 2:  
             area_flux = self.size[0]
            else: 
@@ -609,11 +661,11 @@ class Geometry(object):
      kc2 = elems[1]
      c2 = self.get_next_elem_centroid(kc1,ll)
      dist = c2-c1
-
      ind2 = self.elem_side_map[kc2].index(ll)
      for i in range(self.dim):
-      diff_dist.setdefault(kc1,np.zeros((len(self.elem_side_map[kc1]),self.dim)))[ind1][i] = dist[i]   
-      diff_dist.setdefault(kc2,np.zeros((len(self.elem_side_map[kc2]),self.dim)))[ind2][i] = -dist[i]   
+      diff_dist.setdefault(kc1,np.zeros((len(self.elem_side_map[kc1]),self.dim)))[ind1][i] = dist[i]  
+      diff_dist.setdefault(kc2,np.zeros((len(self.elem_side_map[kc2]),self.dim)))[ind2][i] = -dist[i]  
+
     else :
      dist = self.side_centroids[ll] - c1
     # kk = list(self.side_list['Boundary']).index(ll)   
@@ -629,11 +681,14 @@ class Geometry(object):
      # for i in range(self.dim):
      #   diff_dist.setdefault(np.zeros((len(self.elem_side_map[kc2]),self.dim)))[ind2][i] = dist[i]   
 
+   #print(diff_dist)
+   #quit()
+
    #Compute weights
    self.weigths = {}
    for h in diff_dist.keys() :
-    tmp = diff_dist[h]   
-    self.weigths[h] = np.dot(np.linalg.inv(np.dot(np.transpose(tmp),tmp)),np.transpose(tmp)  )
+    tmp = diff_dist[h]  
+    self.weigths[h] = np.dot(np.linalg.inv(np.dot(np.transpose(tmp),tmp)),np.transpose(tmp))
 
 
 

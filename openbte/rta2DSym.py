@@ -1,8 +1,6 @@
-import deepdish as dd
 import sys
 import numpy as np
 import scipy
-import deepdish as dd
 from .utils import *
 
 
@@ -30,7 +28,7 @@ def generate_rta2DSym(**argv):
  kappam = np.einsum('u,u,u,u->u',data['tau'],data['C'],data['v'][:,0],data['v'][:,0]) 
  tc = data['C']*f
  tc /= tc.sum()
- Jc = np.einsum('k,ki->ki',data['C'],data['v'])
+ Jc = np.einsum('k,ki->ki',data['C'],data['v'][:,:2])
  nm = len(tc)
  mfp_bulk = np.einsum('ki,k->ki',data['v'][:,:2],data['tau'])
  r = np.array([np.linalg.norm(m) for m in mfp_bulk])
@@ -61,10 +59,10 @@ def generate_rta2DSym(**argv):
      temp_coeff[m2,p1] += tc[m]*a2*b1
      temp_coeff[m2,p2] += tc[m]*a2*b2
  
-     kappa_directional[m1,p1,:2] += Jc[m]*a1*b1
-     kappa_directional[m1,p2,:2] += Jc[m]*a1*b2
-     kappa_directional[m2,p1,:2] += Jc[m]*a2*b1
-     kappa_directional[m2,p2,:2] += Jc[m]*a2*b2
+     kappa_directional[m1,p1] += Jc[m]*a1*b1
+     kappa_directional[m1,p2] += Jc[m]*a1*b2
+     kappa_directional[m2,p1] += Jc[m]*a2*b1
+     kappa_directional[m2,p2] += Jc[m]*a2*b2
 
     else: 
      lo += tc[m]   
@@ -89,7 +87,7 @@ def generate_rta2DSym(**argv):
          'sigma':kappa_directional,\
          'kappa':kappa,\
          'mfp_average':rhs_average*1e18,\
-         'VMFP':polar_ave,\
+         'VMFP':polar_ave[:,:2],\
          'mfp_sampled':mfp_sampled,\
          'model':np.array([8])}
 

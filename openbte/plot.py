@@ -4,11 +4,31 @@ from pyvtk import *
 import numpy as np
 import os
 from .utils import *
-import deepdish as dd
+#import deepdish as dd
 from .viewer import *
+import matplotlib
+import matplotlib.patches as patches
+from matplotlib.path import Path
+from matplotlib.pylab import *
 
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
+
+def create_path(obj):
+
+   codes = [Path.MOVETO]
+   for n in range(len(obj)-1):
+    codes.append(Path.LINETO)
+   codes.append(Path.CLOSEPOLY)
+
+   verts = []
+   for tmp in obj:
+     verts.append(tmp)
+   verts.append(verts[0])
+
+   path = Path(verts,codes)
+   return path
+
 
 class Plot(object):
 
@@ -20,11 +40,8 @@ class Plot(object):
    if 'geometry' in argv.keys():
     self.mesh = argv['geometry'].data
    else: 
-     #self.mesh = dd.io.load('geometry.h5')
      a = np.load('geometry.npz',allow_pickle=True)
      self.mesh = {key:a[key].item() for key in a}['arr_0']
-     #tmp = np.load('geometry.npy',allow_pickle=True)
-     #self.mesh = {  for  d1.get('key1')}
 
    self.dim = int(self.mesh['meta'][2])
 
@@ -34,7 +51,6 @@ class Plot(object):
    else: 
      a = np.load('solver.npz',allow_pickle=True)
      self.solver = {key:a[key].item() for key in a}['arr_0']
-     #self.solver = dd.io.load('solver.h5')
 
    #if 'material' in argv.keys():
    # self.solver = argv['material']
@@ -53,10 +69,61 @@ class Plot(object):
     self.duplicate_cells(**argv)
     self.plot_maps(**argv)
 
+   elif model == 'matplotlib':
+    self.plot_matplotlib(**argv)
+
    elif model == 'vtu':
     self.duplicate_cells(**argv)
     self.write_cell_vtu(**argv)   
     #self.write_vtu(**argv)   
+
+
+ def plot_matplotlib(self,**argv):
+
+    cmap = matplotlib.cm.get_cmap('viridis')
+    size = self.mesh['size']
+    frame = self.mesh['frame']
+    lx = size[0]
+    ly = size[1]
+    fig = figure(num=" ", figsize=(4*lx/ly, 4), dpi=80, facecolor='w', edgecolor='k')
+    axes([0,0,1.0,1.0])
+    xlim([-lx/2.0,lx/2.0])
+    ylim([-ly/2.0,ly/2.0])
+     
+    #plot frame---
+    path = create_path(frame)
+    patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color='#D4D4D4',zorder=1,joinstyle='miter')
+    gca().add_patch(patch);
+
+    data = self.solver['variables'][0]['data']
+    data = (data - min(data))/(max(data)-min(data))
+
+    for ne in range(len(self.mesh['elems'])):
+      cc =  self.mesh['elem_mat_map'][ne]
+      if cc == 1:
+         color = 'gray'
+      else:   
+         color = 'green'
+      self.plot_elem(ne,color = cmap(data[ne]))
+      #self.plot_elem(ne,color = color)
+
+    #plot interface sides 
+    for side in self.mesh['interface_sides']:
+      p1 = self.mesh['sides'][side][0]
+      p2 = self.mesh['sides'][side][1]
+      n1 = self.mesh['nodes'][p1]
+      n2 = self.mesh['nodes'][p2]
+      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=2,zorder=1)
+ 
+    show()  
+ 
+ def plot_elem(self,ne,color='gray') :
+
+    elem = self.mesh['elems'][ne][:self.mesh['side_per_elem'][ne]]
+    pp = self.mesh['nodes'][elem,:2]
+    path = create_path(pp)
+    patch = patches.PathPatch(path,linestyle=None,linewidth=0.5,color=color,zorder=1,joinstyle='miter',alpha=0.7)
+    gca().add_patch(patch)
 
 
  def duplicate_cells(self,**argv):

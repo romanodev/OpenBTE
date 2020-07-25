@@ -1,8 +1,6 @@
-import deepdish as dd
 import sys
 import numpy as np
 import scipy
-import deepdish as dd
 from .utils import *
 
 

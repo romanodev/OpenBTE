@@ -1,9 +1,8 @@
-import deepdish as dd
 import sys
 import numpy as np
 import scipy
-import deepdish as dd
 from .utils import *
+import deepdish as dd
 
 def generate_mfp3D(**argv): 
 
@@ -95,6 +94,7 @@ def generate_mfp3D(**argv):
         tmp = kappa_directional[m,index]
         kappa += np.outer(tmp,direction_ave[t,p])*mfp_sampled[m]
 
+   print(kappa)
    tc = temp_coeff/np.sum(temp_coeff)
 
 

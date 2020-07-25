@@ -1,25 +1,33 @@
-import deepdish as dd
 import sys
 import numpy as np
 import scipy
-import deepdish as dd
 from .utils import *
+from mpi4py import MPI
+import time
+import deepdish as dd
 
-
+comm = MPI.COMM_WORLD
 
 def generate_mfp2DSym(**argv):
 
  #Import data----
  data = dd.io.load('mfp.h5')
+ #a = np.load('mfp.npz',allow_pickle=True)
+ #data = {key:a[key].item() for key in a}['arr_0']
+ 
  kappa_bulk = data['K']
  mfp_bulk = data['mfp']
+
+ I = np.where(mfp_bulk > 0)
+ kappa_bulk = kappa_bulk[I]
+ mfp_bulk = mfp_bulk[I]
 
 
  kappa= np.eye(3) * np.sum(kappa_bulk)
  #Get options----
  n_phi = int(argv.setdefault('n_phi',48))
  n_mfp = int(argv.setdefault('n_mfp',50))
- n_theta = 24
+ n_theta = int(argv.setdefault('n_theta',24))
 
  nm = n_phi * n_mfp
 
@@ -40,7 +48,6 @@ def generate_mfp2DSym(**argv):
  #   coeff[m1,m] = a1
  #   coeff[m2,m] = a2
  #-----------------------
-
  #---------------------
    
  #Azimuthal Angle------------------------------
@@ -68,25 +75,40 @@ def generate_mfp2DSym(**argv):
  mfp = np.logspace(min([-2,np.log10(min(mfp_bulk)*0.99)]),np.log10(max(mfp_bulk)*1.01),n_mfp) 
 
  n_mfp = len(mfp)
- temp_coeff = np.zeros((n_mfp,n_phi))
- kappa_directional = np.zeros((n_mfp,n_phi,3)) 
- suppression = np.zeros((n_mfp,n_phi,n_mfp_bulk)) 
-  
- for p in range(n_phi): 
-  for t in range(n_theta): 
-    for m in range(n_mfp_bulk):
-      reduced_mfp = mfp_bulk[m]*ftheta[t]*np.sin(theta[t])
-      (m1,a1,m2,a2) = get_linear_indexes(mfp,reduced_mfp,scale='linear',extent=True)
+
+ temp_coeff_p,temp_coeff = np.zeros((2,n_mfp,n_phi))
+ kappa_directional_p,kappa_directional = np.zeros((2,n_mfp,n_phi,3)) 
+ suppression_p,suppression = np.zeros((2,n_mfp,n_phi,n_mfp_bulk)) 
+
+ block =  n_mfp_bulk//comm.size
+
+ rr = range(block*comm.rank,n_mfp_bulk) if comm.rank == comm.size-1 else range(block*comm.rank,block*(comm.rank+1))
+
+ #temp_coeff = shared_array( np.zeros((n_mfp,n_phi)) ) if comm.rank == 0 else None)
+ #kappa_directional = shared_array( np.zeros((n_mfp,n_phi,3)) ) if comm.rank == 0 else None)
+ #temp_coeff = np.zeros((2,n_mfp,n_phi))
+ #kappa_directional_p,kappa_directional = np.zeros((2,n_mfp,n_phi,3)) 
+ #suppression = shared_array( np.zeros((n_mfp,n_phi,3)) ) if comm.rank == 0 else None)
+ #suppression_p,suppression = np.zeros((2,n_mfp,n_phi,n_mfp_bulk)) 
+ 
+ for t in range(n_theta):
+   for r in range(len(rr)):
+     m = rr[r]  
+     reduced_mfp = mfp_bulk[m]*ftheta[t]*np.sin(theta[t])
+     (m1,a1,m2,a2) = get_linear_indexes(mfp,reduced_mfp,scale='linear',extent=True)
+     for p in range(n_phi): 
       index_1 = p*n_mfp + m1
       index_2 = p*n_mfp + m2
-      if mfp_bulk[m] > 0:
-       kappa_directional[m1,p]         += 3 * a1 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]
-       kappa_directional[m2,p]         += 3 * a2 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]
-       suppression[m1,p,m]         += 3 * a1 * 2 * 1/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p,0]*domega[t,p]
-       suppression[m2,p,m]         += 3 * a2 * 2 * 1/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p,0]*domega[t,p]
-       temp_coeff[m1,p] += a1 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
-       temp_coeff[m2,p] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
+      kappa_directional_p[m1,p]         += 3 * a1 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]
+      kappa_directional_p[m2,p]         += 3 * a2 * 2 * kappa_bulk[m]/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p]*domega[t,p]
+      suppression_p[m1,p,m]         += 3 * a1 * 2 * 1/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p,0]*domega[t,p]
+      suppression_p[m2,p,m]         += 3 * a2 * 2 * 1/mfp_bulk[m]/4.0/np.pi * direction_ave[t,p,0]*domega[t,p]
+      temp_coeff_p[m1,p] += a1 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
+      temp_coeff_p[m2,p] += a2 * kappa_bulk[m]/mfp_bulk[m]/mfp_bulk[m]*domega[t,p]
 
+ comm.Allreduce([suppression_p,MPI.DOUBLE],[suppression,MPI.DOUBLE],op=MPI.SUM)
+ comm.Allreduce([temp_coeff_p,MPI.DOUBLE],[temp_coeff,MPI.DOUBLE],op=MPI.SUM)
+ comm.Allreduce([kappa_directional_p,MPI.DOUBLE],[kappa_directional,MPI.DOUBLE],op=MPI.SUM)
 
  #replicate bulk values---
 
@@ -108,13 +130,13 @@ def generate_mfp2DSym(**argv):
   
  rhs_average = mfp_sampled*mfp_sampled
  rhs_average *= a[0,0]
-
+ 
  #Final----
  return {'tc':tc,\
-         'sigma':kappa_directional,\
+         'sigma':kappa_directional[:,:,:2],\
          'kappa':kappa,\
          'mfp_average':rhs_average*1e18,\
-         'VMFP':polar_ave,\
+         'VMFP':polar_ave[:,:2],\
          'mfp_sampled':mfp,\
          'model':np.array([5]),\
          'suppression':suppression,\

@@ -1,4 +1,3 @@
-import deepdish as dd
 import sys
 import numpy as np
 from scipy.sparse.linalg import lsqr 
@@ -6,7 +5,7 @@ from scipy.sparse.linalg import inv as sinv
 from scipy.linalg import inv as inv
 from scipy.sparse import csc_matrix
 import scipy
-import deepdish as dd
+#import deepdish as dd
 
 
 
@@ -104,7 +103,7 @@ def generate_full(**argv):
 
  F = np.einsum('i,ij->ij',1/np.diag(W),sigma)
 
- data = {'tc':tc,'VMFP':F,'sigma':sigma,'kappa':kappa,'B':B,'scale':1/np.diag(W),'model':[10],'alpha':data['alpha']}
+ data = {'tc':tc,'VMFP':F[:,:2],'sigma':sigma[:,:2],'kappa':kappa,'B':B,'scale':1/np.diag(W),'model':[10],'alpha':data['alpha']}
 
  return data
 

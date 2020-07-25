@@ -1,6 +1,7 @@
 import subprocess
 import numpy as np
 import scipy.interpolate as interpolate
+import os
 
 
 def periodic_kernel(x1, x2, p,l,variance):
@@ -21,10 +22,7 @@ def generate_random_interface(p,l,variance,scale):
  return f
 
 
-
-
 def CreateCorrelation(**argv):
-
 
     p = argv['lx']
     l = argv.setdefault('l',1)
@@ -32,24 +30,21 @@ def CreateCorrelation(**argv):
     variance = argv.setdefault('variance',1)
     f = generate_random_interface(p,l,variance,scale)
 
-    elem_mat_map = {}
+    elem_mat_map = np.zeros(len(argv['centroids']))
     for ne,c in enumerate(argv['centroids']):
       dd = f(c[1])
       if c[0] < dd:
-       elem_mat_map.update({ne:0})
+       elem_mat_map[ne] = 0
       else:
-       elem_mat_map.update({ne:1})
+       elem_mat_map[ne] = 1
 
+    
     return elem_mat_map
    
 
 
-
-
-
-
-
 def GenerateInterface(**argv):
+
 
     s = r'''    
 
@@ -92,10 +87,10 @@ def GenerateInterface(**argv):
     
     Physical Surface('Matrix') = {1,2,3};
 
-    Physical Line('Periodic_1') = {5,1,6};
-    Physical Line('Periodic_2') = {9,3,8};
-    Physical Line('Periodic_3') = {10};
-    Physical Line('Periodic_4') = {7};
+    Physical Line('Periodic_2') = {5,1,6};
+    Physical Line('Periodic_1') = {9,3,8};
+    Physical Line('Periodic_4') = {10};
+    Physical Line('Periodic_3') = {7};
 
     Periodic Line{5}={9};
     Periodic Line{6}={-8};
@@ -106,17 +101,18 @@ def GenerateInterface(**argv):
 
     s = s.replace('h1','10')
     s = s.replace('h2','3')
-    s = s.replace('Nx','20')
-    s = s.replace('Ny','100')
-    s = s.replace('D',str(argv['lx']))
-    s = s.replace('delta','2')
+    s = s.replace('Nx','10')
+    s = s.replace('Ny','20')
+    s = s.replace('D',str(argv['lx']/2))
+    s = s.replace('delta',str(argv['delta']))
 
     f = open('mesh.geo','w+')
 
     f.write(s)
 
     f.close()
-    subprocess.check_output(['gmsh','-optimize_netgen','-format','msh2','-2','mesh.geo','-o','mesh.msh'])
+    with open(os.devnull, 'w') as devnull:
+      output = subprocess.check_output("gmsh -optimize_netgen -format msh2 -2 mesh.geo -o mesh.msh".split(), stderr=devnull)
 
 
 

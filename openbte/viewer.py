@@ -123,9 +123,9 @@ def plot_results(data,nodes,elems,**argv):
    fig.update_layout(xaxis_showgrid=False, yaxis_showgrid=False)
    fig.update_layout(scene_camera=camera)
 
-   if argv.setdefault('write',False):
-    fig.write_html("plotly.html")
-    plotly.io.to_image(fig,format='png')
+   #if argv.setdefault('write',False):
+   # fig.write_html("plotly.html")
+   # plotly.io.to_image(fig,format='png')
 
    if 'google.colab' in sys.modules:
     fig.show(renderer='colab')
