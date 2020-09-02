@@ -2,7 +2,7 @@ import sys
 
 import numpy as np
 #import jax.numpy as np
-from jax import jit,ops
+#from jax import jit,ops
 import scipy
 from mpi4py import MPI
 import time
@@ -32,40 +32,19 @@ def get_linear_indexes(mfp,value):
         return m,1-aj,m+1,aj  
    
 
-@jit
-def update_values(m,mfp,reduced_mfp,kappa_bulk,mfp_bulk,tcp,kdp,tmp_1,tmp_2,n_phi): 
-
-      #(m1,a1,m2,a2) = get_linear_indexes(mfp,reduced_mfp,scale='linear',extent=True)
-
-      #print(reduced_mfp < mfp )
-
-      #quit()
-      m1 = 5
-      m2 = 6
-      a1 = 0.1
-      a2 = 0.9
-
-      kdp = ops.index_add(kdp,ops.index[m1,:],a1*tmp_1)
-      kdp = ops.index_add(kdp,ops.index[m2,:],a2*tmp_1)
-
-      tcp = ops.index_add(tcp,ops.index[m1,:],a1*tmp_2)
-      tcp = ops.index_add(tcp,ops.index[m2,:],a2*tmp_2)
-
-
-      return tcp,kdp
 
 
 def generate_mfp2DSym_2(**argv):
 
  #Import data----
- #a = np.load('mfp.npz',allow_pickle=True)
- #data = {key:a[key].item() for key in a}['arr_0']
+ a = np.load('mfp.npz',allow_pickle=True)
+ data = {key:a[key].item() for key in a}['arr_0']
 
- data = dd.io.load('mfp.h5')
+ #data = dd.io.load('mfp.h5')
 
  kappa_bulk = data['K']
  mfp_bulk = data['mfp']
- print(len(mfp_bulk))
+
 
  I = np.where(mfp_bulk > 0)
  kappa_bulk = kappa_bulk[I]
@@ -86,7 +65,8 @@ def generate_mfp2DSym_2(**argv):
 
  #Polar Angle---------
  Dphi = 2*np.pi/n_phi
- phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+ #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+ phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
 #--------------------
 
  #Get coeff matrix---
@@ -120,13 +100,15 @@ def generate_mfp2DSym_2(**argv):
 
  n_mfp_bulk = len(mfp_bulk) 
  n_mfp = argv.setdefault('n_mfp',100)
- mfp = np.logspace(min([-2,np.log10(min(mfp_bulk)*0.99)]),np.log10(max(mfp_bulk)*1.01),n_mfp) 
+
+
+ mfp = np.logspace(np.log10(max([min(mfp_bulk),1e-11])),np.log10(max(mfp_bulk)*1.01),n_mfp) 
 
  n_mfp = len(mfp)
 
  temp_coeff_p,temp_coeff = np.zeros((2,n_mfp,n_phi))
  kappa_directional_p,kappa_directional = np.zeros((2,n_mfp,n_phi,3)) 
- suppression_p,suppression = np.zeros((2,n_mfp,n_phi,n_mfp_bulk)) 
+ #suppression_p,suppression = np.zeros((2,n_mfp,n_phi,n_mfp_bulk)) 
 
 
  dirr = np.einsum('tpi,tp->tpi',direction_ave[:,:,:2],domega)
@@ -156,12 +138,13 @@ def generate_mfp2DSym_2(**argv):
  #change to mfp
  mfplog = np.log10(mfp)
 
+ print('f')
  for t in range(n_theta):
 
    for m in rr:  
        
-      (m1,a1,m2,a2) = get_linear_indexes(mfplog,np.log10(mfp_bulk[m]*g3[t]))
-      #(m1,a1,m2,a2) = get_linear_indexes(mfp,mfp_bulk[m]*g3[t])
+      #(m1,a1,m2,a2) = get_linear_indexes(mfplog,np.log10(mfp_bulk[m]*g3[t]))
+      (m1,a1,m2,a2) = get_linear_indexes(mfp,mfp_bulk[m]*g3[t])
 
       tmp = g1[m]*dirr[t]
       kdp[m1] += a1*tmp
@@ -188,13 +171,11 @@ def generate_mfp2DSym_2(**argv):
 
  #Test for bulk---
 
- #if comm.rank == 0:
- # kappa_bulk = np.zeros((2,2))
- # for m in range(n_mfp):
- #  for p in range(n_phi):
- #     kappa_bulk += mfp[m]*np.outer(kd[m,p],polar_ave[p,:2])
-
- # print(kappa_bulk)     
+ if comm.rank == 0:
+  kappa_bulk = np.zeros((2,2))
+  for m in range(n_mfp):
+   for p in range(n_phi):
+      kappa_bulk += mfp[m]*np.outer(kd[m,p],polar_ave[p,:2])
 
 
  #replicate bulk values---
@@ -221,6 +202,7 @@ def generate_mfp2DSym_2(**argv):
          'mfp_average':rhs_average*1e18,\
          'VMFP':polar_ave[:,:2],\
          'mfp_sampled':mfp,\
+         'sampling': np.array([n_phi,n_theta,n_mfp]),\
          'model':np.array([5]),\
          'suppression':np.zeros(1),\
          'kappam':kappa_bulk}

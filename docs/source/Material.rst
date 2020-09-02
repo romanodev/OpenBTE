@@ -125,7 +125,7 @@ Assuming you have ``AlmaBTE`` in your current ``PATH``, this an example for ``Si
 
   .. code-block:: bash
 
-   https://almabte.bitbucket.io/database/Si.tar.xz   
+   wget https://almabte.bitbucket.io/database/Si.tar.xz   
    tar -xf Si.tar.xz && rm -rf Si.tar.xz  
 
 - Compute bulk scattering time with AlmaBTE.

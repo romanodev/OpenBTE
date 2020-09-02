@@ -56,13 +56,16 @@ def generate_mfp3D(**argv):
    suppression = np.zeros((n_mfp,n_phi*n_theta,n_mfp_bulk)) 
    temp_coeff = np.zeros((n_mfp,n_theta*n_phi))
    kappa_m = np.zeros(n_mfp)
+   ang_coeff = np.zeros(n_phi*n_theta)
    for m in range(n_mfp_bulk):
     (m1,a1,m2,a2) = get_linear_indexes(mfp_sampled,mfp_bulk[m],scale='linear',extent=True)
     kappa_m[m1] += a1*kappa_bulk[m] 
     kappa_m[m2] += a2*kappa_bulk[m] 
     for t in range(n_theta): 
      for p in range(n_phi): 
+         
       index = t * n_phi + p
+      and_coeff[index] = domega[t,p]/4.0/np.pi
       factor = kappa_bulk[m]/4.0/np.pi*domega[t,p]
       kappa_directional[m1,index] += 3 * a1 * factor/mfp_bulk[m]*direction_ave[t,p]*sym
       kappa_directional[m2,index] += 3 * a2 * factor/mfp_bulk[m]*direction_ave[t,p]*sym
@@ -94,7 +97,6 @@ def generate_mfp3D(**argv):
         tmp = kappa_directional[m,index]
         kappa += np.outer(tmp,direction_ave[t,p])*mfp_sampled[m]
 
-   print(kappa)
    tc = temp_coeff/np.sum(temp_coeff)
 
 
@@ -105,6 +107,7 @@ def generate_mfp3D(**argv):
            'model':np.array([6]),\
            'mfp_average':rhs_average*1e18,\
            'mfp_sampled':mfp_sampled,\
+           'ang_coeff':ang_coeff,\
            'suppression':suppression,\
            'kappam':kappa_bulk,\
            'mfp_bulk':mfp_bulk}

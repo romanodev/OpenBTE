@@ -2,7 +2,7 @@ import sys
 import numpy as np
 import scipy
 from .utils import *
-import deepdish as dd
+#import deepdish as dd
 from mpi4py import MPI
 
 comm = MPI.COMM_WORLD
@@ -35,7 +35,8 @@ def generate_mfp3D_2(**argv):
 
    #Polar Angle-----
    n_phi = int(argv.setdefault('n_phi',48)); Dphi = 2.0*np.pi/n_phi
-   phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+   #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+   phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
    #--------------------
    #Azimuthal Angle------------------------------
    n_theta = int( argv.setdefault('n_theta',24))
@@ -87,13 +88,14 @@ def generate_mfp3D_2(**argv):
    else:  
      mfp_sampled = np.logspace(min([-2,np.log10(min(mfp_bulk)*0.99)]),np.log10(max(mfp_bulk)*1.01),n_mfp)#min MFP = 1e-2 nm 
 
+
    n_mfp = len(mfp_sampled)
    temp_coeff = np.zeros(nm) 
    kappa_directional = np.zeros((n_mfp,n_theta*n_phi,3)) 
    kdp = np.zeros((n_mfp,n_theta*n_phi,3)) 
    kd = np.zeros((n_mfp,n_theta*n_phi,3)) 
 
-   suppression = np.zeros((n_mfp,n_phi*n_theta,n_mfp_bulk)) 
+   #suppression = np.zeros((n_mfp,n_phi*n_theta,n_mfp_bulk)) 
    temp_coeff = np.zeros((n_mfp,n_theta*n_phi))
    tcp = np.zeros((n_mfp,n_theta*n_phi))
    tc = np.zeros((n_mfp,n_theta*n_phi))
@@ -111,7 +113,7 @@ def generate_mfp3D_2(**argv):
    mfp_sampled_log = np.log10(mfp_sampled)
    for m in rr:  
 
-    if argv.setdefault('log_interpolation',True):     
+    if argv.setdefault('log_interpolation',False):     
      (m1,a1,m2,a2) = get_linear_indexes(mfp_sampled_log,np.log10(mfp_bulk[m]))
     else: 
      (m1,a1,m2,a2) = get_linear_indexes(mfp_sampled,mfp_bulk[m])
@@ -125,7 +127,7 @@ def generate_mfp3D_2(**argv):
    comm.Allreduce([kdp,MPI.DOUBLE],[kd,MPI.DOUBLE],op=MPI.SUM)
    comm.Allreduce([tcp,MPI.DOUBLE],[tc,MPI.DOUBLE],op=MPI.SUM)
 
-
+   
      #for t in range(n_theta): 
 
      #index = t * n_phi + np.arange(n_phi)
@@ -166,6 +168,7 @@ def generate_mfp3D_2(**argv):
    #  angular_average += np.einsum('i,j->ij',direction_ave[t,p],direction_ave[t,p])*domega[t,p]/4.0/np.pi
    #rhs_average = np.einsum('m,ij->mij',mfp_sampled*mfp_sampled,angular_average)
    rhs_average = mfp_sampled*mfp_sampled/3
+   thermal_conductance = 3*mfp_sampled/2
    #-----------------------------
 
    #replicate bulk values---
@@ -177,7 +180,6 @@ def generate_mfp3D_2(**argv):
         tmp = kd[m,index]
         kappa += np.outer(tmp,direction_ave[t,p])*mfp_sampled[m]
 
-   print(kappa)
    #tc = temp_coeff/np.sum(temp_coeff)
 
 
@@ -185,8 +187,10 @@ def generate_mfp3D_2(**argv):
            'VMFP':direction,\
            'sigma':kd,\
            'kappa':kappa,\
+           'ang_coeff':domega.reshape(n_phi*n_theta)/4/np.pi,\
            'model':np.array([6]),\
            'mfp_average':rhs_average*1e18,\
+           'thermal_conductance':thermal_conductance*1e9,\
            'mfp_sampled':mfp_sampled,\
            'suppression':np.zeros(1),\
            'kappam':np.zeros(1),\

@@ -11,6 +11,7 @@ import time
 import sys
 import scipy
 
+
 comm = MPI.COMM_WORLD
 
       
@@ -21,11 +22,13 @@ def get_m(Master,data):
 
 def get_boundary(RHS,eb,n_elems):
 
+
     if len(eb) > 0:
      RHS_tmp = np.zeros(n_elems) 
      np.add.at(RHS_tmp,eb,RHS)
     else: 
       return np.zeros(n_elems)
+
     #for c,i in enumerate(eb): RHS_tmp[i] += RHS[c]
 
     return RHS_tmp
@@ -46,7 +49,7 @@ def print_multiscale(argv,MM):
         print(colored(' -----------------------------------------------------------','green'),flush=True)
 
 
-#@profile
+
 def solve_deviational(**argv):
 
     mesh    = argv['mesh']
@@ -66,62 +69,76 @@ def solve_deviational(**argv):
        Gbp2 = Gb.clip(min=0);
        with np.errstate(divide='ignore', invalid='ignore'):
           tot = 1/Gb.clip(max=0).sum(axis=1); tot[np.isinf(tot)] = 0
+          #tot = 1/Gb.clip(max=0).sum(axis=0).sum(axis=0); tot[np.isinf(tot)] = 0
        data = {'GG': np.einsum('mqs,ms->mqs',Gbp2,tot)}
-       del tot, Gbp2, Gb
+       del tot, Gbp2,Gb
       else: data = None
       GG = create_shared_memory_dict(data)['GG']
  
-    Tloc = np.zeros(n_elems)
-    for i in range(n_elems):
-       cx = mesh['centroids'][i,0]
-       Tloc[i] = -0.5 + (cx + mesh['size'][0]/2)/mesh['size'][0]
-    Tloc = np.zeros_like(Tloc)
-
-    #for ll in mesh['periodic_sides']:
-    #  kc1,kc2 = mesh['side_elem_map_vec'][ll]
-    #  if abs(Tloc[kc1]-Tloc[kc2]) > 0.1:
-    #      print(Tloc[kc1]-Tloc[kc2])
-
-
-    ar = {'mesh':mesh}
-    #gradient = mat['VMFP'][argv['rr'],0]/mesh['size'][0]
-    gradient =  np.einsum('ui,ci->uc',mat['VMFP'][argv['rr']],compute_grad(Tloc,ar))
-    print(gradient)
-    #iprint(1/mesh['size'][0])
-    #print(gradT)
-
-    #quit()
     #Bulk properties---
     G = np.einsum('qj,jn->qn',mat['VMFP'][argv['rr']],mesh['k'],optimize=True)
     Gp = G.clip(min=0); Gm = G.clip(max=0)
+ 
+    #REWRITE THIS AND CHECK CONVERGENCE----
+
     D = np.zeros((len(argv['rr']),len(mesh['elems'])))
 
     #for n,i in enumerate(mesh['i']):  D[:,i] += Gp[:,n]
     np.add.at(D.T,mesh['i'],Gp.T)
 
+    #--------
+    Tloc = np.zeros(n_elems)
+    for i in range(n_elems):
+       cx = mesh['centroids'][i,0]
+       Tloc[i] = -0.5 + (cx + mesh['size'][0]/2)/mesh['size'][0]
+    #Tloc = np.zeros_like(Tloc)
+    
+    ar = {'mesh':mesh}
+
+
+    #gradient = np.tile(mat['VMFP'][argv['rr'],0]/mesh['size'][0],(n_elems,1)).T
+  
+    #print(compute_grad(Tloc,ar)[:,0])
+    #for k,i in enumerate(compute_grad(Tloc,ar)[:,0]):
+    #    if i < 0.0020:
+    #        print(mesh['centroids'][k])
+
+    gradient =  np.einsum('ui,ci->uc',mat['VMFP'][argv['rr']],compute_grad(Tloc,ar))
+
+
+    #print(np.allclose(gradient,gradient_2))
+    #print(gradient)
+    #print(gradient_2)
+    #print(compute_grad(Tloc,ar)[:,0])
+    #quit()
+    #-----------------------
+
+    DeltaT = fourier['temperature_fourier'].copy()#-Tloc
     #--------------------------
 
-    DeltaT = fourier['temperature_fourier'].copy() - Tloc
-    #DeltaT =  Tloc
     #---boundary----------------------
     TB = np.zeros((argv['n_serial'],len(mesh['eb'])))   
     if len(mesh['db']) > 0: #boundary
      tmp = np.einsum('rj,jn->rn',mat['VMFP'][argv['rr']],mesh['db'],optimize=True)  
      Gbp2 = tmp.clip(min=0); Gbm2 = tmp.clip(max=0);
      np.add.at(D.T,mesh['eb'],Gbp2.T)
-     #TB = np.tile((DeltaT-Tloc)[mesh['eb']],(argv['n_serial'],1))
      TB = np.tile(DeltaT[mesh['eb']],(argv['n_serial'],1))
 
-     #for n,i in enumerate(mesh['eb']):
-     #    D[:, i]  += Gbp2[:,n]
-     #    TB[:,n]  = DeltaT[i] 
+   
+    #Add correction
+    vv = np.zeros_like(mesh['pp'][:,1])
+    #for k,(i,v) in enumerate(mesh['pp']):
+    #  i1 = mesh['i'][int(i)]
+    #  i2 = mesh['j'][int(i)]
+    #  vv[k] = Tloc[i2]-Tloc[i1]
 
-
-    
     #Periodic---
     sss = np.asarray(mesh['pp'][:,0],dtype=int)
     P = np.zeros((len(argv['rr']),n_elems))
-    np.add.at(P.T,mesh['i'][sss],-(mesh['pp'][:,1]*Gm[:,sss]).T)
+    np.add.at(P.T,mesh['i'][sss],-((mesh['pp'][:,1]+vv)*Gm[:,sss]).T)
+
+    #P -= gradient
+    #P = -gradient
     del G,Gp
     #----------------------------------------------------
 
@@ -137,18 +154,20 @@ def solve_deviational(**argv):
     transitionp = np.zeros(argv['n_parallel'])
     transition = 1e4 * np.ones(argv['n_parallel'])
 
-    #T_old = np.tile(DeltaT,(argv['n_parallel'],argv['n_serial']))
+    T_old = np.tile(DeltaT,(argv['n_parallel'],argv['n_serial']))
 
     Master = sp.csc_matrix((np.arange(len(mesh['im']))+1,(mesh['im'],mesh['jm'])),shape=(n_elems,n_elems),dtype=np.float64)
     conversion = np.asarray(Master.data-1,np.int) 
 
     J = np.zeros((n_elems,argv['dim']))
 
+    #----
+
     cache = {}
     while kk < argv['max_bte_iter'] and error > argv['max_bte_error']:
 
-        a = time.time()
-        if argv['multiscale']: tf,tfg = solve_fourier(mat['mfp_average'],DeltaT + Tloc,argv)
+
+        if argv['multiscale']: tf,tfg = solve_fourier(mat['mfp_average'],DeltaT+Tloc,argv)
         #Multiscale scheme-----------------------------
         diffusive = 0
         bal = 0
@@ -156,9 +175,6 @@ def solve_deviational(**argv):
         TBp = np.zeros_like(TB)
         Jp = np.zeros_like(J)
         kappa_bal,kappa_balp = np.zeros((2,argv['n_parallel']))
-    
-        #if kk == 0:
-        #    DeltaT = np.zeros_like(DeltaT)
         #Sup,Supp   = np.zeros((2,len(mat['kappam'])))
         #Supd,Supdp   = np.zeros((2,len(mat['kappam'])))
         #Supb,Supbp   = np.zeros((2,len(mat['kappam'])))
@@ -173,15 +189,20 @@ def solve_deviational(**argv):
 
               #Supdp += np.einsum('m,mu->u',kappa_fourier_m,mat['suppression'][:,q,:])*1e9
 
-              X_bal = (lu[(-1,n)] if (-1,n) in lu.keys() else \
-                     lu.setdefault((-1,n),sp.linalg.splu(get_m(Master,np.concatenate((mfp[-1]*Gm[n],\
-                     mfp[-1]*D[n]+np.ones(n_elems)))[conversion])))).solve(DeltaT +  mfp[-1]*(-gradient[n]  + P[n] + \
-                     get_boundary(RHS[-1,n],mesh['eb'],n_elems))) 
-                
-              if not argv['keep_lu']: lu.pop((-1,n))        
+              B = DeltaT +  mfp[-1]*(P[n] +  get_boundary(RHS[-1,n],mesh['eb'],n_elems))
+              A = get_m(Master,np.concatenate((mfp[-1]*Gm[n],mfp[-1]*D[n]+np.ones(n_elems)))[conversion])
+              if not argv['keep_lu']:
+                 X_bal = sp.linalg.spsolve(A,B,use_umfpack=True)
+              else:         
+                 X_bal = (lu[(-1,n)] if (-1,n) in lu.keys() else lu.setdefault((-1,n),sp.linalg.splu(A))).solve(B)
+
+              #X_bal = (lu[(-1,n)] if (-1,n) in lu.keys() else \
+              #      lu.setdefault((-1,n),sp.linalg.splu(get_m(Master,np.concatenate((mfp[-1]*Gm[n],\
+              #mfp[-1]*D[n]+np.ones(n_elems)))[conversion])))).solve(DeltaT +  mfp[-1]*(P[n] +\
+              #       get_boundary(RHS[-1,n],mesh['eb'],n_elems))) 
+              #if not argv['keep_lu']: lu.pop((-1,n))        
 
               kappa_bal = np.dot(mesh['kappa_mask'],X_bal+Tloc)
-
               #Supbp += kappa_bal*np.einsum('mu->u',mat['suppression'][:,q,:])*1e9
 
               idx = np.argwhere(np.diff(np.sign(kappa_bal*np.ones(argv['n_serial']) - kappa_fourier_m))).flatten()
@@ -189,36 +210,36 @@ def solve_deviational(**argv):
            else: idx = [argv['n_serial']-1]
 
            #idx = [argv['n_serial']-1]
-
            fourier = False
            for m in range(argv['n_serial'])[idx[0]::-1]:
-               
-
-                X = (lu[(m,n)] if (m,n) in lu.keys() else \
-                     lu.setdefault((m,n),sp.linalg.splu(get_m(Master,np.concatenate((mfp[m]*Gm[n],\
-                     mfp[m]*D[n]+np.ones(n_elems)))[conversion])))).solve(DeltaT +  mfp[m]*(-gradient[n] + P[n] + \
-                     get_boundary(RHS[m,n],mesh['eb'],n_elems)))  
-
-                if not argv['keep_lu']: lu.pop((m,n))        
-                
-                kappap[m,q] = np.dot(mesh['kappa_mask'],X+Tloc)
-                #if q == 20:
-                #    print(kappap[m,q]*1e18,kappa_fourier_m[m]*1e18,m)
+                 
+                A = get_m(Master,np.concatenate((mfp[m]*Gm[n],mfp[m]*D[n]+np.ones(n_elems)))[conversion])
+                b = A.dot(Tloc)
  
+                B = DeltaT +  mfp[m]*(P[n] +  get_boundary(RHS[m,n],mesh['eb'],n_elems)) -  b
+                if not argv['keep_lu']:
+                 X = sp.linalg.spsolve(A,B,use_umfpack=True)
+                else:         
+                 X = (lu[(m,n)] if (m,n) in lu.keys() else lu.setdefault((m,n),sp.linalg.splu(A))).solve(B)
+
+                X +=Tloc
+
+                kappap[m,q] = np.dot(mesh['kappa_mask'],X+Tloc)
+
                 if argv['multiscale']:
-                #if 1==2:    
+                #if 1 == 2:    
                  error = abs(kappap[m,q] - kappa_fourier_m[m])/abs(kappap[m,q])
                  if error < argv['multiscale_error'] and m <= transition[q]:
                   transitionp[q] = m 
                   #Vectorize
                   kappap[:m+1,q] = kappa_fourier_m[:m+1]
                   diffusive += m
-                  Xm = tf[:m+1]-Tloc - np.einsum('m,i,mci->mc',mat['mfp_sampled'][:m+1],mat['VMFP'][q,:argv['dim']],tfg[:m+1]) 
+                  Xm = tf[:m+1] - Tloc -  np.einsum('m,i,mci->mc',mat['mfp_sampled'][:m+1],mat['VMFP'][q,:argv['dim']],tfg[:m+1])
                   DeltaTp += np.einsum('mc,m->c',Xm,mat['tc'][:m+1,q])  
 
                   #for c,i in enumerate(mesh['eb']): TBp[:m+1,c] -= Xm[:m+1,i]*GG[:m+1,q,c]
                   #np.add.at(TBp[:m+1].T,np.arange(mesh['eb'].shape[0]),-(Xm[:m+1,mesh['eb']]*GG[:m+1,q]).T)
-                  if len(mesh['eb'])>0:
+                  if len(mesh['eb']) > 0:
                    np.add.at(TBp[:m+1].T,np.arange(mesh['eb'].shape[0]),-(Xm[:,mesh['eb']]*GG[:m+1,q]).T)
 
                   Jp += np.einsum('mc,mj->cj',Xm,mat['sigma'][:m+1,q,0:argv['dim']])*1e-18
@@ -228,7 +249,8 @@ def solve_deviational(**argv):
                 DeltaTp += X*mat['tc'][m,q]
 
                 #for c,i in enumerate(mesh['eb']): TBp[m,c] -= X[i]*GG[m,q,c]
-                if len(mesh['eb'])>0:
+
+                if len(mesh['eb']) > 0:
                  np.add.at(TBp[m],np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
 
                 Jp += np.einsum('c,j->cj',X,mat['sigma'][m,q,0:argv['dim']])*1e-18
@@ -236,15 +258,16 @@ def solve_deviational(**argv):
                 
  
            for m in range(argv['n_serial'])[idx[0]+1:]:
+              
 
-               X = (lu[(m,n)] if (m,n) in lu.keys() else \
-                     lu.setdefault((m,n),sp.linalg.splu(get_m(Master,np.concatenate((mfp[m]*Gm[n],\
-                     mfp[m]*D[n]+np.ones(n_elems)))[conversion])))).solve(DeltaT +  mfp[m]*(-gradient[n] + P[n] + \
-                     get_boundary(RHS[m,n],mesh['eb'],n_elems)))  
+               B = DeltaT +  mfp[m]*(P[n] +  get_boundary(RHS[m,n],mesh['eb'],n_elems))
+               A = get_m(Master,np.concatenate((mfp[m]*Gm[n],mfp[m]*D[n]+np.ones(n_elems)))[conversion])
+               if not argv['keep_lu']:
+                 X = sp.linalg.spsolve(A,B,use_umfpack=True)
+               else:         
+                X = (lu[(m,n)] if (m,n) in lu.keys() else lu.setdefault((m,n),sp.linalg.splu(A))).solve(B)
 
-               if not argv['keep_lu']: lu.pop((m,n))        
-
-               kappap[m,q] = np.dot(mesh['kappa_mask'],X + Tloc)
+               kappap[m,q] = np.dot(mesh['kappa_mask'],X+Tloc)
 
                error_bal = abs(kappap[m,q] - kappa_bal)/abs(kappap[m,q])
                if error_bal < argv['multiscale_error'] and \
@@ -255,9 +278,7 @@ def solve_deviational(**argv):
                    DeltaTp += X_bal*np.sum(mat['tc'][m:,q])
                    #for c,i in enumerate(mesh['eb']): TBp[m:,c] -= X_bal[i]*GG[m:,q,c]
 
-
-                   if len(mesh['eb'])>0:
-                    np.add.at(TBp[m:].T,np.arange(mesh['eb'].shape[0]),-(X_bal[mesh['eb']]*GG[m:,q]).T)
+                   np.add.at(TBp[m:].T,np.arange(mesh['eb'].shape[0]),-(X_bal[mesh['eb']]*GG[m:,q]).T)
 
                    Jp += np.einsum('c,j->cj',X_bal,np.sum(mat['sigma'][m:,q,0:argv['dim']],axis=0))*1e-18
                    #Supp += np.einsum('m,mu->u',kappap[m:,q],mat['suppression'][m:,q,:])*1e9
@@ -266,7 +287,7 @@ def solve_deviational(**argv):
                DeltaTp += X*mat['tc'][m,q]
                
                #for c,i in enumerate(mesh['eb']): TBp[m,c] -= X[i]*GG[m,q,c]
-               if len(mesh['eb'])>0:
+               if len(mesh['eb']) > 0:
                 np.add.at(TBp[m],np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
 
                Jp += np.einsum('c,j->cj',X,mat['sigma'][m,q,0:argv['dim']])*1e-18
@@ -283,7 +304,6 @@ def solve_deviational(**argv):
         comm.Allreduce([Mp,MPI.DOUBLE],[MM,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([transitionp,MPI.DOUBLE],[transition,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([TBp,MPI.DOUBLE],[TB,MPI.DOUBLE],op=MPI.SUM)
-
         #comm.Allreduce([Supp,MPI.DOUBLE],[Sup,MPI.DOUBLE],op=MPI.SUM)
         #comm.Allreduce([Supdp,MPI.DOUBLE],[Supd,MPI.DOUBLE],op=MPI.SUM)
         #comm.Allreduce([Supbp,MPI.DOUBLE],[Supb,MPI.DOUBLE],op=MPI.SUM)
@@ -303,7 +323,7 @@ def solve_deviational(**argv):
     if argv['verbose'] and comm.rank == 0:
       print(colored(' -----------------------------------------------------------','green'),flush=True)
 
-    output =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J,}#'suppression':Sup}
+    output =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J}#,'suppression':Sup}
     #if argv['multiscale']:   
     #    output.update({'suppression_diffusive':Supd,'suppression_ballistic':Supb})
 

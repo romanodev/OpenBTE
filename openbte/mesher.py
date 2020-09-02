@@ -9,7 +9,7 @@ from .utils import *
 import subprocess
 import os
 import time
-#import matplotlib.pylab as plt
+import matplotlib.pylab as plt
 
 class Mesher(object):
 
@@ -921,14 +921,19 @@ class Mesher(object):
   return -1
 
 
- def already_included_old(self,all_points,new_point):
+ def already_included_old(self,all_points,new_point,p_list):
 
-  dd = 1e-12   
-  for n,p in enumerate(all_points):
-   d = np.linalg.norm(np.array(p)-np.array(new_point))
-   if d < dd:
-    return n
-  return -1
+
+  dd = 1e-12
+  I = []
+  if len(all_points) > 0:
+   I = np.where(np.linalg.norm(np.array(new_point)-np.array(all_points),axis=1)<dd)[0]
+  if len(I) > 0: 
+     return I[0]
+  else: 
+     return -1
+
+
 
  # return loop
  def line_exists_ordered_old(self,l,lines):
@@ -941,17 +946,25 @@ class Mesher(object):
 
  def create_line_list(self,pp,points,lines,store):
 
+   #Eliminate unncessesary points--
+
+
+   #------------------------------
+
    p_list = []
    for p in pp:
-    tmp = self.already_included_old(points,p)
-    if tmp == -1:
-     points.append(p)
-     #store.write( 'Point('+str(len(points)-1) +') = {' + str(p[0]) +','+ str(p[1])+',0,h};\n')
-     store.write( 'Point('+str(len(points)-1) +') = {' + str(p[0]/self.lx) +'*lx,'+ str(p[1]/self.ly)+'*ly,0,h};\n')
-     p_list.append(len(points)-1)
+    tmp = self.already_included_old(points,p,p_list)
+    if tmp == -1:    
+      points.append(p)
+      p_list.append(len(points)-1)
     else:
-     p_list.append(tmp)
+      p_list.append(tmp)
 
+   for k,p in enumerate(p_list):
+     point = points[-len(p_list)+k] 
+     store.write( 'Point('+str(len(points)-len(p_list)+k) +') = {' + str(point[0]/self.lx) +'*lx,'+ str(point[1]/self.ly)+'*ly,0,h};\n')
+
+   
 
    line_list = []
    for l in range(len(p_list)):

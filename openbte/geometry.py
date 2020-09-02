@@ -13,7 +13,10 @@ import time
 #from matplotlib.pylab import *
 import numpy.testing as npt
 from statistics import mean
-import pickle
+#import pickle
+from scipy.ndimage.interpolation import shift
+from collections import Counter
+
 
 #from matplotlib.pylab import *
 
@@ -120,7 +123,6 @@ class Geometry(object):
 
 
 
-
     return {
           'size':self.size,\
           #'conn':self.conn,\
@@ -162,6 +164,7 @@ class Geometry(object):
           'periodic_sides':np.array(self.side_list['Periodic']),
           'boundary_sides':np.array(self.side_list['Boundary']),
           'n_side_per_elem': np.array([len(i)  for i in self.elems]),
+          'n_non_boundary_side_per_elem': np.array(self.n_non_boundary_side_per_elem,dtype=np.int),
           'pp':np.array(self.pp),\
           'side_per_elem':np.array(self.side_per_elem),\
           'meta':np.asarray([self.n_elems,self.kappa_factor,self.dim,len(self.nodes),len(self.side_list['active'])],np.float64)}
@@ -396,11 +399,25 @@ class Geometry(object):
    for side in self.side_list['Boundary'] :# + self.side_list['Hot'] + self.side_list['Cold']:
     self.side_elem_map[side].append(self.side_elem_map[side][0])
 
-   #self.elem_kappa_map = {}
-   #self.elem_mat_map = { ne:0 for ne in list(range(len(self.elems)))}
+   #Put boundaries at the end
 
 
+   self.n_non_boundary_side_per_elem = []
+   for key,value in self.elem_side_map.items():
+       tmp_1 = []
+       tmp_2 = []
+       for s in value:
+         if s in self.side_list['Boundary']:
+           tmp_1.append(s)
+         else:  
+           tmp_2.append(s)
+       self.n_non_boundary_side_per_elem.append(len(tmp_2)+len(tmp_1))
+       #self.n_non_boundary_side_per_elem.append(len(tmp_2))
+       self.elem_side_map[key] = tmp_2 + tmp_1
 
+   #------------------------
+
+   
     
 
  def compute_face_normal(self,ns):
@@ -649,6 +666,8 @@ class Geometry(object):
 
    nd = len(self.elems[0])
    diff_dist = {}
+   #fig = figure()
+   #ax = fig.add_subplot(111, projection='3d')
 
    for ll in self.side_list['active'] :
     elems = self.side_elem_map[ll]
@@ -662,16 +681,24 @@ class Geometry(object):
      c2 = self.get_next_elem_centroid(kc1,ll)
      dist = c2-c1
      ind2 = self.elem_side_map[kc2].index(ll)
-     for i in range(self.dim):
-      diff_dist.setdefault(kc1,np.zeros((len(self.elem_side_map[kc1]),self.dim)))[ind1][i] = dist[i]  
-      diff_dist.setdefault(kc2,np.zeros((len(self.elem_side_map[kc2]),self.dim)))[ind2][i] = -dist[i]  
+     diff_dist.setdefault(kc1,np.zeros((len(self.elem_side_map[kc1]),self.dim)))[ind1] =  dist[:self.dim]
+     diff_dist.setdefault(kc2,np.zeros((len(self.elem_side_map[kc2]),self.dim)))[ind2] = -dist[:self.dim]
+       
+     #diff_dist.setdefault(kc1,np.zeros((self.n_non_boundary_side_per_elem[kc1],self.dim)))[ind1] =  dist
+     #diff_dist.setdefault(kc2,np.zeros((self.n_non_boundary_side_per_elem[kc2],self.dim)))[ind2] = -dist 
+
+
+     #if kc1 == 591:   
+     # ax.scatter(c1[0],c1[1],c1[2],color='k')
+     # ax.scatter(c2[0],c2[1],c2[2],color='k')
+     #if kc2 == 591:   
+     # ax.scatter(c1[0],c1[1],c1[2],color='k')
+     # ax.scatter(c2[0],c2[1],c2[2],color='k')
+         
 
     else :
      dist = self.side_centroids[ll] - c1
-    # kk = list(self.side_list['Boundary']).index(ll)   
-    # dist = self.bconn[kk]
-     for i in range(self.dim):
-      diff_dist.setdefault(kc1,np.zeros((len(self.elem_side_map[kc1]),self.dim)))[ind1][i] = dist[i] 
+     diff_dist.setdefault(kc1,np.zeros((len(self.elem_side_map[kc1]),self.dim)))[ind1] = dist[:self.dim] 
       
      #if ll in self.side_list['Interface']:
      # kc2 = elems[1]
@@ -684,11 +711,24 @@ class Geometry(object):
    #print(diff_dist)
    #quit()
 
+
    #Compute weights
    self.weigths = {}
    for h in diff_dist.keys() :
-    tmp = diff_dist[h]  
-    self.weigths[h] = np.dot(np.linalg.inv(np.dot(np.transpose(tmp),tmp)),np.transpose(tmp))
+   
+    #if h == 591:  
+    #     nodes = self.nodes[self.elems[h]]
+    #     for n in nodes:
+    #      ax.scatter(n[0],n[1],n[2])
+    #     show()
+
+    tmp = diff_dist[h]
+    #a =  np.dot(np.linalg.pinv(np.dot(np.transpose(tmp),tmp)),np.transpose(tmp))
+    #b = np.linalg.pinv(tmp)
+    #print(np.allclose(a,b))
+    #print(np.dot(np.transpose(tmp),tmp))
+    #self.weigths[h] = np.dot(np.linalg.inv(np.dot(np.transpose(tmp),tmp)),np.transpose(tmp))
+    self.weigths[h] = np.linalg.pinv(tmp)
 
 
 

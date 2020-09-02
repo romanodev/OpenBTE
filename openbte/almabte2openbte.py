@@ -1,8 +1,7 @@
-import deepdish
 import numpy as np
 from numpy import inf
 import sys
-import deepdish as dd
+from .utils import *
 
 def main():
 
@@ -18,6 +17,10 @@ def main():
 
  kappa =  np.einsum('ki,kj,k,k',v,v,tau,C) 
 
+ print(kappa)
  data = {'C':C,'tau':tau,'v':v,'kappa':kappa}
- dd.io.save('rta.h5',data)
+ #dd.io.save('rta.h5',data)
  
+
+
+ saveCompressed('rta.npz',**data)   

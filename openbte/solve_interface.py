@@ -47,7 +47,7 @@ def print_multiscale(argv,MM):
 
 
 
-def solve_mfp(**argv):
+def solve_interface(**argv):
 
     mesh    = argv['mesh']
     mat     = argv['mat']
@@ -73,8 +73,8 @@ def solve_mfp(**argv):
    
 
     #Get transmission----
-    #transmission_mo = np.zeros((argv['n_serial']*argv['n_parallel'],argv['n_serial']*argv['n_parallel']))
-    #reflection = np.zeros((argv['n_serial']*argv['n_parallel'],argv['n_serial']*argv['n_parallel']))
+    transmission_mo = np.ones((argv['n_serial']*argv['n_parallel'],argv['n_serial']*argv['n_parallel']))
+    reflection = np.zeros((argv['n_serial']*argv['n_parallel'],argv['n_serial']*argv['n_parallel']))
     #----
  
     #Bulk properties---
@@ -154,33 +154,25 @@ def solve_mfp(**argv):
 
         for n,q in enumerate(argv['rr']):
            
-           #Get ballistic kappa
-           if argv['multiscale']:
-              kappa_fourier_m =  np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mat['mfp_sampled'],mat['VMFP'][q,0:argv['dim']],tfg)
-
-              X_bal = (lu[(-1,n)] if (-1,n) in lu.keys() else \
-                     lu.setdefault((-1,n),sp.linalg.splu(get_m(Master,np.concatenate((mfp[-1]*Gm[n],\
-                     mfp[-1]*D[n]+np.ones(n_elems)))[conversion])))).solve(DeltaT +  mfp[-1]*(P[n] +\
-                     get_boundary(RHS[-1,n],mesh['eb'],n_elems)))  
-
-              kappa_bal = np.dot(mesh['kappa_mask'],X_bal)
-
-              idx = np.argwhere(np.diff(np.sign(kappa_bal*np.ones(argv['n_serial']) - kappa_fourier_m))).flatten()
-              if len(idx) == 0: idx = [argv['n_serial']-1]
-           else: idx = [argv['n_serial']-1]
-
            fourier = False
-           for m in range(argv['n_serial'])[idx[0]::-1]:
+           for m in range(argv['n_serial']):
                
-                #interface = np.zeros(n_elems) 
-                #for tt,(c1,c2) in enumerate(zip(mesh['inti'],mesh['intj'])):
-                #    interface[c1] += np.einsum('v,u->',transmission_mo[q,:],T_old[:,c2])*Trm[n,tt] #tranmission c2->c2
-                #    interface[c1] += np.einsum('v,u->',reflection[q,:],T_old[:,c1])*Trm[n,tt] #reflection  c1->c1
+                interface = np.zeros(n_elems) 
+                for tt,(c1,c2) in enumerate(zip(mesh['inti'],mesh['intj'])):
+                    interface[c1] += np.einsum('v,u->',transmission_mo[q,:],T_old[:,c2])*Trm[n,tt] #tranmission c2->c2
+                    interface[c1] += np.einsum('v,u->',reflection[q,:],T_old[:,c1])*Trm[n,tt] #reflection  c1->c1
 
-                X = (lu[(m,n)] if (m,n) in lu.keys() else \
-                     lu.setdefault((m,n),sp.linalg.splu(get_m(Master,np.concatenate((mfp[m]*Gm[n],\
-                     mfp[m]*D[n]+np.ones(n_elems)))[conversion])))).solve(DeltaT +  mfp[m]*(P[n] +\
-                     get_boundary(RHS[m,n],mesh['eb'],n_elems)))  
+                 
+                if len(RHS[m,n]) > 0:
+                 B = DeltaT +  mfp[m]*(P[n] +  get_boundary(RHS[m,n],mesh['eb'],n_elems))
+                else: 
+                 B = DeltaT +  mfp[m]*P[n] 
+
+                B += mfp[m]*interface 
+
+                A = get_m(Master,np.concatenate((mfp[m]*Gm[n],mfp[m]*D[n]+np.ones(n_elems)))[conversion])
+                X = (lu[(m,n)] if (m,n) in lu.keys() else lu.setdefault((m,n),sp.linalg.splu(A))).solve(B)
+
 
                 kappap[m,q] = np.dot(mesh['kappa_mask'],X)
  
@@ -203,45 +195,14 @@ def solve_mfp(**argv):
 
                 DeltaTp += X*mat['tc'][m,q]
 
-                #for c,i in enumerate(mesh['eb']): TBp[m,c] -= X[i]*GG[m,q,c]
-                np.add.at(TBp[m],np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
+               
+                if len(RHS[m,n]) > 0:
+                 np.add.at(TBp[m],np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
 
                 Jp += np.einsum('c,j->cj',X,mat['sigma'][m,q,0:argv['dim']])*1e-18
                 Supp += kappap[m,q]*mat['suppression'][m,q,:]
                 
  
-           for m in range(argv['n_serial'])[idx[0]+1:]:
-
-               X = (lu[(m,n)] if (m,n) in lu.keys() else \
-                     lu.setdefault((m,n),sp.linalg.splu(get_m(Master,np.concatenate((mfp[m]*Gm[n],\
-                     mfp[m]*D[n]+np.ones(n_elems)))[conversion])))).solve(DeltaT +  mfp[m]*(P[n] +\
-                     get_boundary(RHS[m,n],mesh['eb'],n_elems)))  
-
-               kappap[m,q] = np.dot(mesh['kappa_mask'],X)
-
-               error_bal = abs(kappap[m,q] - kappa_bal)/abs(kappap[m,q])
-               if error_bal < argv['multiscale_error'] and \
-                  abs(kappap[m-1,q] - kappa_bal)/abs(kappap[m-1,q]) < argv['multiscale_error'] and  m > int(len(mat['mfp_sampled'])/2):
-
-                   kappap[m:,q] = kappa_bal
-                   bal += argv['n_serial']-m
-                   DeltaTp += X_bal*np.sum(mat['tc'][m:,q])
-                   #for c,i in enumerate(mesh['eb']): TBp[m:,c] -= X_bal[i]*GG[m:,q,c]
-
-                   np.add.at(TBp[m:].T,np.arange(mesh['eb'].shape[0]),-(X_bal[mesh['eb']]*GG[m:,q]).T)
-
-
-                   Jp += np.einsum('c,j->cj',X_bal,np.sum(mat['sigma'][m:,q,0:argv['dim']],axis=0))*1e-18
-                   Supp += np.einsum('m,mu->u',kappap[m:,q],mat['suppression'][m:,q,:])*argv['kappa_factor']*1e-9
-                   break
-
-               DeltaTp += X*mat['tc'][m,q]
-               #for c,i in enumerate(mesh['eb']): TBp[m,c] -= X[i]*GG[m,q,c]
-               np.add.at(TBp[m],np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
-
-               Jp += np.einsum('c,j->cj',X,mat['sigma'][m,q,0:argv['dim']])*1e-18
-               Supp += kappap[m,q]*mat['suppression'][m,q,:]#*argv['kappa_factor']*1e-9
-          
 
         Mp[0] = diffusive
         Mp[1] = bal

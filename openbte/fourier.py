@@ -16,26 +16,63 @@ from .solve_mfp import *
 
 comm = MPI.COMM_WORLD
 
-def compute_secondary_flux(argv,temp,kappa):
 
+def compute_grad(temp,argv):
+
+    #if not 'rr' in argv['cache']:
+
+    rr = [i*[0]   for k,i in enumerate(argv['mesh']['n_side_per_elem']) ]
+
+    for ll in argv['mesh']['active_sides'] :   
+      kc1,kc2 = argv['mesh']['side_elem_map_vec'][ll]
+      #if not kc1 == kc2 :
+      #if 1 == 1:    
+      ind1 = list(argv['mesh']['elem_side_map_vec'][kc1]).index(ll)
+      ind2 = list(argv['mesh']['elem_side_map_vec'][kc2]).index(ll)
+      temp_1 = temp[kc1]
+      temp_2 = temp[kc2]
+
+      if ll in argv['mesh']['periodic_sides']:
+        delta= argv['mesh']['periodic_side_values'][list(argv['mesh']['periodic_sides']).index(ll)]
+      else: 
+       delta = 0   
+ 
+      #if ll in argv['mesh']['boundary_sides']:
+      #   delta = 1
+
+      rr[kc1][ind1] = [kc2,kc1,delta] 
+      rr[kc2][ind2] = [kc1,kc2,-delta]
+
+    #argv['cache']['rr'] = rr
+
+    #for r in rr: print(r)
+    #diff_temp = [[temp[j[0]]-temp[j[1]]+j[2] for j in f] for f in rr]
+    #gradT = np.array([np.einsum('js,s->j',argv['mesh']['weigths'][k,:,:argv['mesh']['n_non_boundary_side_per_elem'][k]],np.array(dt)) for k,dt in enumerate(diff_temp)])
+    diff_temp = [[temp[j[0]]-temp[j[1]]+j[2] for j in f] for f in rr]
+    gradT = np.array([np.einsum('js,s->j',argv['mesh']['weigths'][k,:,:argv['mesh']['n_non_boundary_side_per_elem'][k]],np.array(dt)) for k,dt in enumerate(diff_temp)])
+
+    return gradT
+
+
+def compute_secondary_flux(argv,temp,kappa):
 
    if not 'rr' in argv['cache']:
 
-    rr = [i*[0]   for k,i in enumerate(argv['mesh']['side_per_elem']) ]
+    rr = [i*[0]   for k,i in enumerate(argv['mesh']['n_side_per_elem']) ]
 
     for ll in argv['mesh']['active_sides'] :
      kc1,kc2 = argv['mesh']['side_elem_map_vec'][ll]
      ind1 = list(argv['mesh']['elem_side_map_vec'][kc1]).index(ll)
-
      ind2 = list(argv['mesh']['elem_side_map_vec'][kc2]).index(ll)
      temp_1 = temp[kc1]
      temp_2 = temp[kc2]
 
      if ll in argv['mesh']['periodic_sides']:
-       delta= argv['mesh']['periodic_side_values'][list(argv['mesh']['periodic_sides']).index(ll)]
+        delta= argv['mesh']['periodic_side_values'][list(argv['mesh']['periodic_sides']).index(ll)]
      else: 
-       delta = 0   
+        delta = 0   
 
+ 
      rr[kc1][ind1] = [kc2,kc1,delta] 
      rr[kc2][ind2] = [kc1,kc2,-delta] 
 
@@ -43,8 +80,7 @@ def compute_secondary_flux(argv,temp,kappa):
 
 
    diff_temp = [[temp[j[0]]-temp[j[1]]+j[2] for j in f] for f in argv['cache']['rr']]
-
-   gradT = np.array([np.einsum('js,s->j',argv['mesh']['weigths'][k,:,:argv['mesh']['side_per_elem'][k]],np.array(dt)) for k,dt in enumerate(diff_temp)])
+   gradT = np.array([np.einsum('js,s->j',argv['mesh']['weigths'][k,:,:argv['mesh']['n_non_boundary_side_per_elem'][k]],np.array(dt)) for k,dt in enumerate(diff_temp)])
    #-----------------------------------------------------
 
    #-----------SAVE some time--------------------------------------
@@ -105,12 +141,18 @@ def fourier_scalar(m,kappa,DeltaT,C,argv):
     kappa_old = 0
     error = 1  
 
-    B = kappa*argv['cache']['RHS_FOURIER'].copy() + DeltaT
+    tmp = np.zeros(n_elems)
+    for n,e in enumerate(argv['mesh']['eb']):
+       area = argv['mesh']['areas'][argv['mesh']['eb'][n]]
+       volume = argv['mesh']['volumes'][e]
+       tmp[e] += argv['TB'][n]*area/volume
+
+    B = kappa*argv['cache']['RHS_FOURIER'].copy() + DeltaT #+ argv['thermal_conductance'][m]*argv['TB']*area/volume
 
     if m in argv['cache']['SU'].keys():
         SU = argv['cache']['SU'][m]
     else:
-        F = kappa*argv['cache']['F'] + sp.eye(n_elems)
+        F = kappa*argv['cache']['F'] + sp.eye(n_elems) #+ argv['thermal_conductance'][m]* kappa*argv['cache']['F_B']
         argv['cache']['SU'][m] = splu(F)
     SU = argv['cache']['SU'][m]
 
@@ -142,8 +184,14 @@ def assemble_fourier(argv):
     jff = []
     dff = []
 
+
+    iffb = []
+    jffb = []
+    dffb = []
+
     n_elems = len(mesh['elems'])
     B = np.zeros(n_elems)
+    Bb = np.zeros(n_elems)
     for ll in mesh['active_sides']:
 
       area = mesh['areas'][ll] 
@@ -172,9 +220,20 @@ def assemble_fourier(argv):
         kk = list(mesh['periodic_sides']).index(ll)   
         B[i] += mesh['periodic_side_values'][kk]*v_orth/vi*area
         B[j] -= mesh['periodic_side_values'][kk]*v_orth/vj*area
+      else:  
+       iffb.append(i)
+       jffb.append(i)
+       dffb.append(1/vi*area)
+       Bb[i] += 1/vi*area
+
+        
+
+
 
     cache['RHS_FOURIER'] =B   
+    cache['RHS_FOURIER_B'] =Bb
     cache['F'] = sp.csc_matrix((np.array(dff),(np.array(iff),np.array(jff))),shape = (n_elems,n_elems))
+    cache['F_B'] = sp.csc_matrix((np.array(dffb),(np.array(iffb),np.array(jffb))),shape = (n_elems,n_elems))
     cache['SU'] = {}
     argv.update({'cache':cache})
     

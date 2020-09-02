@@ -12,11 +12,14 @@ import scipy
 
 def energy_conserving(W):
 
+
  bottom = np.sum(np.absolute(W))
  r = np.sum(np.absolute(np.einsum('ij->j',W)))
- #print('Row check:' + str(r/bottom))
+ print('Row check:' + str(r/bottom))
+ 
  c = np.sum(np.absolute(np.einsum('ij->i',W)))
- #print('Column Check:' + str(c/bottom))
+ print('Column Check:' + str(c/bottom))
+ 
  nm = np.shape(W)[0]
  delta = np.einsum('ij->j',W)
  b = -2*np.concatenate((delta,delta))
@@ -42,14 +45,16 @@ def energy_conserving(W):
  c = np.sum(np.absolute(np.einsum('ij->i',W)))
  print('Column Check:' + str(c/bottom))
 
+ return W
 
 def generate_full(**argv):
 
- filename = 'full.h5'
+ filename = 'full.npz'
 
  print(' ')
  print('Importing ' + filename + ' ... ',end= '')
- data = dd.io.load(filename)
+ data = np.load(filename,allow_pickle=True)
+ #data = dd.io.load(filename)
  print(' done')
  print(' ')
 
@@ -67,7 +72,7 @@ def generate_full(**argv):
  nm = W.shape[0]
 
  print('Making W energy conserving ...',end= '')
- energy_conserving(W)
+ W = energy_conserving(W)
  print('... done')
  print(' ')
  print('Computing kappa bulk ...')

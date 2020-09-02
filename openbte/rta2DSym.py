@@ -2,7 +2,9 @@ import sys
 import numpy as np
 import scipy
 from .utils import *
-
+import time
+from mpi4py import MPI
+comm = MPI.COMM_WORLD
 
 
 def generate_rta2DSym(**argv):
@@ -18,36 +20,63 @@ def generate_rta2DSym(**argv):
  #Create sampled MFPs
  #Polar Angle---------
  Dphi = 2*np.pi/n_phi
- phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+ #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+ phi = np.linspace(0,2.0*np.pi-Dphi,n_phi,endpoint=True)
+
  polar_ave = np.array([np.sin(phi),np.cos(phi),np.zeros(n_phi)]).T
 
-
  #Import data-----------
- data = dd.io.load('rta.h5')
- f = np.divide(np.ones_like(data['tau']), data['tau'], out=np.zeros_like(data['tau']), where=data['tau']!=0)
- kappam = np.einsum('u,u,u,u->u',data['tau'],data['C'],data['v'][:,0],data['v'][:,0]) 
- tc = data['C']*f
- tc /= tc.sum()
- Jc = np.einsum('k,ki->ki',data['C'],data['v'][:,:2])
- nm = len(tc)
+ 
+ #data = dd.io.load('rta.h5')
+
+ a = np.load('rta.npz',allow_pickle=True)
+ data = {key:a[key].item() for key in a}['arr_0']
+
+ #small cut on MFPs
+ mfp_0 = 1e-9
  mfp_bulk = np.einsum('ki,k->ki',data['v'][:,:2],data['tau'])
- r = np.array([np.linalg.norm(m) for m in mfp_bulk])
+ I = np.where(np.linalg.norm(mfp_bulk,axis=1) > mfp_0)[0]
+
+ tau = data['tau'][I]
+ v = data['v'][I]
+ C = data['C'][I]
+
+ f = np.divide(np.ones_like(tau),tau, out=np.zeros_like(tau), where=tau!=0)
+ kappam = np.einsum('u,u,u,u->u',tau,C,v[:,0],v[:,0]) 
+ tc = C*f
+ tc /= tc.sum()
+ Jc = np.einsum('k,ki->ki',C,v[:,:2])
+ nm = len(tc)
+ mfp_bulk = np.einsum('ki,k->ki',v[:,:2],tau)
+ r = np.linalg.norm(mfp_bulk,axis=1)
  phi_bulk = np.array([np.arctan2(m[0],m[1]) for m in mfp_bulk])
  phi_bulk[np.where(phi_bulk < 0) ] = 2*np.pi + phi_bulk[np.where(phi_bulk <0)]
  kappa = data['kappa']
 
- mfp_sampled = np.logspace(-10,np.log10(max(r)*1.01),n_mfp)#min MFP = 1e-1 nm
+ mfp_sampled = np.logspace(np.log10(mfp_0)*1.01,np.log10(max(r)*1.01),n_mfp,endpoint=True)#min MFP = 1e-1 nm
 
+ #mfp_sampled = np.logspace(-10,-1,n_mfp)#min MFP = 1e-1 nm
+ 
  #-----------------------
  n_mfp_bulk = len(mfp_bulk) 
- mfp = np.logspace(-1,np.log10(max(r)*1.01),n_mfp)#min MFP = 1e-2 
 
- n_mfp = len(mfp)
  temp_coeff = np.zeros((n_mfp,n_phi))
  kappa_directional = np.zeros((n_mfp,n_phi,2)) 
- suppression = np.zeros((n_mfp,n_phi,n_mfp_bulk)) 
+ #suppression = np.zeros((n_mfp,n_phi,n_mfp_bulk)) 
 
+ interp = np.zeros((n_mfp,n_phi))
  lo = 0
+ a = time.time()
+
+
+
+ #block =  nm//comm.size
+ #rr = range(block*comm.rank,nm) if comm.rank == comm.size-1 else range(block*comm.rank,block*(comm.rank+1))
+ 
+
+ #tc,tcp = np.zeros((2,n_mfp,n_phi))
+ #kc,kcp = np.zeros((2,n_mfp,n_phi,2))
+
  for m in range(nm):
 
     if r[m] > 0:  
@@ -67,18 +96,12 @@ def generate_rta2DSym(**argv):
     else: 
      lo += tc[m]   
 
- #a = []
- #b = []
- #for m in range(nm):
- # if abs(mfp_bulk[m,0]) > 0:
- #   a.append(Jc[m,0]/kappam[m])     
- #   b.append(1/mfp_bulk[m,0])
+ #comm.Allreduce([kdp,MPI.DOUBLE],[kd,MPI.DOUBLE],op=MPI.SUM)
+ #comm.Allreduce([tcp,MPI.DOUBLE],[tc,MPI.DOUBLE],op=MPI.SUM)
 
- #print(a[10],b[10])   
+ 
 
- #print(np.allclose(a,b)) 
-
-
+ print(time.time()-a)
  temp_coeff *=(1+lo)
 
  rhs_average = mfp_sampled*mfp_sampled/2
@@ -89,6 +112,7 @@ def generate_rta2DSym(**argv):
          'mfp_average':rhs_average*1e18,\
          'VMFP':polar_ave[:,:2],\
          'mfp_sampled':mfp_sampled,\
+         'sampling': np.array([n_phi,n_theta,n_mfp]),\
          'model':np.array([8])}
 
 

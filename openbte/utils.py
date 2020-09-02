@@ -7,6 +7,12 @@ import shapely
 from shapely.ops import cascaded_union
 import os
 import functools
+import matplotlib.pylab as plt
+import io,zipfile
+
+
+os.environ['H5PY_DEFAULT_READONLY']='1'
+
 comm = MPI.COMM_WORLD
 
 def periodic_kernel(x1, x2, p,l,variance):
@@ -25,11 +31,21 @@ def generate_random_interface(p,l,variance,scale):
 
  return f
 
+
+def saveCompressed(fh, **namedict):
+     with zipfile.ZipFile(fh, mode="w", compression=zipfile.ZIP_DEFLATED,
+                          allowZip64=True) as zf:
+         for k, v in namedict.items():
+             with zf.open(k + '.npy', 'w', force_zip64=True) as buf:
+                 np.lib.npyio.format.write_array(buf,
+                                                 np.asanyarray(v),
+                                                 allow_pickle=False)
+
+
 def download_file(file_id,filename):
 
       gdd.download_file_from_google_drive(file_id=file_id,
                                            dest_path='./' + filename,showsize=True,overwrite=True)
-
 
 def generate_frame(**argv):
 
@@ -95,6 +111,8 @@ def repeat_merge_scale(argv):
         #final.append(thin)
         final.append(p1)
 
+  #print(list(final[0].exterior.coords))
+  #quit()
   #Create bulk surface---get only the exterior to avoid holes
   MP = MultiPolygon(final) 
 
@@ -103,12 +121,13 @@ def repeat_merge_scale(argv):
   polygons_final = []
   if isinstance(conso, shapely.geometry.multipolygon.MultiPolygon):
       for i in conso: 
+       #polygons_final.append(list(i.simplify(1e-2).exterior.coords))
        polygons_final.append(list(i.exterior.coords))
   else: 
        polygons_final.append(list(conso.exterior.coords))
   
 
-  #cut redundant points (probably unnecessary)
+  #cut redundant points
   new_poly = []
   for poly in polygons_final:
    N = len(poly)
@@ -119,6 +138,41 @@ def repeat_merge_scale(argv):
     if np.linalg.norm(np.array(p1)-np.array(p2)) >1e-4:
      tmp.append(p1)
    new_poly.append(tmp)
+
+  #------------------------------------------
+
+  #cut points which are in line--
+
+  #cut redundant points
+  
+
+
+  #p = Polygon(polygons_final[0]).simplify(1e-2)
+  #print(len(p.exterior.coords))
+  #new_poly = polygons_final.copy()
+  discard = 1
+  while discard > 0:
+      
+   discard = 0  
+   new_poly_2 = []
+   for gg,poly in enumerate(new_poly):
+    N = len(poly)
+    tmp = []
+    for n in range(N):
+     p1 = np.array(poly[(n-1+N)%N])
+     p = np.array(poly[n])
+     p2 = np.array(poly[(n+1)%N])
+     di = np.linalg.norm(np.cross(p-p1,p-p2))
+
+     if di >1e-5:
+        tmp.append(p)
+     else:
+        discard += 1 
+    new_poly_2.append(tmp)
+   new_poly = new_poly_2.copy()
+
+
+  #----------------------------
 
 
   dmin = check_distances(new_poly)
@@ -194,7 +248,6 @@ def interpolate(vector,value,bounds='extent',period = None):
    else:
 
     if bounds == 'extent':  
-
      if value < vector[0]:
        i=0;j=1;
      elif value > vector[-1]:
@@ -206,9 +259,9 @@ def interpolate(vector,value,bounds='extent',period = None):
     elif bounds == 'periodic':     
      i=n-1;j=0;
      if value < vector[0]:
-       aj = (value + period -vector[i])/(vector[j] + period -vector[i]) 
+       aj = (value + period -vector[i])/(vector[j] + period -vector[i])
      elif value > vector[-1]:
-       aj = (value + period)/(vector[j] + period - vector[i]) 
+       aj = (value - vector[-1])/(vector[0] + period - vector[-1]) 
 
      ai = 1-aj
      return i,ai,j,aj 
@@ -310,6 +363,7 @@ def create_shared_memory_dict(varss):
 
        del varss
        comm.Barrier()
+
        return dict_output
 
 

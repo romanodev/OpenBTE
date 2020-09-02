@@ -33,8 +33,8 @@ class Material(object):
 
    elif model == 'database':
     if comm.rank == 0:
-      source = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/openbte/materials/' + argv['filename'] + '_' + str(argv['temperature']) +'.h5'
-      shutil.copyfile(source,os.getcwd() + '/material.h5')
+      source = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/openbte/materials/' + argv['filename'] + '_' + str(argv['temperature']) +'.npz'
+      shutil.copyfile(source,os.getcwd() + '/material.npz')
       save = False
 
    elif model == 'full':
@@ -60,7 +60,6 @@ class Material(object):
 
    elif model == 'rta3D':
      if comm.rank == 0:
-      #data = generate_rta3D(**argv)
       data = generate_rta3D(**argv)
 
    elif model == 'mfp_ms':

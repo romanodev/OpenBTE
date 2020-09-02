@@ -132,6 +132,7 @@ def generate_mfp2DSym(**argv):
  rhs_average *= a[0,0]
  
  #Final----
+ print('g')
  return {'tc':tc,\
          'sigma':kappa_directional[:,:,:2],\
          'kappa':kappa,\
@@ -139,6 +140,7 @@ def generate_mfp2DSym(**argv):
          'VMFP':polar_ave[:,:2],\
          'mfp_sampled':mfp,\
          'model':np.array([5]),\
+         'sampling': np.array([n_phi,n_theta,n_mfp]),\
          'suppression':suppression,\
          'kappam':kappa_bulk}
 

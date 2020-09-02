@@ -74,8 +74,8 @@ class Plot(object):
 
    elif model == 'vtu':
     self.duplicate_cells(**argv)
-    self.write_cell_vtu(**argv)   
-    #self.write_vtu(**argv)   
+    #self.write_cell_vtu(**argv)   
+    self.write_vtu(**argv)   
 
 
  def plot_matplotlib(self,**argv):
@@ -266,12 +266,12 @@ class Plot(object):
      else:
       strc += ','
 
+   print(strc)
    data = eval(strc)
-
    if self.mesh['dim'] == 3:
     vtk = VtkData(UnstructuredGrid(self.mesh['nodes'],tetra=self.mesh['elems']),data)
    else :
-    vtk = VtkData(UnstructuredGrid(self.mesh['nodes'],triangle=self.mesh['elems']),data)
+    vtk = VtkData(UnstructuredGrid(self.mesh['nodes'][:,:2],triangle=self.mesh['elems']),data)
 
    vtk.tofile('output','ascii')
 
@@ -280,7 +280,7 @@ class Plot(object):
 
    self.duplicate_cells(**argv)
 
-   for key in self.solver['variables'].keys(): 
+   for key in self.solver['variables'].keys():
        self.solver['variables'][key]['data'] = self._get_node_data(self.solver['variables'][key]['data'])
 
 
@@ -288,13 +288,23 @@ class Plot(object):
    strc = 'PointData('
    for n,(key, value) in enumerate(self.solver['variables'].items()):
 
+
      if  value['data'].shape[0] == 1:  value['data'] =  value['data'][0] #band-aid solution
-     output.append(value['data'])
+
+
+
      name = value['name'] + '[' + value['units'] + ']'
      if value['data'].ndim == 1:
        strc += r'''Scalars(output[''' + str(n) + r'''],name =' ''' + name +  r''' ')'''
+       output.append(value['data'])
     
      if value['data'].ndim == 2:
+
+       if self.mesh['dim'] == 2:
+        t = np.zeros_like(value['data'])
+        value['data'] = np.concatenate((value['data'],t),axis=1)[:,:3]
+       output.append(value['data'])
+
        strc += r'''Vectors(output[''' + str(n) + r'''],name =' ''' + name +  r''' ')'''
 
      if n == len(self.solver['variables'])-1:
@@ -307,7 +317,8 @@ class Plot(object):
    if self.mesh['dim'] == 3:
     vtk = VtkData(UnstructuredGrid(self.mesh['nodes'],tetra=self.mesh['elems']),data)
    else :
-    vtk = VtkData(UnstructuredGrid(self.mesh['nodes'],triangle=self.mesh['elems']),data)
+    nodes = self.mesh['nodes']
+    vtk = VtkData(UnstructuredGrid(nodes,triangle=self.mesh['elems']),data)
 
    vtk.tofile('output','ascii')
 

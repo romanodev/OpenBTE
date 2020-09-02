@@ -15,11 +15,12 @@ from shapely.geometry import LineString
 import profile
 import scipy
 from .solve_mfp import *
-from .solve_deviational import *
+from .solve_deviational_2 import *
 from .solve_rta import *
 from .solve_full import *
 import pkg_resources  
 #from .solve_jax import *
+from .solve_interface import *
 
 comm = MPI.COMM_WORLD
 
@@ -37,6 +38,9 @@ class Solver(object):
         self.bundle = argv.setdefault('bundle',False)
         self.verbose = argv.setdefault('verbose',True)
 
+        self.save_state = argv.setdefault('save_state',False)
+        self.load_state = argv.setdefault('load_state',False)
+        self.boost = argv.setdefault('boost',1.0)
         self.relaxation_factor = argv.setdefault('alpha',1.0)
         self.keep_lu = argv.setdefault('keep_lu',True)
         self.only_fourier = argv.setdefault('only_fourier',False)
@@ -91,7 +95,7 @@ class Solver(object):
            names = {0:'mat_0.npz',1:'mat_1.npz'}  
         else:   
            names = {0:'dummy'} #this is when we read it from within the script
-       
+      
         self.mat = {}
         for key,value in names.items():    
          if comm.rank == 0:   
@@ -100,9 +104,9 @@ class Solver(object):
           if 'material' in argv.keys():
             data = argv['material'].data
           else:              
-           a = np.load(value,allow_pickle=True)
-           data = {key:a[key].item() for key in a}['arr_0']
-
+            data = np.load(value,allow_pickle=True)
+            data = {key:a for key,a in data.items()}
+          
           data['VMFP']  *= 1e9
           data['sigma'] *= 1e9
           data['kappa'] = data['kappa'][0:self.dim,0:self.dim] 
@@ -169,22 +173,28 @@ class Solver(object):
          argv['n_parallel'] = self.n_parallel
          argv['kappa_factor'] = self.kappa_factor
 
-         if argv.setdefault('use_jax',False):
+         
+         if argv.setdefault('interface',False):
+            argv['n_serial'] = self.n_serial
+            data = solve_interface(**argv)
+
+         elif argv.setdefault('use_jax',False):
             data = solve_jax(**argv) 
 
-         if self.model[0:3] == 'mfp' or \
+         elif self.model[0:3] == 'mfp' or \
             self.model[0:3] == 'Gra' :
             argv['n_serial'] = self.n_serial
             #a = time.time()
             #data = self.solve_mfp(**argv) 
             #quit()
             #a = time.time()
-            if argv.setdefault('deviational',False):
-             data = solve_deviational(**argv) 
-            else: 
-             data = solve_mfp(**argv) 
+            #if argv.setdefault('deviational',False):
+            # data = solve_deviational(**argv) 
+            #else: 
+            data = solve_mfp(**argv) 
             #print(time.time()-a)
          elif self.model[0:3] == 'rta':
+            argv['n_serial'] = self.n_serial
             data = solve_rta(**argv) 
             #data = self.solve_rta(**argv)
          elif self.model == 'full':
@@ -202,6 +212,13 @@ class Solver(object):
           if not self.only_fourier:
            variables[2]    = {'name':'Temperature BTE','units':'K','data':data['temperature'],'increment':[-1,0,0]}
            variables[3]    = {'name':'Flux BTE'       ,'units':'W/m/m','data':data['flux'],'increment':[0,0,0]}
+           if 'pseudo' in data.keys():
+            variables[4]    = {'name':'Gradient Pseudo','units':'K/m','data':data['pseudo'],'increment':[0,0,0]}
+           if 'GradT' in data.keys():
+            variables[5]    = {'name':'GradT','units':'K/m','data':data['GradT'],'increment':[0,0,0]}
+           if 'DeltaT' in data.keys():
+            variables[6]    = {'name':'DeltaT','units':'K/m','data':data['DeltaT'],'increment':[0,0,0]}
+
            #self.state.update({'kappa':data['kappa_vec']})
            self.state.update(data)
 
@@ -240,6 +257,8 @@ class Solver(object):
           print(colored('  Keep Lu:                                 ','green')+ str(self.keep_lu),flush=True)
           #print(colored('  Use umfpack                              ','green')+ str(self.umfpack),flush=True)
           print(colored('  Deviational                              ','green')+ str(self.deviational),flush=True)
+          print(colored('  Load State                               ','green')+ str(self.load_state),flush=True)
+          print(colored('  Save State                               ','green')+ str(self.save_state),flush=True)
           print(colored('  Multiscale Error:                        ','green')+ str(self.error_multiscale),flush=True)
           print(colored('  Only Fourier:                            ','green')+ str(self.only_fourier),flush=True)
           print(colored('  Max Fourier Error:                       ','green')+ '%.1E' % (self.max_fourier_error),flush=True)

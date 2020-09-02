@@ -26,7 +26,11 @@ def generate_rta3D(**argv):
  #-------------------
 
  #Import data-----------
- data = dd.io.load('rta.h5')
+ a = np.load('rta.npz',allow_pickle=True)
+ data = {key:a[key].item() for key in a}['arr_0']
+
+
+
  f = np.divide(np.ones_like(data['tau']), data['tau'], out=np.zeros_like(data['tau']), where=data['tau']!=0)
  kappa = data['kappa']
  #--------------------------
