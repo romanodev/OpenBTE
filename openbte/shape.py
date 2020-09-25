@@ -1,6 +1,6 @@
 import numpy as np
 import math
-
+from .utils import *
 
 
 def get_shape(argv):
@@ -17,19 +17,16 @@ def get_shape(argv):
 
 
     #compute area weigths
-    argv.setdefault('area_ratios',np.ones(len(argv['base'])))
-    areas =  [argv.setdefault('porosity')* i /sum(argv['area_ratios'])  for i in argv['area_ratios']]
-    
+    argv.setdefault('area_ratio',np.ones(len(argv['base'])))
+    areas =  [argv.setdefault('porosity')* i /sum(argv['area_ratio'])  for i in argv['area_ratio']]
+
 
     #-------------------
 
     shapes = []
     for n,shape in enumerate(shapes_str):
 
-     #area  = argv.setdefault('porosity')/len(argv['base'])
      area= areas[n]
-     #print(area,area2)
-     #quit()
 
      if shape == 'square':
        shapes.append(np.array(make_polygon(4,area)))
@@ -44,24 +41,13 @@ def get_shape(argv):
       options = argv.setdefault('shape_options',{})
       options.update({'area':area})
 
-      shapes.append(argv['shape_function'](options))
+
+      shapes.append(argv['shape_function'](**options))
 
     return shapes  
 
 
 
-def make_polygon(Na,A):
- 
-   dphi = 2.0*math.pi/Na;
-   r = math.sqrt(2.0*A/Na/math.sin(2.0 * math.pi/Na))
-   poly_clip = []
-   for ka in range(Na):
-     ph =  dphi/2 + (ka-1) * dphi
-     px  = r * math.cos(ph) 
-     py  = r * math.sin(ph) 
-     poly_clip.append([px,py])
-
-   return poly_clip  
 
 
 

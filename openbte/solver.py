@@ -20,7 +20,7 @@ from .solve_rta import *
 from .solve_full import *
 import pkg_resources  
 #from .solve_jax import *
-from .solve_interface import *
+#from .solve_interface import *
 
 comm = MPI.COMM_WORLD
 
@@ -90,9 +90,9 @@ class Solver(object):
 
         #IMPORT MATERIAL---------------------------
         if os.path.isfile('material.npz'):
-          names = {0:'material.npz'}  
+          names = {0:'material'}  
         elif os.path.isfile('mat_0.npz'):
-           names = {0:'mat_0.npz',1:'mat_1.npz'}  
+           names = {0:'mat_0',1:'mat_1'}  
         else:   
            names = {0:'dummy'} #this is when we read it from within the script
       
@@ -103,12 +103,12 @@ class Solver(object):
 
           if 'material' in argv.keys():
             data = argv['material'].data
-          else:              
-            data = np.load(value,allow_pickle=True)
-            data = {key:a for key,a in data.items()}
+          else:            
+            data = load_data(value)  
+        
           
-          data['VMFP']  *= 1e9
-          data['sigma'] *= 1e9
+          #data['VMFP']  *= 1e9
+          #data['sigma'] *= 1e9
           data['kappa'] = data['kappa'][0:self.dim,0:self.dim] 
           if data['model'][0] == 10 : #full
            data['B'] = np.einsum('i,ij->ij',data['scale'],data['B'].T + data['B'])
@@ -119,8 +119,9 @@ class Solver(object):
         argv['mat'] = self.mat[0]
         #----------------------
 
-        #Build elem_kappa_map 
+        #Build elem_kappa_map
         self.elem_kappa_map = np.array([ list(self.mat[i]['kappa'])  for i in self.mesh['elem_mat_map']])
+
 
         if comm.rank == 0 and self.verbose: self.bulk_info()
 
@@ -145,6 +146,7 @@ class Solver(object):
 
         if comm.rank == 0:
           data = self.solve_fourier(self.elem_kappa_map)
+          
           #data = self.solve_fourier_scalar(self.kappa[0,0])
           #if  data['meta'][0] - self.kappa[0,0] > self.kappa[0,0]*1e-3:
           #print('WARNING: Fourier thermal conductivity is larger than bulk one.',flush=True)
@@ -174,12 +176,10 @@ class Solver(object):
          argv['kappa_factor'] = self.kappa_factor
 
          
-         if argv.setdefault('interface',False):
+         if argv.setdefault('user',False):
             argv['n_serial'] = self.n_serial
-            data = solve_interface(**argv)
-
-         elif argv.setdefault('use_jax',False):
-            data = solve_jax(**argv) 
+            data = argv['solve'](**argv)
+            #data = solve_interface(**argv)
 
          elif self.model[0:3] == 'mfp' or \
             self.model[0:3] == 'Gra' :
@@ -227,7 +227,8 @@ class Solver(object):
            #  self.state['geometry'] = self.mesh
            #  self.state['material'] = self.mat
            #dd.io.save('solver.h5',self.state)
-           np.savez_compressed('solver.npz',self.state)   
+
+           save_data(argv.setdefault('filename','solver'),self.state)   
 
           if self.verbose:
            print(' ',flush=True)   
@@ -413,6 +414,7 @@ class Solver(object):
            tfgp[m] = dataf['grad']
            for q in range(self.n_parallel): 
             kappafp[m,q] = -np.dot(self.kappa_mask,dataf['temperature_fourier'] - self.mfp_sampled[m]*np.dot(self.VMFP[q],dataf['grad'].T))
+
             Supdp += kappafp[m,q]*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
          comm.Allreduce([kappafp,MPI.DOUBLE],[kappaf,MPI.DOUBLE],op=MPI.SUM)
          comm.Allreduce([tfp,MPI.DOUBLE],[tf,MPI.DOUBLE],op=MPI.SUM)
@@ -483,7 +485,7 @@ class Solver(object):
    w  = self.mesh['interp_weigths'][ll]
 
    kappa_loc = kj*kappa_i/(ki*(1-w) + kj*w)
- 
+
    return kappa_loc
 
   
@@ -586,7 +588,6 @@ class Solver(object):
         C,grad = self.compute_secondary_flux(temp,kappa)
         #print(np.allclose(C2,C))
 
-    
     flux = -grad*kappa
 
     meta = [kappa_eff,error,n_iter] 
@@ -675,6 +676,9 @@ class Solver(object):
       vj = self.mesh['volumes'][j]
       kappa_loc = self.get_kappa(i,j,ll,kappa)
       if not i == j:
+ 
+          
+
        (v_orth,dummy) = self.get_decomposed_directions(ll,rot=kappa_loc)
        F[i,i] += v_orth/vi*area
        F[i,j] -= v_orth/vi*area
@@ -727,6 +731,8 @@ class Solver(object):
 
         C,grad = self.compute_secondary_flux(temp,kappa)
 
+    #    print(min(grad[:,0]),max(grad[:,0]),kappa_eff)
+   #quit()
 
    flux = -np.einsum('cij,cj->ci',kappa,grad)
  

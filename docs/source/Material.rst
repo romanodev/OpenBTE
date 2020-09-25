@@ -1,6 +1,69 @@
 Material
 ===================================
 
+Fourier model
+-----------------------------------
+
+One of the byproducts of OpenBTE is a full-fledge diffusive model. Why not providing it as a stand-alone model then? 
+
+
+
+Gray approximation
+-----------------------------------
+
+
+Mean-free-path approximation
+-----------------------------------
+
+This method estimates kappa given only the MFP distribution. It assumes isotropic distribution, therefore uses it cautiously.
+
+.. tabs::
+
+   .. tab:: ``model='mfp3D'``
+
+    This is the case where an actual 3D simulation is performed. The coefficients are:
+     
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\mathbf{F}_k = \Lambda_k (\sin{\phi_k}\sin{\theta_k}\mathbf{\hat{x}} +\cos{\phi_k}\sin{\theta_k}\mathbf{\hat{y}} +\cos\theta_k \mathbf{\hat{z}} )`  | 
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\alpha_k = \left[\sum_l  C_l/\tau_l \right]^{-1} \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu/\tau_{\mu}`                     | 
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\mathbf{G}_k = \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu \mathbf{v}_\mu`                                                   | 
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+  
+
+   .. tab:: ``model='mfp2DSym'``
+
+    This is the case where the simulation domain has translational invariance along :math:`z`. In this case each bulk MFP :math:`\mathbf{v}_\mu\tau_\mu` can be mapped onto the :math:`z=0` plane. 
+
+    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\mathbf{F}_k = \chi_k (\sin{\phi_k}\mathbf{\hat{x}} +\cos{\phi_k}\mathbf{\hat{y}})`                                                                                                                                        | 
+    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\alpha_k = \left[\sum_l  C_l/\tau_l \right]^{-1} \sum_\mu \left[\mathcal{M}( \mathbf{S}_z\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) + \delta(\mathbf{v}_\mu\cdot\mathbf{\hat{z}}-|\mathbf{v}_\mu|)   \right] C_\mu/\tau_\mu`  |  
+    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\mathbf{G}_k = \sum_\mu \mathcal{M}(\mathbf{v}_\mu^{\mathrm{2D}} \tau_\mu,\mathbf{F}_{k}) C_\mu \mathbf{v}_\mu`                                                                                                            | 
+    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+  
+    where :math:`\mathbf{S}_z` is a projection operator onto the plane :math:`z=0`.
+
+
+   .. tab:: ``model='mfp2D'``
+
+    An actual 2D material is being simulated. 
+
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\mathbf{F}_k = \Lambda_k (\sin{\phi_k}\mathbf{\hat{x}} +\cos{\phi_k}\mathbf{\hat{y}})`                                                              | 
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\alpha_k = \left[\sum_l  C_l/\tau_l \right]^{-1} \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu/\tau_\mu`                       |      
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | :math:`\mathbf{G}_k = \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu \mathbf{v}_\mu`                                                   | 
+    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+
+
+
+
+
 
 Relaxation time approximation
 -----------------------------------
@@ -19,10 +82,10 @@ where
 
 The scattering times are defined as  :math:`\tau_\nu^{-1} = W_{\nu\nu}`, where :math:`\mathbf{W}` is the scattering matrix. Terms :math:`T_\mu`  are the phonon pseudo temperatures. Upon convergence, the heat flux is computed with :math:`\mathbf{J} = \mathcal{V}^{-1} N^{-1} \sum_\mu C_\mu \mathbf{v}_\mu T_\mu`, where :math:`\mathbf{v}_\mu` is the group velocity and :math:`C_\mu` is the heat capacity; the latter is defined as :math:`C_\mu = k_B \eta_\mu \left(\sinh \eta_\mu \right)^{-2}`, where :math:`\eta_\mu = \hbar \omega_\mu/k_B/T_0/2`. Adiabatic boundary conditions are generally applied with :math:`T_{\mu^-} = \sum_{\nu^+} R_{\mu^-\nu^+} T_{\nu^+}`, where :math:`R_{\mu^-\nu^+}` is a reflection matrix, :math:`T_{\mu^-}` (:math:`T_{\mu^+}`) is related to incoming (outgoing) phonons. Currently, OpenBTE employes a crude approximation, i.e. all phonons thermalize to a boundary temperature, whose values is obtained by ensuring zero total incident flux [`Landon (2014)`_]. Within this approach, the reflection matrix reads as :math:`R_{\mu^-\nu^+}=-C_\nu\mathbf{v}_\nu \cdot \hat{\mathbf{n}} \left[\sum_{k^-} C_{k^-} \mathbf{v}_{k^-}\cdot \hat{\mathbf{n}} \right]^{-1}`.
 
-Creating ``rta.h5``
+Creating ``rta.npz``
 ###############################################
 
-The first step for solving the RTA-BTE is to create the file ``rta.h5``. This file is an ``hdf5`` file that must have the following items:
+The first step for solving the RTA-BTE is to create the file ``rta.npz``. This file is an ``gzip`` file that must have the following items:
 
 .. table:: 
    :widths: auto
@@ -41,25 +104,25 @@ The first step for solving the RTA-BTE is to create the file ``rta.h5``. This fi
    +----------------+-------------+--------------------------------------------------------------------------+--------------------------+
 
 
-Each item must be a ``numpy`` array with the prescribed ``shape``. We recommend using the package Deepdish_ for IO ``hdf5`` operations. The thermal conductivity tensor is given by :math:`\kappa^{\alpha\beta} = \mathcal{V}^{-1}N^{-1}\sum_{\mu} C_\mu  v_\mu^{\alpha} v_\mu^{\beta} \tau_\mu`, where :math:`\mathcal{V}` is the volume of the unit cell and :math:`N` is the numbre of wave vectors. To check the consistencty of the data populating ``rta.h5``, you may want to run this script:
+Each item must be a ``numpy`` array with the prescribed ``shape``. The thermal conductivity tensor is given by :math:`\kappa^{\alpha\beta} = \mathcal{V}^{-1}N^{-1}\sum_{\mu} C_\mu  v_\mu^{\alpha} v_\mu^{\beta} \tau_\mu`, where :math:`\mathcal{V}` is the volume of the unit cell and :math:`N` is the numbre of wave vectors. To check the consistencty of the data populating ``rta.npz``, you may want to run this script:
 
 .. code-block:: python
 
    import numpy as np
-   import deepdish as dd
+   from openbte.utils import *
 
-   data = dd.io.load('rta.h5')
+   data = dd.io.load('rta.npz')
    kappa = data['alpha']*np.einsum('k,ki,kj,k->ij',data['C'],data['v'],data['v'],data['tau'])
 
    assert(np.allclose(kappa,data['kappa']))
 
-Of course, the best practice is to have the ``kappa`` populating ``rta.h5`` generated by the other items and compare it with the intended value.
+Of course, the best practice is to have the ``kappa`` populating ``rta.npz`` generated by the other items and compare it with the intended value.
 
 
-Creating ``material.f5``
+Creating ``material.npz``
 ###############################################
 
-With ``rta.h5`` in your current directory, ``material.h5`` can be generated simply with
+With ``rta.npz`` in your current directory, ``material.npz`` can be generated simply with
 
 .. code-block:: python
 
@@ -140,7 +203,7 @@ Assuming you have ``AlmaBTE`` in your current ``PATH``, this an example for ``Si
    VCAbuilder inputfile.xml
    phononinfo Si/Si_8_8_8.h5
     
-- A file named ``Si_8_8_8_300K.phononinfo`` is in your current directory. The file ``rta.h5`` can then be created with 
+- A file named ``Si_8_8_8_300K.phononinfo`` is in your current directory. The file ``rta.npz`` can then be created with 
 
   .. code-block:: bash
 
@@ -192,10 +255,10 @@ where
 
 The term :math:`\mathbf{W}` is the scattering matrix and :math:`T_\mu` the phonon pseudo temperatures. Upon convergence, the heat flux is computed with :math:`\mathbf{J} = \mathcal{V}^{-1} N^{-1} \sum_\mu C_\mu \mathbf{v}_\mu T_\mu`, where :math:`\mathbf{v}_\mu` is the group velocity and :math:`C_\mu` is the heat capacity; the latter is defined as :math:`C_\mu = k_B \eta_\mu \left(\sinh \eta_\mu \right)^{-2}`, where :math:`\eta_\mu = \hbar \omega_\mu/k_B/T_0/2`. Adiabatic boundary conditions are generally applied with :math:`T_{\mu^-} = \sum_{\nu^+} R_{\mu^-\nu^+} T_{\nu^+}`, where :math:`R_{\mu^-\nu^+}` is a reflection matrix, :math:`T_{\mu^-}` (:math:`T_{\mu^+}`) is related to incomng (outgoing) phonons. Currently, OpenBTE employes a crude approximation, i.e. all phonons thermalize to a boundary temperature, whose values is obtained by ensuring zero total incident flux [`Landon (2014)`_]. Within this approach, the reflection matrix reads as :math:`R_{\mu^-\nu^+}=-C_\nu\mathbf{v}_{\nu^-} \cdot \hat{\mathbf{n}} \left[\sum_{k^-} C_{k^-} \mathbf{v}_{k^-}\cdot \hat{\mathbf{n}} \right]^{-1}`.
 
-Creating ``full.h5``
+Creating ``full.npz``
 ###############################################
 
-The first step for solving the BTE with the full collision operator is to create the file ``full.h5``. This file is an ``hdf5`` file that must have the following items:
+The first step for solving the BTE with the full collision operator is to create the file ``full.npz``. This file is an ``gzip`` file that must have the following items:
 
 .. table:: 
    :widths: auto
@@ -217,26 +280,26 @@ The first step for solving the BTE with the full collision operator is to create
 
 
 
-Each item must be a ``numpy`` array with prescribed ``shape``. We recommend using the package Deepdish_ for IO ``hdf5`` operations. Within this formalism the thermal conductivity tensor is given by :math:`\langle S^{\alpha}|W^{\sim1}|S^{\beta}\rangle`, where :math:`S^\alpha_\mu = C_\mu v^\alpha_\mu` and :math:`\sim1` is the Moore-Penrose inverse. Note that we use the notation :math:`< f | g | f > = N^{-1} \mathcal{V}^{-1} \sum_{\mu\nu} f_\mu g_{\mu\nu} f_\nu` .To check the consistencty of the data populating ``full.h5``, you may want to run this script:
+Each item must be a ``numpy`` array with prescribed ``shape``. We recommend using the package Deepdish_ for IO ``hdf5`` operations. Within this formalism the thermal conductivity tensor is given by :math:`\langle S^{\alpha}|W^{\sim1}|S^{\beta}\rangle`, where :math:`S^\alpha_\mu = C_\mu v^\alpha_\mu` and :math:`\sim1` is the Moore-Penrose inverse. Note that we use the notation :math:`< f | g | f > = N^{-1} \mathcal{V}^{-1} \sum_{\mu\nu} f_\mu g_{\mu\nu} f_\nu` .To check the consistencty of the data populating ``full.npz``, you may want to run this script:
 
 .. code-block:: python
 
    import numpy as np
-   import deepdish as dd
+   from openbte.utils import *
 
-   data = dd.io.load('full.h5')
+   data = load_data('full')
    S = np.einsum('i,ij->ij',data['C'],data['v'])
    kappa = np.einsum('i,ij,j->ij',S,np.linalg.pinv(data['W']),S)/data['alpha']
 
    assert(np.allclose(kappa,data['kappa']))
 
-Of course, the best practice is to have the ``kappa`` populating ``full.h5`` generated by the other items and compare it with the intended value.
+Of course, the best practice is to have the ``kappa`` populating ``full.npz`` generated by the other items and compare it with the intended value.
 
 
-Creating ``material.f5``
+Creating ``material.npz``
 ###############################################
 
-With ``full.h5`` in your current directory, ``material.h5`` can be generated simply with
+With ``full.npz`` in your current directory, ``material.npz`` can be generated simply with
 
 .. code-block:: python
 
@@ -248,7 +311,7 @@ The ``Material`` will ensure that the scattering operator :math:`W` is energy co
 Interface with Phono3py (Experimental)
 ###############################################
 
-Phono3py_ calculates the bulk thermal conductivity using the full scattering matrix defined here [`Chaput (2013)`_]. In order to be used in tandem with OpenBTE, Phono3py must be run with the following options ``--reducible-colmat --write-lbte-solution --lbte``. Once Phono3py is solved, the ``full.h5`` is created by
+Phono3py_ calculates the bulk thermal conductivity using the full scattering matrix defined here [`Chaput (2013)`_]. In order to be used in tandem with OpenBTE, Phono3py must be run with the following options ``--reducible-colmat --write-lbte-solution --lbte``. Once Phono3py is solved, the ``full.npz`` is created by
 
 
 .. code-block:: bash
@@ -271,7 +334,7 @@ Here is an example assuming you have a working installation of Phono3py:
 
    Phono3py2OpenBTE POSCAR-unitcell 8 8 8 
 
-Note that ``rta.h5`` is also created in the case you want to use a RTA model.   
+Note that ``rta.npz`` is also created in the case you want to use a RTA model.   
 
 Conversion from other collision matrix definitions
 ##################################################

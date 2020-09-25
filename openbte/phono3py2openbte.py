@@ -129,11 +129,12 @@ def main():
  data = {'W':W,'v':v,'C':C,'kappa':kappa,'alpha':np.array([alpha])}
  #np.savez_compressed('full.npz',data)   
  #Saving data
- saveCompressed('full.npz',**data)   
+ save_data('full',data)   
  #hdfdict.dump(data,'full.h5')
 
  data = {'C':C/alpha,'tau':tau,'v':v,'kappa':kappa}
  saveCompressed('rta.npz',**data)   
+ #save_data('full',data)   
  #np.savez_compressed('rta.npz',data)   
 
  #---------------------------------------------

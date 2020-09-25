@@ -3,6 +3,7 @@ import plotly
 import plotly.graph_objs as go
 import numpy as np
 import sys
+from .utils import *
 
 
 
@@ -28,7 +29,7 @@ def plotly_trisurf(nodes, simplices, data,name,units,visible=False):
 
 def add_data(nodes,elems,name,data,units,buttons,fig,nv):
 
-      plotly_data=plotly_trisurf(nodes,elems,data,name,units,visible= True if (len(buttons) == nv-2 or nv == 1) else False)
+      plotly_data=plotly_trisurf(nodes,elems,data,name,units,visible= True if (len(buttons) == nv-5 or nv == 1) else False)
       fig.add_trace(plotly_data)
       visible = nv*[False]; visible[len(buttons)] = True
       buttons.append(dict(label=name,
@@ -38,8 +39,9 @@ def add_data(nodes,elems,name,data,units,buttons,fig,nv):
 
 def plot_results(data,nodes,elems,**argv):
 
-       
-   size = [ max(nodes[:,i]) - min(nodes[:,i])  for i in range(3)] 
+   
+
+   size = [max(nodes[:,i]) - min(nodes[:,i])  for i in range(3)] 
    dim = 2   if size[2] == 0 else 3
 
    nv = 0
@@ -84,11 +86,11 @@ def plot_results(data,nodes,elems,**argv):
 
    #fig.update_layout(width=600,height=600,autosize=True,margin=dict(t=50, b=20, l=20, r=20),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
    #fig.update_layout(width=500,height=500,autosize=True,margin=dict(t=10, b=10, l=20, r=20),paper_bgcolor='LightSteelBlue')  
-   fig.update_layout(width=400,height=450,autosize=True,margin=dict(t=50, b=10, l=20, r=20),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
+   fig.update_layout(width=400,height=450,autosize=True,margin=dict(t=20, b=10, l=00, r=20),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
    #fig.update_layout(width=500,height=500,autosize=True,margin=dict(t=50, b=20, l=20, r=20),template='plotly')#,plot_bgcolor='rgba(0,0,0,0)')  
 
 
-   updatemenus=[dict(direction='down',active=nv-2 if nv > 1 else 0,x=0.4,y=1.15,buttons=list(buttons),showactive=True)]
+   updatemenus=[dict(direction='down',active=nv-5 if nv > 1 else 0,x=0.4,y=1.15,buttons=list(buttons),showactive=True)]
    fig.update_layout(updatemenus=updatemenus)
 
 
@@ -123,14 +125,23 @@ def plot_results(data,nodes,elems,**argv):
    fig.update_layout(xaxis_showgrid=False, yaxis_showgrid=False)
    fig.update_layout(scene_camera=camera)
 
-   #if argv.setdefault('write',False):
-   # fig.write_html("plotly.html")
-   # plotly.io.to_image(fig,format='png')
+   if argv.setdefault('write_html',False):
+    fig.write_html("plotly.html")
 
-   if 'google.colab' in sys.modules:
-    fig.show(renderer='colab')
-   else:
-    fig.show(renderer='browser')
+
+   if argv.setdefault('write_data',False):
+       data = {'elems':elems,'nodes':nodes,'variables':data}
+       save_data('bundle',data)
+
+
+   # plotly.io.to_image(fig,format='png')
+   #fig.write_image("test.png",scale=5)
+
+   if argv.setdefault('show',True):
+    if 'google.colab' in sys.modules:
+     fig.show(renderer='colab')
+    else:
+     fig.show(renderer='browser')
 
    #if argv.setdefault('show',False):
    #else:

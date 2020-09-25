@@ -1,7 +1,9 @@
 Reference
 ===================================
 
-If you use OpenBTE, please consider this citation
+The paper on OpenBTE is coming soon. Meanwhile, please consider this citation
+
+
 
 
 .. code-block:: bash

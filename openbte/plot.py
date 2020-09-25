@@ -45,12 +45,10 @@ class Plot(object):
 
    self.dim = int(self.mesh['meta'][2])
 
-   
    if 'solver' in argv.keys():
     self.solver = argv['solver'].state
    else: 
-     a = np.load('solver.npz',allow_pickle=True)
-     self.solver = {key:a[key].item() for key in a}['arr_0']
+     self.solver = load_data('solver')
 
    #if 'material' in argv.keys():
    # self.solver = argv['material']
@@ -73,7 +71,7 @@ class Plot(object):
     self.plot_matplotlib(**argv)
 
    elif model == 'vtu':
-    self.duplicate_cells(**argv)
+    #self.duplicate_cells(**argv)
     #self.write_cell_vtu(**argv)   
     self.write_vtu(**argv)   
 
@@ -91,11 +89,17 @@ class Plot(object):
     ylim([-ly/2.0,ly/2.0])
      
     #plot frame---
-    path = create_path(frame)
-    patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color='#D4D4D4',zorder=1,joinstyle='miter')
-    gca().add_patch(patch);
+    #path = create_path(frame)
+    #patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color='#D4D4D4',zorder=1,joinstyle='miter')
+    #gca().add_patch(patch);
 
-    data = self.solver['variables'][0]['data']
+    idd = 3
+    if idd in [1,3]:
+     data = np.array([np.linalg.norm(tmp) for tmp in self.solver['variables'][idd]['data']])
+     print(min(data),max(data))
+    else: 
+     data = self.solver['variables'][0]['data']
+
     data = (data - min(data))/(max(data)-min(data))
 
     for ne in range(len(self.mesh['elems'])):
@@ -113,8 +117,8 @@ class Plot(object):
       p2 = self.mesh['sides'][side][1]
       n1 = self.mesh['nodes'][p1]
       n2 = self.mesh['nodes'][p2]
-      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=2,zorder=1)
- 
+      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=1,zorder=1)
+
     show()  
  
  def plot_elem(self,ne,color='gray') :
@@ -122,7 +126,7 @@ class Plot(object):
     elem = self.mesh['elems'][ne][:self.mesh['side_per_elem'][ne]]
     pp = self.mesh['nodes'][elem,:2]
     path = create_path(pp)
-    patch = patches.PathPatch(path,linestyle=None,linewidth=0.5,color=color,zorder=1,joinstyle='miter',alpha=0.7)
+    patch = patches.PathPatch(path,linestyle=None,linewidth=0.0,color=color,zorder=1,joinstyle='bevel',alpha=0.7)
     gca().add_patch(patch)
 
 

@@ -83,7 +83,7 @@ When using predefined shapes and multiple pores it is possible to create uneven 
 
 .. code:: python
 
-   Geometry(model='lattice',lx = 10,ly = 10, step = 0.5, base = [[0.2,0],[-0.2,0]],porosity=0.1,shape='circle',area_ration=[1,2])
+   Geometry(model='lattice',lx = 10,ly = 10, step = 0.5, base = [[0.2,0],[-0.2,0]],porosity=0.1,shape='circle',area_ratio=[1,2])
 
 
 In this case the second pore would be twice as larger as the first one. Optionally, you can also define a vector of shapes, e.g. ``shape=['circle','square']``.

@@ -141,11 +141,11 @@ def fourier_scalar(m,kappa,DeltaT,C,argv):
     kappa_old = 0
     error = 1  
 
-    tmp = np.zeros(n_elems)
-    for n,e in enumerate(argv['mesh']['eb']):
-       area = argv['mesh']['areas'][argv['mesh']['eb'][n]]
-       volume = argv['mesh']['volumes'][e]
-       tmp[e] += argv['TB'][n]*area/volume
+    #tmp = np.zeros(n_elems)
+    #for n,e in enumerate(argv['mesh']['eb']):
+    #   area = argv['mesh']['areas'][argv['mesh']['eb'][n]]
+    #   volume = argv['mesh']['volumes'][e]
+       #tmp[e] += argv['TB'][n]*area/volume
 
     B = kappa*argv['cache']['RHS_FOURIER'].copy() + DeltaT #+ argv['thermal_conductance'][m]*argv['TB']*area/volume
 

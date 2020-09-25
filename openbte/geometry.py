@@ -5,20 +5,14 @@ from .mesher import *
 from .utils import *
 import time
 import scipy.sparse as sp
-#import deepdish as dd
 import itertools
-from .GenerateInterface import *
 from mpi4py import MPI
 import time
-#from matplotlib.pylab import *
 import numpy.testing as npt
 from statistics import mean
-#import pickle
 from scipy.ndimage.interpolation import shift
 from collections import Counter
 
-
-#from matplotlib.pylab import *
 
 comm = MPI.COMM_WORLD
 
@@ -27,29 +21,19 @@ class Geometry(object):
  def __init__(self,**argv):
 
   if comm.rank == 0:
-   if argv.setdefault('model','lattice') == 'interface':
-     GenerateInterface(**argv) #this create mesh.msh 
+   if argv.setdefault('user',False):
      self.import_mesh(**argv)
      argv.update({'centroids':self.elem_centroids})
-     self.elem_mat_map = CreateCorrelation(**argv)
-     self.update_side_interface()
-     self.data = self.compute_mesh_data(**argv)
+     self.elem_mat_map = argv['correlation'](**argv)
    else:
      Mesher(argv) #this create mesh.msh
      self.dmin = argv['dmin']
      self.import_mesh(**argv)
      self.elem_mat_map = np.zeros(len(self.elems)) #omhogeneous material
-     self.data = self.compute_mesh_data(**argv)
    self.update_side_interface()
+   self.data = self.compute_mesh_data(**argv)
    if argv.setdefault('save',True):
     np.savez_compressed('geometry',self.data)   
-
- #def compute_node_map(self,**argv):
-
- #  self.conn = np.zeros(len(self.nodes))
- #  for k,e in enumerate(self.elems):
- #    for n in e:
- #     self.conn[n] +=1
 
 
  def compute_boundary_connection(self):
@@ -213,8 +197,10 @@ class Geometry(object):
       self.intj.append(l1)   
       self.intk.append(normal*area/vol1)
       self.intk.append(-normal*area/vol2)
+      #ij.append([l1,l2])
+      #ij.append([l2,l1])
 
-     if not l1 == l2:
+     if not l1 == l2 :#and not (ll in self.side_list['Interface']):
        self.i.append(l1)   
        self.j.append(l2)   
        self.i.append(l2)   
@@ -232,6 +218,9 @@ class Geometry(object):
    self.db = np.array(self.db).T
    self.intk = np.array(self.intk).T
 
+   
+   #self.i += self.inti
+   #self.j += self.intj
    self.ij = ij
 
 

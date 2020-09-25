@@ -43,13 +43,12 @@ class Mesher(object):
        self.add_symmetry(argv) 
        self.add_polygons(argv)
        repeat_merge_scale(argv)
-       print(argv['dmin'])
   #---------------------
 
   if argv.setdefault('lz',0) == 0:
     self.generate_mesh_2D(argv)
   else:   
-     self.generate_mesh_3D(argv)
+    self.generate_mesh_3D(argv)
 
 
  def generate_bulk_3D(self,argv):
@@ -215,7 +214,8 @@ class Mesher(object):
       argv['base'] =  np.append(argv['base'],[[0,0]],axis=0)
 
   if argv.setdefault('reflection',False):
-      
+     
+      argv['base']=np.array(argv['base'])
       base = argv['base'].copy()
       tmp = base/2 + np.array([0.25,0.25])
       base = argv['base'].copy()
@@ -627,6 +627,7 @@ class Mesher(object):
   self.common(z=-self.argv['lz']/2)
 
   self.common(z=self.argv['lz']/2)
+
   self.merge() 
   self.points = np.array(self.points)
   self.lines = np.array(self.lines)
@@ -699,6 +700,7 @@ class Mesher(object):
      
      
  def apply_periodic_mesh(self):
+
      self.argv.setdefault('Periodic',[True,True,False])
      #Find periodic surfaces----
      self.periodic = {}
@@ -710,7 +712,6 @@ class Mesher(object):
            corr = {}
            pts1,ind1 = self.get_points_from_surface(s1)
            pts2,ind2 = self.get_points_from_surface(s2)
-
 
            for n1,p1 in zip(ind1,pts1):
             for n2,p2 in zip(ind2,pts2):
@@ -743,8 +744,31 @@ class Mesher(object):
    Nh = int(len(self.points)/2)
    for n in range(Nh):
      self.lines.append([n,n+Nh])  
-     
 
+   Ns = int(len(self.surfaces)/2)
+   self.surfaces3D = []
+   for s in range(Ns):
+    tmp2 = [s,s+Ns]  
+
+    for loop in self.surfaces[s]:
+
+     #Create vertical loop    
+     for l in self.loops[loop]:
+      i1 = self.lines[l-1][0];  i2 = self.lines[l-1][1]
+      j1 = i1 + Nh; j2 = i2 + Nh
+      tmp = []
+      tmp.append(self.line_exists_ordered(i1,i2))
+      tmp.append(self.line_exists_ordered(i2,j2))
+      tmp.append(self.line_exists_ordered(j2,j1))
+      tmp.append(self.line_exists_ordered(j1,i1))
+      self.loops.append(tmp)
+      self.surfaces.append([len(self.loops)-1])
+      tmp2.append(len(self.surfaces)-1)
+
+ 
+    self.surfaces3D.append(tmp2)
+
+   '''
    #Create new loops 
    N = int(len(self.loops)/2)
    for ll in range(N):
@@ -761,8 +785,8 @@ class Mesher(object):
   
      self.loops.append(tmp)
      self.surfaces.append([len(self.loops)-1])
-     
- 
+   print(self.loops)
+   '''   
  
  #def apply_periodic_mesh(self):
 
@@ -793,7 +817,7 @@ class Mesher(object):
     store.write(strc)
    
    
-   #Write surface------
+   #Write surface-----
    nll = len(self.loops)
    for s,surface in enumerate(self.surfaces):
     strc = '''Plane Surface(''' +str(s+nll+nl) + ''')= {''' 
@@ -809,6 +833,7 @@ class Mesher(object):
    boundary = list(range(len(self.surfaces)))
    #Apply periodicity
    vec = {}
+
    for key, value in self.periodic.items():
    
      boundary.remove(key)  
@@ -829,7 +854,6 @@ class Mesher(object):
        store.write(',')
      store.write('};\n')
     
-
      value[0] += nl+nll
      tt = key +  nl + nll
      if np.array_equal(np.array([1,0,0]),value[3]) : 
@@ -837,8 +861,8 @@ class Mesher(object):
         vec.setdefault(1,[]).append(tt) 
      
      if np.array_equal(np.array([-1,0,0]),value[3]): 
+        vec.setdefault(1,[]).append(value[0]) 
         vec.setdefault(2,[]).append(tt) 
-        vec.setdefault(1,[]).append(value) 
         
      if np.array_equal(np.array([0,1,0]),value[3]) : 
         vec.setdefault(3,[]).append(value[0]) 
@@ -848,6 +872,7 @@ class Mesher(object):
         vec.setdefault(4,[]).append(value[0]) 
         vec.setdefault(3,[]).append(tt)
         
+
      if np.array_equal(np.array([0,0,1]),value[3]) : 
         vec.setdefault(5,[]).append(value[0]) 
         vec.setdefault(6,[]).append(tt)   
@@ -855,7 +880,6 @@ class Mesher(object):
      if np.array_equal(np.array([0,0,-1]),value[3]) : 
         vec.setdefault(6,[]).append(value[0]) 
         vec.setdefault(5,[]).append(tt) 
-        
    for key, value in vec.items():
     
      strc = r'''Physical Surface("Periodic_''' + str(key) + '''") = {'''
@@ -866,7 +890,7 @@ class Mesher(object):
       else :
        strc += ','
      store.write(strc)
-         
+
    strc = r'''Physical Surface("Boundary") = {'''
    for n,p in enumerate(boundary) :
       strc +=str(p+nl+nll)
@@ -876,24 +900,36 @@ class Mesher(object):
        strc += ','
    store.write(strc)
     
-    
-   if len(self.surfaces) > 0:
+  
+   #this part needs to change---
+
+   index = nll+nl +  len(self.surfaces3D)
+   for k,surfaces in enumerate(self.surfaces3D):
+       
     #------------------
-    ss  = len(self.surfaces)
-    strc = r'''Surface Loop(''' + str(ss+nll+nl) + ') = {'
-    for s in range(len(self.surfaces)) :
-     strc +=str(s+nl+nll)
-     if s == len(self.surfaces)-1:
+    strc = r'''Surface Loop(''' + str(nll+nl + k) + ') = {'
+    for s,surface in enumerate(surfaces) :
+     strc +=str(nll+nl+surface)
+     if s == len(surfaces)-1:
       strc += '};\n'
      else :
       strc += ','
     store.write(strc)
     
-    strc = r'''Volume(0) = {''' + str(ss+nll+nl) + '};\n'
+    strc = r'''Volume(''' + str(index + k) + ''') = {''' + str(nll+nl+k) + '};\n'
     store.write(strc)
-    strc = r'''Physical Volume('Bulk') = {0};'''
-    store.write(strc) 
+  
+   strc = r'''Physical Volume('Bulk') = {'''
+   for k in range(len(self.surfaces3D)) :
+     strc +=str(k+index)
+     if k == len(self.surfaces3D)-1:
+      strc += '};\n'
+     else :
+      strc += ','
+   store.write(strc)
 
+   #---------------------------------------------
+    
    store.close()
 
 
@@ -1020,28 +1056,24 @@ class Mesher(object):
   Frame = Polygon(generate_frame(**self.argv))
   polygons = self.argv['polygons']
 
-  polypores = []
-  for poly in polygons:
-   polypores.append(Polygon(poly))
-
+  polypores = [ Polygon(poly)  for poly in polygons]
   
   MP = MultiPolygon(polypores)
   bulk = Frame.difference(cascaded_union(MP))
   if not (isinstance(bulk, shapely.geometry.multipolygon.MultiPolygon)):
    bulk = [bulk]
-  
-  loop_start = len(self.loops)  
+
   for region in bulk:
+   loop_start = len(self.loops)  
    pp = list(region.exterior.coords)[:-1]
-   self.create_lines_and_loop_from_points(pp,z)
-   
+   self.create_lines_and_loop_from_points(pp,z) 
    #From pores 
    for interior in region.interiors:
     pp = list(interior.coords)[:-1]
     self.create_lines_and_loop_from_points(pp,z)
-  loop_end = len(self.loops)  
-  
-  self.surfaces.append(range(loop_start,loop_end))
+   loop_end = len(self.loops) 
+
+   self.surfaces.append(range(loop_start,loop_end))
 
     
 

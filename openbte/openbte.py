@@ -5,8 +5,6 @@ import re,os
 
 def main():
 
-
-
  if len(os.sys.argv) == 1:
    name = 'input.yaml'  
    with open(name) as f:

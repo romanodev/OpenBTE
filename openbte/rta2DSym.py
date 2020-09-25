@@ -29,8 +29,7 @@ def generate_rta2DSym(**argv):
  
  #data = dd.io.load('rta.h5')
 
- a = np.load('rta.npz',allow_pickle=True)
- data = {key:a[key].item() for key in a}['arr_0']
+ data = load_data('rta')
 
  #small cut on MFPs
  mfp_0 = 1e-9
@@ -95,13 +94,10 @@ def generate_rta2DSym(**argv):
 
     else: 
      lo += tc[m]   
-
  #comm.Allreduce([kdp,MPI.DOUBLE],[kd,MPI.DOUBLE],op=MPI.SUM)
  #comm.Allreduce([tcp,MPI.DOUBLE],[tc,MPI.DOUBLE],op=MPI.SUM)
 
  
-
- print(time.time()-a)
  temp_coeff *=(1+lo)
 
  rhs_average = mfp_sampled*mfp_sampled/2

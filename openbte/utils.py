@@ -9,7 +9,9 @@ import os
 import functools
 import matplotlib.pylab as plt
 import io,zipfile
-
+import math
+import pickle
+import gzip
 
 os.environ['H5PY_DEFAULT_READONLY']='1'
 
@@ -32,14 +34,114 @@ def generate_random_interface(p,l,variance,scale):
  return f
 
 
-def saveCompressed(fh, **namedict):
-     with zipfile.ZipFile(fh, mode="w", compression=zipfile.ZIP_DEFLATED,
-                          allowZip64=True) as zf:
-         for k, v in namedict.items():
-             with zf.open(k + '.npy', 'w', force_zip64=True) as buf:
-                 np.lib.npyio.format.write_array(buf,
-                                                 np.asanyarray(v),
-                                                 allow_pickle=False)
+def make_polygon(Na,A):
+
+ 
+   dphi = 2.0*math.pi/Na;
+   r = math.sqrt(2.0*A/Na/math.sin(2.0 * math.pi/Na))
+   poly_clip = []
+   for ka in range(Na):
+     ph =  dphi/2 + (ka-1) * dphi
+     px  = r * math.cos(ph) 
+     py  = r * math.sin(ph) 
+     poly_clip.append([px,py])
+
+   return poly_clip  
+
+
+def create_loop(loops,line_list,store):
+
+   #create external loop
+
+   strc = 'Line Loop(' + str(loops)+ ') = {'
+   for n in range(len(line_list)):
+    strc +=str(line_list[n])
+    if n == len(line_list)-1:
+     strc += '};\n'
+    else:
+     strc += ','
+   store.write(strc)
+
+   return strc
+
+
+def create_line_list(pp,points,lines,store,lx,ly):
+
+   def line_exists_ordered_old(l,lines):
+    for n,line in enumerate(lines) :
+     if (line[0] == l[0] and line[1] == l[1]) :
+      return n+1
+     if (line[0] == l[1] and line[1] == l[0]) :
+      return -(n+1)
+    return 0
+
+
+   def already_included_old(all_points,new_point,p_list):
+
+    dd = 1e-12
+    I = []
+    if len(all_points) > 0:
+     I = np.where(np.linalg.norm(np.array(new_point)-np.array(all_points),axis=1)<dd)[0]
+    if len(I) > 0: 
+       return I[0]
+    else: 
+      return -1
+
+   p_list = []
+   for p in pp:
+    tmp = already_included_old(points,p,p_list)
+    if tmp == -1:    
+      points.append(p)
+      p_list.append(len(points)-1)
+    else:
+      p_list.append(tmp)
+
+   for k,p in enumerate(p_list):
+     point = points[-len(p_list)+k] 
+     store.write( 'Point('+str(len(points)-len(p_list)+k) +') = {' + str(point[0]/lx) +'*lx,'+ str(point[1]/ly)+'*ly,0,h};\n')
+
+   line_list = []
+   for l in range(len(p_list)):
+    p1 = p_list[l]
+    p2 = p_list[(l+1)%len(p_list)]
+    if not p1 == p2:
+     tmp = line_exists_ordered_old([p1,p2],lines)
+
+     if tmp == 0 : #craete line
+      lines.append([p1,p2])
+      store.write( 'Line('+str(len(lines)) +') = {' + str(p1) +','+ str(p2)+'};\n')
+      line_list.append(len(lines))
+     else:
+      line_list.append(tmp)
+
+   
+   return line_list
+
+
+ 
+
+
+def save_data(fh, namedict):
+
+     with gzip.GzipFile(fh + '.npz', 'w') as f:
+            pickle.dump(namedict, f,protocol=pickle.HIGHEST_PROTOCOL)
+
+     #pickle.sa
+     #with zipfile.ZipFile(fh + '.npz', mode="w", compression=zipfile.ZIP_DEFLATED,
+      #                    allowZip64=True) as zf:
+      #   for k, v in namedict.items():
+      #       with zf.open(k + '.npy', 'w', force_zip64=True) as buf:
+      #           np.lib.npyio.format.write_array(buf,
+                                                 #np.asanyarray(v),
+                                                 #allow_pickle=True)
+
+def load_data(fh):
+
+     with gzip.open(fh + '.npz', 'rb') as f:
+         return pickle.load(f)
+
+       #     data = np.load(filename + '.npz',allow_pickle=True)
+       #     return {key:a for key,a in data.items()}
 
 
 def download_file(file_id,filename):

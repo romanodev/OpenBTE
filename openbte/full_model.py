@@ -5,6 +5,7 @@ from scipy.sparse.linalg import inv as sinv
 from scipy.linalg import inv as inv
 from scipy.sparse import csc_matrix
 import scipy
+from .utils import *
 #import deepdish as dd
 
 
@@ -53,7 +54,8 @@ def generate_full(**argv):
 
  print(' ')
  print('Importing ' + filename + ' ... ',end= '')
- data = np.load(filename,allow_pickle=True)
+ #data = np.load(filename,allow_pickle=True)
+ data = load_data('full')
  #data = dd.io.load(filename)
  print(' done')
  print(' ')
@@ -94,7 +96,6 @@ def generate_full(**argv):
  #    x_old = x.copy()
  #quit()
  #----------
-
 
  #postprocessing----
  B = -np.einsum('i,ij->ij',1/np.diag(W),W-np.diag(np.diag(W)))

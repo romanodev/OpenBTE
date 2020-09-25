@@ -8,7 +8,7 @@ def generate_gray2D(**argv):
  #Import data----
  kappa_bulk = argv['kappa']
  kappa = argv['kappa']*np.eye(2)
- mfp_bulk = argv['mfp'] #nm
+ mfp_bulk = argv['mfp']*1e-9
  n_phi = int(argv.setdefault('n_phi',48))
  Dphi = 2*np.pi/n_phi
  phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
@@ -36,6 +36,8 @@ def generate_gray2D(**argv):
          'mfp_sampled':np.array([mfp_bulk]),\
          'model':np.array([1]),\
          'suppression':suppression,\
+         'phi': phi  ,\
+         'directions': polar  ,\
          'kappam':np.array([kappa_bulk])}
 
 

@@ -1,5 +1,5 @@
 import numpy as np
-from numpy import inf
+#from numpy import inf
 import sys
 from .utils import *
 
@@ -14,13 +14,10 @@ def main():
  tau = tmp[:,7]
  v   = tmp[:,8:]
  C   = tmp[:,6]
-
  kappa =  np.einsum('ki,kj,k,k',v,v,tau,C) 
 
- print(kappa)
  data = {'C':C,'tau':tau,'v':v,'kappa':kappa}
- #dd.io.save('rta.h5',data)
  
 
 
- saveCompressed('rta.npz',**data)   
+ save_data('rta',data)   

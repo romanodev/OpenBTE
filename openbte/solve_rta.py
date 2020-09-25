@@ -55,7 +55,8 @@ def solve_rta(**argv):
     mat     = argv['mat']
     fourier = argv['fourier']
     n_elems = len(mesh['elems'])
-    mfp = mat['mfp_sampled']
+    mfp = mat['mfp_sampled']*1e9
+    sigma = mat['sigma']*1e9
 
     if comm.rank == 0 and argv['verbose']:
        print(flush=True)
@@ -161,14 +162,16 @@ def solve_rta(**argv):
            
            #Get ballistic kappa
            if argv['multiscale']:
-              kappa_fourier_m =  np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mat['mfp_sampled'],mat['VMFP'][q,0:argv['dim']],tfg)
+              kappa_fourier_m =  np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:argv['dim']],tfg)
               #Supdp += np.einsum('m,mu->u',kappa_fourier_m,mat['suppression'][:,q,:])*1e9
 
-              X_bal = (lu[(-1,n)] if (-1,n) in lu.keys() else \
-                     lu.setdefault((-1,n),sp.linalg.splu(get_m(Master,np.concatenate((mfp[-1]*Gm[n],\
-                     mfp[-1]*D[n]+np.ones(n_elems)))[conversion])))).solve(DeltaT +  mfp[-1]*(P[n] +\
-                     get_boundary(RHS[n],mesh['eb'],n_elems))) 
-              if not argv['keep_lu']: lu.pop((-1,n))        
+
+              B = DeltaT +  mfp[-1]*(P[n] +get_boundary(RHS[n],mesh['eb'],n_elems))
+              A = get_m(Master,np.concatenate((mfp[-1]*Gm[n],mfp[-1]*D[n]+np.ones(n_elems)))[conversion])
+              if not argv['keep_lu']:
+                  X_bal = sp.linalg.spsolve(A,B,use_umfpack=True)
+              else: 
+                  X_bal = (lu[(-1,n)] if (-1,n) in lu.keys() else lu.setdefault((-1,n),sp.linalg.splu(A))).solve(B)
 
               kappa_bal = np.dot(mesh['kappa_mask'],X_bal)
 
@@ -178,7 +181,6 @@ def solve_rta(**argv):
 
            fourier = False
            for m in range(argv['n_serial'])[idx[0]::-1]:
-
                  
                  B = DeltaT +  mfp[m]*(P[n] +get_boundary(RHS[n],mesh['eb'],n_elems))
                  A = get_m(Master,np.concatenate((mfp[m]*Gm[n],mfp[m]*D[n]+np.ones(n_elems)))[conversion])
@@ -200,14 +202,18 @@ def solve_rta(**argv):
                        transitionp[q] = 1e4
 
                    #Vectorize
-                   kappap[:m+1,q] = kappa_fourier_m[:m+1]
+                   #kappap[:m+1,q] = kappa_fourier_m[:m+1]
+                   kappap[:m,q] = kappa_fourier_m[:m]
                    diffusive += m
-                   Xm = tf[:m+1] - np.einsum('m,i,mci->mc',mat['mfp_sampled'][:m+1],mat['VMFP'][q,:argv['dim']],tfg[:m+1])
-                   DeltaTp += np.einsum('mc,m->c',Xm,mat['tc'][:m+1,q])  
+                   #Xm = tf[:m+1] - np.einsum('m,i,mci->mc',mat['mfp_sampled'][:m+1],mat['VMFP'][q,:argv['dim']],tfg[:m+1])
+                   Xm = tf[:m] - np.einsum('m,i,mci->mc',mat['mfp_sampled'][:m],mat['VMFP'][q,:argv['dim']],tfg[:m])
+                   #DeltaTp += np.einsum('mc,m->c',Xm,mat['tc'][:m+1,q])  
+                   DeltaTp += np.einsum('mc,m->c',Xm,mat['tc'][:m,q])  
                   
-                   np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('mc,mc->c',Xm[:,mesh['eb']],GG[:m+1,q]))
-                   ##for c,i in enumerate(mesh['eb']): TBp[c] -= Xm[:m+1,i]*GG[:m+1,q,c]
-                   Jp += np.einsum('mc,mj->cj',Xm,mat['sigma'][:m+1,q,0:argv['dim']])*1e-18
+                   #np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('mc,mc->c',Xm[:,mesh['eb']],GG[:m+1,q]))
+                   np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('mc,mc->c',Xm[:,mesh['eb']],GG[:m,q]))
+                   #Jp += np.einsum('mc,mj->cj',Xm,sigma[:m+1,q,0:argv['dim']])*1e-18
+                   Jp += np.einsum('mc,mj->cj',Xm,sigma[:m,q,0:argv['dim']])*1e-18
                    break
 
                  DeltaTp += X*mat['tc'][m,q]
@@ -216,7 +222,7 @@ def solve_rta(**argv):
                  if len(mesh['eb']) > 0:
                   np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
 
-                 Jp += np.einsum('c,j->cj',X,mat['sigma'][m,q,0:argv['dim']])*1e-18
+                 Jp += np.einsum('c,j->cj',X,sigma[m,q,0:argv['dim']])*1e-18
                  #Supp += kappap[m,q]*mat['suppression'][m,q,:]*1e9
                 
  
@@ -230,12 +236,6 @@ def solve_rta(**argv):
                else: 
                   X = (lu[(m,n)] if (m,n) in lu.keys() else lu.setdefault((m,n),sp.linalg.splu(A))).solve(B)
 
-               #X = (lu[(m,n)] if (m,n) in lu.keys() else \
-                     #lu.setdefault((m,n),sp.linalg.splu(get_m(Master,np.concatenate((mfp[m]*Gm[n],\
-                     #mfp[m]*D[n]+np.ones(n_elems)))[conversion])))).solve(DeltaT +  mfp[m]*(P[n] +\
-                     #get_boundary(RHS[n],mesh['eb'],n_elems)))  
-
-               #if not argv['keep_lu']: lu.pop((m,n))        
 
                kappap[m,q] = np.dot(mesh['kappa_mask'],X)
 
@@ -250,7 +250,7 @@ def solve_rta(**argv):
 
                    np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('c,mc->c',X_bal[mesh['eb']],GG[m:,q]))
 
-                   Jp += np.einsum('c,j->cj',X_bal,np.sum(mat['sigma'][m:,q,0:argv['dim']],axis=0))*1e-18
+                   Jp += np.einsum('c,j->cj',X_bal,np.sum(sigma[m:,q,0:argv['dim']],axis=0))*1e-18
                    #Supp += np.einsum('m,mu->u',kappap[m:,q],mat['suppression'][m:,q,:])*1e9
                    break
 
@@ -260,7 +260,7 @@ def solve_rta(**argv):
                #np.add.at(TBp[m],np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
                np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
 
-               Jp += np.einsum('c,j->cj',X,mat['sigma'][m,q,0:argv['dim']])*1e-18
+               Jp += np.einsum('c,j->cj',X,sigma[m,q,0:argv['dim']])*1e-18
                #Supp += kappap[m,q]*mat['suppression'][m,q,:]*1e9
           
 
@@ -277,7 +277,7 @@ def solve_rta(**argv):
         #comm.Allreduce([Supp,MPI.DOUBLE],[Sup,MPI.DOUBLE],op=MPI.SUM)
         #comm.Allreduce([Supdp,MPI.DOUBLE],[Supd,MPI.DOUBLE],op=MPI.SUM)
         #comm.Allreduce([Supbp,MPI.DOUBLE],[Supb,MPI.DOUBLE],op=MPI.SUM)
-        kappa_totp = np.array([np.einsum('mq,mq->',mat['sigma'][:,argv['rr'],0],kappa[:,argv['rr']])])
+        kappa_totp = np.array([np.einsum('mq,mq->',sigma[:,argv['rr'],0],kappa[:,argv['rr']])])
         comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
 
 
