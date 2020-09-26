@@ -9,7 +9,7 @@ NOTE: a multiscale model is coming soon (check back in a few days)
 
 .. raw:: html
 
-     <a href="https://colab.research.google.com/drive/1jBXpOagmO1SK554sdxCTUkXDt5EHo2rp?usp=sharing"><img  src="https://colab.research.google.com/assets/colab-badge.svg" style="vertical-align:text-bottom"></a>
+     <a href="https://colab.research.google.com/drive/1aCGJdg3Mm_B_0iUrJHHAk7-J-RE7QAeL?usp=sharing"><img  src="https://colab.research.google.com/assets/colab-badge.svg" style="vertical-align:text-bottom"></a>
 
 
 .. code-block:: python

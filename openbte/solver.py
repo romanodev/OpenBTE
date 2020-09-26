@@ -3,24 +3,18 @@ import numpy as np
 from scipy.sparse.linalg import splu
 from termcolor import colored, cprint 
 from .utils import *
-#import deepdish as dd
 from mpi4py import MPI
 import scipy.sparse as sp
 import time
-#import scikits.umfpack as um
 from scipy.sparse.linalg import lgmres
-#import scikits.umfpack as um
 import sys
 from shapely.geometry import LineString
 import profile
 import scipy
 from .solve_mfp import *
-from .solve_deviational_2 import *
 from .solve_rta import *
 from .solve_full import *
 import pkg_resources  
-#from .solve_jax import *
-#from .solve_interface import *
 
 comm = MPI.COMM_WORLD
 

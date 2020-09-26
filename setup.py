@@ -2,7 +2,7 @@ from setuptools import setup,find_packages
 import os
 
 setup(name='openbte',
-      version='1.58',
+      version='1.65',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',
@@ -19,14 +19,13 @@ setup(name='openbte',
                         'alabaster',
                         'deepdish',
                         'mpi4py',
-                        'plotly==4.8.1',
+                        'plotly==4.10.0',
                         'numpy',
-                        'gzip',
                         'scikit-umfpack',
                         'nbsphinx',
-                        'sphinx-tabs',
+                        #'sphinx-tabs',
                         'recommonmark',
-                        'sphinx>=1.4.6',
+                        'sphinx',
                         'sphinx_rtd_theme'
                          ],
       license='GPLv2',\

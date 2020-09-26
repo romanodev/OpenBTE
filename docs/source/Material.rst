@@ -1,68 +1,70 @@
 Material
 ===================================
 
+
 Fourier model
 -----------------------------------
 
-One of the byproducts of OpenBTE is a full-fledge diffusive model. Why not providing it as a stand-alone model then? 
+OpenBTE features a 3D solver of diffusive heat conduction solved on unstructured grids. This model is used as a first-guess to OpenBTE and can be used as a stand-alone model. To create the relative material model, simply use
+
+.. code-block:: python
+
+   Material(model='fourier',kappa=130)
+
+where ``kappa`` is the bulk thermal conductivity.
 
 
-
-Gray approximation
+Gray model approximation
 -----------------------------------
+
+Within the gray model, we assume single MFP-materials. In light of new first-principles developments, this model might not be needed. However, it can be useful to understand heat transport regimes and trends. To create ``material.npz`` no prior file is needed in this case, but only two options, e.g the mean-free-path (in m) and the bulk thermal conductivity. Here is an example:
+
+.. code-block:: python
+
+   Material(model='gray2DSym',mfp=1e-8,kappa=130)
+
+
+There are three material models associated with this method
+
+* ``model='gray3D'``: three-dimensional domain (coming soon)
+
+* ``model='gray2DSym'``: three-dimensional domain with infinite thickness (coming soon)
+
+* ``model='gray2D'``: two-dimensional domain
 
 
 Mean-free-path approximation
 -----------------------------------
 
-This method estimates kappa given only the MFP distribution. It assumes isotropic distribution, therefore uses it cautiously.
+This method estimates kappa given only the cumulative thermal conductivity. It assumes isotropic distribution, therefore use it cautiously. The BTE to solve is
 
-.. tabs::
+* ``model='mfp3D'``: three-dimensional domain
 
-   .. tab:: ``model='mfp3D'``
+* ``model='mfp2DSym'``: three-dimensional domain with infinite thickness
 
-    This is the case where an actual 3D simulation is performed. The coefficients are:
-     
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\mathbf{F}_k = \Lambda_k (\sin{\phi_k}\sin{\theta_k}\mathbf{\hat{x}} +\cos{\phi_k}\sin{\theta_k}\mathbf{\hat{y}} +\cos\theta_k \mathbf{\hat{z}} )`  | 
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\alpha_k = \left[\sum_l  C_l/\tau_l \right]^{-1} \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu/\tau_{\mu}`                     | 
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\mathbf{G}_k = \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu \mathbf{v}_\mu`                                                   | 
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
-  
-
-   .. tab:: ``model='mfp2DSym'``
-
-    This is the case where the simulation domain has translational invariance along :math:`z`. In this case each bulk MFP :math:`\mathbf{v}_\mu\tau_\mu` can be mapped onto the :math:`z=0` plane. 
-
-    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\mathbf{F}_k = \chi_k (\sin{\phi_k}\mathbf{\hat{x}} +\cos{\phi_k}\mathbf{\hat{y}})`                                                                                                                                        | 
-    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\alpha_k = \left[\sum_l  C_l/\tau_l \right]^{-1} \sum_\mu \left[\mathcal{M}( \mathbf{S}_z\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) + \delta(\mathbf{v}_\mu\cdot\mathbf{\hat{z}}-|\mathbf{v}_\mu|)   \right] C_\mu/\tau_\mu`  |  
-    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\mathbf{G}_k = \sum_\mu \mathcal{M}(\mathbf{v}_\mu^{\mathrm{2D}} \tau_\mu,\mathbf{F}_{k}) C_\mu \mathbf{v}_\mu`                                                                                                            | 
-    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-  
-    where :math:`\mathbf{S}_z` is a projection operator onto the plane :math:`z=0`.
+* ``model='mfp2D'``: two-dimensional domain
 
 
-   .. tab:: ``model='mfp2D'``
+The material file can be created by running
 
-    An actual 2D material is being simulated. 
+.. code-block:: python
 
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\mathbf{F}_k = \Lambda_k (\sin{\phi_k}\mathbf{\hat{x}} +\cos{\phi_k}\mathbf{\hat{y}})`                                                              | 
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\alpha_k = \left[\sum_l  C_l/\tau_l \right]^{-1} \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu/\tau_\mu`                       |      
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\mathbf{G}_k = \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu \mathbf{v}_\mu`                                                   | 
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   Material(model=<('mfp3D'),'mfp2DSym','mfp2D'>)
 
+provided the file ``mfp.npz`` is in your current directory. This file must contain the following information
 
+.. table:: 
+   :widths: auto
+   :align: center
 
-
-
+   +--------------------------+-------------+--------------------------------------------------------------------------+-------------------------------------------+
+   | **Item**                 | **Shape**   |       **Symbol [Units]**                                                 |    **Name**                               |
+   +--------------------------+-------------+--------------------------------------------------------------------------+-------------------------------------------+
+   | ``mfp``                  |  N          |   :math:`\Lambda` [:math:`m`]                                            | Mean Free Path                            |
+   +--------------------------+-------------+--------------------------------------------------------------------------+-------------------------------------------+
+   | ``Kacc``                 |  N          |   :math:`\alpha` [:math:`\mathrm{W}\mathrm{m}^{-1}\textrm{K}^{-1}`]      | Cumulative thermal conductivity           |
+   +--------------------------+-------------+--------------------------------------------------------------------------+-------------------------------------------+
+   
 
 
 Relaxation time approximation
@@ -119,63 +121,21 @@ Each item must be a ``numpy`` array with the prescribed ``shape``. The thermal c
 Of course, the best practice is to have the ``kappa`` populating ``rta.npz`` generated by the other items and compare it with the intended value.
 
 
-Creating ``material.npz``
-###############################################
-
 With ``rta.npz`` in your current directory, ``material.npz`` can be generated simply with
 
 .. code-block:: python
 
    Material(model=<('rta3D'),'rta2DSym','rta2D'>)
 
-The ``Material`` object will perform MFP interpolation. In fact, due to the fact that :math:`T_{\mu}` is a smooth function of :math:`\mathbf{v}_\mu \tau_mu`, the BTE can be cast into
 
-:math:`\mathbf{F}_k \cdot \nabla T_k + T_k = \sum_{k'} a_{k'} T_{k'}`,
+The RTA-BTE has three material models:
 
-where :math:`\mathbf{F}_k` uniformnly span a sphere or a disk, depending on our problem. The coefficients :math:`a_{k'}` arise from the linear interpolation. As outlined below, submodels (specified with ``submodel``) may enhance computational efficiency.
+* ``model='rta3D'``: three-dimensional domain
 
+* ``model='rta2DSym'``: three-dimensional domain with infinite thickness
 
-.. tabs::
+* ``model='rta2D'``: two-dimensional domain
 
-   .. tab:: ``model='rta3D'``
-
-    This is the case where an actual 3D simulation is performed. The coefficients are:
-     
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\mathbf{F}_k = \Lambda_k (\sin{\phi_k}\sin{\theta_k}\mathbf{\hat{x}} +\cos{\phi_k}\sin{\theta_k}\mathbf{\hat{y}} +\cos\theta_k \mathbf{\hat{z}} )`  | 
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\alpha_k = \left[\sum_l  C_l/\tau_l \right]^{-1} \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu/\tau_{\mu}`                     | 
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\mathbf{G}_k = \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu \mathbf{v}_\mu`                                                   | 
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
-  
-
-   .. tab:: ``model='rta2DSym'``
-
-    This is the case where the simulation domain has translational invariance along :math:`z`. In this case each bulk MFP :math:`\mathbf{v}_\mu\tau_\mu` can be mapped onto the :math:`z=0` plane. 
-
-    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\mathbf{F}_k = \chi_k (\sin{\phi_k}\mathbf{\hat{x}} +\cos{\phi_k}\mathbf{\hat{y}})`                                                                                                                                        | 
-    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\alpha_k = \left[\sum_l  C_l/\tau_l \right]^{-1} \sum_\mu \left[\mathcal{M}( \mathbf{S}_z\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) + \delta(\mathbf{v}_\mu\cdot\mathbf{\hat{z}}-|\mathbf{v}_\mu|)   \right] C_\mu/\tau_\mu`  |  
-    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\mathbf{G}_k = \sum_\mu \mathcal{M}(\mathbf{v}_\mu^{\mathrm{2D}} \tau_\mu,\mathbf{F}_{k}) C_\mu \mathbf{v}_\mu`                                                                                                            | 
-    +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-  
-    where :math:`\mathbf{S}_z` is a projection operator onto the plane :math:`z=0`.
-
-
-   .. tab:: ``model='rta2D'``
-
-    An actual 2D material is being simulated. 
-
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\mathbf{F}_k = \Lambda_k (\sin{\phi_k}\mathbf{\hat{x}} +\cos{\phi_k}\mathbf{\hat{y}})`                                                              | 
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\alpha_k = \left[\sum_l  C_l/\tau_l \right]^{-1} \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu/\tau_\mu`                       |      
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | :math:`\mathbf{G}_k = \sum_\mu \mathcal{M}(\mathbf{v}_\mu \tau_\mu,\mathbf{F}_{k}) C_\mu \mathbf{v}_\mu`                                                   | 
-    +------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 Interface with AlmaBTE
 ###############################################
@@ -294,10 +254,6 @@ Each item must be a ``numpy`` array with prescribed ``shape``. We recommend usin
    assert(np.allclose(kappa,data['kappa']))
 
 Of course, the best practice is to have the ``kappa`` populating ``full.npz`` generated by the other items and compare it with the intended value.
-
-
-Creating ``material.npz``
-###############################################
 
 With ``full.npz`` in your current directory, ``material.npz`` can be generated simply with
 
