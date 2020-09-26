@@ -2,8 +2,14 @@ Examples
 =========================================
 
 
-1) Different shapes and non-uniform areas
+Different shapes and non-uniform areas
 #########################################
+
+
+.. raw:: html
+
+     <a href="https://colab.research.google.com/drive/18u1ieij2Wn6WEZFN2TmMteYHAJADMdSk?usp=sharing"><img  src="https://colab.research.google.com/assets/colab-badge.svg" style="vertical-align:text-bottom"></a>
+
 
 .. code-block:: python
 
@@ -16,7 +22,7 @@ Examples
    Geometry(model='lattice',lx = 10,ly = 10, step = 0.5, base = [[0.2,0],[-0.2,0]],porosity=0.1,shape=['circle','square'],area_ratio=[1,2])
 
    #Run the BTE
-   Solver()
+   Solver(verbose=False)
 
    #Plot Maps
    Plot(model='maps',repeat=[3,3,1])

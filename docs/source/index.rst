@@ -23,7 +23,7 @@ NOTE: a multiscale model is coming soon (check back in a few days)
    Geometry(model='lattice',lx=100,ly=100,step=5,porosity=0.1,base=[[-0.1,-0.1],[0.1,0.1]])
 
    #Run the BTE
-   Solver(keep_lu=True,verbose=False)
+   Solver(verbose=False)
 
    #Plot Maps
    Plot(model='maps',repeat=[3,3,1]);
