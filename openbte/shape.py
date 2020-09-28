@@ -18,7 +18,11 @@ def get_shape(argv):
 
     #compute area weigths
     argv.setdefault('area_ratio',np.ones(len(argv['base'])))
-    areas =  [argv['porosity']* i /sum(argv['area_ratio'])  for i in argv['area_ratio']]
+
+    if argv.setdefault('relative',True):
+     areas =  [argv['porosity']* i /sum(argv['area_ratio'])  for i in argv['area_ratio']]
+    else: 
+     areas = argv['area_ratio']
 
     #-------------------
     shapes = []
