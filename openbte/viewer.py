@@ -70,7 +70,6 @@ def plot_results(data,nodes,elems,**argv):
     font=dict(
         family="Courier New, monospace",
         size=12,
-        #color="#7f7f7f"
         color="black"
     )
    )
@@ -84,10 +83,7 @@ def plot_results(data,nodes,elems,**argv):
         'xanchor': 'center',
         'yanchor': 'top'})
 
-   #fig.update_layout(width=600,height=600,autosize=True,margin=dict(t=50, b=20, l=20, r=20),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
-   #fig.update_layout(width=500,height=500,autosize=True,margin=dict(t=10, b=10, l=20, r=20),paper_bgcolor='LightSteelBlue')  
    fig.update_layout(width=400,height=450,autosize=True,margin=dict(t=20, b=10, l=00, r=20),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
-   #fig.update_layout(width=500,height=500,autosize=True,margin=dict(t=50, b=20, l=20, r=20),template='plotly')#,plot_bgcolor='rgba(0,0,0,0)')  
 
 
    updatemenus=[dict(direction='down',active=nv-5 if nv > 1 else 0,x=0.4,y=1.15,buttons=list(buttons),showactive=True)]
@@ -104,6 +100,20 @@ def plot_results(data,nodes,elems,**argv):
          )
 
    #axis = dict(ticktext=[],tickvals= [],showbackground=False)
+
+   fig.add_annotation(
+            x=0.97,
+            y=0.05,
+            xref='paper',
+            showarrow=False,
+            yref='paper',
+            text='Bulk: ' + str(round(argv['bulk'][0,0],2)) +' W/m/K<br>Fourier: '\
+                    +       str(round(argv['fourier'],2)) + ' W/m/K<br>BTE:' \
+                    +       str(round(argv['bte'],2))+' W/m/K',align='left')
+
+   #fig.add_annotation(annotations)
+
+   fig.update_layout(showlegend=False)
 
    # Update 3D scene options
    fig.update_scenes(
@@ -125,13 +135,27 @@ def plot_results(data,nodes,elems,**argv):
    fig.update_layout(xaxis_showgrid=False, yaxis_showgrid=False)
    fig.update_layout(scene_camera=camera)
 
+
    if argv.setdefault('write_html',False):
     fig.write_html("plotly.html")
 
 
    if argv.setdefault('write_data',False):
-       data = {'elems':elems,'nodes':nodes,'variables':data}
-       save_data('bundle',data)
+       idd = 0
+       data_rolled = {} 
+       for key,value in data.items():
+        if value['data'].ndim == 1: #scalar
+            data_rolled.update({idd:{'name':value['name'],'data':value['data'],'units':value['units']}}); idd +=1
+        elif value['data'].ndim == 2 : #vector 
+            data_rolled.update({idd:{'name':value['name'] + ' (x)','data':value['data'][:,0],'units':value['units']}}); idd+=1
+            data_rolled.update({idd:{'name':value['name'] + ' (y)','data':value['data'][:,1],'units':value['units']}}); idd+=1
+            if dim == 3: 
+                data_rolled.update({idd:{'name':value['name'] + ' (z)','data':value['data'][:,2],'units':value['units']}}); idd+=1
+            mag = [np.linalg.norm(value) for value in value['data']]
+            data_rolled.update({idd:{'name':value['name'] + ' (mag)','data':mag,'units':value['units']}}); idd +=1
+
+       data = {'name':argv['name'],'elems':elems,'nodes':nodes,'variables':data_rolled,'bulk':argv['bulk'],'fourier':argv['fourier'],'bte':argv['bte']}
+       save_data(argv.setdefault('name','sample'),data)
 
 
    # plotly.io.to_image(fig,format='png')

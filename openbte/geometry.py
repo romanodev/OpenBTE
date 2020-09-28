@@ -21,19 +21,22 @@ class Geometry(object):
  def __init__(self,**argv):
 
   if comm.rank == 0:
-   if argv.setdefault('user',False):
+   if argv.setdefault('only_geo',False):
+     Mesher(argv) #this create mesh.msh
+   else:    
+    if argv.setdefault('user',False):
      self.import_mesh(**argv)
      argv.update({'centroids':self.elem_centroids})
      self.elem_mat_map = argv['correlation'](**argv)
-   else:
+    else:
      Mesher(argv) #this create mesh.msh
      self.dmin = argv['dmin']
      self.import_mesh(**argv)
      self.elem_mat_map = np.zeros(len(self.elems)) #omhogeneous material
-   self.update_side_interface()
-   self.data = self.compute_mesh_data(**argv)
-   if argv.setdefault('save',True):
-    np.savez_compressed('geometry',self.data)   
+    self.update_side_interface()
+    self.data = self.compute_mesh_data(**argv)
+    if argv.setdefault('save',True):
+     save_data('geometry',self.data)   
 
 
  def compute_boundary_connection(self):
@@ -197,10 +200,9 @@ class Geometry(object):
       self.intj.append(l1)   
       self.intk.append(normal*area/vol1)
       self.intk.append(-normal*area/vol2)
-      #ij.append([l1,l2])
-      #ij.append([l2,l1])
 
-     if not l1 == l2 :#and not (ll in self.side_list['Interface']):
+     if not (l1 == l2) and  (not (ll in self.side_list['Interface'])):
+     #if not (l1 == l2):
        self.i.append(l1)   
        self.j.append(l2)   
        self.i.append(l2)   
@@ -210,17 +212,22 @@ class Geometry(object):
        self.k.append(normal*area/vol1)
        self.k.append(-normal*area/vol2)
      else:
-       self.eb.append(l1)
-       self.sb.append(ll)
-       self.db.append(normal*area/vol1)
+
+       if ll in self.side_list['Boundary']:
+        self.eb.append(l1)
+        self.sb.append(ll)
+        self.db.append(normal*area/vol1)
    
+   self.k += self.intk
+   #self.i += self.inti
+   #self.j += self.intj
+
    self.k = np.array(self.k).T
    self.db = np.array(self.db).T
    self.intk = np.array(self.intk).T
 
    
-   #self.i += self.inti
-   #self.j += self.intj
+   
    self.ij = ij
 
 
@@ -580,6 +587,7 @@ class Geometry(object):
     B_with_area_old = sp.dok_matrix((n_el,n_el),dtype=np.float64)
     self.B_area = np.zeros(n_el,dtype=np.float64)
    
+    counter = 0
     self.pp = ()
     self.ip = []; self.jp = []; self.dp = []; self.pv = [] 
     if len(self.side_list.setdefault('Periodic',[])) > 0:
@@ -610,15 +618,16 @@ class Geometry(object):
       if abs(side_value[side[0]]) > 0:
        self.pp += ((self.ij.index([i,j]),side_value[side[0]]),)
        self.ip.append(i); self.jp.append(j); self.dp.append(side_value[side[0]]); self.pv.append(normal*area/voli)
+       counter +=1
 
       if abs(side_value[side[1]]) > 0:
        self.pp += ((self.ij.index([j,i]),side_value[side[1]]),)
-       #self.pp.append(self.ij.index([j,i]))
        self.ip.append(j); self.jp.append(i); self.dp.append(side_value[side[1]]); self.pv.append(-normal*area/volj)
+       counter +=1
 
       if np.linalg.norm(np.cross(self.face_normals[side[0]],applied_grad)) < 1e-12:
        B_with_area_old[i,j] = abs(side_value[side[0]]*area)
-      
+     
     #select flux sides-------------------------------
     self.flux_sides = [] #where flux goes
     total_area = 0

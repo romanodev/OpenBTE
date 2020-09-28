@@ -402,15 +402,15 @@ class Mesher(object):
     self.create_loop(loops,line_list,store)
 
     #Create internal loops-------------
+    a = 0
     for interior in region.interiors:
-
+     a +=1
      pp = list(interior.coords)[:-1]
      line_list = self.create_line_list(pp,points,lines,store)
      loops +=1
      local_loops.append(loops)
      self.create_loop(loops,line_list,store)
     #---------------------------------
-
     ss +=1
     bulk_surface.append(ss)
     self.create_surface_old(local_loops,ss,store)

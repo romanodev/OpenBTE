@@ -57,12 +57,10 @@ class Solver(object):
 
         #-----IMPORT MESH--------------------------------------------------------------
         if comm.rank == 0:
-         if 'geometry' in argv.keys() :
-          data = argv['geometry'].data 
-         else: 
-          a = np.load('geometry.npz',allow_pickle=True)
-          data = {key:a[key].item() for key in a}['arr_0']
          
+         data = argv['geometry'].data if 'geometry' in argv.keys() else load_data('geometry')
+
+
          self.n_elems = int(data['meta'][0])
          im = np.concatenate((data['i'],list(np.arange(self.n_elems))))
          jm = np.concatenate((data['j'],list(np.arange(self.n_elems))))
@@ -125,7 +123,6 @@ class Solver(object):
          block =  self.n_serial//comm.size
          self.ff = range(block*comm.rank,self.n_serial) if comm.rank == comm.size-1 else range(block*comm.rank,block*(comm.rank+1))
          if comm.rank == 0 and self.verbose: self.mfp_info()
-
 
 
         elif self.model == 'full': 

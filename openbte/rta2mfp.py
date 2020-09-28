@@ -1,13 +1,12 @@
-import deepdish
 import numpy as np
 from numpy import inf
 import sys
-import deepdish as dd
+from .utils import *
 
 
 def main():
 
- data = dd.io.load('rta.h5')
+ data = load_data(rta)
  kappam = np.einsum('u,u,u,u->u',data['tau'],data['C'],data['v'][:,0],data['v'][:,0]) 
  mfp_bulk = np.einsum('ki,k->ki',data['v'],data['tau'])
 
@@ -18,7 +17,7 @@ def main():
  kappa = kappam[I]
  mfp = mfp[I]
 
- dd.io.save('mfp.h5',{'K':kappa,'mfp':mfp})
+ save_data('mfp',{'K':kappa,'mfp':mfp})
 
 
 

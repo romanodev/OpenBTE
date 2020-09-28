@@ -4,32 +4,12 @@ from pyvtk import *
 import numpy as np
 import os
 from .utils import *
-#import deepdish as dd
 from .viewer import *
 import matplotlib
-import matplotlib.patches as patches
-from matplotlib.path import Path
 from matplotlib.pylab import *
 
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
-
-def create_path(obj):
-
-   codes = [Path.MOVETO]
-   for n in range(len(obj)-1):
-    codes.append(Path.LINETO)
-   codes.append(Path.CLOSEPOLY)
-
-   verts = []
-   for tmp in obj:
-     verts.append(tmp)
-   verts.append(verts[0])
-
-   path = Path(verts,codes)
-   return path
-
-
 class Plot(object):
 
  def __init__(self,**argv):
@@ -37,98 +17,31 @@ class Plot(object):
   if comm.rank == 0:
 
    #import data-------------------------------
-   if 'geometry' in argv.keys():
-    self.mesh = argv['geometry'].data
-   else: 
-     a = np.load('geometry.npz',allow_pickle=True)
-     self.mesh = {key:a[key].item() for key in a}['arr_0']
+   self.mesh     = argv['geometry'].data if 'geometry' in argv.keys() else load_data('geometry')
+   self.solver     = argv['solver'].state if 'geometry' in argv.keys() else load_data('solver')
+   self.material = argv['material'].state if 'material' in argv.keys() else load_data('material')
 
    self.dim = int(self.mesh['meta'][2])
 
-   if 'solver' in argv.keys():
-    self.solver = argv['solver'].state
-   else: 
-     self.solver = load_data('solver')
+   if argv.setdefault('user',False):
+    argv['model'](self.material,self.solver,self.mesh)   
+   else:    
+    model = argv['model'].split('/')[0]
+    if model == 'structure':
+     self.duplicate_cells(**argv)
+     self.plot_structure(**argv)
 
-   #if 'material' in argv.keys():
-   # self.solver = argv['material']
-   #else: 
-   #    if os.path.isfile('material.h5') :
-   #     self.material = load_dictionary('material.h5')
-   #--------------------------------------------
+    elif model == 'maps':
+     self.duplicate_cells(**argv)
+     self.plot_maps(**argv)
 
-   model = argv['model'].split('/')[0]
+    elif model == 'matplotlib':
+     self.plot_matplotlib(**argv)
 
-   if model == 'structure':
-    self.duplicate_cells(**argv)
-    self.plot_structure(**argv)
-
-   elif model == 'maps':
-    self.duplicate_cells(**argv)
-    self.plot_maps(**argv)
-
-   elif model == 'matplotlib':
-    self.plot_matplotlib(**argv)
-
-   elif model == 'vtu':
-    #self.duplicate_cells(**argv)
-    #self.write_cell_vtu(**argv)   
-    self.write_vtu(**argv)   
-
-
- def plot_matplotlib(self,**argv):
-
-    cmap = matplotlib.cm.get_cmap('viridis')
-    size = self.mesh['size']
-    frame = self.mesh['frame']
-    lx = size[0]
-    ly = size[1]
-    fig = figure(num=" ", figsize=(4*lx/ly, 4), dpi=80, facecolor='w', edgecolor='k')
-    axes([0,0,1.0,1.0])
-    xlim([-lx/2.0,lx/2.0])
-    ylim([-ly/2.0,ly/2.0])
-     
-    #plot frame---
-    #path = create_path(frame)
-    #patch = patches.PathPatch(path,linestyle=None,linewidth=0.1,color='#D4D4D4',zorder=1,joinstyle='miter')
-    #gca().add_patch(patch);
-
-    idd = 3
-    if idd in [1,3]:
-     data = np.array([np.linalg.norm(tmp) for tmp in self.solver['variables'][idd]['data']])
-     print(min(data),max(data))
-    else: 
-     data = self.solver['variables'][0]['data']
-
-    data = (data - min(data))/(max(data)-min(data))
-
-    for ne in range(len(self.mesh['elems'])):
-      cc =  self.mesh['elem_mat_map'][ne]
-      if cc == 1:
-         color = 'gray'
-      else:   
-         color = 'green'
-      self.plot_elem(ne,color = cmap(data[ne]))
-      #self.plot_elem(ne,color = color)
-
-    #plot interface sides 
-    for side in self.mesh['interface_sides']:
-      p1 = self.mesh['sides'][side][0]
-      p2 = self.mesh['sides'][side][1]
-      n1 = self.mesh['nodes'][p1]
-      n2 = self.mesh['nodes'][p2]
-      plot([n1[0],n2[0]],[n1[1],n2[1]],color='#1f77b4',lw=1,zorder=1)
-
-    show()  
- 
- def plot_elem(self,ne,color='gray') :
-
-    elem = self.mesh['elems'][ne][:self.mesh['side_per_elem'][ne]]
-    pp = self.mesh['nodes'][elem,:2]
-    path = create_path(pp)
-    patch = patches.PathPatch(path,linestyle=None,linewidth=0.0,color=color,zorder=1,joinstyle='bevel',alpha=0.7)
-    gca().add_patch(patch)
-
+    elif model == 'vtu':
+     #self.duplicate_cells(**argv)
+     #self.write_cell_vtu(**argv)   
+     self.write_vtu(**argv)   
 
  def duplicate_cells(self,**argv):
 
@@ -375,11 +288,16 @@ class Plot(object):
  def plot_structure(self,**argv):
 
     data = {0:{'name':'Structure','units':'','data':np.zeros(len(self.mesh['nodes'] if self.dim == 2 else self.indices))}}
+   
 
     plot_results(data,np.array(self.mesh['nodes']) if self.dim == 2 else self.surface_nodes,\
                                         np.array(self.mesh['elems']) if self.dim == 2 else self.surface_sides,**argv)
 
  def plot_maps(self,**argv):
+
+
+   argv.update({'bulk':self.material['kappa'],'fourier':self.solver['kappa'][0],'bte':self.solver['kappa'][-1]})
+
 
    for key in self.solver['variables'].keys():
         self.solver['variables'][key]['data'] = self._get_node_data(self.solver['variables'][key]['data'],\

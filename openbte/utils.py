@@ -5,7 +5,7 @@ from shapely.geometry import Polygon
 from shapely.geometry import MultiPolygon,LineString
 import shapely
 from shapely.ops import cascaded_union
-import os
+import os,sys
 import functools
 import matplotlib.pylab as plt
 import io,zipfile
@@ -45,6 +45,7 @@ def make_polygon(Na,A):
      px  = r * math.cos(ph) 
      py  = r * math.sin(ph) 
      poly_clip.append([px,py])
+
 
    return poly_clip  
 
@@ -137,8 +138,10 @@ def save_data(fh, namedict):
 
 def load_data(fh):
 
-     with gzip.open(fh + '.npz', 'rb') as f:
-         return pickle.load(f)
+     if os.path.isfile(fh + '.npz'):
+      with gzip.open(fh + '.npz', 'rb') as f:
+          return pickle.load(f)
+     return -1 
 
        #     data = np.load(filename + '.npz',allow_pickle=True)
        #     return {key:a for key,a in data.items()}
