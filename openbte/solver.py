@@ -66,7 +66,6 @@ class Solver(object):
          jm = np.concatenate((data['j'],list(np.arange(self.n_elems))))
          data['im'] = im
          data['jm'] = jm
-         self.assemble_fourier_scalar(data)
         else: data = None
         #self.__dict__.update(create_shared_memory_dict(data))
         self.mesh = create_shared_memory_dict(data)
@@ -113,6 +112,7 @@ class Solver(object):
 
         #Build elem_kappa_map
         self.elem_kappa_map = np.array([ list(self.mat[i]['kappa'])  for i in self.mesh['elem_mat_map']])
+        #self.elem_kappa_map = np.array([ list(np.eye(2)*self.mat[i]['kappa'][0,0])  for i in self.mesh['elem_mat_map']])
 
 
         if comm.rank == 0 and self.verbose: self.bulk_info()
@@ -138,9 +138,6 @@ class Solver(object):
         if comm.rank == 0:
           data = self.solve_fourier(self.elem_kappa_map)
           
-          #data = self.solve_fourier_scalar(self.kappa[0,0])
-          #if  data['meta'][0] - self.kappa[0,0] > self.kappa[0,0]*1e-3:
-          #print('WARNING: Fourier thermal conductivity is larger than bulk one.',flush=True)
 
           variables = {0:{'name':'Temperature Fourier','units':'K','data':data['temperature_fourier'],'increment':[-1,0,0]},\
                        1:{'name':'Flux Fourier'       ,'units':'W/m/m','data':data['flux_fourier'],'increment':[0,0,0]}}
@@ -149,7 +146,6 @@ class Solver(object):
                            'kappa_fourier':data['meta'][0]})
           if self.verbose: self.fourier_info(data)
         else: data = None
-        #self.__dict__.update(create_shared_memory_dict(data))
         self.fourier = create_shared_memory_dict(data)
 
         #----------------------------------------------------------------
@@ -165,7 +161,6 @@ class Solver(object):
          argv['rr'] = self.rr
          argv['n_parallel'] = self.n_parallel
          argv['kappa_factor'] = self.kappa_factor
-
          
          if argv.setdefault('user',False):
             argv['n_serial'] = self.n_serial
@@ -301,51 +296,6 @@ class Solver(object):
           #print(" ")
 
 
-  def solve_serial_fourier(self,DeltaT,compute_sup = True):
-
-
-
-        if comm.rank == 0:
-            
-         self.tf[:,:] = np.zeros((self.n_serial,self.n_elems))
-         self.tfg[:,:,:] = np.zeros((self.n_serial,self.n_elems,self.dim))
-         self.kappaf[:,:] = np.zeros((self.n_serial,self.n_parallel))
-         
-         if compute_sup:
-          self.Supd[:] = np.zeros(len(self.mat[0]['kappam']))
-         base_old = 0
-         fourier = False
-         C = np.zeros(self.n_elems)
-         for m in range(len(self.mat[0]['mfp_sampled'])):
-
-            dataf = self.solve_fourier_scalar(self.mat[0]['mfp_average'][m],pseudo=DeltaT,m=m,guess = C)
-            temp  = dataf['temperature_fourier']
-            grad  = dataf['grad'] 
-            base  = np.dot(self.mesh['kappa_mask'],temp)
-            error = abs(base-base_old)/abs(base)
-
-            if error < 1e-3 and m > int(len(self.mat[0]['mfp_sampled'])/4):
-             self.kappaf[m:,:] = -base + np.einsum('m,c,qj,cj->mq',self.mat[0]['mfp_sampled'][m:],self.mesh['kappa_mask'],self.mat[0]['VMFP'][:,0:self.dim],grad)
-             if compute_sup:
-              self.Supd[:] += np.einsum('gq,gqm->m',self.kappaf[m:,:],self.mat[0]['suppression'][m:,:,:])*self.kappa_factor*1e-9
-             self.tf[m:,:] = temp[:]
-             self.tfg[m:,:,:] = grad[:,:]
-             break
-            else:    
-             base_old = base
-             self.kappaf[m,:] = -base + self.mat[0]['mfp_sampled'][m] * np.einsum('c,qj,cj->q',self.mesh['kappa_mask'],self.mat[0]['VMFP'][:,0:self.dim],grad)    
-             if compute_sup:
-              self.Supd[:] += np.einsum('q,qm->m',self.kappaf[m,:],self.mat[0]['suppression'][m,:,:])*self.kappa_factor*1e-9
-             self.tf[m,:] = temp[:]
-             self.tfg[m,:,:] = grad[:,:]
-           #---------------------------------
-
-        comm.Barrier()
-
-        if compute_sup:
-         return self.kappaf,self.tf,self.tfg,self.Supd
-        else:
-         return self.kappaf,self.tf,self.tfg,0
 
   def set_model(self,m):
 
@@ -387,71 +337,6 @@ class Solver(object):
 
 
 
-
-
-
-  def solve_modified_fourier(self,DeltaT):
-
-         kappaf,kappafp = np.zeros((2,self.n_serial,self.n_parallel))   
-         tf,tfp = np.zeros((2,self.n_serial,self.n_elems))
-         tfg,tfgp = np.zeros((2,self.n_serial,self.n_elems,self.dim))
-         Supd,Supdp   = np.zeros((2,len(self.kappam)))
-
-         for m in self.ff:
-           #dataf = self.solve_fourier(self.mfp_average[m],pseudo=DeltaT,m=m)
-           dataf = self.solve_fourier_scalar(self.mfp_average[m],pseudo=DeltaT,m=m,guess = np.zeros(self.n_elems))
-
-           tfp[m] = dataf['temperature_fourier']
-           tfgp[m] = dataf['grad']
-           for q in range(self.n_parallel): 
-            kappafp[m,q] = -np.dot(self.kappa_mask,dataf['temperature_fourier'] - self.mfp_sampled[m]*np.dot(self.VMFP[q],dataf['grad'].T))
-
-            Supdp += kappafp[m,q]*self.suppression[m,q,:,0]*self.kappa_factor*1e-9
-         comm.Allreduce([kappafp,MPI.DOUBLE],[kappaf,MPI.DOUBLE],op=MPI.SUM)
-         comm.Allreduce([tfp,MPI.DOUBLE],[tf,MPI.DOUBLE],op=MPI.SUM)
-         comm.Allreduce([tfgp,MPI.DOUBLE],[tfg,MPI.DOUBLE],op=MPI.SUM)
-         comm.Allreduce([Supdp,MPI.DOUBLE],[Supd,MPI.DOUBLE],op=MPI.SUM)
-
-
-         return kappaf,tf,tfg,Supd
-
-  def solve_modified_fourier_shared(self,DeltaT):
-
-         tf = shared_array(np.zeros((self.n_serial,self.n_elems)) if comm.rank == 0 else None)
-         tfg = shared_array(np.zeros((self.n_serial,self.n_elems,self.dim)) if comm.rank == 0 else None)
-         kappaf = shared_array(np.zeros((self.n_serial,self.n_elems)) if comm.rank == 0 else None)
- 
-         for m in self.ff:
-           #dataf = self.solve_fourier(self.mfp_average[m],pseudo=DeltaT,m=m)
-           dataf = self.solve_fourier_scalar(self.mfp_average[m],pseudo=DeltaT,m=m)
-           tf[m,:]    = dataf['temperature_fourier']
-           tfg[m,:,:] = dataf['grad']
-           for q in range(self.n_parallel): 
-            kappaf[m,q] = -np.dot(self.kappa_mask,dataf['temperature_fourier'] - self.mfp_sampled[m]*np.dot(self.VMFP[q],dataf['grad'].T))
-
-
-         return kappaf,tf,tfg,1
-
-
-
-
-
-
-  def print_multiscale(self,MM,total,termination):
-
-        print(flush=True)
-        print('                  Multiscale Diagnostics        ''',flush=True)
-        print(colored(' -----------------------------------------------------------','green'),flush=True)
-        diff = int(MM[0])/total
-        bal = int(MM[1])/total
-        print(colored(' BTE:              ','green') + str(round((1-diff-bal)*100,2)) + ' %',flush=True)
-        print(colored(' FOURIER:          ','green') + str(round(diff*100,2)) + ' %',flush=True)
-        print(colored(' BALLISTIC:        ','green') + str(round(bal*100,2)) + ' %',flush=True)
-        print(colored(' Full termination: ','green') + str(termination),flush=True)
-        print(colored(' -----------------------------------------------------------','green'),flush=True)
-
-
-
   def get_decomposed_directions(self,ll,rot):
 
     normal = self.mesh['face_normals'][ll,0:self.dim]
@@ -481,113 +366,10 @@ class Solver(object):
 
   
 
-  def assemble_fourier_scalar(self,mesh):
-    
-    iff = []
-    jff = []
-    dff = []
-
-    B = np.zeros(self.n_elems)
-    for ll in mesh['active_sides']:
-
-      area = mesh['areas'][ll] 
-      (i,j) = mesh['side_elem_map_vec'][ll]
-      vi = mesh['volumes'][i]
-      vj = mesh['volumes'][j]
-      if not i == j:
-
-       normal = mesh['face_normals'][ll]
-       dist   = mesh['dists'][ll]
-       v_orth = 1/np.dot(normal,dist)
-
-       iff.append(i)
-       jff.append(i)
-       dff.append(v_orth/vi*area)
-       iff.append(i)
-       jff.append(j)
-       dff.append(-v_orth/vi*area)
-       iff.append(j)
-       jff.append(j)
-       dff.append(v_orth/vj*area)
-       iff.append(j)
-       jff.append(i)
-       dff.append(-v_orth/vj*area)
-       if ll in mesh['periodic_sides']:    
-        kk = list(mesh['periodic_sides']).index(ll)   
-        B[i] += mesh['periodic_side_values'][kk]*v_orth/vi*area
-        B[j] -= mesh['periodic_side_values'][kk]*v_orth/vj*area
-
-    mesh['RHS_FOURIER'] =B   
-    mesh['iff'] = np.array(iff)
-    mesh['jff'] = np.array(jff)
-    mesh['dff'] = np.array(dff)
-    
-
-  def solve_fourier_scalar(self,kappa,**argv):
-
-    m = argv.setdefault('m',-1)
-
-    if m in self.MF.keys():
-       SU = self.MF[m]['SU']
-       scale = self.MF[m]['scale']
-       B = self.MF[m]['B'] + argv['pseudo']
-    else: 
-     F = sp.csc_matrix((self.mesh['dff'],(self.mesh['iff'],self.mesh['jff'])),shape = (self.n_elems,self.n_elems))
-     if 'pseudo' in argv.keys():
-       a = time.time() 
-       F = kappa*F + sp.eye(self.n_elems)
-       scale = 1/F.max(axis=0).toarray()[0]
-       F.data = F.data * scale[F.indices]
-       SU = splu(F)
-       B = kappa*self.mesh['RHS_FOURIER'].copy()
-       self.MF[m] = {'SU':SU,'scale':scale,'B':B.copy()}
-       B = B + argv['pseudo']
-     else:  
-      F *= kappa   
-      B = self.RHS_FOURIER.copy()*kappa
-      scale = 1/F.max(axis=0).toarray()[0]
-      n = np.random.randint(self.n_elems)
-      scale[n] = 0
-      F.data = F.data * scale[F.indices]
-      F[n,n] = 1
-      B[n] = 0
-      SU = splu(F)
-
-    #--------------
-    C = np.zeros(self.n_elems)
-    #C = argv['guess']
-    n_iter = 0
-    kappa_old = 0
-    error = 1  
-    grad = np.zeros((self.n_elems,self.dim))
-    while error > self.max_fourier_error and \
-                  n_iter < self.max_fourier_iter :
-
-        RHS = B + C
-        for n in range(self.n_elems):
-          RHS[n] = RHS[n]*scale[n]  
-
-        temp = SU.solve(RHS)
-        temp = temp - (max(temp)+min(temp))/2.0
-        kappa_eff = self.compute_diffusive_thermal_conductivity(temp,grad,kappa)
-
-        error = abs((kappa_eff - kappa_old)/kappa_eff)
-        kappa_old = kappa_eff
-        n_iter +=1
-        #grad = self.compute_grad(temp,grad)
-        #C = self.compute_non_orth_contribution(grad,kappa)
-        C,grad = self.compute_secondary_flux(temp,kappa)
-        #print(np.allclose(C2,C))
-
-    flux = -grad*kappa
-
-    meta = [kappa_eff,error,n_iter] 
-    return {'flux_fourier':flux,'temperature_fourier':temp,'meta':np.array(meta),'grad':grad,'C':C}
-
   def compute_secondary_flux(self,temp,kappa):
 
-   if not np.isscalar(kappa):
-     kappa = kappa[0,0]
+   #if not np.isscalar(kappa):
+   #  kappa = kappa[0,0]
 
    diff_temp = []
    for i in self.mesh['side_per_elem']:
@@ -622,22 +404,22 @@ class Solver(object):
    for ll in self.mesh['active_sides']:
       (i,j) = self.mesh['side_elem_map_vec'][ll]
       if not i==j:
+       kappa_loc = self.get_kappa(i,j,ll,kappa)
        w = self.mesh['interp_weigths'][ll]
        F_ave[ll] = w*gradT[i] + (1.0-w)*gradT[j]
-   F_ave *= kappa 
+    
 
-   #a = time.time()
    C = np.zeros(self.n_elems)
    for ll in self.mesh['active_sides']:
     (i,j) = self.mesh['side_elem_map_vec'][ll]
     if not i==j:
+      kappa_loc = self.get_kappa(i,j,ll,kappa)
       area = self.mesh['areas'][ll]   
-      (dummy,v_non_orth) = self.get_decomposed_directions(ll,np.eye(self.dim))#,rot=self.mat['kappa'])
+      (dummy,v_non_orth) = self.get_decomposed_directions(ll,rot=kappa_loc)
       tmp = np.dot(F_ave[ll],v_non_orth)*area
       C[i] += tmp/self.mesh['volumes'][i]
       C[j] -= tmp/self.mesh['volumes'][j]
 
-   #print(time.time()-a)   
 
    return C,gradT
 
@@ -650,25 +432,18 @@ class Solver(object):
    if kappa.ndim == 2:
       kappa = np.repeat(np.array([np.diag(np.diag(kappa))]),self.n_elems,axis=0)
 
-   m = argv.setdefault('m',-1)
-   if m in self.MF.keys():
-       SU = self.MF[m]['SU']
-       scale = self.MF[m]['scale']
-       B = self.MF[m]['B'] + argv['pseudo']
-   else:   
-
-    F = sp.dok_matrix((self.n_elems,self.n_elems))
-    B = np.zeros(self.n_elems)
-    for ll in self.mesh['active_sides']:
+   F = sp.dok_matrix((self.n_elems,self.n_elems))
+   B = np.zeros(self.n_elems)
+   for ll in self.mesh['active_sides']:
 
       area = self.mesh['areas'][ll] 
       (i,j) = self.mesh['side_elem_map_vec'][ll]
       vi = self.mesh['volumes'][i]
       vj = self.mesh['volumes'][j]
       kappa_loc = self.get_kappa(i,j,ll,kappa)
+      #kappa_loc = np.eye(2)*kappa_loc[0,0] 
+
       if not i == j:
- 
-          
 
        (v_orth,dummy) = self.get_decomposed_directions(ll,rot=kappa_loc)
        F[i,i] += v_orth/vi*area
@@ -681,23 +456,14 @@ class Solver(object):
         B[j] -= self.mesh['periodic_side_values'][kk]*v_orth/vj*area
    
     
-    #rescaleand fix one point to 0
-    F = F.tocsc()
-    if 'pseudo' in argv.keys():
-       F = F + sp.eye(self.n_elems)
-       scale = 1/F.max(axis=0).toarray()[0]
-       F.data = F.data * scale[F.indices]
-       SU = splu(F)
-       self.MF[m] = {'SU':SU,'scale':scale,'B':B}
-       B = B + argv['pseudo']
-    else:  
-      scale = 1/F.max(axis=0).toarray()[0]
-      n = np.random.randint(self.n_elems)
-      scale[n] = 0
-      F.data = F.data * scale[F.indices]
-      F[n,n] = 1
-      B[n] = 0
-      SU = splu(F)
+   ##rescaleand fix one point to 0
+   #scale = 1/F.max(axis=0).toarray()[0]
+   #n = np.random.randint(self.n_elems)
+   #scale[n] = 0
+   #F.data = F.data * scale[F.indices]
+   #F[n,n] = 1
+   #B[n] = 0
+   SU = splu(F.tocsc())
     #-----------------------
 
    C = np.zeros(self.n_elems)
@@ -708,8 +474,8 @@ class Solver(object):
    while error > self.max_fourier_error and \
                   n_iter < self.max_fourier_iter :
         RHS = B + C
-        for n in range(self.n_elems):
-          RHS[n] = RHS[n]*scale[n]  
+        #for n in range(self.n_elems):
+        #  RHS[n] = RHS[n]*scale[n]  
 
         temp = SU.solve(RHS)
         temp = temp - (max(temp)+min(temp))/2.0
@@ -717,90 +483,16 @@ class Solver(object):
         error = abs((kappa_eff - kappa_old)/kappa_eff)
         kappa_old = kappa_eff
         n_iter +=1
-        #grad = self.compute_grad(temp,grad)
-        #C = self.compute_non_orth_contribution(grad,kappa)
 
         C,grad = self.compute_secondary_flux(temp,kappa)
 
-    #    print(min(grad[:,0]),max(grad[:,0]),kappa_eff)
-   #quit()
 
    flux = -np.einsum('cij,cj->ci',kappa,grad)
  
    meta = [kappa_eff,error,n_iter] 
    return {'flux_fourier':flux,'temperature_fourier':temp,'meta':np.array(meta),'grad':grad}
 
-   #return {'flux':flux,'temperature':temp,'kappa':kappa_eff,'grad':grad,'error':error,'n_iter':n_iter}
 
-  def compute_grad(self,temp,gradT):
-
-   diff_temp = self.n_elems*[None]
-   for i in range(len(diff_temp)):
-      diff_temp[i] = self.n_side_per_elem[i]*[0] 
-
-   for ll in self.active_sides :
-    elems = self.side_elem_map_vec[ll]
-    kc1 = elems[0]
-    c1 = self.centroids[kc1]
-
-    ind1 = list(self.elem_side_map_vec[kc1]).index(ll)
-    if not ll in self.boundary_sides: 
-     kc2 = elems[1]
-     ind2 = list(self.elem_side_map_vec[kc2]).index(ll)
-     temp_1 = temp[kc1]
-     temp_2 = temp[kc2]
-
-     if ll in self.periodic_sides:
-      temp_2 += self.periodic_side_values[list(self.periodic_sides).index(ll)]
-
-     diff_t = temp_2 - temp_1
-     diff_temp[kc1][ind1]  = diff_t
-     diff_temp[kc2][ind2]  = -diff_t
-
-   gradT = np.zeros((self.n_elems,self.dim))
-   for k in range(self.n_elems) :
-    tmp = np.dot(self.weigths[k],diff_temp[k])
-    gradT[k,0] = tmp[0] #THESE HAS TO BE POSITIVE
-    gradT[k,1] = tmp[1]
-    if self.dim == 3:
-     gradT[k,2] = tmp[2]
-
-   return gradT  
-
-
-  def compute_non_orth_contribution(self,gradT,kappa) :
-
-    C = np.zeros(self.n_elems)
-
-    for ll in self.active_sides:
-
-     (i,j) = self.side_elem_map_vec[ll]
-
-     if not i==j:
-
-      if np.isscalar(kappa):
-        kappa_1 = np.diag(np.diag(kappa*np.eye(self.dim)))
-        kappa_2 = np.diag(np.diag(kappa*np.eye(self.dim)))
-      else:  
-        kappa_1 = kappa[i]  
-        kappa_2 = kappa[j]  
-
-      area = self.areas[ll]   
-      w = self.interp_weigths[ll]
-
-      #print(np.shape(gradT))
-      #print(np.shape(kappa_1))
-      #print(np.shape(kappa_2))
-      F_ave = w*np.dot(gradT[i],kappa_1) + (1.0-w)*np.dot(gradT[j],kappa_2)
-      #grad_ave = w*gradT[i] + (1.0-w)*gradT[j]
-
-      (dummy,v_non_orth) = self.get_decomposed_directions(ll,np.eye(self.dim))#,rot=self.mat['kappa'])
-      
-
-      C[i] += np.dot(F_ave,v_non_orth)/self.volumes[i]*area
-      C[j] -= np.dot(F_ave,v_non_orth)/self.volumes[j]*area
-
-    return C
 
 
   def compute_diffusive_thermal_conductivity(self,temp,gradT,kappa):

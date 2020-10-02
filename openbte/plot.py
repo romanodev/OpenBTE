@@ -296,7 +296,10 @@ class Plot(object):
  def plot_maps(self,**argv):
 
 
-   argv.update({'bulk':self.material['kappa'],'fourier':self.solver['kappa'][0],'bte':self.solver['kappa'][-1]})
+   argv.update({'bulk':self.material['kappa'],'fourier':self.solver['kappa_fourier']})
+   if len(self.solver['variables'])> 2:
+    argv.update({'bte':self.solver['kappa'][-1]})
+
 
 
    for key in self.solver['variables'].keys():

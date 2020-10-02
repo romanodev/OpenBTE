@@ -490,7 +490,8 @@ class Mesher(object):
     pore_wall.append(l+1)
 
   additional_boundary = []
-  if argv.setdefault('Periodic',[True,True,True])[0]:
+  argv.setdefault('Periodic',[True,True,True])
+  if argv['Periodic'][0]:
    strc = r'''Physical Line('Periodic_2') = {'''
    for n in range(len(hot)-1):
     strc += str(hot[n]) + ','
@@ -556,16 +557,17 @@ class Mesher(object):
     else :
      strc += ','
 
-  for n in range(len(hot)):
+  if argv['Periodic'][0]:
    periodic = self.FindPeriodic(hot[n],cold,points,lines)
    
    strc = 'Periodic Line{' + str(hot[n]) + '}={' + str(periodic) + '};\n'
    store.write(strc)
 
-  for n in range(len(lower)):
-   periodic = self.FindPeriodic(lower[n],upper,points,lines)
-   strc = 'Periodic Line{' + str(lower[n]) + '}={' + str(periodic) + '};\n'
-   store.write(strc)
+  if argv['Periodic'][1]:
+   for n in range(len(lower)):
+    periodic = self.FindPeriodic(lower[n],upper,points,lines)
+    strc = 'Periodic Line{' + str(lower[n]) + '}={' + str(periodic) + '};\n'
+    store.write(strc)
 
 #-------------------------------------------------------
   store.close()

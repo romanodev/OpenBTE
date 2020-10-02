@@ -2,11 +2,11 @@ Run
 ===================================
  
 OpenBTE can be run either via API or through a properly-formatted ``yaml`` file.
+    
 
-.. tabs::
+API
+########################################################################################
 
-   .. tab:: API
-     
       Assuming you have `rta.h5` in your current directory, create the file ``input.py``
 
       .. code-block:: python
@@ -31,9 +31,9 @@ OpenBTE can be run either via API or through a properly-formatted ``yaml`` file.
 
        mpirun -np 4 python input.py
 
+YAML
+########################################################################################
 
-
-   .. tab:: YAML
 
       Prepare a ``yaml`` file like the one below, and let's name it ``input.yaml``. Note that there are 1-1 correspondance between the API and the ``yaml`` version.
 
@@ -70,7 +70,8 @@ OpenBTE can be run either via API or through a properly-formatted ``yaml`` file.
 
       Note that ``input.yaml`` is the default name, so you can omit in this case.    
 
-   .. tab:: Command Line
+COMMAND LINE
+########################################################################################
 
       For whe command line version we feed OpenBTE directly with the contents of the ``YAML`` file instead of the file itself. For example:
       

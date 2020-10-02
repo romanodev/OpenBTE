@@ -1,9 +1,9 @@
 Install
 ===================================
  
-.. tabs::
 
-   .. tab:: PYPI
+PYPI
+####################################
 
       .. code-block:: bash
 
@@ -13,7 +13,10 @@ Install
 
       If you have trouble getting ``Gmsh`` via the above method, just get it from here_.      
 
-   .. tab:: CONDA
+
+CONDA
+####################################
+
 
        Install Anaconda_.
 
@@ -32,7 +35,8 @@ Install
 
        If you have trouble getting ``Gmsh`` via the above method, just get it from here_.      
 
-   .. tab:: DOCKER 
+DOCKER
+####################################
 
       Install Docker_.
 
@@ -64,13 +68,21 @@ Install
          
          docker info
 
-   .. tab:: WINDOWS
+WINDOWS
+####################################
 
       Use Docker after Installing MSMPI_.
 
-   .. tab:: CLOUD
+
+CLOUD
+####################################
+
        
       You can run OpenBTE in Google Colab (Example_). 
+
+
+
+
 
 
 

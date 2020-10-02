@@ -218,15 +218,10 @@ class Geometry(object):
         self.sb.append(ll)
         self.db.append(normal*area/vol1)
    
-   self.k += self.intk
-   #self.i += self.inti
-   #self.j += self.intj
 
    self.k = np.array(self.k).T
    self.db = np.array(self.db).T
    self.intk = np.array(self.intk).T
-
-   
    
    self.ij = ij
 

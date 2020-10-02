@@ -179,21 +179,29 @@ def repeat_merge_scale(argv):
   polygons = argv['polygons']
 
 
-  pbc = []
-  pbc.append([0,0])
-  pbc.append([1,0])
-  pbc.append([-1,0])
-  pbc.append([0,1])
-  pbc.append([0,-1])
-  pbc.append([1,1])
-  pbc.append([-1,-1])
-  pbc.append([-1,1])
-  pbc.append([1,-1])
   lx = argv['lx']   
   ly = argv['ly']   
+  
+  
+  if argv.setdefault('relative',True):
+    dx = 1;dy=1
+  else:  
+    dx = lx;dy=ly
+  
 
+  pbc = []
+  pbc.append([0,0])
+  if argv.setdefault('repeat',True):
+   pbc.append([dx,0]) 
+   pbc.append([-dx,0])
+   pbc.append([0,dy])
+   pbc.append([0,-dy])
+   pbc.append([dx,dy])
+   pbc.append([-dx,-dy])
+   pbc.append([-dx,dy])
+   pbc.append([dx,-dy])
 
-  frame = Polygon([[-0.5,-0.5],[-0.5,0.5],[0.5,0.5],[0.5,-0.5]])
+  frame = Polygon([[-dx/2,-dy/2],[-dx/2,dy/2],[dx/2,dy/2],[dx/2,-dy/2]])
 
    #---------------------
   #Store only the intersecting polygons
@@ -284,15 +292,16 @@ def repeat_merge_scale(argv):
 
 
   #scale-----------------------
-  polygons = []
-  for poly in new_poly:
-   tmp = []
-   for p in poly:
-    g = list(p)
-    g[0] *=lx
-    g[1] *=ly
-    tmp.append(g)
-   polygons.append(tmp) 
+  if argv.setdefault('relative',True):
+   polygons = []
+   for poly in new_poly:
+    tmp = []
+    for p in poly:
+     g = list(p)
+     g[0] *=lx
+     g[1] *=ly
+     tmp.append(g)
+    polygons.append(tmp) 
 
   argv['polygons'] = polygons
   argv['dmin'] = dmin
