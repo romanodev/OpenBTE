@@ -31,6 +31,7 @@ def generate_rta2DSym(**argv):
 
  data = load_data('rta')
 
+ #kappa = np.einsum('k,ki,kj,k->ij',data['C'],data['v'],data['v'],data['tau'])
  #small cut on MFPs
  mfp_0 = 1e-9
  mfp_bulk = np.einsum('ki,k->ki',data['v'][:,:2],data['tau'])

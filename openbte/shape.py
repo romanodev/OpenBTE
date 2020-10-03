@@ -40,7 +40,8 @@ def get_shape(argv):
        shapes.append(np.array(make_polygon(24,area)))
 
      elif shape == 'custom':
-      options = argv.setdefault('shape_options',{})
+      #options = argv.setdefault('shape_options',{})
+      options = {key:value[n] for key,value in argv.setdefault('shape_options',{}).items()}
       options.update({'area':area})
 
 

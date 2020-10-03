@@ -101,14 +101,14 @@ def plot_results(data,nodes,elems,**argv):
 
    #axis = dict(ticktext=[],tickvals= [],showbackground=False)
 
-   bb = str(round(argv['bte'],2))+' W/m/K' if 'bte' in argv.keys() else ''
+   bb = str(round(argv['bte'],2))+' W/m/K' if 'bte' in argv.keys() else '--'
    fig.add_annotation(
             x=0.97,
             y=0.05,
             xref='paper',
             showarrow=False,
             yref='paper',
-            text='Bulk: ' + str(round(argv['bulk'][0,0],2)) +' W/m/K<br>Fourier: '\
+            text='Bulk: ' + str(round(argv['bulk'],2)) +' W/m/K<br>Fourier: '\
                     +       str(round(argv['fourier'],2)) + ' W/m/K<br>BTE:' \
                     +       bb,align='left')
 
@@ -155,7 +155,7 @@ def plot_results(data,nodes,elems,**argv):
             mag = [np.linalg.norm(value) for value in value['data']]
             data_rolled.update({idd:{'name':value['name'] + ' (mag)','data':mag,'units':value['units']}}); idd +=1
 
-       data = {'name':argv['name'],'elems':elems,'nodes':nodes,'variables':data_rolled,'bulk':argv['bulk'],'fourier':argv['fourier']}
+       data = {'name':argv.setdefault('name','bundle'),'elems':elems,'nodes':nodes,'variables':data_rolled,'bulk':argv['bulk'],'fourier':argv['fourier']}
        if 'bte' in argv.keys():
            data.update({'bte':argv['bte']}) 
        save_data(argv.setdefault('name','sample'),data)

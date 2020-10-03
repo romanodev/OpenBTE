@@ -211,7 +211,10 @@ def solve_rta(**argv):
                    DeltaTp += np.einsum('mc,m->c',Xm,mat['tc'][:m,q])  
                   
                    #np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('mc,mc->c',Xm[:,mesh['eb']],GG[:m+1,q]))
-                   np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('mc,mc->c',Xm[:,mesh['eb']],GG[:m,q]))
+                  
+                   
+                   if len(mesh['eb']) > 0:
+                    np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('mc,mc->c',Xm[:,mesh['eb']],GG[:m,q]))
                    #Jp += np.einsum('mc,mj->cj',Xm,sigma[:m+1,q,0:argv['dim']])*1e-18
                    Jp += np.einsum('mc,mj->cj',Xm,sigma[:m,q,0:argv['dim']])*1e-18
                    break
@@ -236,7 +239,6 @@ def solve_rta(**argv):
                else: 
                   X = (lu[(m,n)] if (m,n) in lu.keys() else lu.setdefault((m,n),sp.linalg.splu(A))).solve(B)
 
-
                kappap[m,q] = np.dot(mesh['kappa_mask'],X)
 
                error_bal = abs(kappap[m,q] - kappa_bal)/abs(kappap[m,q])
@@ -258,7 +260,8 @@ def solve_rta(**argv):
                
                #for c,i in enumerate(mesh['eb']): TBp[m,c] -= X[i]*GG[m,q,c]
                #np.add.at(TBp[m],np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
-               np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
+               if len(mesh['eb'])>0:
+                np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
 
                Jp += np.einsum('c,j->cj',X,sigma[m,q,0:argv['dim']])*1e-18
                #Supp += kappap[m,q]*mat['suppression'][m,q,:]*1e9
@@ -277,7 +280,7 @@ def solve_rta(**argv):
         #comm.Allreduce([Supp,MPI.DOUBLE],[Sup,MPI.DOUBLE],op=MPI.SUM)
         #comm.Allreduce([Supdp,MPI.DOUBLE],[Supd,MPI.DOUBLE],op=MPI.SUM)
         #comm.Allreduce([Supbp,MPI.DOUBLE],[Supb,MPI.DOUBLE],op=MPI.SUM)
-        kappa_totp = np.array([np.einsum('mq,mq->',sigma[:,argv['rr'],0],kappa[:,argv['rr']])])
+        kappa_totp = np.array([np.einsum('mq,mq->',sigma[:,argv['rr'],int(mesh['meta'][-1])],kappa[:,argv['rr']])])
         comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
 
 

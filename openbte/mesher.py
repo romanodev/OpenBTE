@@ -510,13 +510,13 @@ class Mesher(object):
     additional_boundary.append(k)
 
   if argv.setdefault('Periodic',[True,True,True])[1] and len(upper) > 0:
-   strc = r'''Physical Line('Periodic_4') = {'''
+   strc = r'''Physical Line('Periodic_3') = {'''
    for n in range(len(upper)-1):
     strc += str(upper[n]) + ','
    strc += str(upper[-1]) + '};\n'
    store.write(strc)
 
-   strc = r'''Physical Line('Periodic_3') = {'''
+   strc = r'''Physical Line('Periodic_4') = {'''
    for n in range(len(lower)-1):
     strc += str(lower[n]) + ','
    strc += str(lower[-1]) + '};\n'
@@ -558,10 +558,10 @@ class Mesher(object):
      strc += ','
 
   if argv['Periodic'][0]:
-   periodic = self.FindPeriodic(hot[n],cold,points,lines)
-   
-   strc = 'Periodic Line{' + str(hot[n]) + '}={' + str(periodic) + '};\n'
-   store.write(strc)
+   for n in range(len(hot)):
+    periodic = self.FindPeriodic(hot[n],cold,points,lines) 
+    strc = 'Periodic Line{' + str(hot[n]) + '}={' + str(periodic) + '};\n'
+    store.write(strc)
 
   if argv['Periodic'][1]:
    for n in range(len(lower)):

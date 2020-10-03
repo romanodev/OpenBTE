@@ -108,6 +108,13 @@ class Geometry(object):
             e.append(-1)
             self.elem_side_map[n].append(-1)
 
+    if self.direction=='x':
+       dirr = 0
+    elif self.direction=='y':
+       dirr = 1
+    else:
+       dirr = 2
+       
 
 
     return {
@@ -154,7 +161,8 @@ class Geometry(object):
           'n_non_boundary_side_per_elem': np.array(self.n_non_boundary_side_per_elem,dtype=np.int),
           'pp':np.array(self.pp),\
           'side_per_elem':np.array(self.side_per_elem),\
-          'meta':np.asarray([self.n_elems,self.kappa_factor,self.dim,len(self.nodes),len(self.side_list['active'])],np.float64)}
+          'applied_gradient':np.array(self.applied_grad),\
+          'meta':np.asarray([self.n_elems,self.kappa_factor,self.dim,len(self.nodes),len(self.side_list['active']),dirr],np.float64)}
 
 
 
@@ -531,15 +539,15 @@ class Geometry(object):
 
  def compute_boundary_condition_data(self,argv):
 
-    direction = argv.setdefault('direction','x')
-    if direction == 'x':
+    self.direction = argv.setdefault('direction','x')
+    if self.direction == 'x':
      gradir = 0
-     applied_grad = [1,0,0]
-    if direction == 'y': 
-     applied_grad = [0,1,0]
+     self.applied_grad = [1,0,0]
+    if self.direction == 'y':
      gradir = 1
-    if direction == 'z':
-     applied_grad = [0,0,1]
+     self.applied_grad = [0,1,0]
+    if self.direction == 'z':
+     self.applied_grad = [0,0,1]
      gradir = 2
 
     if gradir == 0:
@@ -620,9 +628,10 @@ class Geometry(object):
        self.ip.append(j); self.jp.append(i); self.dp.append(side_value[side[1]]); self.pv.append(-normal*area/volj)
        counter +=1
 
-      if np.linalg.norm(np.cross(self.face_normals[side[0]],applied_grad)) < 1e-12:
+      if np.linalg.norm(np.cross(self.face_normals[side[0]],self.applied_grad)) < 1e-12:
        B_with_area_old[i,j] = abs(side_value[side[0]]*area)
-     
+    
+
     #select flux sides-------------------------------
     self.flux_sides = [] #where flux goes
     total_area = 0
@@ -654,7 +663,7 @@ class Geometry(object):
     self.B_with_area_old = B_with_area_old.tocoo()
     self.pv = np.array(self.pv).T
     self.kappa_factor = self.size[gradir]/area_flux
-  
+
  def compute_least_square_weigths(self):
 
    nd = len(self.elems[0])

@@ -137,9 +137,9 @@ class Solver(object):
 
         if comm.rank == 0:
           data = self.solve_fourier(self.elem_kappa_map)
-          
 
-          variables = {0:{'name':'Temperature Fourier','units':'K','data':data['temperature_fourier'],'increment':[-1,0,0]},\
+          
+          variables = {0:{'name':'Temperature Fourier','units':'K','data':data['temperature_fourier'],'increment':-self.mesh['applied_gradient']},\
                        1:{'name':'Flux Fourier'       ,'units':'W/m/m','data':data['flux_fourier'],'increment':[0,0,0]}}
 
           self.state.update({'variables':variables,\
@@ -196,7 +196,7 @@ class Solver(object):
           variables = self.state['variables']
 
           if not self.only_fourier:
-           variables[2]    = {'name':'Temperature BTE','units':'K','data':data['temperature'],'increment':[-1,0,0]}
+           variables[2]    = {'name':'Temperature BTE','units':'K','data':data['temperature'],'increment':-self.mesh['applied_gradient']}
            variables[3]    = {'name':'Flux BTE'       ,'units':'W/m/m','data':data['flux'],'increment':[0,0,0]}
            if 'pseudo' in data.keys():
             variables[4]    = {'name':'Gradient Pseudo','units':'K/m','data':data['pseudo'],'increment':[0,0,0]}
@@ -268,7 +268,20 @@ class Solver(object):
           print(colored('  Model:                                   ','green')+ self.model,flush=True)
 
           for key,value in self.mat.items():
-           print(colored('  Bulk Thermal Conductivity [W/m/K]:       ','green')+ str(round(self.mat[key]['kappa'][0,0],2)),flush=True)
+           print(colored('  Bulk Thermal Conductivity (xx) [W/m/K]:  ','green')+ str(round(self.mat[key]['kappa'][0,0],2)),flush=True)
+           print(colored('  Bulk Thermal Conductivity (yy) [W/m/K]:  ','green')+ str(round(self.mat[key]['kappa'][1,1],2)),flush=True)
+           if self.dim == 3:
+            print(colored('  Bulk Thermal Conductivity (zz)[W/m/K]:   ','green')+ str(round(self.mat[key]['kappa'][2,2],2)),flush=True)
+
+           dirr = self.mesh['meta'][-1]
+           if dirr == 0:
+               direction = 'x'
+           elif dirr == 1:    
+               direction = 'y'
+           else:    
+               direction = 'z'
+           print(colored('  Applied Thermal Gradient along :         ','green')+ direction,flush=True)
+
           #print(colored(' -----------------------------------------------------------','green'))
           #print(" ")
 
@@ -508,7 +521,7 @@ class Solver(object):
  
     if kappa.ndim == 3:
       kappa = self.get_kappa(i,j,l,kappa)
-       
+      
     (v_orth,v_non_orth) = self.get_decomposed_directions(l,rot=kappa)
 
     deltaT = temp[i] - (temp[j] + 1)
