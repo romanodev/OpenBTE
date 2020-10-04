@@ -2,7 +2,7 @@ from setuptools import setup,find_packages
 import os
 
 setup(name='openbte',
-      version='1.70',
+      version='1.71',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',
@@ -28,7 +28,7 @@ setup(name='openbte',
                         'sphinx',
                         'sphinx_rtd_theme'
                          ],
-      license='GPLv2',\
+      license='GPLv3',\
       packages = ['openbte'],
       package_data = {'openbte':['materials/*.npz']},
       entry_points = {

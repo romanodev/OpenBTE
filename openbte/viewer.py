@@ -156,13 +156,10 @@ def plot_results(data,nodes,elems,**argv):
             data_rolled.update({idd:{'name':value['name'] + ' (mag)','data':mag,'units':value['units']}}); idd +=1
 
        
-       tmp = {'elems':elems,'nodes':nodes,'variables':data_rolled}
-       text='Bulk: ' + str(round(argv['bulk'],2)) +' W/m/K<br>Fourier: '\
-                     +       str(round(argv['fourier'],2)) + ' W/m/K<br>BTE:' 
+       tmp = {'elems':elems,'nodes':nodes,'variables':data_rolled,'fourier':str(round(argv['fourier'],2)),'bulk':str(round(argv['bulk'],2))}
 
        if 'bte' in argv.keys():
-           text += '<br>Fourier: '+ str(round(argv['bte'],2))+' W/m/K'
-       tmp['text'] = text
+           tmp['bte'] = str(round(argv['bulk'],2))
 
 
        data = {argv.setdefault('name','sample'):tmp}
