@@ -155,9 +155,17 @@ def plot_results(data,nodes,elems,**argv):
             mag = [np.linalg.norm(value) for value in value['data']]
             data_rolled.update({idd:{'name':value['name'] + ' (mag)','data':mag,'units':value['units']}}); idd +=1
 
-       data = {'name':argv.setdefault('name','bundle'),'elems':elems,'nodes':nodes,'variables':data_rolled,'bulk':argv['bulk'],'fourier':argv['fourier']}
+       
+       tmp = {'elems':elems,'nodes':nodes,'variables':data_rolled}
+       text='Bulk: ' + str(round(argv['bulk'],2)) +' W/m/K<br>Fourier: '\
+                     +       str(round(argv['fourier'],2)) + ' W/m/K<br>BTE:' 
+
        if 'bte' in argv.keys():
-           data.update({'bte':argv['bte']}) 
+           text += '<br>Fourier: '+ str(round(argv['bte'],2))+' W/m/K'
+       tmp['text'] = text
+
+
+       data = {argv.setdefault('name','output'):tmp}
        save_data(argv.setdefault('name','sample'),data)
 
 
