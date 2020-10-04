@@ -313,7 +313,6 @@ class Plot(object):
     dd.io.save('plot.h5',{'variables':self.solver['variables'],'nodes':self.mesh['nodes'] if self.dim == 2 else self.surface_nodes,\
                                                                'elems':self.mesh['elems'] if self.dim == 2 else self.surface_sides})
 
-   if argv.setdefault('show',True):
-    plot_results(self.solver['variables'],np.array(self.mesh['nodes']) if self.dim == 2 else self.surface_nodes,\
+   plot_results(self.solver['variables'],np.array(self.mesh['nodes']) if self.dim == 2 else self.surface_nodes,\
                                           np.array(self.mesh['elems']) if self.dim == 2 else self.surface_sides,**argv)
 

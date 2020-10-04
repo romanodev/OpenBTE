@@ -165,13 +165,12 @@ def plot_results(data,nodes,elems,**argv):
        tmp['text'] = text
 
 
-       data = {argv.setdefault('name','output'):tmp}
-       save_data(argv.setdefault('name','sample'),data)
+       data = {argv.setdefault('name','sample'):tmp}
+       save_data(argv.setdefault('name','output'),data)
 
 
    # plotly.io.to_image(fig,format='png')
    #fig.write_image("test.png",scale=5)
-
    if argv.setdefault('show',True):
     if 'google.colab' in sys.modules:
      fig.show(renderer='colab')
