@@ -5,11 +5,11 @@ import math
 from .full_model import generate_full
 from .utils import *
 from .mfp2DSym import *
+from .mfp2D import *
 from .mfp3D import *
 from .gray2D import *
 from .rta2DSym import *
 from .rta3D import *
-#import deepdish as dd
 from mpi4py import MPI
 import shutil
 import pickle
@@ -46,14 +46,42 @@ class Material(object):
       data = generate_full(**argv)
 
     elif model == 'mfp2DSym':
-      data = generate_mfp2DSym_2(**argv)
-    
+      data = generate_mfp2DSym(**argv)
+   
+    elif model == 'fourier':
+      
+      kappa = np.eye(3)
+      if 'kappa' in argv.keys():
+        kappa *= argv['kappa']
+      else:  
+       kappa[0,0] = argv['kappa_xx']
+       kappa[1,1] = argv['kappa_yy']
+       kappa[2,2] = argv['kappa_zz']
+      data = {'kappa':kappa,'model':[0]}
+
+    elif model == 'mfp2D':
+      data = generate_mfp2D(**argv)
+
+    elif model == 'gray2DSym':
+      argv['read_from_file'] = False
+      argv['mfp'] = np.array([argv['mfp']])
+      argv['Kacc'] = np.array([argv['kappa']])
+      data = generate_mfp2DSym(**argv)
+
     elif model == 'gray2D':
-     if comm.rank == 0:
-      data = generate_gray2D(**argv)
+      argv['read_from_file'] = False
+      argv['mfp'] = np.array([argv['mfp']])
+      argv['Kacc'] = np.array([argv['kappa']])
+      data = generate_mfp2D(**argv)
+
+    elif model == 'gray3D':
+      argv['read_from_file'] = False
+      argv['mfp'] = np.array([argv['mfp']])
+      argv['Kacc'] = np.array([argv['kappa']])
+      data = generate_mfp3D(**argv)
 
     elif model == 'mfp3D':
-      data = generate_mfp3D_2(**argv)
+      data = generate_mfp3D(**argv)
 
     elif model == 'rta2DSym':
      if comm.rank == 0:
@@ -62,10 +90,6 @@ class Material(object):
     elif model == 'rta3D':
      if comm.rank == 0:
       data = generate_rta3D(**argv)
-
-    elif model == 'mfp_ms':
-     if comm.rank == 0:
-      data = generate_mfp_ms(**argv)
 
    if save:
      if comm.rank == 0:

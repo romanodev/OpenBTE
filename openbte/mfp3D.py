@@ -30,7 +30,23 @@ def get_linear_indexes(mfp,value):
 
 
 
-def generate_mfp3D_2(**argv): 
+def generate_mfp3D(**argv): 
+
+   #load data
+   if argv.setdefault('read_from_file',True):
+     data = load_data('mfp')
+     Kacc = data['Kacc']
+     mfp_bulk  = data['mfp']
+   else:  
+     mfp_bulk = argv['mfp']
+     Kacc    = argv['Kacc']
+
+   #Get the distribution
+   kappa_bulk = Kacc[-1]
+   kappa_bulk = np.zeros_like(Kacc)
+   kappa_bulk[0] = Kacc[0]
+
+
 
    #Polar Angle-----
    n_phi = int(argv.setdefault('n_phi',48)); Dphi = 2.0*np.pi/n_phi
@@ -63,12 +79,12 @@ def generate_mfp3D_2(**argv):
    nm = n_phi * n_mfp * n_theta
    #------------------------------------------
 
-   data = load_data('mfp')
-   kappa_bulk = data['K']
-   mfp_bulk = data['mfp']
-   I = np.where(mfp_bulk > 0)
-   kappa_bulk = kappa_bulk[I]
-   mfp_bulk = mfp_bulk[I]
+   #data = load_data('mfp')
+   #kappa_bulk = data['K']
+   #mfp_bulk = data['mfp']
+   #I = np.where(mfp_bulk > 0)
+   #kappa_bulk = kappa_bulk[I]
+   #mfp_bulk = mfp_bulk[I]
    #kappa = data['kappa']
    #-----------------------
 

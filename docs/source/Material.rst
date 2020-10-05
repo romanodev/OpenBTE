@@ -13,6 +13,11 @@ OpenBTE features a 3D solver of diffusive heat conduction solved on unstructured
 
 where ``kappa`` is the bulk thermal conductivity.
 
+It is also possible to define an anisotropic thermal conductivity 
+
+.. code-block:: python
+
+   Material(model='fourier',kappa_xx=100,kappa_yy=150)
 
 Gray model approximation
 -----------------------------------
@@ -26,9 +31,9 @@ Within the gray model, we assume single MFP-materials. In light of new first-pri
 
 There are three material models associated with this method
 
-* ``model='gray3D'``: three-dimensional domain (coming soon)
+* ``model='gray3D'``: three-dimensional domain 
 
-* ``model='gray2DSym'``: three-dimensional domain with infinite thickness (coming soon)
+* ``model='gray2DSym'``: three-dimensional domain with infinite thickness
 
 * ``model='gray2D'``: two-dimensional domain
 

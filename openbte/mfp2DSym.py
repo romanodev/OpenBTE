@@ -1,15 +1,11 @@
 import sys
-
 import numpy as np
-#import jax.numpy as np
-#from jax import jit,ops
 import scipy
 from mpi4py import MPI
 import time
 import os 
 import deepdish as dd
-
-#os.environ['JAX_ENABLE_X64'] = 'True'
+from openbte.utils import *
 
 
 comm = MPI.COMM_WORLD
@@ -34,23 +30,24 @@ def get_linear_indexes(mfp,value):
 
 
 
-def generate_mfp2DSym_2(**argv):
+def generate_mfp2DSym(**argv):
 
- #Import data----
- a = np.load('mfp.npz',allow_pickle=True)
- data = {key:a[key].item() for key in a}['arr_0']
+ #load data
+ data = load_data('mfp')
+ Kacc = data['Kacc']
+ mfp_bulk  = data['mfp']
+ kappa_bulk = Kacc[-1]
+ kappa_bulk = np.zeros_like(Kacc)
+ kappa_bulk[0] = Kacc[0]
+ for n in range(len(Kacc)-1):
+    kappa_bulk[n+1] = Kacc[n+1]-Kacc[n]
 
- #data = dd.io.load('mfp.h5')
-
- kappa_bulk = data['K']
- mfp_bulk = data['mfp']
-
-
+ #pruning--
  I = np.where(mfp_bulk > 0)
  kappa_bulk = kappa_bulk[I]
  mfp_bulk = mfp_bulk[I]
-
  kappa= np.eye(3) * np.sum(kappa_bulk)
+
  #Get options----
  n_phi = int(argv.setdefault('n_phi',48))
  n_mfp = int(argv.setdefault('n_mfp',50))
@@ -62,21 +59,11 @@ def generate_mfp2DSym_2(**argv):
  n_mfp_bulk = len(mfp_bulk)
  mfp_sampled = np.logspace(min([-2,np.log10(min(mfp_bulk)*0.99)]),np.log10(max(mfp_bulk)*1.01),n_mfp)#min MFP = 1e-2 nm 
 
-
  #Polar Angle---------
  Dphi = 2*np.pi/n_phi
  #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
  phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
-#--------------------
-
- #Get coeff matrix---
- #coeff = np.zeros((n_mfp,n_mfp_bulk))
- #for m,rr in enumerate(mfp_bulk):
- #   (m1,a1,m2,a2) = get_linear_indexes(mfp_sampled,rr,scale='linear',extent=True)
- #   coeff[m1,m] = a1
- #   coeff[m2,m] = a2
- #-----------------------
- #---------------------
+ #--------------------
    
  #Azimuthal Angle------------------------------
  Dtheta = np.pi/n_theta/2.0
@@ -101,7 +88,6 @@ def generate_mfp2DSym_2(**argv):
  n_mfp_bulk = len(mfp_bulk) 
  n_mfp = argv.setdefault('n_mfp',100)
 
-
  mfp = np.logspace(np.log10(max([min(mfp_bulk),1e-11])),np.log10(max(mfp_bulk)*1.01),n_mfp) 
 
  n_mfp = len(mfp)
@@ -113,10 +99,6 @@ def generate_mfp2DSym_2(**argv):
 
  dirr = np.einsum('tpi,tp->tpi',direction_ave[:,:,:2],domega)
 
- #reduced_mfp = np.outer(mfp_bulk,ftheta*np.sin(theta))#.reshape(n_mfp_bulk*n_theta)
- #tmp_1 = np.einsum('m,tpi->mtpi',kappa_bulk/mfp_bulk,dirr,optimize=True)#.reshape((n_mfp_bulk*n_theta,n_phi,2))
- #tmp_2 = np.einsum('m,tp->mtp',kappa_bulk/mfp_bulk/mfp_bulk,domega,optimize=True)#.reshape((n_mfp_bulk*n_theta,n_phi))
-
   
  kdp = np.zeros((n_mfp,n_phi,2))
  kd = np.zeros((n_mfp,n_phi,2))
@@ -125,8 +107,6 @@ def generate_mfp2DSym_2(**argv):
  p = np.arange(n_phi)
 
 
- #sp = np.zeros((n_mfp,n_phi,n_mfp_bulk))  
- #s = np.zeros((n_mfp,n_phi,n_mfp_bulk))  
  g1 = kappa_bulk/mfp_bulk
  g2 = kappa_bulk/mfp_bulk/mfp_bulk
  g3 = ftheta*np.sin(theta)
@@ -136,14 +116,11 @@ def generate_mfp2DSym_2(**argv):
  rr = range(block*comm.rank,n_tot) if comm.rank == comm.size-1 else range(block*comm.rank,block*(comm.rank+1))
 
  #change to mfp
- mfplog = np.log10(mfp)
 
- print('f')
  for t in range(n_theta):
 
    for m in rr:  
        
-      #(m1,a1,m2,a2) = get_linear_indexes(mfplog,np.log10(mfp_bulk[m]*g3[t]))
       (m1,a1,m2,a2) = get_linear_indexes(mfp,mfp_bulk[m]*g3[t])
 
       tmp = g1[m]*dirr[t]

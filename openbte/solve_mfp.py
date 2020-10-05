@@ -57,6 +57,7 @@ def solve_mfp(**argv):
     n_elems = len(mesh['elems'])
     mfp = mat['mfp_sampled']*1e9
     sigma = mat['sigma']*1e9
+    thermalizing = argv.setdefault('thermalizing',True)
 
 
     if comm.rank == 0 and argv['verbose']:
@@ -134,7 +135,8 @@ def solve_mfp(**argv):
 
 
     DeltaTold = DeltaT.copy()
-    TBold = TB.copy()
+    #if len(mesh['db']) > 0: #boundary
+    # TBold = TB.copy()
 
     #T_old = np.tile(DeltaT,(argv['n_parallel'],argv['n_serial']))
 
@@ -178,7 +180,8 @@ def solve_mfp(**argv):
         diffusive = 0
         bal = 0
         DeltaTp = np.zeros_like(DeltaT)
-        TBp = np.zeros_like(TB)
+        if len(mesh['db']) > 0: #boundary
+         TBp = np.zeros_like(TB)
         Jp = np.zeros_like(J)
         kappa_bal,kappa_balp = np.zeros((2,argv['n_parallel']))
         #Sup,Supp   = np.zeros((2,len(mat['kappam'])))
@@ -342,14 +345,16 @@ def solve_mfp(**argv):
         comm.Barrier()
 
         DeltaTold = DeltaT.copy()
-        TBold = TB.copy()
+        #if len(mesh['eb']) > 0:
+        #TBold = TB.copy()
         comm.Allreduce([DeltaTp,MPI.DOUBLE],[DeltaT,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([DeltaTBp,MPI.DOUBLE],[DeltaTB,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([kappap,MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([Mp,MPI.DOUBLE],[MM,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([transitionp,MPI.DOUBLE],[transition,MPI.DOUBLE],op=MPI.SUM)
-        comm.Allreduce([TBp,MPI.DOUBLE],[TB,MPI.DOUBLE],op=MPI.SUM)
+        if len(mesh['eb']) > 0:
+         comm.Allreduce([TBp,MPI.DOUBLE],[TB,MPI.DOUBLE],op=MPI.SUM)
         #comm.Allreduce([Supp,MPI.DOUBLE],[Sup,MPI.DOUBLE],op=MPI.SUM)
         #comm.Allreduce([Supdp,MPI.DOUBLE],[Supd,MPI.DOUBLE],op=MPI.SUM)
         #comm.Allreduce([Supbp,MPI.DOUBLE],[Supb,MPI.DOUBLE],op=MPI.SUM)
@@ -357,8 +362,7 @@ def solve_mfp(**argv):
         comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
 
         if argv.setdefault('save_state',False):
-            np.savez_compressed('state.npz',{'DeltaT':DeltaT,'TB':TB,'kappa_vec':kappa_vec})   
-
+            save_data('state',{'DeltaT':DeltaT,'TB':TB,'kappa_vec':kappa_vec})   
 
         if argv['multiscale'] and comm.rank == 0: print_multiscale(argv,MM) 
 

@@ -97,14 +97,11 @@ class Solver(object):
           else:            
             data = load_data(value)  
         
-          
-          #data['VMFP']  *= 1e9
-          #data['sigma'] *= 1e9
           data['kappa'] = data['kappa'][0:self.dim,0:self.dim] 
           if data['model'][0] == 10 : #full
            data['B'] = np.einsum('i,ij->ij',data['scale'],data['B'].T + data['B'])
          else: data = None
-         #self.__dict__.update(create_shared_memory_dict(data))
+
          self.mat.update({key:create_shared_memory_dict(data)})
          self.set_model(self.mat[key]['model'][0])
         argv['mat'] = self.mat[0]
@@ -124,6 +121,9 @@ class Solver(object):
          self.ff = range(block*comm.rank,self.n_serial) if comm.rank == comm.size-1 else range(block*comm.rank,block*(comm.rank+1))
          if comm.rank == 0 and self.verbose: self.mfp_info()
 
+        elif self.model == 'Fourier':
+          argv['only_fourier'] = True 
+          self.only_fourier = True
 
         elif self.model == 'full': 
          self.n_parallel = len(self.mat[0]['tc'])
@@ -138,7 +138,6 @@ class Solver(object):
         if comm.rank == 0:
           data = self.solve_fourier(self.elem_kappa_map)
 
-          
           variables = {0:{'name':'Temperature Fourier','units':'K','data':data['temperature_fourier'],'increment':-self.mesh['applied_gradient']},\
                        1:{'name':'Flux Fourier'       ,'units':'W/m/m','data':data['flux_fourier'],'increment':[0,0,0]}}
 
@@ -165,27 +164,18 @@ class Solver(object):
          if argv.setdefault('user',False):
             argv['n_serial'] = self.n_serial
             data = argv['solve'](**argv)
-            #data = solve_interface(**argv)
 
          elif self.model[0:3] == 'mfp' or \
             self.model[0:3] == 'Gra' :
             argv['n_serial'] = self.n_serial
-            #a = time.time()
-            #data = self.solve_mfp(**argv) 
-            #quit()
-            #a = time.time()
-            #if argv.setdefault('deviational',False):
-            # data = solve_deviational(**argv) 
-            #else: 
             data = solve_mfp(**argv) 
-            #print(time.time()-a)
+
          elif self.model[0:3] == 'rta':
             argv['n_serial'] = self.n_serial
             data = solve_rta(**argv) 
-            #data = self.solve_rta(**argv)
+
          elif self.model == 'full':
             data = solve_full(**argv) 
-            #data = self.solve_full(**argv)
 
 
          #self.state.update({'kappa':data['kappa_vec']})

@@ -155,16 +155,19 @@ def plot_results(data,nodes,elems,**argv):
             mag = [np.linalg.norm(value) for value in value['data']]
             data_rolled.update({idd:{'name':value['name'] + ' (mag)','data':mag,'units':value['units']}}); idd +=1
 
-       
-       tmp = {'elems':elems,'nodes':nodes,'variables':data_rolled,'fourier':str(round(argv['fourier'],2)),'bulk':str(round(argv['bulk'],2))}
+       tmp = {'elems':elems,'nodes':nodes,'variables':data_rolled,'fourier':argv['fourier'],'bulk':argv['bulk']}
 
        if 'bte' in argv.keys():
-           tmp['bte'] = str(round(argv['bulk'],2))
+           tmp['bte'] = argv['bte']
+
+       data = {argv.setdefault('name','output'):tmp}
+
+       data_tot = {'data':data}
 
 
-       data = {argv.setdefault('name','sample'):tmp}
-       save_data(argv.setdefault('name','output'),data)
+       save_data(argv.setdefault('name','output'),data_tot)
 
+       #data = load_data('output')
 
    # plotly.io.to_image(fig,format='png')
    #fig.write_image("test.png",scale=5)
