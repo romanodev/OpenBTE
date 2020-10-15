@@ -28,7 +28,8 @@ class Solver(object):
         self.state = {}
         self.multiscale = argv.setdefault('multiscale',False)
         #self.umfpack = argv.setdefault('umfpack',False)
-        self.error_multiscale = argv.setdefault('multiscale_error',1e-2)
+        self.error_multiscale_fourier = argv.setdefault('multiscale_error_fourier',5e-2)
+        self.error_multiscale_ballistic = argv.setdefault('multiscale_error_ballistic',1e-2)
         self.bundle = argv.setdefault('bundle',False)
         self.verbose = argv.setdefault('verbose',True)
 
@@ -233,10 +234,11 @@ class Solver(object):
           print(colored('  Relaxation:                              ','green')+ str(self.relaxation_factor),flush=True)
           print(colored('  Keep Lu:                                 ','green')+ str(self.keep_lu),flush=True)
           #print(colored('  Use umfpack                              ','green')+ str(self.umfpack),flush=True)
-          print(colored('  Deviational                              ','green')+ str(self.deviational),flush=True)
+          #print(colored('  Deviational                              ','green')+ str(self.deviational),flush=True)
           print(colored('  Load State                               ','green')+ str(self.load_state),flush=True)
           print(colored('  Save State                               ','green')+ str(self.save_state),flush=True)
-          print(colored('  Multiscale Error:                        ','green')+ str(self.error_multiscale),flush=True)
+          print(colored('  Multiscale Error (Fourier):              ','green')+ str(self.error_multiscale_fourier),flush=True)
+          print(colored('  Multiscale Error (Ballistic):            ','green')+ str(self.error_multiscale_ballistic),flush=True)
           print(colored('  Only Fourier:                            ','green')+ str(self.only_fourier),flush=True)
           print(colored('  Max Fourier Error:                       ','green')+ '%.1E' % (self.max_fourier_error),flush=True)
           print(colored('  Max Fourier Iter:                        ','green')+ str(self.max_fourier_iter),flush=True)

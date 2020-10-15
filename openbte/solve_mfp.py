@@ -109,10 +109,6 @@ def solve_mfp(**argv):
       TB = DeltaT[mesh['eb']]
 
 
-     #for n,i in enumerate(mesh['eb']):
-     #    D[:, i]  += Gbp2[:,n]
-     #    TB[:,n]  = DeltaT[i] 
-
 
     #Periodic---
     sss = np.asarray(mesh['pp'][:,0],dtype=int)
@@ -135,17 +131,12 @@ def solve_mfp(**argv):
 
 
     DeltaTold = DeltaT.copy()
-    #if len(mesh['db']) > 0: #boundary
-    # TBold = TB.copy()
-
-    #T_old = np.tile(DeltaT,(argv['n_parallel'],argv['n_serial']))
 
     Master = sp.csc_matrix((np.arange(len(mesh['im']))+1,(mesh['im'],mesh['jm'])),shape=(n_elems,n_elems),dtype=np.float64)
     conversion = np.asarray(Master.data-1,np.int) 
 
     J = np.zeros((n_elems,argv['dim']))
     alpha = 0.75
-
 
     if argv.setdefault('load_state',False):
       a = np.load('state.npz',allow_pickle=True)
@@ -166,12 +157,7 @@ def solve_mfp(**argv):
         a = time.time()
         
         DeltaT = DeltaTold + (DeltaT - DeltaTold)*argv['boost']
-        #DeltaT = alpha *DeltaT + DeltaTold*(1-alpha)
 
-        
-        #tmp = np.zeros(n_elems)
-        #for n,e in enumerate(mesh['eb']): tmp[e] += TB[n]
-        #argv['TB'] = tmp
        
         #argv['thermal_conductance'] = mat['thermal_conductance']
         if argv['multiscale']: tf,tfg = solve_fourier(mat['mfp_average'],DeltaT,argv)
@@ -188,11 +174,6 @@ def solve_mfp(**argv):
         #Supd,Supdp   = np.zeros((2,len(mat['kappam'])))
         #Supb,Supbp   = np.zeros((2,len(mat['kappam'])))
 
-        #TB = alpha * TB + DeltaTold*(1-alpha)
-        #TB = TB + (TB - TBold)*5
-        #DeltaT = DeltaT
-        #TB = alpha * TB + TBold*(1-alpha)
-
 
         if argv['thermalizing']:
          RHS = -np.einsum('c,nc->nc',TB,Gbm2) if len(mesh['db']) > 0 else  np.zeros((argv['n_serial'],argv['n_parallel'],0))   
@@ -203,8 +184,8 @@ def solve_mfp(**argv):
            
            #Get ballistic kappa
            if argv['multiscale']:
-              kappa_fourier_m =  np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mat['mfp_sampled'],mat['VMFP'][q,0:argv['dim']],tfg)
-
+              kappa_fourier_m =  np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:argv['dim']],tfg)
+              
               #Supdp += np.einsum('m,mu->u',kappa_fourier_m,mat['suppression'][:,q,:])*1e9
               if not argv['thermalizing']:
                B = DeltaT +  mfp[-1]*(P[n] +  get_boundary(RHS[-1,n],mesh['eb'],n_elems))
@@ -224,8 +205,6 @@ def solve_mfp(**argv):
               if len(idx) == 0: idx = [argv['n_serial']-1]
            else: idx = [argv['n_serial']-1]
 
-           #idx = [argv['n_serial']-1]
-           fourier = False
            for m in range(argv['n_serial'])[idx[0]::-1]:
               
                 if not argv['thermalizing']:
@@ -241,43 +220,31 @@ def solve_mfp(**argv):
                 
                 kappap[m,q] = np.dot(mesh['kappa_mask'],X)
                 tmp = np.dot(mesh['kappa_mask'],X)
-                # print(mfp[m],q,kappap[m,q]*1e18)
 
                 if argv['multiscale']:
                 
                  error = abs(tmp - kappa_fourier_m[m])/abs(tmp)
-                 #if q == 10:
-                 #    print(error,m)
-                 if error < argv['multiscale_error'] :#and m <= transition[q]:
+                 error = 0
+                 if error < argv['multiscale_error_fourier'] :#and m <= transition[q]:
                   transitionp[q] = m 
                   #Vectorize
-                  kappap[:m+1,q] = kappa_fourier_m[:m+1]
-                  diffusive += m
-                  Xm = tf[:m+1] - np.einsum('m,i,mci->mc',mat['mfp_sampled'][:m+1],mat['VMFP'][q,:argv['dim']],tfg[:m+1])
-                  DeltaTp += np.einsum('mc,m->c',Xm,mat['tc'][:m+1,q])  
+                  kappap[:m,q] = kappa_fourier_m[:m]
+                  diffusive += m+1
+                  Xm = tf[:m] - np.einsum('m,i,mci->mc',mat['mfp_sampled'][:m],mat['VMFP'][q,:argv['dim']],tfg[:m])
+                  DeltaTp += np.einsum('mc,m->c',Xm,mat['tc'][:m,q])  
 
-                  
-
-                  #for c,i in enumerate(mesh['eb']): TBp[:m+1,c] -= Xm[:m+1,i]*GG[:m+1,q,c]
-                  #np.add.at(TBp[:m+1].T,np.arange(mesh['eb'].shape[0]),-(Xm[:m+1,mesh['eb']]*GG[:m+1,q]).T)
                   if len(mesh['eb']) > 0:
                    if not argv['thermalizing']:
-                    np.add.at(TBp[:m+1].T,np.arange(mesh['eb'].shape[0]),-(Xm[:,mesh['eb']]*GG[:m+1,q]).T)
+                    np.add.at(TBp[:m].T,np.arange(mesh['eb'].shape[0]),-(Xm[:,mesh['eb']]*GG[:m,q]).T)
                    else:
-                    tt = np.einsum('mc,mc->c',Xm[:,mesh['eb']],GG[:m+1,q])   
+                    tt = np.einsum('mc,mc->c',Xm[:,mesh['eb']],GG[:m,q])   
                     np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-tt.T)
 
-                  Jp += np.einsum('mc,mj->cj',Xm,sigma[:m+1,q,0:argv['dim']])*1e-18
+                  Jp += np.einsum('mc,mj->cj',Xm,sigma[:m,q,0:argv['dim']])*1e-18
                   #Supp += np.einsum('m,mu->u',kappap[:m+1,q],mat['suppression'][:m+1,q,:])*1e9
                   break
 
                 DeltaTp += X*mat['tc'][m,q]
-
-                #if m == argv['m_pick']:
-                 #DeltaTBp += X/48
-                # DeltaTBp += X*mat['ang_coeff'][q]
-
-                #for c,i in enumerate(mesh['eb']): TBp[m,c] -= X[i]*GG[m,q,c]
 
                 if len(mesh['eb']) > 0:
                  if not argv['thermalizing']:
@@ -290,8 +257,7 @@ def solve_mfp(**argv):
                 
  
            for m in range(argv['n_serial'])[idx[0]+1:]:
-
-               print('g')
+ 
                if not argv['thermalizing']:
                  B = DeltaT +  mfp[m]*(P[n] +  get_boundary(RHS[m,n],mesh['eb'],n_elems))
                else: 
@@ -303,17 +269,15 @@ def solve_mfp(**argv):
                else:         
                  X = (lu[(m,n)] if (m,n) in lu.keys() else lu.setdefault((m,n),sp.linalg.splu(A))).solve(B)
                  
-
                kappap[m,q] = np.dot(mesh['kappa_mask'],X)
 
                error_bal = abs(kappap[m,q] - kappa_bal)/abs(kappap[m,q])
-               if error_bal < argv['multiscale_error'] and \
-                  abs(kappap[m-1,q] - kappa_bal)/abs(kappap[m-1,q]) < argv['multiscale_error'] and  m > int(len(mat['mfp_sampled'])/2):
+               if error_bal < argv['multiscale_error_ballistic'] and \
+                  abs(kappap[m-1,q] - kappa_bal)/abs(kappap[m-1,q]) < argv['multiscale_error_ballistic'] and  m > int(len(mat['mfp_sampled'])/2):
 
                    kappap[m:,q] = kappa_bal
                    bal += argv['n_serial']-m
                    DeltaTp += X_bal*np.sum(mat['tc'][m:,q])
-                   #for c,i in enumerate(mesh['eb']): TBp[m:,c] -= X_bal[i]*GG[m:,q,c]
 
                    if not argv['thermalizing']:
                     np.add.at(TBp[m:].T,np.arange(mesh['eb'].shape[0]),-(X_bal[mesh['eb']]*GG[m:,q]).T)
@@ -323,7 +287,7 @@ def solve_mfp(**argv):
                    Jp += np.einsum('c,j->cj',X_bal,np.sum(sigma[m:,q,0:argv['dim']],axis=0))*1e-18
                    #Supp += np.einsum('m,mu->u',kappap[m:,q],mat['suppression'][m:,q,:])*1e9
                    break
-
+               
                DeltaTp += X*mat['tc'][m,q]
 
                
@@ -333,7 +297,6 @@ def solve_mfp(**argv):
                  np.add.at(TBp[m],np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
                 else: 
                  np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
-
                   
 
                Jp += np.einsum('c,j->cj',X,sigma[m,q,0:argv['dim']])*1e-18
@@ -345,8 +308,6 @@ def solve_mfp(**argv):
         comm.Barrier()
 
         DeltaTold = DeltaT.copy()
-        #if len(mesh['eb']) > 0:
-        #TBold = TB.copy()
         comm.Allreduce([DeltaTp,MPI.DOUBLE],[DeltaT,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([DeltaTBp,MPI.DOUBLE],[DeltaTB,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
@@ -358,7 +319,8 @@ def solve_mfp(**argv):
         #comm.Allreduce([Supp,MPI.DOUBLE],[Sup,MPI.DOUBLE],op=MPI.SUM)
         #comm.Allreduce([Supdp,MPI.DOUBLE],[Supd,MPI.DOUBLE],op=MPI.SUM)
         #comm.Allreduce([Supbp,MPI.DOUBLE],[Supb,MPI.DOUBLE],op=MPI.SUM)
-        kappa_totp = np.array([np.einsum('mq,mq->',sigma[:,argv['rr'],0],kappa[:,argv['rr']])])
+        #kappa_totp = np.array([np.einsum('mq,mq->',sigma[:,argv['rr'],0],kappa[:,argv['rr']])])
+        kappa_totp = np.array([np.einsum('mq,mq->',sigma[:,argv['rr'],int(mesh['meta'][-1])],kappa[:,argv['rr']])])
         comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
 
         if argv.setdefault('save_state',False):

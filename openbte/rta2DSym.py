@@ -23,6 +23,7 @@ def generate_rta2DSym(**argv):
  #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
  phi = np.linspace(0,2.0*np.pi-Dphi,n_phi,endpoint=True)
 
+ 
  polar_ave = np.array([np.sin(phi),np.cos(phi),np.zeros(n_phi)]).T
 
  #Import data-----------

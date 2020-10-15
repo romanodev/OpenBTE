@@ -10,10 +10,8 @@ import scipy.sparse as sp
 import time
 import sys
 import scipy
-
-
+from matplotlib.pylab import *
 comm = MPI.COMM_WORLD
-
       
 def get_m(Master,data):
     
@@ -121,27 +119,15 @@ def solve_rta(**argv):
 
 
     #T_old = np.tile(DeltaT,(argv['n_parallel'],argv['n_serial']))
-
     Master = sp.csc_matrix((np.arange(len(mesh['im']))+1,(mesh['im'],mesh['jm'])),shape=(n_elems,n_elems),dtype=np.float64)
     conversion = np.asarray(Master.data-1,np.int) 
 
     J = np.zeros((n_elems,argv['dim']))
 
-  
-    #DELTA---
-       
-    #----------------
-
-
+    a1 = []
+    a2 = []
     cache = {}
     while kk < argv['max_bte_iter'] and error > argv['max_bte_error']:
-
-        #for ll in mesh['periodic_sides']:
-        # (k1,k2) = mesh['side_elem_map_vec'][ll] 
-        # DT = abs(DeltaT[k1] - DeltaT[k2])
-        # if DT > 0.1:
-        #print(DT)
-
 
         a = time.time()
         if argv['multiscale']: tf,tfg = solve_fourier(mat['mfp_average'],DeltaT,argv)
@@ -165,7 +151,6 @@ def solve_rta(**argv):
               kappa_fourier_m =  np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:argv['dim']],tfg)
               #Supdp += np.einsum('m,mu->u',kappa_fourier_m,mat['suppression'][:,q,:])*1e9
 
-
               B = DeltaT +  mfp[-1]*(P[n] +get_boundary(RHS[n],mesh['eb'],n_elems))
               A = get_m(Master,np.concatenate((mfp[-1]*Gm[n],mfp[-1]*D[n]+np.ones(n_elems)))[conversion])
               if not argv['keep_lu']:
@@ -175,11 +160,12 @@ def solve_rta(**argv):
 
               kappa_bal = np.dot(mesh['kappa_mask'],X_bal)
 
-              idx = np.argwhere(np.diff(np.sign(kappa_bal*np.ones(argv['n_serial']) - kappa_fourier_m))).flatten()
+              idx = np.argwhere(np.diff(np.sign(kappa_bal*np.ones(argv['n_serial']) - kappa_fourier_m))).flatten()+1
+              idx = min([idx,argv['n_serial']])
               if len(idx) == 0: idx = [argv['n_serial']-1]
            else: idx = [argv['n_serial']-1]
 
-           fourier = False
+
            for m in range(argv['n_serial'])[idx[0]::-1]:
                  
                  B = DeltaT +  mfp[m]*(P[n] +get_boundary(RHS[n],mesh['eb'],n_elems))
@@ -190,10 +176,9 @@ def solve_rta(**argv):
                   X = (lu[(m,n)] if (m,n) in lu.keys() else lu.setdefault((m,n),sp.linalg.splu(A))).solve(B)
 
                  kappap[m,q] = np.dot(mesh['kappa_mask'],X)#-DeltaT)
-
                  if argv['multiscale']:
                   error = abs(kappap[m,q] - kappa_fourier_m[m])/abs(kappap[m,q])
-                  if error < argv['multiscale_error'] and m <= transition[q]:
+                  if error < argv['multiscale_error_fourier'] and m <= transition[q]:
 
                    fourier = True   
                    if argv.setdefault('transition',False):
@@ -202,25 +187,18 @@ def solve_rta(**argv):
                        transitionp[q] = 1e4
 
                    #Vectorize
-                   #kappap[:m+1,q] = kappa_fourier_m[:m+1]
                    kappap[:m,q] = kappa_fourier_m[:m]
-                   diffusive += m
-                   #Xm = tf[:m+1] - np.einsum('m,i,mci->mc',mat['mfp_sampled'][:m+1],mat['VMFP'][q,:argv['dim']],tfg[:m+1])
+                   diffusive += m+1
                    Xm = tf[:m] - np.einsum('m,i,mci->mc',mat['mfp_sampled'][:m],mat['VMFP'][q,:argv['dim']],tfg[:m])
-                   #DeltaTp += np.einsum('mc,m->c',Xm,mat['tc'][:m+1,q])  
                    DeltaTp += np.einsum('mc,m->c',Xm,mat['tc'][:m,q])  
                   
-                   #np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('mc,mc->c',Xm[:,mesh['eb']],GG[:m+1,q]))
-                  
-                   
                    if len(mesh['eb']) > 0:
                     np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('mc,mc->c',Xm[:,mesh['eb']],GG[:m,q]))
-                   #Jp += np.einsum('mc,mj->cj',Xm,sigma[:m+1,q,0:argv['dim']])*1e-18
+                   
                    Jp += np.einsum('mc,mj->cj',Xm,sigma[:m,q,0:argv['dim']])*1e-18
                    break
 
                  DeltaTp += X*mat['tc'][m,q]
-                #for c,i in enumerate(mesh['eb']): TBp[m,c] -= X[i]*GG[m,q,c]
 
                  if len(mesh['eb']) > 0:
                   np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
@@ -242,13 +220,12 @@ def solve_rta(**argv):
                kappap[m,q] = np.dot(mesh['kappa_mask'],X)
 
                error_bal = abs(kappap[m,q] - kappa_bal)/abs(kappap[m,q])
-               if error_bal < argv['multiscale_error'] and \
-                  abs(kappap[m-1,q] - kappa_bal)/abs(kappap[m-1,q]) < argv['multiscale_error'] and  m > int(len(mat['mfp_sampled'])/2):
+               if error_bal < argv['multiscale_error_ballistic'] and \
+                  abs(kappap[m-1,q] - kappa_bal)/abs(kappap[m-1,q]) < argv['multiscale_error_ballistic'] and  m > int(len(mat['mfp_sampled'])/2):
 
                    kappap[m:,q] = kappa_bal
                    bal += argv['n_serial']-m
                    DeltaTp += X_bal*np.sum(mat['tc'][m:,q])
-                   #for c,i in enumerate(mesh['eb']): TBp[m:,c] -= X_bal[i]*GG[m:,q,c]
 
                    np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('c,mc->c',X_bal[mesh['eb']],GG[m:,q]))
 
@@ -258,8 +235,6 @@ def solve_rta(**argv):
 
                DeltaTp += X*mat['tc'][m,q]
                
-               #for c,i in enumerate(mesh['eb']): TBp[m,c] -= X[i]*GG[m,q,c]
-               #np.add.at(TBp[m],np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
                if len(mesh['eb'])>0:
                 np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
 
