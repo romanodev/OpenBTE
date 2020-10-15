@@ -63,21 +63,25 @@ class Material(object):
       data = generate_mfp2D(**argv)
 
     elif model == 'gray2DSym':
-      argv['read_from_file'] = False
-      argv['mfp'] = np.array([argv['mfp']])
-      argv['Kacc'] = np.array([argv['kappa']])
+      #argv['read_from_file'] = False
+      #argv['mfp'] = np.array([argv['mfp']])
+      #argv['Kacc'] = np.array([argv['kappa']])
+      #argv['interpolation'] = False
       data = generate_mfp2DSym(**argv)
 
     elif model == 'gray2D':
-      argv['read_from_file'] = False
-      argv['mfp'] = np.array([argv['mfp']])
-      argv['Kacc'] = np.array([argv['kappa']])
-      data = generate_mfp2D(**argv)
+      #argv['read_from_file'] = False
+      #argv['mfp'] = np.array([argv['mfp']])
+      #argv['Kacc'] = np.array([argv['kappa']])
+      #argv['interpolation'] = False
+      #data = generate_mfp2D(**argv)
+      data = generate_gray2D(**argv)
 
     elif model == 'gray3D':
-      argv['read_from_file'] = False
-      argv['mfp'] = np.array([argv['mfp']])
-      argv['Kacc'] = np.array([argv['kappa']])
+      #argv['read_from_file'] = False
+      #argv['mfp'] = np.array([argv['mfp']])
+      #argv['Kacc'] = np.array([argv['kappa']])
+      #argv['interpolation'] = False
       data = generate_mfp3D(**argv)
 
     elif model == 'mfp3D':

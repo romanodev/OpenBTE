@@ -41,11 +41,12 @@ def get_shape(argv):
 
      elif shape == 'custom':
       #options = argv.setdefault('shape_options',{})
-      options = {key:value[n] for key,value in argv.setdefault('shape_options',{}).items()}
+      options = {key:value[n] if isinstance(value,list) else value for key,value in argv.setdefault('shape_options',{}).items()}
       options.update({'area':area})
 
 
       shapes.append(argv['shape_function'](**options))
+
 
     return shapes  
 

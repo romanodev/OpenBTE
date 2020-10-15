@@ -54,10 +54,38 @@ Additional info/tips:
  
  - Diffuse scattering boundary conditions are applied along the walls of the pores.
 
-A shape can be either a predefined one - including ``square``, ``triangle`` and ``circle`` - or user defined. In the latter case, the option ``shape=custom`` must be used and two additional keywords are to be used, i.e. ``shape_function`` and ``shape_options``, where the options can be used for additional parameters to be used to shape function. Note that the shape coordinates are normalized to :math:`(-0.5,0.5)` both in :math:`x` and :math:`y` coordinates. Lastly, the shape function must at least take the option ``area`` in input, which is internally calculated.
- 
+ - A shape can be either a predefined one - including ``square``, ``triangle`` and ``circle`` - or user defined, as outlined in the next section.
+
+Pores with different size/shapes
+##########################################
+
+When using predefined shapes and multiple pores it is possible to create uneven sizes. To do you, you have to specifiy the option ``area_ratio``, which takes a vector of the relative areas with respect to area set by the porosity. For example:
 
 .. code:: python
+
+   Geometry(model='lattice',lx = 10,ly = 10, step = 0.5, base = [[0.2,0],[-0.2,0]],porosity=0.1,shape='circle',area_ratio=[1,2])
+
+In this case the second pore would be twice as larger as the first one. Optionally, you can also define a vector of shapes, e.g. ``shape=['circle','square']``. An example is reported in Example 1.
+
+
+Custom shapes
+##########################################
+ 
+Custom shapes (which should not be confused with custom geometry mode, defined below) can be created with ``shape=custom``. The user-defined structure is identified with ``shape_function`` and its options, ``shape_options``. An example is reported in the Example section.
+
+Additional info/tips:
+
+  - The shape coordinates are normalized to :math:`(-0.5,0.5)` both in :math:`x` and :math:`y` coordinates.
+  - The shape function must at least take the option ``area`` in input, which is internally calculated, so that the nominal porosity is respected. Note that ``area`` is normalized to the unit square. The workflow is this: 1) decide the porosity of your material 2) based on the option ``area_ratio``, assign a porosity to each pore. If ``area_ratio`` is not assigned, then the porosity of each pore is the porosity of the material. 3) Build your structure using custom options.
+  - The values for ``shape_options`` can also be a ``list`` with the same size as the number of pores. In this case, these values are passed separately to the pores.
+    
+For an example, see Example 2.
+
+
+.. code:: python
+
+   from openbte import Geometry
+   import numpy as np
 
    def shape(options):
     area = options['area']
@@ -79,14 +107,6 @@ A shape can be either a predefined one - including ``square``, ``triangle`` and 
    geo = Geometry(porosity=0.05,lx=100,ly=100,step=5,shape='custom',base=[[0,0]],lz=0,save=False,shape_function=shape,shape_options={'T':0.05})
 
 
-When using predefined shapes and multiple pores it is possible to create uneven sizes. To do you, you have to specifiy the option ``area_ratio``, which takes a vector of the relative areas with respect to area set by the porosity. For example:
-
-.. code:: python
-
-   Geometry(model='lattice',lx = 10,ly = 10, step = 0.5, base = [[0.2,0],[-0.2,0]],porosity=0.1,shape='circle',area_ratio=[1,2])
-
-
-In this case the second pore would be twice as larger as the first one. Optionally, you can also define a vector of shapes, e.g. ``shape=['circle','square']``.
 
 Custom
 -----------------------------------------------------
@@ -94,6 +114,8 @@ Custom
 With the custom model, the structured is defined a series of polygons defining the regions of the material to be carved out. Below is an example 
 
 .. code:: python
+
+   from openbte import Geometry
 
    k = 0.1
    h = 0.1
@@ -105,6 +127,15 @@ With the custom model, the structured is defined a series of polygons defining t
 
 .. image:: carved.png
    :width: 500 px
+
+Note that the coordinates are within the :math:`(-0.5,0.5)` range. 
+
+
+Additional info/tips:
+
+ - If you want to work with unnormalized coordinate use ``relative=False``. 
+ 
+ - Pores that cross the boundaries are repeated. You can turn off this behaviour by using ``repeat=False``. 
 
 
 

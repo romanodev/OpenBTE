@@ -292,7 +292,7 @@ def repeat_merge_scale(argv):
 
 
   #scale-----------------------
-  if argv.setdefault('scale',True):
+  if argv.setdefault('relative',True):
    polygons = []
    for poly in new_poly:
     tmp = []

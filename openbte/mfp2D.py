@@ -56,14 +56,18 @@ def generate_mfp2D(**argv):
 
  #Get options----
  n_phi = int(argv.setdefault('n_phi',48))
- n_mfp = int(argv.setdefault('n_mfp',50))
 
- nm = n_phi * n_mfp
 
  #Create sampled MFPs
  n_mfp_bulk = len(mfp_bulk)
- mfp_sampled = np.logspace(min([-2,np.log10(min(mfp_bulk)*0.99)]),np.log10(max(mfp_bulk)*1.01),n_mfp)#min MFP = 1e-2 nm 
+ if argv.setdefault('interpolation',True):
+  n_mfp = int(argv.setdefault('n_mfp',50))
+  mfp_sampled = np.logspace(min([-2,np.log10(min(mfp_bulk)*0.99)]),np.log10(max(mfp_bulk)*1.01),n_mfp)#min MFP = 1e-2 nm 
+ else:
+  mfp_sampled = mfp_bulk
+  n_mfp = len(mfp_bulk)
 
+ nm = n_phi * n_mfp
  #Polar Angle---------
  Dphi = 2*np.pi/n_phi
  #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
@@ -150,6 +154,8 @@ def generate_mfp2D(**argv):
          'mfp_average':rhs_average*1e18,\
          'VMFP':polar_ave[:,:2],\
          'mfp_sampled':mfp,\
+         'phi':phi,\
+         'directions': polar  ,\
          'sampling': np.array([n_phi,n_mfp]),\
          'model':np.array([5]),\
          'suppression':np.zeros(1),\

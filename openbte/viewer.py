@@ -35,6 +35,7 @@ def add_data(nodes,elems,name,data,units,buttons,fig,nv):
       buttons.append(dict(label=name,
                      method="update",
                      args=[{"visible":visible},]))
+      return  plotly_data
 
 
 def plot_results(data,nodes,elems,**argv):
@@ -55,16 +56,31 @@ def plot_results(data,nodes,elems,**argv):
    buttons = []
    fig = go.Figure()
    current = 0
+   #plotly_tot_tmp = {}
+   
    for key,value in data.items():
-
      if value['data'].ndim == 1: #scalar
-      add_data(nodes,elems,value['name'],value['data'],value['units'],buttons,fig,nv)
+      plotly_data = add_data(nodes,elems,value['name'],value['data'],value['units'],buttons,fig,nv)
+      #plotly_tot_tmp[value['name']] = go.Figureplotly_data
      elif value['data'].ndim == 2 : #vector 
-         add_data(nodes,elems,value['name'] + '(x)',value['data'][:,0],value['units'],buttons,fig,nv)
-         add_data(nodes,elems,value['name'] + '(y)',value['data'][:,1],value['units'],buttons,fig,nv)
-         if dim == 3: add_data(nodes,elems,value['name']+ '(z)',value['data'][:,2],value['units'],buttons,fig,nv)
+         plotly_data = add_data(nodes,elems,value['name'] + '(x)',value['data'][:,0],value['units'],buttons,fig,nv)
+         #plotly_tot_tmp[value['name'] + '(x)'] = plotly_data
+         plotly_data = add_data(nodes,elems,value['name'] + '(y)',value['data'][:,1],value['units'],buttons,fig,nv)
+         #plotly_tot_tmp[value['name'] + '(y)'] = plotly_data
+         if dim == 3: 
+             plotly_data = add_data(nodes,elems,value['name']+ '(z)',value['data'][:,2],value['units'],buttons,fig,nv)
+         #    plotly_tot_tmp[value['name'] + '(z)'] = plotly_data
+
          mag = [np.linalg.norm(value) for value in value['data']]
-         add_data(nodes,elems,value['name'] + '(mag.)',mag,value['units'],buttons,fig,nv)
+         plotly_data = add_data(nodes,elems,value['name'] + '(mag.)',mag,value['units'],buttons,fig,nv)
+         #plotly_tot_tmp[value['name'] + '(mag.)'] = plotly_data
+
+   #add extra data----------
+   #plotly_tot = {'sample_0':{'variables':plotly_tot_tmp,'size':size}}
+   #plotly_tot = {'sample_0':fig}
+   
+   
+   #-----------------------
 
    fig.update_layout(
     font=dict(
@@ -87,7 +103,6 @@ def plot_results(data,nodes,elems,**argv):
 
 
    updatemenus=[dict(direction='down',active=nv-5 if nv > 1 else 0,x=0.4,y=1.15,buttons=list(buttons),showactive=True)]
-   fig.update_layout(updatemenus=updatemenus)
 
 
    #update axes---------------
@@ -136,38 +151,60 @@ def plot_results(data,nodes,elems,**argv):
    fig.update_layout(xaxis_showgrid=False, yaxis_showgrid=False)
    fig.update_layout(scene_camera=camera)
 
+   fig.update_layout(updatemenus=updatemenus)
 
    if argv.setdefault('write_html',False):
     fig.write_html("plotly.html")
 
 
    if argv.setdefault('write_data',False):
-       idd = 0
-       data_rolled = {} 
-       for key,value in data.items():
-        if value['data'].ndim == 1: #scalar
-            data_rolled.update({idd:{'name':value['name'],'data':value['data'],'units':value['units']}}); idd +=1
-        elif value['data'].ndim == 2 : #vector 
-            data_rolled.update({idd:{'name':value['name'] + ' (x)','data':value['data'][:,0],'units':value['units']}}); idd+=1
-            data_rolled.update({idd:{'name':value['name'] + ' (y)','data':value['data'][:,1],'units':value['units']}}); idd+=1
-            if dim == 3: 
-                data_rolled.update({idd:{'name':value['name'] + ' (z)','data':value['data'][:,2],'units':value['units']}}); idd+=1
-            mag = [np.linalg.norm(value) for value in value['data']]
-            data_rolled.update({idd:{'name':value['name'] + ' (mag)','data':mag,'units':value['units']}}); idd +=1
 
-       tmp = {'elems':elems,'nodes':nodes,'variables':data_rolled,'fourier':argv['fourier'],'bulk':argv['bulk']}
-
-       if 'bte' in argv.keys():
-           tmp['bte'] = argv['bte']
-
-       data = {argv.setdefault('name','output'):tmp}
-
-       data_tot = {'data':data}
+       variables = {}
+       for d in fig.data:
+        variables[d['name']]=d
 
 
-       save_data(argv.setdefault('name','output'),data_tot)
+       plotly_tot = {'sample_0':{'variables':variables,'size':size}}
+      
+       save_data('output_new',plotly_tot)
 
-       #data = load_data('output')
+       #plotly.io.write_json(fig,'ff.json')
+       #output = {}
+       #for d in fig.data:
+       # output[d['name']]=go.Figure(data=d).to_json()
+
+       #save_data('output_new',output)
+        
+
+
+       #plotly_tot = {'sample_0':fig}
+
+       #idd = 0
+       #data_rolled = {} 
+       #for key,value in data.items():
+       # if value['data'].ndim == 1: #scalar
+       #     data_rolled.update({idd:{'name':value['name'],'data':value['data'],'units':value['units']}}); idd +=1
+       # elif value['data'].ndim == 2 : #vector 
+       #     data_rolled.update({idd:{'name':value['name'] + ' (x)','data':value['data'][:,0],'units':value['units']}}); idd+=1
+       #     data_rolled.update({idd:{'name':value['name'] + ' (y)','data':value['data'][:,1],'units':value['units']}}); idd+=1
+       #     if dim == 3: 
+       #         data_rolled.update({idd:{'name':value['name'] + ' (z)','data':value['data'][:,2],'units':value['units']}}); idd+=1
+       #     mag = [np.linalg.norm(value) for value in value['data']]
+       #     data_rolled.update({idd:{'name':value['name'] + ' (mag)','data':mag,'units':value['units']}}); idd +=1
+
+       #tmp = {'elems':elems,'nodes':nodes,'variables':data_rolled,'fourier':argv['fourier'],'bulk':argv['bulk']}
+
+       #if 'bte' in argv.keys():
+       #    tmp['bte'] = argv['bte']
+
+       #data = {argv.setdefault('name','output'):tmp}
+
+       #data_tot = {'data':data}
+     
+   
+       #save_data(argv.setdefault('name','output'),data_tot)
+       #save_data('output_new',plotly_tot)
+
 
    # plotly.io.to_image(fig,format='png')
    #fig.write_image("test.png",scale=5)
