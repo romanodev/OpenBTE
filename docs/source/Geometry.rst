@@ -59,19 +59,19 @@ Additional info/tips:
 Pores with different size/shapes
 ##########################################
 
-When using predefined shapes and multiple pores it is possible to create uneven sizes. To do you, you have to specifiy the option ``area_ratio``, which takes a vector of the relative areas with respect to area set by the porosity. For example:
+To have pores with different sizes, you can use the option ``area_ratio``, which takes a list of ``relative`` areas for each pores. Note that the total area will still be set by the porosity. Example:
 
 .. code:: python
 
    Geometry(model='lattice',lx = 10,ly = 10, step = 0.5, base = [[0.2,0],[-0.2,0]],porosity=0.1,shape='circle',area_ratio=[1,2])
 
-In this case the second pore would be twice as larger as the first one. Optionally, you can also define a vector of shapes, e.g. ``shape=['circle','square']``. An example is reported in Example 1.
+In this case the second pore would be twice as large as the first one. Optionally, you can also define a vector of shapes, e.g. ``shape=['circle','square']``. An example is reported in Example 1.
 
 
 Custom shapes
 ##########################################
  
-Custom shapes (which should not be confused with custom geometry mode, defined below) can be created with ``shape=custom``. The user-defined structure is identified with ``shape_function`` and its options, ``shape_options``. An example is reported in the Example section.
+Custom shapes (which should not be confused with custom geometry mode, defined below) can be created with ``shape=custom``. The user-defined structure is identified with ``shape_function`` and its options, ``shape_options``. See Example 2 for further clarifications.
 
 Additional info/tips:
 
