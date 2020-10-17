@@ -33,6 +33,7 @@ class Material(object):
       source = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/openbte/materials/' + argv['filename'] + '_' + str(argv['temperature']) + '_'+ model + '.npz'
       shutil.copyfile(source,os.getcwd() + '/material.npz')
       save = False
+      data = load_data('material')
 
    elif source == 'unlisted':
     if comm.rank == 0:
@@ -63,25 +64,12 @@ class Material(object):
       data = generate_mfp2D(**argv)
 
     elif model == 'gray2DSym':
-      #argv['read_from_file'] = False
-      #argv['mfp'] = np.array([argv['mfp']])
-      #argv['Kacc'] = np.array([argv['kappa']])
-      #argv['interpolation'] = False
       data = generate_mfp2DSym(**argv)
 
     elif model == 'gray2D':
-      #argv['read_from_file'] = False
-      #argv['mfp'] = np.array([argv['mfp']])
-      #argv['Kacc'] = np.array([argv['kappa']])
-      #argv['interpolation'] = False
-      #data = generate_mfp2D(**argv)
       data = generate_gray2D(**argv)
 
     elif model == 'gray3D':
-      #argv['read_from_file'] = False
-      #argv['mfp'] = np.array([argv['mfp']])
-      #argv['Kacc'] = np.array([argv['kappa']])
-      #argv['interpolation'] = False
       data = generate_mfp3D(**argv)
 
     elif model == 'mfp3D':
@@ -99,3 +87,4 @@ class Material(object):
      if comm.rank == 0:
       save_data(argv.setdefault('filename','material'),data)   
 
+   self.data = data

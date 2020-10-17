@@ -22,6 +22,7 @@ class Mesher(object):
    #create polygons-----
    self.add_symmetry(argv) 
    shapes = get_shape(argv)
+
    polygons = [translate_shape(shapes[n],i) for n,i in enumerate(argv['base'])]
    argv.update({'polygons':np.array(polygons)})
    repeat_merge_scale(argv)

@@ -175,7 +175,7 @@ def solve_rta(**argv):
                  else: 
                   X = (lu[(m,n)] if (m,n) in lu.keys() else lu.setdefault((m,n),sp.linalg.splu(A))).solve(B)
 
-                 kappap[m,q] = np.dot(mesh['kappa_mask'],X)#-DeltaT)
+                 kappap[m,q] = np.dot(mesh['kappa_mask'],X-DeltaT)
                  if argv['multiscale']:
                   error = abs(kappap[m,q] - kappa_fourier_m[m])/abs(kappap[m,q])
                   if error < argv['multiscale_error_fourier'] and m <= transition[q]:
