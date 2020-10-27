@@ -34,9 +34,9 @@ class Geometry(object):
      self.import_mesh(**argv)
      self.elem_mat_map = np.zeros(len(self.elems)) #omhogeneous material
     self.update_side_interface()
-    self.data = self.compute_mesh_data(**argv)
+    self.state = self.compute_mesh_data(**argv)
     if argv.setdefault('save',True):
-     save_data('geometry',self.data)   
+     save_data('geometry',self.state)   
 
 
  def compute_boundary_connection(self):
@@ -192,7 +192,7 @@ class Geometry(object):
    self.inti = [];self.intj = []; self.intk = []; 
 
    data = []
- 
+
    ij = []
    for ll in self.side_list['active'] :
      (l1,l2) = self.side_elem_map[ll]
@@ -230,7 +230,7 @@ class Geometry(object):
    self.k = np.array(self.k).T
    self.db = np.array(self.db).T
    self.intk = np.array(self.intk).T
-   
+  
    self.ij = ij
 
 
@@ -265,6 +265,7 @@ class Geometry(object):
    self.nodes = np.array([lines[current_line + n][1:4] for n in range(n_nodes)],float)
    current_line += n_nodes+1 
    self.size = [ np.max(self.nodes[:,i]) - np.min(self.nodes[:,i])   for i in range(3)]
+   
    self.dim = 2 if self.size[2] == 0 else 3
    current_line += 1
    n_elem_tot = int(lines[current_line][0])
@@ -637,7 +638,6 @@ class Geometry(object):
     total_area = 0
     for ll in self.side_list['Periodic']:
      e1,e2 = self.side_elem_map[ll]
-     #normal = self.new_normals[e1][e2]   
      normal = self.face_normals[ll]   
      tmp = np.abs(np.dot(normal,flux_dir))
      if tmp > delta : #either negative or positive
@@ -651,11 +651,13 @@ class Geometry(object):
        elif abs(normal[1]) == 1:
            if self.dim == 2:  
             area_flux = self.size[0]
-           else: 
+           else:
             area_flux = self.size[0]*self.size[2]
 
        self.flux_sides.append(ll)
 
+    
+    
     #-----------------------------------------------
     #----------------------------------------------------------------
     self.side_periodic_value = side_periodic_value

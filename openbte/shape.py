@@ -5,16 +5,28 @@ from .utils import *
 
 def get_shape(argv):
 
-
     
-    shape = argv.setdefault('shape','square')
-   
+    #Vectorize shape if needed
+    shape = argv.setdefault('shape','square') 
     if type(shape) == list:
      assert(len(shape)==len(argv['base']))
      shapes_str = shape
     else:
      shapes_str = len(argv['base'])*[shape]   
 
+    #Vectorize custom shapes if needed
+    n_custom = 0
+    for shape in shapes_str:
+        if shape == 'custom':
+           n_custom +=1
+
+    if n_custom > 0:
+      if type(argv['shape_function']) == list:
+       assert(len(argv['shape_function'])==len(argv['base']))
+      else:
+       argv['shape_function'] = len(argv['base'])*[argv['shape_function']]   
+    #-----------------------
+           
 
     #compute area weigths
     argv.setdefault('area_ratio',np.ones(len(argv['base'])))
@@ -26,6 +38,7 @@ def get_shape(argv):
 
     #-------------------
     shapes = []
+    n_custom = 0
     for n,shape in enumerate(shapes_str):
 
      area= areas[n]
@@ -40,12 +53,13 @@ def get_shape(argv):
        shapes.append(np.array(make_polygon(24,area)))
 
      elif shape == 'custom':
-      #options = argv.setdefault('shape_options',{})
-      options = {key:value[n] if isinstance(value,list) else value for key,value in argv.setdefault('shape_options',{}).items()}
+
+      options = {key:value[n_custom] if isinstance(value,list) else value for key,value in argv.setdefault('shape_options',{}).items()}
+
       options.update({'area':area})
 
-
-      shapes.append(argv['shape_function'](**options))
+      shapes.append(argv['shape_function'][n_custom](**options))
+      n_custom +=1
 
 
     return shapes  

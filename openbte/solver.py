@@ -59,7 +59,7 @@ class Solver(object):
         #-----IMPORT MESH--------------------------------------------------------------
         if comm.rank == 0:
          
-         data = argv['geometry'].data if 'geometry' in argv.keys() else load_data('geometry')
+         data = argv['geometry'] if 'geometry' in argv.keys() else load_data('geometry')
 
 
          self.n_elems = int(data['meta'][0])
@@ -94,7 +94,7 @@ class Solver(object):
           #data = argv['material'].data if 'material' in argv.keys() else dd.io.load(value)
 
           if 'material' in argv.keys():
-            data = argv['material'].data
+            data = argv['material']
           else:            
             data = load_data(value)  
         
@@ -516,13 +516,13 @@ class Solver(object):
       
     (v_orth,v_non_orth) = self.get_decomposed_directions(l,rot=kappa)
 
-    deltaT = temp[i] - (temp[j] + 1)
+    deltaT = temp[i] - temp[j] - 1
+
     kappa_eff -= v_orth *  deltaT * self.mesh['areas'][l]
     w  = self.mesh['interp_weigths'][l]
     grad_ave = w*gradT[i] + (1.0-w)*gradT[j]
 
     kappa_eff += np.dot(grad_ave,v_non_orth)/2 * self.mesh['areas'][l]
-
 
    return kappa_eff*self.kappa_factor
 

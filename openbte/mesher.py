@@ -167,9 +167,9 @@ class Mesher(object):
    boundary_surfaces.append(5)
 
   if argv.setdefault('Periodic',[True,True,True])[1]:
-   strc = r'''Physical Surface('Periodic_3') = {6} ;''' + '\n'
+   strc = r'''Physical Surface('Periodic_3') = {4} ;''' + '\n'
    store.write(strc)
-   strc = r'''Physical Surface('Periodic_4') = {4} ;''' + '\n'
+   strc = r'''Physical Surface('Periodic_4') = {6} ;''' + '\n'
    store.write(strc)
   else:
    boundary_surfaces.append(4)
@@ -733,8 +733,6 @@ class Mesher(object):
              loop_2.append(self.line_exists_ordered(corr[p1],corr[p2]))             
            self.periodic[s1] = [s2,loop_1,loop_2,np.array(per/np.linalg.norm(per))]  
            
-          
-           
            break  
      
       
@@ -868,12 +866,12 @@ class Mesher(object):
         vec.setdefault(2,[]).append(tt) 
         
      if np.array_equal(np.array([0,1,0]),value[3]) : 
-        vec.setdefault(3,[]).append(value[0]) 
-        vec.setdefault(4,[]).append(tt)
+        vec.setdefault(3,[]).append(tt) 
+        vec.setdefault(4,[]).append(value[0])
         
      if np.array_equal(np.array([0,-1,0]),value[3]) : 
-        vec.setdefault(4,[]).append(value[0]) 
-        vec.setdefault(3,[]).append(tt)
+        vec.setdefault(4,[]).append(tt) 
+        vec.setdefault(3,[]).append(value[0])
         
 
      if np.array_equal(np.array([0,0,1]),value[3]) : 
@@ -884,7 +882,6 @@ class Mesher(object):
         vec.setdefault(6,[]).append(value[0]) 
         vec.setdefault(5,[]).append(tt) 
    for key, value in vec.items():
-    
      strc = r'''Physical Surface("Periodic_''' + str(key) + '''") = {'''
      for n,p in enumerate(value) :
       strc +=str(p)

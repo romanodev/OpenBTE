@@ -76,8 +76,9 @@ Custom shapes (which should not be confused with custom geometry mode, defined b
 Additional info/tips:
 
   - The shape coordinates are normalized to :math:`(-0.5,0.5)` both in :math:`x` and :math:`y` coordinates.
+  - Multiple shape functions can also be declared in lists.
   - The shape function must at least take the option ``area`` in input, which is internally calculated, so that the nominal porosity is respected. Note that ``area`` is normalized to the unit square. The workflow is this: 1) decide the porosity of your material 2) based on the option ``area_ratio``, assign a porosity to each pore. If ``area_ratio`` is not assigned, then the porosity of each pore is the porosity of the material. 3) Build your structure using custom options.
-  - The values for ``shape_options`` can also be a ``list`` with the same size as the number of pores. In this case, these values are passed separately to the pores.
+  - The values for ``shape_options`` can also be a ``list`` with the same size as the number of pores with custom shapes. In this case, these values are passed separately to the pores.
     
 For an example, see Example 2.
 

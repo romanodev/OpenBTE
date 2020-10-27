@@ -25,15 +25,16 @@ class Material(object):
 
  def __init__(self,**argv):
 
-   save = True   
+   save = argv.setdefault('save',True)
    model = argv['model']
    source = argv.setdefault('source','local')
    if source == 'database':
     if comm.rank == 0:
-      source = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/openbte/materials/' + argv['filename'] + '_' + str(argv['temperature']) + '_'+ model + '.npz'
-      shutil.copyfile(source,os.getcwd() + '/material.npz')
-      save = False
-      data = load_data('material')
+      filename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/openbte/materials/' + argv['filename'] + '_' + str(argv['temperature']) + '_'+ model  + ".npz"
+      if save:
+       shutil.copyfile(filename,os.getcwd() + '/material'+'.npz')
+      else: 
+       data = load_data(filename[-3:])
 
    elif source == 'unlisted':
     if comm.rank == 0:
@@ -83,8 +84,9 @@ class Material(object):
      if comm.rank == 0:
       data = generate_rta3D(**argv)
 
-   if save:
+   if save and (not source == 'database'):
      if comm.rank == 0:
       save_data(argv.setdefault('filename','material'),data)   
-
-   self.data = data
+   else:
+    if not save:  
+      self.state = data

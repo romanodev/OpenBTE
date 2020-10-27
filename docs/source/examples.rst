@@ -31,7 +31,7 @@ Interactive examples can be run in Google Colab
    Plot(model='maps',repeat=[3,3,1])
 
 .. raw:: html
-
+  
     <iframe src="_static/plotly_1.html" height="475px" width="65%"  display= inline-block  ></iframe>
 
 
@@ -40,18 +40,17 @@ Interactive examples can be run in Google Colab
 
 
 .. code-block:: python
-
+   
    from openbte import Geometry,Material,Solver,Plot
    import numpy as np
 
-   def shape(**options):
+   def shape1(**options):
     area = options['area']
     T = options['T']
     f = np.sqrt(2)
 
     poly_clip = []
     a = area/T/2
-
     poly_clip.append([0,0])
     poly_clip.append([a/f,a/f])
     poly_clip.append([a/f-T*f,a/f])
@@ -59,19 +58,36 @@ Interactive examples can be run in Google Colab
     poly_clip.append([a/f-T*f,-a/f])
     poly_clip.append([a/f,-a/f])
 
-    return poly_clip
+   return poly_clip
 
+
+   def shape2(**options):
+
+    area = options['area']
+    angle = options['angle']
+
+    dphi = np.pi/2
+    L = np.sqrt(area) 
+    poly_clip = []
+    for ka in range(4):
+     ph =  dphi/2 + (ka-1) * dphi + angle
+     px  = L * np.cos(ph) 
+     py  = L * np.sin(ph) 
+     poly_clip.append([px,py])
+
+   return poly_clip  
 
    #Create Material
    Material(source='database',filename='Si',temperature=300,model='rta2DSym')
 
-   Geometry(porosity=0.05,lx=100,ly=100,step=5,model='lattice',shape='custom',base=[[0,0],[0.5,0.5]],shape_function=shape,shape_options={'T':[0.025,0.1]})
+   Geometry(porosity=0.05,lx=100,ly=100,step=5,model='lattice',shape='custom',base=[[0,0],[0.5,0.5]],shape_function=[shape1,shape2],shape_options={'T':[0.05,None],'angle':[None,45]})
 
    #Run the BTE
-   Solver(verbose=True)
+   Solver(verbose=False)
 
    #Plot Maps
-   Plot(model='maps',repeat=[3,3,1])
+   Plot(model='maps',repeat=[3,3,1],show=True,write_html=True)
+
 
 .. raw:: html
 

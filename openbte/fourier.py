@@ -148,6 +148,7 @@ def fourier_scalar(m,kappa,DeltaT,C,argv):
     #   volume = argv['mesh']['volumes'][e]
        #tmp[e] += argv['TB'][n]*area/volume
 
+   
     B = kappa*argv['cache']['RHS_FOURIER'].copy() + DeltaT #+ argv['thermal_conductance'][m]*argv['TB']*area/volume
 
     if m in argv['cache']['SU'].keys():
@@ -163,7 +164,7 @@ def fourier_scalar(m,kappa,DeltaT,C,argv):
 
         RHS = B + C
         temp = SU.solve(RHS)
-        temp = temp - (max(temp)+min(temp))/2.0
+        #temp = temp - (max(temp)+min(temp))/2.0
         kappa_eff = compute_diffusive_thermal_conductivity(argv,temp,1)
         error = abs((kappa_eff - kappa_old)/kappa_eff)
         kappa_old = kappa_eff
@@ -226,8 +227,6 @@ def assemble_fourier(argv):
        jffb.append(i)
        dffb.append(1/vi*area)
        Bb[i] += 1/vi*area
-
-        
 
 
 

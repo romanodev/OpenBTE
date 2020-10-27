@@ -92,10 +92,13 @@ def generate_rta3D(**argv):
 
  rhs_average = mfp_sampled*mfp_sampled/3
 
+ 
+
  return {'tc':temp_coeff,\
          'sigma':kappa_directional,\
          'kappa':kappa,\
          'mfp_average':rhs_average*1e18,\
+         'sampling': np.array([n_phi,n_theta,n_mfp]),\
          'VMFP':direction,\
          'mfp_sampled':mfp_sampled,\
          'model':np.array([9])}

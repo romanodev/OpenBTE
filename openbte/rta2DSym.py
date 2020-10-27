@@ -20,8 +20,8 @@ def generate_rta2DSym(**argv):
  #Create sampled MFPs
  #Polar Angle---------
  Dphi = 2*np.pi/n_phi
- #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
- phi = np.linspace(0,2.0*np.pi-Dphi,n_phi,endpoint=True)
+ phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+ #phi = np.linspace(0,2.0*np.pi-Dphi,n_phi,endpoint=True)
 
  
  polar_ave = np.array([np.sin(phi),np.cos(phi),np.zeros(n_phi)]).T
@@ -32,16 +32,13 @@ def generate_rta2DSym(**argv):
 
  data = load_data('rta')
 
- #kappa = np.einsum('k,ki,kj,k->ij',data['C'],data['v'],data['v'],data['tau'])
  #small cut on MFPs
  mfp_0 = 1e-9
  mfp_bulk = np.einsum('ki,k->ki',data['v'][:,:2],data['tau'])
  I = np.where(np.linalg.norm(mfp_bulk,axis=1) > mfp_0)[0]
-
  tau = data['tau'][I]
  v = data['v'][I]
  C = data['C'][I]
-
  f = np.divide(np.ones_like(tau),tau, out=np.zeros_like(tau), where=tau!=0)
  kappam = np.einsum('u,u,u,u->u',tau,C,v[:,0],v[:,0]) 
  tc = C*f
@@ -53,6 +50,8 @@ def generate_rta2DSym(**argv):
  phi_bulk = np.array([np.arctan2(m[0],m[1]) for m in mfp_bulk])
  phi_bulk[np.where(phi_bulk < 0) ] = 2*np.pi + phi_bulk[np.where(phi_bulk <0)]
  kappa = data['kappa']
+
+
 
  mfp_sampled = np.logspace(np.log10(mfp_0)*1.01,np.log10(max(r)*1.01),n_mfp,endpoint=True)#min MFP = 1e-1 nm
 

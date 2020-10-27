@@ -99,7 +99,15 @@ def plot_results(data,nodes,elems,**argv):
         'xanchor': 'center',
         'yanchor': 'top'})
 
-   fig.update_layout(width=400,height=450,autosize=True,margin=dict(t=20, b=10, l=00, r=20),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
+
+   if argv.setdefault('large',False):
+       x1 = 700
+       x2 = 500
+   else:    
+       x1 = 400
+       x2 = 450
+
+   fig.update_layout(width=x1,height=x2,autosize=True,margin=dict(t=20, b=10, l=00, r=20),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
 
 
    updatemenus=[dict(direction='down',active=nv-5 if nv > 1 else 0,x=0.4,y=1.15,buttons=list(buttons),showactive=True)]
@@ -154,6 +162,7 @@ def plot_results(data,nodes,elems,**argv):
    fig.update_layout(updatemenus=updatemenus)
 
    if argv.setdefault('write_html',False):
+   
     fig.write_html("plotly.html")
 
 
@@ -163,48 +172,11 @@ def plot_results(data,nodes,elems,**argv):
        for d in fig.data:
         variables[d['name']]=d
 
-
        plotly_tot = {'sample_0':{'variables':variables,'size':size}}
       
        save_data('output_new',plotly_tot)
 
        #plotly.io.write_json(fig,'ff.json')
-       #output = {}
-       #for d in fig.data:
-       # output[d['name']]=go.Figure(data=d).to_json()
-
-       #save_data('output_new',output)
-        
-
-
-       #plotly_tot = {'sample_0':fig}
-
-       #idd = 0
-       #data_rolled = {} 
-       #for key,value in data.items():
-       # if value['data'].ndim == 1: #scalar
-       #     data_rolled.update({idd:{'name':value['name'],'data':value['data'],'units':value['units']}}); idd +=1
-       # elif value['data'].ndim == 2 : #vector 
-       #     data_rolled.update({idd:{'name':value['name'] + ' (x)','data':value['data'][:,0],'units':value['units']}}); idd+=1
-       #     data_rolled.update({idd:{'name':value['name'] + ' (y)','data':value['data'][:,1],'units':value['units']}}); idd+=1
-       #     if dim == 3: 
-       #         data_rolled.update({idd:{'name':value['name'] + ' (z)','data':value['data'][:,2],'units':value['units']}}); idd+=1
-       #     mag = [np.linalg.norm(value) for value in value['data']]
-       #     data_rolled.update({idd:{'name':value['name'] + ' (mag)','data':mag,'units':value['units']}}); idd +=1
-
-       #tmp = {'elems':elems,'nodes':nodes,'variables':data_rolled,'fourier':argv['fourier'],'bulk':argv['bulk']}
-
-       #if 'bte' in argv.keys():
-       #    tmp['bte'] = argv['bte']
-
-       #data = {argv.setdefault('name','output'):tmp}
-
-       #data_tot = {'data':data}
-     
-   
-       #save_data(argv.setdefault('name','output'),data_tot)
-       #save_data('output_new',plotly_tot)
-
 
    # plotly.io.to_image(fig,format='png')
    #fig.write_image("test.png",scale=5)
@@ -214,10 +186,6 @@ def plot_results(data,nodes,elems,**argv):
     else:
      fig.show(renderer='browser')
 
-   #if argv.setdefault('show',False):
-   #else:
-   #app = dash.Dash(__name__, external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css'])
-   #app.layout = html.Div(children=[dcc.Graph(figure=fig)])
-   #app.run_server()
 
+   return fig
 
