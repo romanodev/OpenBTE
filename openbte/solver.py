@@ -112,7 +112,6 @@ class Solver(object):
         self.elem_kappa_map = np.array([ list(self.mat[i]['kappa'])  for i in self.mesh['elem_mat_map']])
         #self.elem_kappa_map = np.array([ list(np.eye(2)*self.mat[i]['kappa'][0,0])  for i in self.mesh['elem_mat_map']])
 
-
         if comm.rank == 0 and self.verbose: self.bulk_info()
 
         if self.model[0:3] == 'mfp' or self.model[0:3] == 'rta' or self.model[0:3] == 'Gra':
@@ -541,11 +540,13 @@ class Solver(object):
     print(flush=True)
     print('                       GENERAL INFO',flush=True)
     print(colored(' -----------------------------------------------------------','green'),flush=True)
-    print(colored('  Contact:          ','green') + 'romanog@mit.edu                       ',flush=True) 
-    print(colored('  Source code:      ','green') + 'https://github.com/romanodev/OpenBTE  ',flush=True)
-    print(colored('  Become a sponsor: ','green') + 'https://github.com/sponsors/romanodev ',flush=True)
-    print(colored('  Cloud:            ','green') + 'https://shorturl.at/cwDIP             ',flush=True)
-    print(colored('  Mailing List:     ','green') + 'https://shorturl.at/admB0             ',flush=True)
+    print(colored('  Contact:          ','green') + 'romanog@mit.edu                        ',flush=True) 
+    print(colored('  Source code:      ','green') + 'https://github.com/romanodev/OpenBTE     ',flush=True)
+    print(colored('  Become a sponsor: ','green') + 'https://github.com/sponsors/romanodev    ',flush=True)
+    print(colored('  Documentation:    ','green') + 'https://openbte.readthedocs.io',flush=True)
     print(colored(' -----------------------------------------------------------','green'),flush=True)
+    print('                       WARNINGS',flush=True)
+    print(colored(' -----------------------------------------------------------','green'),flush=True)
+    print(colored('  Material database now refers to bulk data (e.g. rta.npz)  ','red'),flush=True) 
     print(flush=True)   
 

@@ -30,27 +30,25 @@ class Material(object):
    source = argv.setdefault('source','local')
    if source == 'database':
     if comm.rank == 0:
-      filename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/openbte/materials/' + argv['filename'] + '_' + str(argv['temperature']) + '_'+ model  + ".npz"
-      if save:
-       shutil.copyfile(filename,os.getcwd() + '/material'+'.npz')
-      else: 
-       data = load_data(filename[-3:])
+        filename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/openbte/materials/' + model[:3] + '_' +  argv['filename'] + '_' + str(argv['temperature']) + ".npz"
+        shutil.copyfile(filename,os.getcwd() + model[:3] +'.npz')
+      #else: 
+      # data = load_data(filename[-3:])
 
-   elif source == 'unlisted':
+   if source == 'unlisted':
     if comm.rank == 0:
-      download_file(argv['file_id'],'material.npz')
-      save = False
+      download_file(argv['file_id'],'rta.npz')
+      #save = False
    
-   elif source == 'local':
 
-    if model == 'full':
+   if model == 'full':
      if comm.rank == 0:
       data = generate_full(**argv)
 
-    elif model == 'mfp2DSym':
+   elif model == 'mfp2DSym':
       data = generate_mfp2DSym(**argv)
    
-    elif model == 'fourier':
+   elif model == 'fourier':
       
       kappa = np.eye(3)
       if 'kappa' in argv.keys():
@@ -61,32 +59,32 @@ class Material(object):
        kappa[2,2] = argv['kappa_zz']
       data = {'kappa':kappa,'model':[0]}
 
-    elif model == 'mfp2D':
+   elif model == 'mfp2D':
       data = generate_mfp2D(**argv)
 
-    elif model == 'gray2DSym':
+   elif model == 'gray2DSym':
       data = generate_mfp2DSym(**argv)
 
-    elif model == 'gray2D':
+   elif model == 'gray2D':
       data = generate_gray2D(**argv)
 
-    elif model == 'gray3D':
+   elif model == 'gray3D':
       data = generate_mfp3D(**argv)
 
-    elif model == 'mfp3D':
+   elif model == 'mfp3D':
       data = generate_mfp3D(**argv)
 
-    elif model == 'rta2DSym':
+   elif model == 'rta2DSym':
      if comm.rank == 0:
       data = generate_rta2DSym(**argv)
 
-    elif model == 'rta3D':
+   elif model == 'rta3D':
      if comm.rank == 0:
       data = generate_rta3D(**argv)
 
-   if save and (not source == 'database'):
+   if save :
      if comm.rank == 0:
       save_data(argv.setdefault('filename','material'),data)   
    else:
-    if not save:  
+     if comm.rank == 0:
       self.state = data

@@ -64,6 +64,13 @@ NOTE: a multiscale model is coming soon (check back in a few days)
 
    examples
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Scripts
+
+   scripts
+
+
 
 .. toctree::
    :maxdepth: 2

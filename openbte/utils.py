@@ -286,8 +286,6 @@ def repeat_merge_scale(argv):
 
 
   #----------------------------
-
-
   dmin = check_distances(new_poly)
 
 
@@ -379,13 +377,6 @@ def interpolate(vector,value,bounds='extent',period = None):
 
      ai = 1-aj
      return i,ai,j,aj 
-
-
-     
-
-
-
-
 
 
 
