@@ -30,7 +30,7 @@ def generate_rta2DSym(**argv):
  data = load_data('rta')
 
  #small cut on MFPs
- mfp_0 = 1e-10
+ mfp_0 = 1e-9
  mfp_bulk = np.einsum('ki,k->ki',data['v'],data['tau']) #the minimum MFP is calculated on the real MFP
  I = np.where(np.linalg.norm(mfp_bulk,axis=1) > mfp_0)[0]
  tau = data['tau'][I]
@@ -50,7 +50,6 @@ def generate_rta2DSym(**argv):
 
 
  mfp_sampled = np.logspace(np.log10(mfp_0)*1.01,np.log10(max(r)*1.01),n_mfp,endpoint=True)#min MFP = 1e-1 nm
-
  
  #-----------------------
  n_mfp_bulk = len(mfp_bulk) 

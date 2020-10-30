@@ -40,7 +40,7 @@ class Plot(object):
      self.plot_matplotlib(**argv)
 
     elif model == 'kappa_mode':
-        plot_mode_kappa()
+        plot_mode_kappa(**argv)
 
     elif model == 'vtu':
      #self.duplicate_cells(**argv)

@@ -154,11 +154,7 @@ def solve_rta(**argv):
            
            #Get ballistic kappa
            if argv['multiscale']:
-              #kappa_fourier_m =  np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:argv['dim']],tfg)
               kappap_f[:,q] =    np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:argv['dim']],tfg)
-              #kappap_f[:,q] =  - np.einsum('c,m,i,ci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:argv['dim']],compute_grad(DeltaT2,tt))
-              #kappap_f[:,q] =   - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:argv['dim']],tfg)
-              #Supdp += np.einsum('m,mu->u',kappa_fourier_m,mat['suppression'][:,q,:])*1e9
 
               B = DeltaT +  mfp[-1]*(P[n] +get_boundary(RHS[n],mesh['eb'],n_elems))
               A = get_m(Master,np.concatenate((mfp[-1]*Gm[n],mfp[-1]*D[n]+np.ones(n_elems)))[conversion])
@@ -167,7 +163,6 @@ def solve_rta(**argv):
               else: 
                   X_bal = (lu[(-1,n)] if (-1,n) in lu.keys() else lu.setdefault((-1,n),sp.linalg.splu(A))).solve(B)
 
-              #kappa_bal = np.dot(mesh['kappa_mask'],X_bal)
               kappap_b[:,q] = np.dot(mesh['kappa_mask'],X_bal)
 
               #idx = np.argwhere(np.diff(np.sign(kappa_bal*np.ones(argv['n_serial']) - kappap_f[:,q]))).flatten()+1
@@ -184,7 +179,6 @@ def solve_rta(**argv):
 
            else: idx = argv['n_serial']-1
 
-           #idx = argv['n_serial']-1
            for m in range(argv['n_serial'])[idx::-1]:
                  
                  B = DeltaT +  mfp[m]*(P[n] +get_boundary(RHS[n],mesh['eb'],n_elems))
@@ -195,21 +189,18 @@ def solve_rta(**argv):
                   X = (lu[(m,n)] if (m,n) in lu.keys() else lu.setdefault((m,n),sp.linalg.splu(A))).solve(B)
 
                  kappap[m,q] = np.dot(mesh['kappa_mask'],X)
-                 #kappa2p[m,q] = np.dot(mesh['kappa_mask'],X-DeltaT)
                  if argv['multiscale']:
                   error = abs(kappap[m,q] - kappap_f[m,q])/abs(kappap[m,q])
 
+                  if error < argv['multiscale_error_fourier'] and m <= transition[q] and kk==0:
 
-                  if error < argv['multiscale_error_fourier'] and m <= transition[q]:
-
-                   fourier = True   
+                   #fourier = True   
                    if argv.setdefault('transition',False):
                        transitionp[q] = m
                    else:
                        transitionp[q] = 1e4
 
                    #Vectorize
-                   #kappap[:m+1,q] = kappa_fourier_m[:m+1]
                    kappap[:m+1,q] = kappap_f[:m+1,q]
                    diffusive += m+1
                    Xm = tf[:m+1] - np.einsum('m,i,mci->mc',mat['mfp_sampled'][:m+1],mat['VMFP'][q,:argv['dim']],tfg[:m+1])

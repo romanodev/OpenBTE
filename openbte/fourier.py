@@ -179,7 +179,7 @@ def compute_diffusive_thermal_conductivity(temp,kappa,**argv):
    return kappa_eff+k_non_orth*mesh['meta'][1]
 
 
-def solve_convergence(argv,kappa,B,SU):
+def solve_convergence(argv,kappa,B,SU,log=False):
 
     C  = np.zeros_like(B)
 
@@ -192,16 +192,16 @@ def solve_convergence(argv,kappa,B,SU):
     while error > argv['max_fourier_error'] and \
                   n_iter < argv['max_fourier_iter'] :
 
-        argv['grad'] = grad
+        #argv['grad'] = grad
         RHS = B + C
         temp = SU.solve(RHS)
         temp = temp - (max(temp)+min(temp))/2.0
-        
         kappa_eff = compute_diffusive_thermal_conductivity(temp,kappa,**argv)
         error = abs((kappa_eff - kappa_old)/kappa_eff)
         kappa_old = kappa_eff
         n_iter +=1
         C,grad = compute_secondary_flux(temp,kappa,**argv)
+
     return [kappa_eff,error,n_iter],temp,grad 
 
 
@@ -269,10 +269,11 @@ def solve_fourier(kappa,DeltaT,argv):
 
          B  = k*argv['cache']['RHS_FOURIER'].copy() + argv.setdefault('DeltaT',np.zeros(n_elems)) 
          SU = argv['cache']['SU'].setdefault(m,splu(k*argv['cache']['F'] + sp.eye(n_elems)))
-         meta,tf[m,:],tfg[m,:,:] = solve_convergence(argv,k,B,SU)
+         log = True if m == 0 else False
+         meta,tf[m,:],tfg[m,:,:] = solve_convergence(argv,k,B,SU,log=False)
          kappaf = meta[0]
-
-         if m > int(len(kappa)/4) and abs((kappaf-old_kappa))/kappaf < 1e-2:
+         error = abs((kappaf-old_kappa))/kappaf
+         if m > int(len(kappa)/4) and error < 1e-2:
           tf[m:,:]  = tf[m-1]; tfg[m:,:,:] = tfg[m-1] 
           break 
          else:  

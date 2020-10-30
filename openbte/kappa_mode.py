@@ -4,7 +4,7 @@ from pubeasy import MakeFigure
 
 
 
-def plot_mode_kappa():
+def plot_mode_kappa(**argv):
  #-----------------------
  mat = load_data('material')
  data = load_data('rta')
@@ -78,18 +78,16 @@ def plot_mode_kappa():
 
  mfp_nano = np.linalg.norm(mfp_bulk,axis=1)
 
+ if argv.setdefault('show',True):
+  fig = MakeFigure()
+  fig.add_plot(f*1e-12,mfp_nano*1e6,model='scatter',color='r')
+  fig.add_labels('Frequency [THz]','Mean Free Path [$\mu$m]')
+  fig.finalize(grid=True,yscale='log',write = True,show=True,ylim=[1e-4,1e2])
 
- fig = MakeFigure()
- fig.add_plot(f*1e-12,mfp_nano*1e6,model='scatter',color='r')
- fig.add_labels('Frequency [THz]','Mean Free Path [$\mu$m]')
- fig.finalize(grid=True,yscale='log',write = True,show=True,ylim=[1e-4,1e2])
+ if argv.setdefault('save',True):
+     data = {'kappa_nano':kappa_nano,'mfp_nano':mfp_nano,'kappa_fourier':kappa_bulk*ratio,'mfp_bulk':r,'f':f}
+     save_data('kappa_mode',data)
 
- 
-
- return {'kappa_nano':kappa_nano,'mfp_nano':mfp_nano,'kappa_fourier':kappa_bulk*ratio,'mfp_bulk':r,'f':f}
-
-
- #save_data('suppression',{'kappa_nano':kappa_nano,'mfp_nano':mfp_nano,'kappa_fourier':kappa_bulk*ratio,'mfp_bulk':r,'f':f})
 
 
 if __name__ == "__main__":

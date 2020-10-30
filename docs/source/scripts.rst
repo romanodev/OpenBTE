@@ -20,13 +20,19 @@ Extract thermal conductivity
 Extract mode-resolved thermal conductivity
 ############################################
 
+First, you will need to create the ``kappa_mode`` file with
 
 .. code-block:: python
 
    from openbte import Plot
+   from openbte.utils import *
 
-   data = Plot('kappa_mode',show=False)
+   #rta.npz, solver.npz and material.npz must be in your current directory
+   Plot(model='kappa_mode',save=True,show=False)
 
-   #Here are all the data field you can read   
+   #this create kappa_mode.rtz
+   data= load_data('kappa_mode')
+
    print(data.keys())
+
 
