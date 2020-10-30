@@ -39,7 +39,7 @@ class Plot(object):
     elif model == 'matplotlib':
      self.plot_matplotlib(**argv)
 
-    elif model == 'mode-resolved-kappa':
+    elif model == 'kappa_mode':
         plot_mode_kappa()
 
     elif model == 'vtu':

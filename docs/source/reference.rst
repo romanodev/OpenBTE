@@ -1,9 +1,9 @@
 Reference
 ===================================
 
-The paper on OpenBTE is coming soon. Meanwhile, please consider this citation
+The easiest way to support OpenBTE is to star its github repository.
 
-
+The paper on OpenBTE is coming soon. Meanwhile, if you use the code or get inspiration from it please consider this citation
 
 
 .. code-block:: bash

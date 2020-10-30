@@ -2,7 +2,7 @@ import sys
 import numpy as np
 import scipy
 from .utils import *
-
+import time
 
 def generate_rta3D(**argv):
 
@@ -60,6 +60,7 @@ def generate_rta3D(**argv):
  kappa_directional = np.zeros((n_mfp,n_phi*n_theta,3)) 
 
  #We perform three separate linear interpolations
+ a= time.time()
  for m in range(n_mfp_bulk):
 
      (m1,a1,m2,a2) = interpolate(mfp_sampled,r[m],bounds='extent')
@@ -87,6 +88,7 @@ def generate_rta3D(**argv):
      kappa_directional[m1,index_4] += Jc[m]*a1*u4
      kappa_directional[m2,index_3] += Jc[m]*a2*u3
      kappa_directional[m2,index_4] += Jc[m]*a2*u4
+
 
  rhs_average = mfp_sampled*mfp_sampled/3
  
