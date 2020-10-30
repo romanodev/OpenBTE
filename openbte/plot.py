@@ -7,6 +7,7 @@ from .utils import *
 from .viewer import *
 import matplotlib
 from matplotlib.pylab import *
+from .kappa_mode import *
 
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
@@ -37,6 +38,9 @@ class Plot(object):
 
     elif model == 'matplotlib':
      self.plot_matplotlib(**argv)
+
+    elif model == 'mode-resolved-kappa':
+        plot_mode_kappa()
 
     elif model == 'vtu':
      #self.duplicate_cells(**argv)

@@ -21,9 +21,9 @@ RUN cp gmsh-4.5.6-Linux64/bin/gmsh /usr/bin/
 RUN rm -rf gmsh-4.5.6-Linux64
 RUN rm gmsh-4.5.6-Linux64.tgz
 
-COPY openbte-1.83.tar.gz .
-RUN pip install --no-cache openbte-1.83.tar.gz
-RUN rm openbte-1.83.tar.gz
+COPY openbte-1.87.tar.gz .
+RUN pip install --no-cache openbte-1.87.tar.gz
+RUN rm openbte-1.87.tar.gz
 
 RUN useradd -ms /bin/bash openbte
 

@@ -1,14 +1,13 @@
-from openbte import Geometry, Solver, Material, Plot
 import numpy as np
 from openbte.utils import *
+from pubeasy import MakeFigure
 
 
 
-def main():
+def plot_mode_kappa():
  #-----------------------
  mat = load_data('material')
- #data = load_data('rta')
- data = mat['origin']
+ data = load_data('rta')
  mfp_0 = 1e-9
  #I = np.where(np.linalg.norm(mfp_bulk,axis=1) > mfp_0)[0]
  I = np.arange(len(data['tau']))
@@ -79,7 +78,18 @@ def main():
 
  mfp_nano = np.linalg.norm(mfp_bulk,axis=1)
 
- save_data('suppression',{'kappa_nano':kappa_nano/ratio,'mfp_nano':mfp_nano,'kappa_bulk':kappa_bulk,'mfp_bulk':r,'f':f})
+
+ fig = MakeFigure()
+ fig.add_plot(f*1e-12,mfp_nano*1e6,model='scatter',color='r')
+ fig.add_labels('Frequency [THz]','Mean Free Path [$\mu$m]')
+ fig.finalize(grid=True,yscale='log',write = True,show=True,ylim=[1e-4,1e2])
+
+ 
+
+ return {'kappa_nano':kappa_nano,'mfp_nano':mfp_nano,'kappa_fourier':kappa_bulk*ratio,'mfp_bulk':r,'f':f}
+
+
+ #save_data('suppression',{'kappa_nano':kappa_nano,'mfp_nano':mfp_nano,'kappa_fourier':kappa_bulk*ratio,'mfp_bulk':r,'f':f})
 
 
 if __name__ == "__main__":

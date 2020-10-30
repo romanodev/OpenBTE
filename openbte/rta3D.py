@@ -21,8 +21,6 @@ def generate_rta3D(**argv):
  azimuthal = np.array([np.sin(theta),np.sin(theta),np.cos(theta)]).T
  direction = np.einsum('lj,kj->lkj',azimuthal,polar)
  direction = direction.reshape((n_theta * n_phi,3))
- #direction = np.concatenate((direction,np.array([[0,0,1]])),axis=0) #nort pole
- #direction = np.concatenate((direction,np.array([[0,0,-1]])),axis=0) #south pole
  #-------------------
 
  #Import data-----------
@@ -91,7 +89,6 @@ def generate_rta3D(**argv):
      kappa_directional[m2,index_4] += Jc[m]*a2*u4
 
  rhs_average = mfp_sampled*mfp_sampled/3
-
  
 
  return {'tc':temp_coeff,\

@@ -132,8 +132,9 @@ def solve_rta(**argv):
     cache = {}
     while kk < argv['max_bte_iter'] and error > argv['max_bte_error']:
 
-        a = time.time()
+        #a = time.time()
         if argv['multiscale']: tf,tfg = solve_fourier(mat['mfp_average'],DeltaT,argv)
+        #print(time.time()-a)
         #Multiscale scheme-----------------------------
         diffusive = 0
         bal = 0
@@ -196,8 +197,9 @@ def solve_rta(**argv):
                  kappap[m,q] = np.dot(mesh['kappa_mask'],X)
                  #kappa2p[m,q] = np.dot(mesh['kappa_mask'],X-DeltaT)
                  if argv['multiscale']:
-                  #error = abs(kappap[m,q] - kappa_fourier_m[m])/abs(kappap[m,q])
                   error = abs(kappap[m,q] - kappap_f[m,q])/abs(kappap[m,q])
+
+
                   if error < argv['multiscale_error_fourier'] and m <= transition[q]:
 
                    fourier = True   
@@ -251,7 +253,8 @@ def solve_rta(**argv):
                    bal += argv['n_serial']-m
                    DeltaTp += X_bal*np.sum(mat['tc'][m:,q])
 
-                   np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('c,mc->c',X_bal[mesh['eb']],GG[m:,q]))
+                   if len(mesh['eb']) > 0:
+                    np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('c,mc->c',X_bal[mesh['eb']],GG[m:,q]))
 
                    Jp += np.einsum('c,j->cj',X_bal,np.sum(sigma[m:,q,0:argv['dim']],axis=0))*1e-18
                    #Supp += np.einsum('m,mu->u',kappap[m:,q],mat['suppression'][m:,q,:])*1e9

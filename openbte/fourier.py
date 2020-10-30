@@ -6,194 +6,211 @@ from .utils import *
 from mpi4py import MPI
 import scipy.sparse as sp
 import time
-import scikits.umfpack as um
 from scipy.sparse.linalg import lgmres
 import scikits.umfpack as um
 import sys
 from shapely.geometry import LineString
 import scipy
-from .solve_mfp import *
 
 comm = MPI.COMM_WORLD
 
 
+def solve_fourier_single(kappa,**argv):
 
-def compute_grad(temp,argv):
+   mesh = argv['mesh']
+   dim = int(mesh['meta'][2])
+   n_elems = int(mesh['meta'][0])
 
-    #if not 'rr' in argv['cache']:
-
-    rr = [i*[0]   for k,i in enumerate(argv['mesh']['n_side_per_elem']) ]
-
-    for ll in argv['mesh']['active_sides'] :   
-      kc1,kc2 = argv['mesh']['side_elem_map_vec'][ll]
-      #if not kc1 == kc2 :
-      #if 1 == 1:    
-      ind1 = list(argv['mesh']['elem_side_map_vec'][kc1]).index(ll)
-      ind2 = list(argv['mesh']['elem_side_map_vec'][kc2]).index(ll)
-      temp_1 = temp[kc1]
-      temp_2 = temp[kc2]
-
-      if ll in argv['mesh']['periodic_sides']:
-        delta= argv['mesh']['periodic_side_values'][list(argv['mesh']['periodic_sides']).index(ll)]
-      else: 
-       delta = 0   
+   F,B = assemble(mesh,kappa)
+   
+   SU = splu(F.tocsc())
+   meta,temp,grad =  solve_convergence(argv,kappa,B,SU)
+   flux = -np.einsum('cij,cj->ci',kappa,grad)
  
-      #if ll in argv['mesh']['boundary_sides']:
-      #   delta = 1
+   return {'flux_fourier':flux,'temperature_fourier':temp,'meta':np.array(meta),'grad':grad}
 
-      rr[kc1][ind1] = [kc2,kc1,delta] 
-      rr[kc2][ind2] = [kc1,kc2,-delta]
+def get_kappa(mesh,i,j,ll,kappa):
 
-    #argv['cache']['rr'] = rr
+   if i == j:
+    return np.array(kappa[i])
+   
+   dim = int(mesh['meta'][2])
+   normal = mesh['face_normals'][ll,0:dim]
 
-    #for r in rr: print(r)
-    #diff_temp = [[temp[j[0]]-temp[j[1]]+j[2] for j in f] for f in rr]
-    #gradT = np.array([np.einsum('js,s->j',argv['mesh']['weigths'][k,:,:argv['mesh']['n_non_boundary_side_per_elem'][k]],np.array(dt)) for k,dt in enumerate(diff_temp)])
-    diff_temp = [[temp[j[0]]-temp[j[1]]+j[2] for j in f] for f in rr]
-    gradT = np.array([np.einsum('js,s->j',argv['mesh']['weigths'][k,:,:argv['mesh']['n_non_boundary_side_per_elem'][k]],np.array(dt)) for k,dt in enumerate(diff_temp)])
+   kappa_i = np.array(kappa[i])
+   kappa_j = np.array(kappa[j])
 
-    return gradT
+   ki = np.dot(normal,np.dot(kappa_i,normal))
+   kj = np.dot(normal,np.dot(kappa_j,normal))
+   w  = mesh['interp_weigths'][ll]
+
+   kappa_loc = kj*kappa_i/(ki*(1-w) + kj*w)
+
+   return kappa_loc
+
+  
+def get_decomposed_directions(mesh,ll,kappa):
+
+    if np.isscalar(kappa):
+       rot = [] 
+    elif  kappa.ndim == 3:
+       i,j = mesh['side_elem_map_vec'][ll]
+       rot = get_kappa(mesh,i,j,ll,kappa)
+    else:   
+       rot = kappa  
+
+    dim = int(mesh['meta'][2])
+    normal = mesh['face_normals'][ll,0:dim]
+    dist   = mesh['dists'][ll,0:dim]
+
+    if len(rot) == 0: #to speed up a bit
+      v_orth = 1/np.dot(normal,dist)
+      v_non_orth = normal - dist*v_orth
+    else:  
+     rot = rot[:dim,:dim]
+     v_orth = np.dot(normal,np.dot(rot,normal))/np.dot(normal,dist)
+     v_non_orth = np.dot(rot,normal) - dist*v_orth
+
+    
+    return v_orth,v_non_orth[:dim]
 
 
-def compute_secondary_flux(argv,temp,kappa):
+def compute_grad(temp,**argv):
 
+   mesh = argv['mesh'] 
+   
+   #Compute grad
    if not 'rr' in argv['cache']:
 
-    rr = [i*[0]   for k,i in enumerate(argv['mesh']['n_side_per_elem']) ]
+     #Compute deltas-------------------   
+     rr = [i*[0]   for k,i in enumerate(mesh['n_side_per_elem']) ]
 
-    for ll in argv['mesh']['active_sides'] :
-     kc1,kc2 = argv['mesh']['side_elem_map_vec'][ll]
-     ind1 = list(argv['mesh']['elem_side_map_vec'][kc1]).index(ll)
-     ind2 = list(argv['mesh']['elem_side_map_vec'][kc2]).index(ll)
-     temp_1 = temp[kc1]
-     temp_2 = temp[kc2]
-
-     if ll in argv['mesh']['periodic_sides']:
-        delta= argv['mesh']['periodic_side_values'][list(argv['mesh']['periodic_sides']).index(ll)]
-     else: 
-        delta = 0   
-
+     for ll in mesh['active_sides'] :
+      kc1,kc2 = argv['mesh']['side_elem_map_vec'][ll]
+      ind1 = list(mesh['elem_side_map_vec'][kc1]).index(ll)
+      ind2 = list(mesh['elem_side_map_vec'][kc2]).index(ll)
+      if ll in mesh['periodic_sides']:
+         delta = mesh['periodic_side_values'][list(mesh['periodic_sides']).index(ll)]
+      else: delta = 0   
+      rr[kc1][ind1] = [kc2,kc1,delta] 
+      rr[kc2][ind2] = [kc1,kc2,-delta] 
  
-     rr[kc1][ind1] = [kc2,kc1,delta] 
-     rr[kc2][ind2] = [kc1,kc2,-delta] 
+     argv['cache']['rr'] = rr
+   else:
+     rr = argv['cache']['rr']  
 
-    argv['cache']['rr'] = rr
 
 
-   diff_temp = [[temp[j[0]]-temp[j[1]]+j[2] for j in f] for f in argv['cache']['rr']]
-   gradT = np.array([np.einsum('js,s->j',argv['mesh']['weigths'][k,:,:argv['mesh']['n_non_boundary_side_per_elem'][k]],np.array(dt)) for k,dt in enumerate(diff_temp)])
-   #-----------------------------------------------------
+   diff_temp = [[temp[j[0]]-temp[j[1]]+j[2] for j in f] for f in rr]
+   gradT = np.array([np.einsum('js,s->j',mesh['weigths'][k,:,:mesh['n_non_boundary_side_per_elem'][k]],np.array(dt)) for k,dt in enumerate(diff_temp)])
+   return gradT
+
+
+
+
+def compute_secondary_flux(temp,kappa,**argv):
+
+   
+   #Compute gradient
+   gradT = compute_grad(temp,**argv)
+   #--------------
+
+   mesh = argv['mesh'] 
+   cache = argv['cache'] 
+   dim = int(mesh['meta'][2])
+   n_elems = len(argv['mesh']['elems'])
 
    #-----------SAVE some time--------------------------------------
-   if not 'v_non_orth' in argv['cache'].keys():
+   if not 'v_non_orth' in cache.keys():
     v_non_orth = {}
-    for ll in argv['mesh']['active_sides']:
-      (i,j) = argv['mesh']['side_elem_map_vec'][ll]
+    for ll in mesh['active_sides']:
+      (i,j) = mesh['side_elem_map_vec'][ll]
       if not i==j:
-       area = argv['mesh']['areas'][ll]   
-       normal = argv['mesh']['face_normals'][ll,0:argv['dim']]
-       dist   = argv['mesh']['dists'][ll,0:argv['dim']]
-       v_orth = 1/np.dot(normal,dist)
-       v_non_orth[ll] = ((normal - dist*v_orth)*area)[:argv['dim']]
-    argv['cache']['v_non_orth'] = v_non_orth
+
+       (v_orth,v_non_orth[ll]) = get_decomposed_directions(mesh,ll,kappa)
+
+       area   = mesh['areas'][ll]   
+       normal = mesh['face_normals'][ll,0:dim]
+       dist   = mesh['dists'][ll,0:dim]
+    cache['v_non_orth'] = v_non_orth
    #-----------------------------------------------------------------
 
-   C = np.zeros(argv['n_elems'])
-   for ll in argv['mesh']['active_sides']:
-      (i,j) = argv['mesh']['side_elem_map_vec'][ll]
+   C = np.zeros(n_elems)
+   for ll in mesh['active_sides']:
+      area = mesh['areas'][ll] 
+      (i,j) = mesh['side_elem_map_vec'][ll]
       if not i==j:
-       w = argv['mesh']['interp_weigths'][ll]
-       F_ave = (w*gradT[i] + (1.0-w)*gradT[j])*kappa
-       tmp = np.dot(F_ave,argv['cache']['v_non_orth'][ll])
+       w =  mesh['interp_weigths'][ll]
+       F_ave = (w*gradT[i] + (1.0-w)*gradT[j])
+       tmp = np.dot(F_ave,cache['v_non_orth'][ll])*area
        C[i] += tmp
        C[j] -= tmp
 
-   return C/argv['mesh']['volumes'],gradT
+   return C/mesh['volumes'],gradT
 
 
 
 
-def compute_diffusive_thermal_conductivity(argv,temp,kappa):
+def compute_diffusive_thermal_conductivity(temp,kappa,**argv):
 
+
+   mesh = argv['mesh']  
+   dim = int(mesh['meta'][2])
    kappa_eff = 0
-   for ll in argv['mesh']['flux_sides']:
+   k_non_orth = 0
+   for ll in mesh['flux_sides']:
 
-    (i,j) = argv['mesh']['side_elem_map_vec'][ll]
+    (i,j) = mesh['side_elem_map_vec'][ll]
+    area = mesh['areas'][ll]
 
-    normal = argv['mesh']['face_normals'][ll]
-    dist   = argv['mesh']['dists'][ll]
-    v_orth = 1/np.dot(normal,dist)
-    deltaT = temp[i] - (temp[j] + 1)
+    (v_orth,v_non_orth) = get_decomposed_directions(mesh,ll,kappa)
 
-    kappa_eff -= kappa * v_orth *  deltaT * argv['mesh']['areas'][ll]
-    w  = argv['mesh']['interp_weigths'][ll]
+    deltaT = temp[i] - temp[j] - 1
+    kappa_eff -= v_orth *  deltaT * area
 
-   return kappa_eff*argv['kappa_factor']
+    if 'grad' in argv.keys():
+     gradT = argv['grad']  
+     w  =  mesh['interp_weigths'][ll]
+     grad_ave = w*gradT[i] + (1.0-w)*gradT[j]
+     k_non_orth += np.dot(grad_ave,v_non_orth)/2 * area
+
+   #print(kappa_eff,k_non_orth,kappa_eff+k_non_orth)
+
+   return kappa_eff+k_non_orth*mesh['meta'][1]
 
 
+def solve_convergence(argv,kappa,B,SU):
 
-def fourier_scalar(m,kappa,DeltaT,C,argv):
+    C  = np.zeros_like(B)
 
-    C *=kappa 
-    n_elems = len(argv['mesh']['elems'])
-    dim = int(argv['mesh']['meta'][2])
+    mesh = argv['mesh']   
+    n_elems = len(mesh['elems'])
+    dim = int(mesh['meta'][2])
+    grad = np.zeros((n_elems,dim))
 
-    n_iter = 0
-    kappa_old = 0
-    error = 1  
-
-    #tmp = np.zeros(n_elems)
-    #for n,e in enumerate(argv['mesh']['eb']):
-    #   area = argv['mesh']['areas'][argv['mesh']['eb'][n]]
-    #   volume = argv['mesh']['volumes'][e]
-       #tmp[e] += argv['TB'][n]*area/volume
-
-   
-    B = kappa*argv['cache']['RHS_FOURIER'].copy() + DeltaT #+ argv['thermal_conductance'][m]*argv['TB']*area/volume
-
-    if m in argv['cache']['SU'].keys():
-        SU = argv['cache']['SU'][m]
-    else:
-        F = kappa*argv['cache']['F'] + sp.eye(n_elems) #+ argv['thermal_conductance'][m]* kappa*argv['cache']['F_B']
-        argv['cache']['SU'][m] = splu(F)
-    SU = argv['cache']['SU'][m]
-
-   
+    n_iter = 0;kappa_old = 0;error = 1  
     while error > argv['max_fourier_error'] and \
                   n_iter < argv['max_fourier_iter'] :
 
+        argv['grad'] = grad
         RHS = B + C
         temp = SU.solve(RHS)
-        #temp = temp - (max(temp)+min(temp))/2.0
-        kappa_eff = compute_diffusive_thermal_conductivity(argv,temp,1)
+        temp = temp - (max(temp)+min(temp))/2.0
+        
+        kappa_eff = compute_diffusive_thermal_conductivity(temp,kappa,**argv)
         error = abs((kappa_eff - kappa_old)/kappa_eff)
         kappa_old = kappa_eff
         n_iter +=1
-        C,grad = compute_secondary_flux(argv,temp,kappa)
-
-    flux = -grad*kappa
-    return kappa_eff,temp,grad,C/kappa
+        C,grad = compute_secondary_flux(temp,kappa,**argv)
+    return [kappa_eff,error,n_iter],temp,grad 
 
 
-def assemble_fourier(argv):
+def assemble(mesh,kappa):
 
-  if not 'cache' in argv.keys():
-    mesh = argv['mesh']
-
-    cache = {}
-    
-    iff = []
-    jff = []
-    dff = []
-
-
-    iffb = []
-    jffb = []
-    dffb = []
+    iff = [];jff = [];dff = []
 
     n_elems = len(mesh['elems'])
     B = np.zeros(n_elems)
-    Bb = np.zeros(n_elems)
     for ll in mesh['active_sides']:
 
       area = mesh['areas'][ll] 
@@ -202,9 +219,7 @@ def assemble_fourier(argv):
       vj = mesh['volumes'][j]
       if not i == j:
 
-       normal = mesh['face_normals'][ll]
-       dist   = mesh['dists'][ll]
-       v_orth = 1/np.dot(normal,dist)
+       (v_orth,dummy) = get_decomposed_directions(mesh,ll,kappa)
 
        iff.append(i)
        jff.append(i)
@@ -222,37 +237,41 @@ def assemble_fourier(argv):
         kk = list(mesh['periodic_sides']).index(ll)   
         B[i] += mesh['periodic_side_values'][kk]*v_orth/vi*area
         B[j] -= mesh['periodic_side_values'][kk]*v_orth/vj*area
-      else:  
-       iffb.append(i)
-       jffb.append(i)
-       dffb.append(1/vi*area)
-       Bb[i] += 1/vi*area
 
+    F = sp.csc_matrix((np.array(dff),(np.array(iff),np.array(jff))),shape = (n_elems,n_elems))
 
+    return F,B
 
-    cache['RHS_FOURIER'] =B   
-    cache['RHS_FOURIER_B'] =Bb
-    cache['F'] = sp.csc_matrix((np.array(dff),(np.array(iff),np.array(jff))),shape = (n_elems,n_elems))
-    cache['F_B'] = sp.csc_matrix((np.array(dffb),(np.array(iffb),np.array(jffb))),shape = (n_elems,n_elems))
-    cache['SU'] = {}
-    argv.update({'cache':cache})
-    
 
 
 def solve_fourier(kappa,DeltaT,argv):
 
+    argv['DeltaT'] = DeltaT
+
+    n_elems = len(argv['mesh']['elems'])
 
     tf = shared_array(np.zeros((argv['n_serial'],argv['n_elems'])) if comm.rank == 0 else None)
     tfg = shared_array(np.zeros((argv['n_serial'],argv['n_elems'],argv['dim'])) if comm.rank == 0 else None)
 
     if comm.rank == 0:
 
-     assemble_fourier(argv)
-
+     if len(argv['cache']):
+      mesh = argv['mesh']
+      cache = {}
+      F,B = assemble(mesh,1)
+      cache['RHS_FOURIER'] =B   
+      cache['F'] = F
+      cache['SU'] = {}
+      argv.update({'cache':cache})
+    
      old_kappa = 0
-     C = np.zeros(argv['n_elems'])
      for m,k in enumerate(kappa):
-         kappaf,tf[m,:],tfg[m,:,:],C = fourier_scalar(m,k,DeltaT,C,argv)
+
+         B  = k*argv['cache']['RHS_FOURIER'].copy() + argv.setdefault('DeltaT',np.zeros(n_elems)) 
+         SU = argv['cache']['SU'].setdefault(m,splu(k*argv['cache']['F'] + sp.eye(n_elems)))
+         meta,tf[m,:],tfg[m,:,:] = solve_convergence(argv,k,B,SU)
+         kappaf = meta[0]
+
          if m > int(len(kappa)/4) and abs((kappaf-old_kappa))/kappaf < 1e-2:
           tf[m:,:]  = tf[m-1]; tfg[m:,:,:] = tfg[m-1] 
           break 
@@ -261,3 +280,6 @@ def solve_fourier(kappa,DeltaT,argv):
 
     comm.Barrier()
     return tf,tfg
+
+
+
