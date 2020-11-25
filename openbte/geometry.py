@@ -26,8 +26,15 @@ class Geometry(object):
    else:    
     if argv.setdefault('user',False):
      self.import_mesh(**argv)
+   
+     #Create elem map--
      argv.update({'centroids':self.elem_centroids})
-     self.elem_mat_map = argv['correlation'](**argv)
+     interface = argv['interface']
+     argv.update(interface['options'])
+     argv.update({'centroids':self.elem_centroids})
+     self.elem_mat_map = interface['structure'](**argv)
+     #------------------
+
     else:
      Mesher(argv) #this create mesh.msh
      self.dmin = argv['dmin']

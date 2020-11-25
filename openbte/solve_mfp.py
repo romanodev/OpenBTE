@@ -91,7 +91,7 @@ def solve_mfp(**argv):
     np.add.at(D.T,mesh['i'],Gp.T)
 
     DeltaT = fourier['temperature_fourier'].copy()
-    GradT = compute_grad(DeltaT,argv)
+    #GradT = compute_grad(DeltaT,argv)
 
     #--------------------------
 
@@ -341,7 +341,7 @@ def solve_mfp(**argv):
 
    
 
-    output =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J,'kappa_mode':kappa-np.dot(mesh['kappa_mask'],DeltaT),'pseudo':compute_grad(DeltaTB,argv),'GradT':GradT,'DeltaT':DeltaTB}
+    output =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J,'kappa_mode':kappa-np.dot(mesh['kappa_mask'],DeltaT),'pseudo':compute_grad(DeltaTB,argv),'DeltaT':DeltaTB}
     #if argv['multiscale']:   
     #    output.update({'suppression_diffusive':Supd,'suppression_ballistic':Supb})
 

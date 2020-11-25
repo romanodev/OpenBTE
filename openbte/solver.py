@@ -98,7 +98,7 @@ class Solver(object):
             data = argv['material']
           else:            
             data = load_data(value)  
-        
+       
           data['kappa'] = data['kappa'][0:self.dim,0:self.dim] 
           if data['model'][0] == 10 : #full
            data['B'] = np.einsum('i,ij->ij',data['scale'],data['B'].T + data['B'])
@@ -344,64 +344,6 @@ class Solver(object):
 
 
 
-  def compute_secondary_flux(self,temp,kappa):
-
-
-   diff_temp = []
-   for i in self.mesh['side_per_elem']:
-       diff_temp.append(i*[0])
-
-   a = time.time()
-   for ll in self.mesh['active_sides'] :
-    elems = self.mesh['side_elem_map_vec'][ll]
-    kc1 = elems[0]
-    c1 = self.mesh['centroids'][kc1]
-
-    ind1 = list(self.mesh['elem_side_map_vec'][kc1]).index(ll)
-    if not ll in self.mesh['boundary_sides']: 
-     kc2 = elems[1]
-     ind2 = list(self.mesh['elem_side_map_vec'][kc2]).index(ll)
-     temp_1 = temp[kc1]
-     temp_2 = temp[kc2]
-
-     if ll in self.mesh['periodic_sides']:
-      temp_2 += self.mesh['periodic_side_values'][list(self.mesh['periodic_sides']).index(ll)]
-
-     diff_t = temp_2 - temp_1
-     diff_temp[kc1][ind1]  = diff_t
-     diff_temp[kc2][ind2]  = -diff_t
-
-   gradT = np.zeros((self.n_elems,self.dim))
-   for k,dt in enumerate(diff_temp):
-    gradT[k] = np.einsum('js,s->j',self.mesh['weigths'][k,:,:self.mesh['side_per_elem'][k]],np.array(dt))
-
-   #-----------------------------------------------------
-   F_ave = np.zeros((len(self.mesh['sides']),self.dim))
-   for ll in self.mesh['active_sides']:
-      (i,j) = self.mesh['side_elem_map_vec'][ll]
-      if not i==j:
-       kappa_loc = get_kappa(self.mesh,i,j,ll,kappa)
-       w = self.mesh['interp_weigths'][ll]
-       F_ave[ll] = w*gradT[i] + (1.0-w)*gradT[j]
-    
-
-   C = np.zeros(self.n_elems)
-   for ll in self.mesh['active_sides']:
-    (i,j) = self.mesh['side_elem_map_vec'][ll]
-    if not i==j:
-      kappa_loc = get_kappa(self.mesh,i,j,ll,kappa)
-      area = self.mesh['areas'][ll]   
-      (dummy,v_non_orth) = get_decomposed_directions(self.mesh,ll,rot=kappa_loc)
-      tmp = np.dot(F_ave[ll],v_non_orth)*area
-      C[i] += tmp/self.mesh['volumes'][i]
-      C[j] -= tmp/self.mesh['volumes'][j]
-
-
-   return C,gradT
-
-
-
-
   def print_logo(self):
 
 
@@ -426,4 +368,3 @@ class Solver(object):
     print(colored(' -----------------------------------------------------------','green'),flush=True)
     print(colored('  Material database now refers to bulk data (e.g. rta.npz)  ','red'),flush=True) 
     print(flush=True)   
-

@@ -66,7 +66,7 @@ def create_loop(loops,line_list,store):
    return strc
 
 
-def create_line_list(pp,points,lines,store,lx,ly):
+def create_line_list(pp,points,lines,store,lx,ly,step_label = 'h'):
 
    def line_exists_ordered_old(l,lines):
     for n,line in enumerate(lines) :
@@ -99,7 +99,7 @@ def create_line_list(pp,points,lines,store,lx,ly):
 
    for k,p in enumerate(p_list):
      point = points[-len(p_list)+k] 
-     store.write( 'Point('+str(len(points)-len(p_list)+k) +') = {' + str(point[0]/lx) +'*lx,'+ str(point[1]/ly)+'*ly,0,h};\n')
+     store.write( 'Point('+str(len(points)-len(p_list)+k) +') = {' + str(point[0]/lx) +'*lx,'+ str(point[1]/ly)+'*ly,0,' + step_label + '};\n')
 
    line_list = []
    for l in range(len(p_list)):

@@ -46,7 +46,7 @@ The created file ``output.vtk`` can be read by Paraview_
 
 Mode-resolved effective thermal conductivity
 ############################################
-Once you have calculated the effective thermal conductivity, you may want to interpolate back the results on the original mode-resolved grid (e.g. the one used for bulk). You can do so with the script ``kappa_mode``.
+Once you have calculated the effective thermal conductivity, you may want to interpolate back the results on the original mode-resolved grid (e.g. the one used for bulk). You can do so with the model ``kappa_mode``.
 
 .. code:: python
 

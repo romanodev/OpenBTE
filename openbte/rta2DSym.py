@@ -13,7 +13,7 @@ def generate_rta2DSym(**argv):
  #Get options----
  n_phi = int(argv.setdefault('n_phi',48))
  n_mfp = int(argv.setdefault('n_mfp',50))
- n_theta = 24
+ n_theta = 48
 
  nm = n_phi * n_mfp
 
@@ -21,7 +21,6 @@ def generate_rta2DSym(**argv):
  #Polar Angle---------
  Dphi = 2*np.pi/n_phi
  phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
-
  
  polar_ave = np.array([np.sin(phi),np.cos(phi),np.zeros(n_phi)]).T
 
@@ -30,7 +29,8 @@ def generate_rta2DSym(**argv):
  data = load_data('rta')
 
  #small cut on MFPs
- mfp_0 = 1e-9
+ mfp_0 = 1e-10
+ mfp_max = 1e-4
  mfp_bulk = np.einsum('ki,k->ki',data['v'],data['tau']) #the minimum MFP is calculated on the real MFP
  I = np.where(np.linalg.norm(mfp_bulk,axis=1) > mfp_0)[0]
  tau = data['tau'][I]
@@ -49,7 +49,8 @@ def generate_rta2DSym(**argv):
  kappa = data['kappa']
 
 
- mfp_sampled = np.logspace(np.log10(mfp_0)*1.01,np.log10(max(r)*1.01),n_mfp,endpoint=True)#min MFP = 1e-1 nm
+ #mfp_sampled = np.logspace(np.log10(mfp_0)*1.01,np.log10(max(r)*1.01),n_mfp,endpoint=True)#min MFP = 1e-1 nm
+ mfp_sampled = np.logspace(np.log10(mfp_0)*1.01,np.log10(mfp_max),n_mfp,endpoint=True)#min MFP = 1e-1 nm
  
  #-----------------------
  n_mfp_bulk = len(mfp_bulk) 
@@ -102,11 +103,13 @@ def generate_rta2DSym(**argv):
 
  lo_cut = np.sum(tc[r<mfp_0])
  
- temp_coeff *=(1+lo)
+ temp_coeff *=(1+lo_cut)
+
+ assert(abs(np.sum(temp_coeff)) -1 < 1e-5)
+ #Adjusment for numerical stability temp_coeff /= np.sum(temp_coeff)
 
  rhs_average = mfp_sampled*mfp_sampled/2
 
-    
  output =  {'tc':temp_coeff,\
          'sigma':kappa_directional,\
          'kappa':kappa,\

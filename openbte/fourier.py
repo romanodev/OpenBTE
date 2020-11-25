@@ -9,25 +9,45 @@ import time
 from scipy.sparse.linalg import lgmres
 import scikits.umfpack as um
 import sys
-from shapely.geometry import LineString
+#from shapely.geometry import LineString
 import scipy
+from cachetools import cached
+from cachetools.keys import hashkey
+
 
 comm = MPI.COMM_WORLD
 
+@cached(cache={}, key=lambda F, k: hashkey(k))
+def get_SU(F,k):
+     return splu(k*F + sp.eye(F.shape[0]))
+
+
+def get_key(ll,kappa):
+
+   if  kappa.ndim == 3:
+     kappa = kappa[0]  
+
+   return (ll,tuple(map(tuple,kappa)))
+
+def unpack(data):
+
+    return data[0],np.array(data[1])
 
 def solve_fourier_single(kappa,**argv):
 
+    
    mesh = argv['mesh']
    dim = int(mesh['meta'][2])
    n_elems = int(mesh['meta'][0])
 
-   F,B = assemble(mesh,kappa)
+   F,B = assemble(mesh,tuple(map(tuple,kappa[0])))
    
-   SU = splu(F.tocsc())
-   meta,temp,grad =  solve_convergence(argv,kappa,B,SU)
+   meta,temp,grad =  solve_convergence(argv,kappa,B,splu(F))
+
    flux = -np.einsum('cij,cj->ci',kappa,grad)
- 
    return {'flux_fourier':flux,'temperature_fourier':temp,'meta':np.array(meta),'grad':grad}
+
+
 
 def get_kappa(mesh,i,j,ll,kappa):
 
@@ -48,60 +68,72 @@ def get_kappa(mesh,i,j,ll,kappa):
 
    return kappa_loc
 
-  
-def get_decomposed_directions(mesh,ll,kappa):
+
+def get_kappa_tensor(mesh,ll,kappa):
+
 
     if np.isscalar(kappa):
-       rot = [] 
+       rot = kappa*np.eye(3) 
     elif  kappa.ndim == 3:
        i,j = mesh['side_elem_map_vec'][ll]
        rot = get_kappa(mesh,i,j,ll,kappa)
     else:   
        rot = kappa  
 
+    return rot   
+
+
+@cached(cache={}, key=lambda mesh,kappa_ll:hashkey(kappa_ll))
+def get_decomposed_directions(mesh,kappa_ll):
+
+    ll,kappa = unpack(kappa_ll)
+
+    kappa_map = get_kappa_tensor(mesh,ll,kappa)
+
     dim = int(mesh['meta'][2])
     normal = mesh['face_normals'][ll,0:dim]
     dist   = mesh['dists'][ll,0:dim]
 
-    if len(rot) == 0: #to speed up a bit
-      v_orth = 1/np.dot(normal,dist)
-      v_non_orth = normal - dist*v_orth
-    else:  
-     rot = rot[:dim,:dim]
-     v_orth = np.dot(normal,np.dot(rot,normal))/np.dot(normal,dist)
-     v_non_orth = np.dot(rot,normal) - dist*v_orth
-
+    rot = kappa_map[:dim,:dim]
+    v_orth = np.dot(normal,np.dot(rot,normal))/np.dot(normal,dist)
+    v_non_orth = np.dot(rot,normal) - dist*v_orth
     
     return v_orth,v_non_orth[:dim]
+
+
+
+
+@cached(cache={},key=lambda mesh,dummy:dummy)
+def compute_grad_data(mesh,dummy):
+
+     #Compute deltas-------------------   
+     rr = []
+     for i in mesh['side_per_elem']:
+       rr.append(i*[0])
+
+     #this is wrong
+
+     for ll in mesh['active_sides'] :
+      kc1,kc2 = mesh['side_elem_map_vec'][ll]
+      ind1 = list(mesh['elem_side_map_vec'][kc1]).index(ll)
+      ind2 = list(mesh['elem_side_map_vec'][kc2]).index(ll)
+      if ll in mesh['periodic_sides']:
+         delta = mesh['periodic_side_values'][list(mesh['periodic_sides']).index(ll)]
+      else: delta = 0  
+      rr[kc1][ind1] = [kc2,kc1,delta] 
+      rr[kc2][ind2] = [kc1,kc2,-delta] 
+ 
+     return rr
 
 
 def compute_grad(temp,**argv):
 
    mesh = argv['mesh'] 
    
-   #Compute grad
-   if not 'rr' in argv['cache']:
-
-     #Compute deltas-------------------   
-     rr = [i*[0]   for k,i in enumerate(mesh['n_side_per_elem']) ]
-
-     for ll in mesh['active_sides'] :
-      kc1,kc2 = argv['mesh']['side_elem_map_vec'][ll]
-      ind1 = list(mesh['elem_side_map_vec'][kc1]).index(ll)
-      ind2 = list(mesh['elem_side_map_vec'][kc2]).index(ll)
-      if ll in mesh['periodic_sides']:
-         delta = mesh['periodic_side_values'][list(mesh['periodic_sides']).index(ll)]
-      else: delta = 0   
-      rr[kc1][ind1] = [kc2,kc1,delta] 
-      rr[kc2][ind2] = [kc1,kc2,-delta] 
- 
-     argv['cache']['rr'] = rr
-   else:
-     rr = argv['cache']['rr']  
-
-
+   rr = compute_grad_data(mesh,1)
 
    diff_temp = [[temp[j[0]]-temp[j[1]]+j[2] for j in f] for f in rr]
+   
    gradT = np.array([np.einsum('js,s->j',mesh['weigths'][k,:,:mesh['n_non_boundary_side_per_elem'][k]],np.array(dt)) for k,dt in enumerate(diff_temp)])
    return gradT
 
@@ -116,23 +148,20 @@ def compute_secondary_flux(temp,kappa,**argv):
    #--------------
 
    mesh = argv['mesh'] 
-   cache = argv['cache'] 
    dim = int(mesh['meta'][2])
    n_elems = len(argv['mesh']['elems'])
 
    #-----------SAVE some time--------------------------------------
-   if not 'v_non_orth' in cache.keys():
-    v_non_orth = {}
-    for ll in mesh['active_sides']:
+   v_non_orth = {}
+   for ll in mesh['active_sides']:
       (i,j) = mesh['side_elem_map_vec'][ll]
       if not i==j:
 
-       (v_orth,v_non_orth[ll]) = get_decomposed_directions(mesh,ll,kappa)
+       (v_orth,v_non_orth[ll]) = get_decomposed_directions(mesh,get_key(ll,kappa))
 
        area   = mesh['areas'][ll]   
        normal = mesh['face_normals'][ll,0:dim]
        dist   = mesh['dists'][ll,0:dim]
-    cache['v_non_orth'] = v_non_orth
    #-----------------------------------------------------------------
 
    C = np.zeros(n_elems)
@@ -142,7 +171,8 @@ def compute_secondary_flux(temp,kappa,**argv):
       if not i==j:
        w =  mesh['interp_weigths'][ll]
        F_ave = (w*gradT[i] + (1.0-w)*gradT[j])
-       tmp = np.dot(F_ave,cache['v_non_orth'][ll])*area
+       #tmp = np.dot(F_ave,cache['v_non_orth'][ll])*area
+       tmp = np.dot(F_ave,v_non_orth[ll])*area
        C[i] += tmp
        C[j] -= tmp
 
@@ -163,7 +193,7 @@ def compute_diffusive_thermal_conductivity(temp,kappa,**argv):
     (i,j) = mesh['side_elem_map_vec'][ll]
     area = mesh['areas'][ll]
 
-    (v_orth,v_non_orth) = get_decomposed_directions(mesh,ll,kappa)
+    (v_orth,v_non_orth) = get_decomposed_directions(mesh,get_key(ll,kappa))
 
     deltaT = temp[i] - temp[j] - 1
     kappa_eff -= v_orth *  deltaT * area
@@ -196,7 +226,10 @@ def solve_convergence(argv,kappa,B,SU,log=False):
         RHS = B + C
         temp = SU.solve(RHS)
         temp = temp - (max(temp)+min(temp))/2.0
+        #print(min(temp),max(temp))
+
         kappa_eff = compute_diffusive_thermal_conductivity(temp,kappa,**argv)
+        #quit()
         error = abs((kappa_eff - kappa_old)/kappa_eff)
         kappa_old = kappa_eff
         n_iter +=1
@@ -205,7 +238,14 @@ def solve_convergence(argv,kappa,B,SU,log=False):
     return [kappa_eff,error,n_iter],temp,grad 
 
 
+@cached(cache={}, key=lambda mesh, kappa: hashkey(kappa))
 def assemble(mesh,kappa):
+
+    if isinstance(kappa,tuple):
+     kappa = np.array(kappa) 
+    else: 
+     dim = int(mesh['meta'][2])
+     kappa = kappa*np.eye(dim)
 
     iff = [];jff = [];dff = []
 
@@ -219,7 +259,8 @@ def assemble(mesh,kappa):
       vj = mesh['volumes'][j]
       if not i == j:
 
-       (v_orth,dummy) = get_decomposed_directions(mesh,ll,kappa)
+      
+       (v_orth,dummy) = get_decomposed_directions(mesh,get_key(ll,kappa))
 
        iff.append(i)
        jff.append(i)
@@ -244,6 +285,7 @@ def assemble(mesh,kappa):
 
 
 
+
 def solve_fourier(kappa,DeltaT,argv):
 
     argv['DeltaT'] = DeltaT
@@ -252,32 +294,40 @@ def solve_fourier(kappa,DeltaT,argv):
 
     tf = shared_array(np.zeros((argv['n_serial'],argv['n_elems'])) if comm.rank == 0 else None)
     tfg = shared_array(np.zeros((argv['n_serial'],argv['n_elems'],argv['dim'])) if comm.rank == 0 else None)
+    #tf = np.zeros((argv['n_serial'],argv['n_elems']))
+    #tfg = np.zeros((argv['n_serial'],argv['n_elems'],argv['dim']))
+
 
     if comm.rank == 0:
 
-     if len(argv['cache']):
-      mesh = argv['mesh']
-      cache = {}
-      F,B = assemble(mesh,1)
-      cache['RHS_FOURIER'] =B   
-      cache['F'] = F
-      cache['SU'] = {}
-      argv.update({'cache':cache})
-    
-     old_kappa = 0
-     for m,k in enumerate(kappa):
+     dim = int(argv['mesh']['meta'][2])
+     ratio_0 = compute_diffusive_thermal_conductivity(DeltaT,np.eye(dim),**argv)
+     grad_DeltaT = compute_grad(DeltaT,**argv)
 
-         B  = k*argv['cache']['RHS_FOURIER'].copy() + argv.setdefault('DeltaT',np.zeros(n_elems)) 
-         SU = argv['cache']['SU'].setdefault(m,splu(k*argv['cache']['F'] + sp.eye(n_elems)))
-         log = True if m == 0 else False
-         meta,tf[m,:],tfg[m,:,:] = solve_convergence(argv,k,B,SU,log=False)
+     F,B = assemble(argv['mesh'],tuple(map(tuple,np.eye(dim))))
+
+     ratio_old = 0
+     ratio = []
+     for m,k in enumerate(kappa):
+         
+         BB = k*B+argv['DeltaT']
+         meta,tf[m,:],tfg[m,:,:] = solve_convergence(argv\
+                                                        ,k*np.eye(dim),BB,\
+                                                         get_SU(F,k))
          kappaf = meta[0]
-         error = abs((kappaf-old_kappa))/kappaf
+         #print(np.linalg.norm(tf[m,:]-argv['DeltaT'])/np.linalg.norm(argv['DeltaT']),min(argv['DeltaT']),max(argv['DeltaT']),min(tf[m,:]),max(tf[m,:]))
+         ratio.append(kappaf/k)
+         error = abs((ratio[-1]-ratio_old))/ratio[-1]
          if m > int(len(kappa)/4) and error < 1e-2:
           tf[m:,:]  = tf[m-1]; tfg[m:,:,:] = tfg[m-1] 
           break 
          else:  
-          old_kappa = kappaf
+          ratio_old = ratio[-1]
+
+     for m1 in range(m)[::-1]:
+        if (ratio[m1] - ratio_0) < 1e-1 and abs(ratio[m1]-ratio[m1-1])/ratio[m1] < 1e-1:
+          tf[:m1,:]  = DeltaT; tfg[:m1,:,:] = grad_DeltaT 
+          break
 
     comm.Barrier()
     return tf,tfg

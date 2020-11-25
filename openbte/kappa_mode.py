@@ -71,8 +71,8 @@ def plot_mode_kappa(**argv):
 
  print('Check:')
  print('kappa (bulk):  ' + str(round(np.sum(kappa_bulk),2)) + ' W/m/K')
- print('kappa (mfp-sampled):  ' + str(round(np.sum(kappa_nano),2)) + ' W/m/K')
- print('kappa (mode-sampled): ' + str(round(kappa_nano_ori,2)) + ' W/m/K')
+ print('kappa (mode-sampled):  ' + str(round(np.sum(kappa_nano),2)) + ' W/m/K')
+ print('kappa (mfp-sampled): ' + str(round(kappa_nano_ori,2)) + ' W/m/K')
 
  mfp_bulk[:,0] = T_mode
 
