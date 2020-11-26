@@ -4,7 +4,6 @@ import scipy
 from mpi4py import MPI
 import time
 import os 
-import deepdish as dd
 from openbte.utils import *
 
 

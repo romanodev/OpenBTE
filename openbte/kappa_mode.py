@@ -36,10 +36,14 @@ def plot_mode_kappa(**argv):
  Dphi = 2*np.pi/n_phi
  phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
  phi = list(phi)
- mfp_vec = np.outer(vmfp[:,0],mfp_sampled)
- mfp = np.log10(mfp_sampled)
- mfp -= np.min(mfp)
  #--------------------------------
+
+ mat = load_data('geometry')
+ dirr = int(mat['meta'][-1])
+
+ #--------
+
+
 
 
  #Compute kappa
@@ -66,7 +70,6 @@ def plot_mode_kappa(**argv):
 
  kappa_nano = np.einsum('i,i,i->i',C,v[:,0],T_mode)
  kappa_bulk = np.einsum('i,i,i->i',C,v[:,0],mfp_bulk[:,0])
-
  kappa_nano_ori = np.einsum('ij,ji',sigma,T_sampled)*1e9
 
  print('Check:')
@@ -74,20 +77,22 @@ def plot_mode_kappa(**argv):
  print('kappa (mode-sampled):  ' + str(round(np.sum(kappa_nano),2)) + ' W/m/K')
  print('kappa (mfp-sampled): ' + str(round(kappa_nano_ori,2)) + ' W/m/K')
 
- mfp_bulk[:,0] = T_mode
 
- mfp_nano = np.linalg.norm(mfp_bulk,axis=1)
+ mfp_nano = mfp_bulk.copy()
+
+
+ mfp_nano[:,dirr] = T_mode
 
  if argv.setdefault('show',True):
   fig = MakeFigure()
-  fig.add_plot(f*1e-12,mfp_nano*1e6,model='scatter',color='r')
+  fig.add_plot(f*1e-12,mfp_nano[:,dirr]*1e6,model='scatter',color='r')
+  fig.add_plot(f*1e-12,mfp_bulk[:,dirr]*1e6,model='scatter',color='b')
   fig.add_labels('Frequency [THz]','Mean Free Path [$\mu$m]')
   fig.finalize(grid=True,yscale='log',write = True,show=True,ylim=[1e-4,1e2])
 
  if argv.setdefault('save',True):
-     data = {'kappa_nano':kappa_nano,'mfp_nano':mfp_nano,'kappa_fourier':kappa_bulk*ratio,'mfp_bulk':r,'f':f}
+     data = {'kappa_nano':kappa_nano,'mfp_nano':mfp_nano[:,dirr],'kappa_fourier':kappa_bulk*ratio,'mfp_bulk':mfp_bulk[:,dirr],'f':f}
      save_data('kappa_mode',data)
-
 
 
 if __name__ == "__main__":

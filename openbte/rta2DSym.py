@@ -26,7 +26,7 @@ def generate_rta2DSym(**argv):
 
  #Import data-----------
  
- data = load_data('rta')
+ data = load_data(argv.setdefault('basename','rta'))
 
  #small cut on MFPs
  mfp_0 = 1e-10
@@ -49,7 +49,6 @@ def generate_rta2DSym(**argv):
  kappa = data['kappa']
 
 
- #mfp_sampled = np.logspace(np.log10(mfp_0)*1.01,np.log10(max(r)*1.01),n_mfp,endpoint=True)#min MFP = 1e-1 nm
  mfp_sampled = np.logspace(np.log10(mfp_0)*1.01,np.log10(mfp_max),n_mfp,endpoint=True)#min MFP = 1e-1 nm
  
  #-----------------------

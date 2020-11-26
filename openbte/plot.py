@@ -187,7 +187,6 @@ class Plot(object):
      else:
       strc += ','
 
-   print(strc)
    data = eval(strc)
    if self.mesh['dim'] == 3:
     vtk = VtkData(UnstructuredGrid(self.mesh['nodes'],tetra=self.mesh['elems']),data)

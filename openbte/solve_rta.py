@@ -258,7 +258,7 @@ def solve_rta(**argv):
         Mp[1] = bal
 
         #Centering--
-        DeltaT = DeltaT - (max(DeltaT)+min(DeltaT))/2.0
+        #DeltaT = DeltaT - (max(DeltaT)+min(DeltaT))/2.0
 
         DeltaT_old = DeltaT.copy()
 
@@ -292,58 +292,13 @@ def solve_rta(**argv):
       print(colored(' -----------------------------------------------------------','green'),flush=True)
 
 
-    #print(np.dot(mesh['kappa_mask'],DeltaT)*1e18)
-
-    #DeltaT2 = DeltaT - (max(DeltaT)+min(DeltaT))/2.0
-    #print(min(DeltaT2),max(DeltaT2))
-    #output =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J,'kappa_mode':kappa-np.dot(mesh['kappa_mask'],DeltaT_old),'kappa_mode_f':kappaf,\
-    #          'kappa_mode_b':kappab-np.dot(mesh['kappa_mask'],DeltaT_old)}
-    #ZEROTH ORDER
-    # for m in range(argv['n_serial']):
-    # gradT_old = compute_grad(Xm[m],**argv)
-    # print(min(gradT_old[:,0]),max(gradT_old[:,0]))
-
-    #for m in range(argv['n_serial']):
-        #print(np.linalg.norm(gradT_old - tfg[m,:]))
-    #    print(np.linalg.norm(DeltaT_old - tf[m,:]))
-    #print(min(gradT_old[:,0]),max(gradT_old[:,0]))
-    #print(gradT_old[:,0])
-    #quit()
-    #kappa_0 = - np.einsum('c,m,q,c->qm',mesh['kappa_mask'],mfp,mat['VMFP'][:,0],gradT_old[:,0])
-
 
     kappaf -=np.dot(mesh['kappa_mask'],DeltaT_old)
     kappa -=np.dot(mesh['kappa_mask'],DeltaT_old)
-
-
     output =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J,'kappa_mode':kappa,'kappa_mode_f':kappaf,\
                 'kappa_mode_b':kappab-np.dot(mesh['kappa_mask'],DeltaT_old)}
 
 
-
-    if comm.rank == 0:
-     gradT_old = compute_grad(DeltaT_old,**argv)
-     kappa_0 = - np.einsum('c,m,qi,ci->qm',mesh['kappa_mask'],mfp,mat['VMFP'][:,0:argv['dim']],gradT_old)
-     output.update({'kappa_0':kappa_0})
-
-     #add two components
-
-     kappa_b = -np.einsum('c,m,qi,mci->qm',mesh['kappa_mask'],mfp,mat['VMFP'][:,0:argv['dim']],tfg)
-
-     kappa_a = np.zeros_like(kappa_b)
-     #for t in tf:
-     #    print(np.linalg.norm(t-DeltaT)/np.linalg.norm(DeltaT))
-     kappa_a[:,:] = np.einsum('c,mc->m',mesh['kappa_mask'],tf-DeltaT_old)
-     output.update({'kappa_a':kappa_a})
-     output.update({'kappa_b':kappa_b})
-
-
-    #output =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J,'kappa_mode':kappa-np.dot(mesh['kappa_mask'],DeltaT_old),'kappa_mode_f':kappaf,\
-    #        'kappa_mode_b':kappab-np.dot(mesh['kappa_mask'],DeltaT_old),'kappa_0':kappa_0,'GradT':gradT_old}
-    #output =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J,'kappa_mode':kappa}#,'suppression':Sup}
-    #if argv['multiscale']:   
-    #    output.update({'suppression_diffusive':Supd})
-    #    output.update({'suppression_diffusive':Supd,'suppression_ballistic':Supb})
 
     return output
 

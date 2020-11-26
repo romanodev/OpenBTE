@@ -30,13 +30,16 @@ class Material(object):
    source = argv.setdefault('source','local')
    if source == 'database':
     if comm.rank == 0:
-        filename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/openbte/materials/' + model[:3] + '_' +  argv['filename'] + '_' + str(argv['temperature']) + ".npz"
-        shutil.copyfile(filename,os.getcwd() + '/' + model[:3] +'.npz')
+        basename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + \
+                  '/openbte/materials/' + model[:3] + '_' +  argv['filename'] + \
+                  '_' + str(argv['temperature']) 
+
+        argv['basename'] = basename
+
+        #shutil.copyfile(filename,os.getcwd() + '/' + model[:3] +'.npz')
    if source == 'unlisted':
     if comm.rank == 0:
       download_file(argv['file_id'],'rta.npz')
-      #save = False
-   
 
    if model == 'full':
      if comm.rank == 0:

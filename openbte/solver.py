@@ -366,5 +366,4 @@ class Solver(object):
     print(colored(' -----------------------------------------------------------','green'),flush=True)
     print('                       WARNINGS',flush=True)
     print(colored(' -----------------------------------------------------------','green'),flush=True)
-    print(colored('  Material database now refers to bulk data (e.g. rta.npz)  ','red'),flush=True) 
     print(flush=True)   

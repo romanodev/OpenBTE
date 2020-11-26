@@ -78,15 +78,6 @@ where
 
   \Lambda_\mu^{x,\mathrm{eff}}= \frac{L}{\Delta T A_{\mathrm{hot}}}\int_{A_\mathrm{hot}} dS \Delta T_\mu(\mathbf{r}).
 
-The mean free path is then defined as
-
-
-.. math::
-
-   \Lambda_\mu = \sqrt{(\Lambda^y_\mu)^2 + (\Lambda^z_\mu)^2 +   (\Lambda_\mu^{x,\mathrm{eff}})^2}
-
-
-Note the the effective projected mean-free-path above also includes the macroscopic geometrical effect.  
 
   
 

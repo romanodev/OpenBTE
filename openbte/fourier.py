@@ -101,6 +101,16 @@ def get_decomposed_directions(mesh,kappa_ll):
     return v_orth,v_non_orth[:dim]
 
 
+def compute_laplacian(temp,**argv):
+
+  grad_T = compute_grad(temp,**argv).T
+
+  laplacian = np.zeros_like(temp)
+  for i,grad in enumerate(grad_T):
+     laplacian +=   compute_grad(grad,**argv).T[i]
+
+  return laplacian
+
 
 
 @cached(cache={},key=lambda mesh,dummy:dummy)
@@ -297,7 +307,6 @@ def solve_fourier(kappa,DeltaT,argv):
     #tf = np.zeros((argv['n_serial'],argv['n_elems']))
     #tfg = np.zeros((argv['n_serial'],argv['n_elems'],argv['dim']))
 
-
     if comm.rank == 0:
 
      dim = int(argv['mesh']['meta'][2])
@@ -307,7 +316,7 @@ def solve_fourier(kappa,DeltaT,argv):
      F,B = assemble(argv['mesh'],tuple(map(tuple,np.eye(dim))))
 
      ratio_old = 0
-     ratio = []
+     ratio = np.zeros_like(kappa)
      for m,k in enumerate(kappa):
          
          BB = k*B+argv['DeltaT']
@@ -315,19 +324,33 @@ def solve_fourier(kappa,DeltaT,argv):
                                                         ,k*np.eye(dim),BB,\
                                                          get_SU(F,k))
          kappaf = meta[0]
-         #print(np.linalg.norm(tf[m,:]-argv['DeltaT'])/np.linalg.norm(argv['DeltaT']),min(argv['DeltaT']),max(argv['DeltaT']),min(tf[m,:]),max(tf[m,:]))
-         ratio.append(kappaf/k)
-         error = abs((ratio[-1]-ratio_old))/ratio[-1]
-         if m > int(len(kappa)/4) and error < 1e-2:
-          tf[m:,:]  = tf[m-1]; tfg[m:,:,:] = tfg[m-1] 
-          break 
-         else:  
-          ratio_old = ratio[-1]
+         ratio[m] = kappaf/k
 
-     for m1 in range(m)[::-1]:
-        if (ratio[m1] - ratio_0) < 1e-1 and abs(ratio[m1]-ratio[m1-1])/ratio[m1] < 1e-1:
-          tf[:m1,:]  = DeltaT; tfg[:m1,:,:] = grad_DeltaT 
-          break
+         if m > int(len(kappa)/4):
+           error = abs((ratio[m]-ratio[m-1]))/ratio[m]
+           if error < 1e-2:
+             tf[m:,:]  = tf[m-1]; tfg[m:,:,:] = tfg[m-1]
+             ratio[m:] = ratio[m]
+             break
+
+    
+
+     #Regularize gradient
+     for m1 in range(len(kappa))[::-1]:
+        error = (ratio[m1] - ratio_0)/ratio[m1]
+        if (ratio[m1] - ratio_0)/ratio[m1] < 1e-1 and abs(ratio[m1]-ratio[m1-1])/ratio[m1] < 1e-1:
+            tfg[:m1+1,:,:] = grad_DeltaT
+            break
+
+     #Regularize average temperature
+
+     for m1 in range(len(kappa))[::-1]:
+        error = np.linalg.norm(tf[m1] - DeltaT)/np.linalg.norm(DeltaT)
+        if error < 1e-1 :
+            tf[:m1+1,:] = DeltaT
+            break
+
+
 
     comm.Barrier()
     return tf,tfg
