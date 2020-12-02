@@ -29,10 +29,13 @@ class Geometry(object):
    
      #Create elem map--
      argv.update({'centroids':self.elem_centroids})
-     interface = argv['interface']
-     argv.update(interface['options'])
-     argv.update({'centroids':self.elem_centroids})
-     self.elem_mat_map = interface['structure'](**argv)
+     if 'interface' in argv.keys():
+      interface = argv['interface']
+      argv.update(interface['options'])
+      argv.update({'centroids':self.elem_centroids})
+      self.elem_mat_map = interface['structure'](**argv)
+     else: 
+      self.elem_mat_map = np.zeros(len(self.elems)) #omhogeneous material
      #------------------
 
     else:
@@ -40,6 +43,7 @@ class Geometry(object):
      self.dmin = argv['dmin']
      self.import_mesh(**argv)
      self.elem_mat_map = np.zeros(len(self.elems)) #omhogeneous material
+
     self.update_side_interface()
     self.state = self.compute_mesh_data(**argv)
     if argv.setdefault('save',True):

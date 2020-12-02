@@ -24,11 +24,10 @@ def generate_rta3D(**argv):
  #-------------------
 
  #Import data-----------
- #a = np.load('rta.npz',allow_pickle=True)
- #data = {key:a[key].item() for key in a}['arr_0']
 
- data = load_data('rta')
+ data = load_data(argv.setdefault('basename','rta'))
 
+ 
  f = np.divide(np.ones_like(data['tau']), data['tau'], out=np.zeros_like(data['tau']), where=data['tau']!=0)
  kappa = data['kappa']
  #--------------------------

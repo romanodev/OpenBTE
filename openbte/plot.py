@@ -8,6 +8,9 @@ from .viewer import *
 import matplotlib
 from matplotlib.pylab import *
 from .kappa_mode import *
+from scipy.spatial import distance
+import numpy.ma as ma
+
 
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
@@ -44,19 +47,95 @@ class Plot(object):
 
     elif model == 'vtu':
      #self.duplicate_cells(**argv)
-     #self.write_cell_vtu(**argv)   
+     #self.write_cell_vtu(**argv)  
      self.write_vtu(**argv)   
 
  def duplicate_cells(self,**argv):
 
-   #Compute periodic_nodes
+   bb = time.time()   
+   nodes = np.round(self.mesh['nodes'],4)
+   n_nodes = len(nodes)
+   repeat = argv.setdefault('repeat',[1,1,1])
+   size = self.mesh['size']
+
+   #Create periodic vector
+   P = []
+   for px in size[0]*np.arange(repeat[0]):
+    for py in size[1]*np.arange(repeat[1]):
+     for pz in size[2]*np.arange(repeat[2]):
+       P.append([px,py,pz])  
+   P = np.asarray(P[1:],np.float32)
+
+   #Compute periodic nodes------------------
+   pnodes = []
+   for s in list(self.mesh['periodic_sides'])+ list(self.mesh['inactive_sides']):
+     pnodes += list(self.mesh['sides'][s])
+   pnodes = list(np.unique(np.array(pnodes)))
+   #--------------------------------------------
+
+   #Repeat Nodes
+   #-----------------------------------------------------
+   def repeat_cell(axis,n,d,nodes,replace):
+
+    tmp = nodes.copy()
+    for x in np.arange(n-1):
+     tmp[:,axis] +=  size[axis]
+
+     #Mask arrays are used in order not to consider nodes that have been already assigned to their periodic ones.
+     #intersecting = np.nonzero(distance.cdist(tmp,ma.array(nodes, \
+     #                          mask = replace.keys()))<1e-4)
+     #for new,old in zip(*intersecting): replace[new] = old
+
+     nodes = np.vstack((nodes,tmp))
+    
+    return nodes,replace
+
+   replace = {}  
+   for i in range(int(self.mesh['dim'])):
+     nodes,replace = repeat_cell(i,repeat[i],size[i],nodes,replace)
+   #---------------------------------------------------
+
+   #Repeat elements----------
+   unit_cell = self.mesh['elems'].copy()
    
+   elems = self.mesh['elems'] 
+   for i in range(np.prod(repeat)-1):
+     elems = np.vstack((elems,unit_cell+(i+1)*(n_nodes)))
+   #------------------------
+
+   #duplicate variables---
+   for n,(key, value) in enumerate(self.solver['variables'].items()):
+      
+     unit_cell = value['data'].copy()  
+     for nz in range(repeat[0]):
+      for ny in range(repeat[1]):
+       for nx in range(repeat[2]):
+           if nx + ny + nz > 0:   
+            inc = value['increment'][0]*nx + value['increment'][1]*ny + value['increment'][2]*nz
+            tmp = unit_cell - inc
+            if value['data'].ndim == 1:
+             value['data'] = np.hstack((value['data'],tmp))
+            else: 
+             value['data'] = np.vstack((value['data'],tmp))
+
+     self.solver['variables'][key]['data'] = value['data']
+
+
+   self.mesh['elems'] = elems
+   self.mesh['nodes'] = nodes
+
+ 
+ def duplicate_cells_old(self,**argv):
+
+   #Compute periodic_nodes
    nodes = np.round(self.mesh['nodes'],4)
    pnodes = []
    for s in list(self.mesh['periodic_sides'])+ list(self.mesh['inactive_sides']):
      pnodes += list(self.mesh['sides'][s])
    pnodes = list(np.unique(np.array(pnodes)))
 
+   #repeat elements
+   bb = time.time()
    #---------------------------
    size = self.mesh['size']
    n_nodes = len(nodes)
@@ -72,6 +151,7 @@ class Plot(object):
      for nz in range(Nz):
       P = [size[0]*nx,size[1]*ny,size[2]*nz]
       index = nx * Ny * Nz * n_nodes +  ny *  Nz * n_nodes + nz * n_nodes
+      print(index)
       if index > 0:
        for n in range(n_nodes):
         node_trial = [nodes[n,0] + P[0],\
@@ -197,12 +277,9 @@ class Plot(object):
 
 
  def write_vtu(self,**argv):
-
    self.duplicate_cells(**argv)
-
    for key in self.solver['variables'].keys():
        self.solver['variables'][key]['data'] = self._get_node_data(self.solver['variables'][key]['data'])
-
 
    output = []
    strc = 'PointData('
@@ -210,8 +287,6 @@ class Plot(object):
 
 
      if  value['data'].shape[0] == 1:  value['data'] =  value['data'][0] #band-aid solution
-
-
 
      name = value['name'] + '[' + value['units'] + ']'
      if value['data'].ndim == 1:
@@ -251,11 +326,14 @@ class Plot(object):
    else:   
        node_data = np.zeros(len(self.mesh['nodes']))
 
+   #THIS CAN BE VECTORIZED---
    conn = np.zeros(len(self.mesh['nodes']))
    for k,e in enumerate(self.mesh['elems']):
      for n in e:   
       node_data[n] += data[k]
       conn[n] +=1
+   #------------------------------
+  
    for n in range(len(self.mesh['nodes'])):   
     node_data[n] /= conn[n]
 

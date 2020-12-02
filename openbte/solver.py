@@ -40,8 +40,8 @@ class Solver(object):
         self.relaxation_factor = argv.setdefault('alpha',1.0)
         self.keep_lu = argv.setdefault('keep_lu',True)
         self.only_fourier = argv.setdefault('only_fourier',False)
-        self.max_bte_iter = argv.setdefault('max_bte_iter',10)
-        self.min_bte_iter = argv.setdefault('min_bte_iter',20)
+        self.max_bte_iter = argv.setdefault('max_bte_iter',20)
+        #self.min_bte_iter = argv.setdefault('min_bte_iter',20)
         self.max_bte_error = argv.setdefault('max_bte_error',1e-3)
         self.max_fourier_iter = argv.setdefault('max_fourier_iter',20)
         self.deviational = argv.setdefault('deviational',False)
@@ -109,8 +109,11 @@ class Solver(object):
         argv['mat'] = self.mat[0]
         #----------------------
 
-        #Build elem_kappa_map
+        #Build elem_kappa_mapi
         self.elem_kappa_map = np.array([ list(self.mat[i]['kappa'])  for i in self.mesh['elem_mat_map']])
+        self.mesh['elem_kappa_map'] = self.elem_kappa_map
+
+
         #self.elem_kappa_map = np.array([ list(np.eye(2)*self.mat[i]['kappa'][0,0])  for i in self.mesh['elem_mat_map']])
 
         if comm.rank == 0 and self.verbose: self.bulk_info()
@@ -245,7 +248,7 @@ class Solver(object):
           print(colored('  Max Fourier Error:                       ','green')+ '%.1E' % (self.max_fourier_error),flush=True)
           print(colored('  Max Fourier Iter:                        ','green')+ str(self.max_fourier_iter),flush=True)
           print(colored('  Max BTE Error:                           ','green')+ '%.1E' % (self.max_bte_error),flush=True)
-          print(colored('  Min BTE Iter:                            ','green')+ str(self.min_bte_iter),flush=True)
+          #print(colored('  Min BTE Iter:                            ','green')+ str(self.min_bte_iter),flush=True)
           print(colored('  Max BTE Iter:                            ','green')+ str(self.max_bte_iter),flush=True)
 
   def full_info(self):

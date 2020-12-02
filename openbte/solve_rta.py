@@ -53,7 +53,6 @@ def compute_lu(A,indices):
 
  return sp.linalg.splu(A)
 
-
 @cached(cache={}, key=lambda data,indices:hashkey(indices))
 def compute_spilu(A,indices):
 

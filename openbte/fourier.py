@@ -21,11 +21,8 @@ comm = MPI.COMM_WORLD
 def get_SU(F,k):
      return splu(k*F + sp.eye(F.shape[0]))
 
-
 def get_key(ll,kappa):
 
-   if  kappa.ndim == 3:
-     kappa = kappa[0]  
 
    return (ll,tuple(map(tuple,kappa)))
 
@@ -33,18 +30,40 @@ def unpack(data):
 
     return data[0],np.array(data[1])
 
+
+def fix(F,B):
+
+   n_elems = F.shape[0]
+   scale = 1/F.max(axis=0).toarray()[0]
+   n = np.random.randint(n_elems)
+   scale[n] = 0
+   F.data = F.data * scale[F.indices]
+   F[n,n] = 1
+   B[n] = 0   
+
+   return scale
+
+
 def solve_fourier_single(kappa,**argv):
 
-    
    mesh = argv['mesh']
    dim = int(mesh['meta'][2])
    n_elems = int(mesh['meta'][0])
 
-   F,B = assemble(mesh,tuple(map(tuple,kappa[0])))
-   
-   meta,temp,grad =  solve_convergence(argv,kappa,B,splu(F))
+   kappa = -1 #it means that it will take the map from mesh
 
-   flux = -np.einsum('cij,cj->ci',kappa,grad)
+   F,B = assemble(mesh,kappa)
+
+   if argv.setdefault('fix',True): 
+       scale = fix(F,B)
+   else:
+       scale = []
+
+   meta,temp,grad =  solve_convergence(argv,kappa,B,splu(F),scale=scale)
+
+   kappa_map = get_kappa_map(mesh,kappa)
+
+   flux = -np.einsum('cij,cj->ci',kappa_map,grad)
    return {'flux_fourier':flux,'temperature_fourier':temp,'meta':np.array(meta),'grad':grad}
 
 
@@ -86,6 +105,7 @@ def get_kappa_tensor(mesh,ll,kappa):
 @cached(cache={}, key=lambda mesh,kappa_ll:hashkey(kappa_ll))
 def get_decomposed_directions(mesh,kappa_ll):
 
+     
     ll,kappa = unpack(kappa_ll)
 
     kappa_map = get_kappa_tensor(mesh,ll,kappa)
@@ -150,7 +170,7 @@ def compute_grad(temp,**argv):
 
 
 
-def compute_secondary_flux(temp,kappa,**argv):
+def compute_secondary_flux(temp,kappa_map,**argv):
 
    
    #Compute gradient
@@ -167,7 +187,8 @@ def compute_secondary_flux(temp,kappa,**argv):
       (i,j) = mesh['side_elem_map_vec'][ll]
       if not i==j:
 
-       (v_orth,v_non_orth[ll]) = get_decomposed_directions(mesh,get_key(ll,kappa))
+       kappa_loc = get_kappa(mesh,i,j,ll,kappa_map)
+       (v_orth,v_non_orth[ll]) = get_decomposed_directions(mesh,get_key(ll,kappa_loc))
 
        area   = mesh['areas'][ll]   
        normal = mesh['face_normals'][ll,0:dim]
@@ -191,19 +212,24 @@ def compute_secondary_flux(temp,kappa,**argv):
 
 
 
-def compute_diffusive_thermal_conductivity(temp,kappa,**argv):
+def compute_diffusive_thermal_conductivity(temp,kappa_map,**argv):
+    
 
 
    mesh = argv['mesh']  
+
    dim = int(mesh['meta'][2])
    kappa_eff = 0
    k_non_orth = 0
+   area_tot = 0
    for ll in mesh['flux_sides']:
 
     (i,j) = mesh['side_elem_map_vec'][ll]
     area = mesh['areas'][ll]
 
-    (v_orth,v_non_orth) = get_decomposed_directions(mesh,get_key(ll,kappa))
+
+    kappa_loc = get_kappa(mesh,i,j,ll,kappa_map)
+    (v_orth,v_non_orth) = get_decomposed_directions(mesh,get_key(ll,kappa_loc))
 
     deltaT = temp[i] - temp[j] - 1
     kappa_eff -= v_orth *  deltaT * area
@@ -213,17 +239,19 @@ def compute_diffusive_thermal_conductivity(temp,kappa,**argv):
      w  =  mesh['interp_weigths'][ll]
      grad_ave = w*gradT[i] + (1.0-w)*gradT[j]
      k_non_orth += np.dot(grad_ave,v_non_orth)/2 * area
+    area_tot +=area
 
-   #print(kappa_eff,k_non_orth,kappa_eff+k_non_orth)
-
-   return kappa_eff+k_non_orth*mesh['meta'][1]
+   return (kappa_eff+k_non_orth)*mesh['meta'][1]
 
 
-def solve_convergence(argv,kappa,B,SU,log=False):
+def solve_convergence(argv,kappa,B,SU,log=False,scale=[]):
 
     C  = np.zeros_like(B)
 
-    mesh = argv['mesh']   
+    mesh = argv['mesh']  
+
+    kappa_map = get_kappa_map(mesh,kappa)
+
     n_elems = len(mesh['elems'])
     dim = int(mesh['meta'][2])
     grad = np.zeros((n_elems,dim))
@@ -232,34 +260,58 @@ def solve_convergence(argv,kappa,B,SU,log=False):
     while error > argv['max_fourier_error'] and \
                   n_iter < argv['max_fourier_iter'] :
 
-        #argv['grad'] = grad
         RHS = B + C
+    
+        if len(scale) > 0: RHS *=scale
+
+
         temp = SU.solve(RHS)
         temp = temp - (max(temp)+min(temp))/2.0
         #print(min(temp),max(temp))
 
-        kappa_eff = compute_diffusive_thermal_conductivity(temp,kappa,**argv)
+        kappa_eff = compute_diffusive_thermal_conductivity(temp,kappa_map,**argv)
         #quit()
         error = abs((kappa_eff - kappa_old)/kappa_eff)
         kappa_old = kappa_eff
         n_iter +=1
-        C,grad = compute_secondary_flux(temp,kappa,**argv)
+        C,grad = compute_secondary_flux(temp,kappa_map,**argv)
 
     return [kappa_eff,error,n_iter],temp,grad 
+
+
+def get_kappa_map(mesh,kappa):
+
+    n_elems = len(mesh['elems'])
+    dim = int(mesh['meta'][2])
+
+    if np.isscalar(kappa):
+        if kappa == -1: 
+           kappa = mesh['elem_kappa_map']
+        else: 
+           print('error')
+
+    elif isinstance(kappa,tuple):
+       kappa = np.array(kappa) 
+       if kappa.ndim == 2: 
+          kappa = np.tile(kappa,(n_elems,1,1))
+    elif isinstance(kappa,np.ndarray):
+        if kappa.ndim == 2: 
+          kappa = np.tile(kappa,(n_elems,1,1))
+
+    return kappa
 
 
 @cached(cache={}, key=lambda mesh, kappa: hashkey(kappa))
 def assemble(mesh,kappa):
 
-    if isinstance(kappa,tuple):
-     kappa = np.array(kappa) 
-    else: 
-     dim = int(mesh['meta'][2])
-     kappa = kappa*np.eye(dim)
+
+    kappa_map = get_kappa_map(mesh,kappa)
+
+    n_elems = len(mesh['elems'])
+    dim = int(mesh['meta'][2])
 
     iff = [];jff = [];dff = []
 
-    n_elems = len(mesh['elems'])
     B = np.zeros(n_elems)
     for ll in mesh['active_sides']:
 
@@ -268,9 +320,9 @@ def assemble(mesh,kappa):
       vi = mesh['volumes'][i]
       vj = mesh['volumes'][j]
       if not i == j:
-
-      
-       (v_orth,dummy) = get_decomposed_directions(mesh,get_key(ll,kappa))
+     
+       kappa_loc = get_kappa(mesh,i,j,ll,kappa_map)
+       (v_orth,dummy) = get_decomposed_directions(mesh,get_key(ll,kappa_loc))
 
        iff.append(i)
        jff.append(i)
@@ -304,14 +356,10 @@ def solve_fourier(kappa,DeltaT,argv):
 
     tf = shared_array(np.zeros((argv['n_serial'],argv['n_elems'])) if comm.rank == 0 else None)
     tfg = shared_array(np.zeros((argv['n_serial'],argv['n_elems'],argv['dim'])) if comm.rank == 0 else None)
-    #tf = np.zeros((argv['n_serial'],argv['n_elems']))
-    #tfg = np.zeros((argv['n_serial'],argv['n_elems'],argv['dim']))
 
     if comm.rank == 0:
-
      dim = int(argv['mesh']['meta'][2])
-     ratio_0 = compute_diffusive_thermal_conductivity(DeltaT,np.eye(dim),**argv)
-     grad_DeltaT = compute_grad(DeltaT,**argv)
+
 
      F,B = assemble(argv['mesh'],tuple(map(tuple,np.eye(dim))))
 
@@ -333,24 +381,27 @@ def solve_fourier(kappa,DeltaT,argv):
              ratio[m:] = ratio[m]
              break
 
+     #Regularize---
+     if argv.setdefault('experimental_multiscale',False):
+      kappa_map = get_kappa_map(argv['mesh'],np.eye(dim))
+      ratio_0 = compute_diffusive_thermal_conductivity(DeltaT,kappa_map,**argv)
+      grad_DeltaT = compute_grad(DeltaT,**argv)
     
-
-     #Regularize gradient
-     for m1 in range(len(kappa))[::-1]:
+      #Regularize gradient
+      for m1 in range(len(kappa))[::-1]:
         error = (ratio[m1] - ratio_0)/ratio[m1]
         if (ratio[m1] - ratio_0)/ratio[m1] < 1e-1 and abs(ratio[m1]-ratio[m1-1])/ratio[m1] < 1e-1:
             tfg[:m1+1,:,:] = grad_DeltaT
+            tf[:m1+1,:] = DeltaT
             break
 
-     #Regularize average temperature
-
-     for m1 in range(len(kappa))[::-1]:
+      #Regularize average temperature
+      for m1 in range(len(kappa))[::-1]:
         error = np.linalg.norm(tf[m1] - DeltaT)/np.linalg.norm(DeltaT)
         if error < 1e-1 :
             tf[:m1+1,:] = DeltaT
             break
-
-
+     #-----------------
 
     comm.Barrier()
     return tf,tfg
