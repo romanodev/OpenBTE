@@ -17,6 +17,48 @@ os.environ['H5PY_DEFAULT_READONLY']='1'
 
 comm = MPI.COMM_WORLD
 
+def fast_interpolation(fine,coarse,bound=False) :
+
+ m2 = np.argmax(coarse >= fine[:,np.newaxis],axis=1)
+ m1 = m2-1
+ a2 = (fine-coarse[m1])/(coarse[m2]-coarse[m1])
+ a1 = 1-a2
+
+ if bound == 'periodic':
+  Delta = coarse[-1]-coarse[-2]  
+  a = np.where(m2==0)[0] #this can be either regions
+  m1[a] = len(coarse) -1
+  m2[a] = 0
+  fine[fine < Delta/2] += 2*np.pi 
+  a2[a] = (fine[a] - coarse[-1])/ Delta
+  a1 = 1-a2
+
+
+ if bound == 'extent':
+
+   #Small values
+   al = np.where(fine<coarse[0])[0] 
+   m2[al] = 1; 
+   m1[al] = 0;
+   a2[al] = (fine[al]-coarse[0])/ (coarse[1]-coarse[0])
+   a1[al] = 1-a2[al]
+
+
+   #Large values
+   ar = np.where(fine>coarse[-1])[0]
+   m2[ar] = len(coarse)-1; 
+   m1[ar] = len(coarse)-2;
+   a2[ar] = (fine[ar]-coarse[-2])/ (coarse[-1]-coarse[-2])
+   a1[ar] = 1-a2[ar]
+
+
+ return a1,a2,m1,m2
+
+
+
+
+
+
 def periodic_kernel(x1, x2, p,l,variance):
     return variance*np.exp(-2/l/l * np.sin(np.pi*abs(x1-x2)/p) ** 2)
 
@@ -143,9 +185,6 @@ def load_data(fh):
           return pickle.load(f)
      return -1 
 
-       #     data = np.load(filename + '.npz',allow_pickle=True)
-       #     return {key:a for key,a in data.items()}
-
 
 def download_file(file_id,filename):
 
@@ -154,8 +193,9 @@ def download_file(file_id,filename):
 
 def generate_frame(**argv):
 
-    Lx = float(argv['lx'])
-    Ly = float(argv['ly'])
+
+    Lx = float(argv.setdefault('lx',argv['bounding_box'][0]))
+    Ly = float(argv.setdefault('ly',argv['bounding_box'][1]))
     frame = []
     frame.append([-Lx/2,Ly/2])
     frame.append([Lx/2,Ly/2])
@@ -359,7 +399,7 @@ def interpolate(vector,value,bounds='extent',period = None):
 
    else:
 
-    if bounds == 'extent':  
+    if bounds == 'extent': 
      if value < vector[0]:
        i=0;j=1;
      elif value > vector[-1]:

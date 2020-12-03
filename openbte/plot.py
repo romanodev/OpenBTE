@@ -314,33 +314,31 @@ class Plot(object):
    else :
     nodes = self.mesh['nodes']
     vtk = VtkData(UnstructuredGrid(nodes,triangle=self.mesh['elems']),data)
-
+   
    vtk.tofile('output','ascii')
 
 
  def _get_node_data(self,data,indices=[]):
 
-
+   #NEW-------------
+   conn = np.zeros(len(self.mesh['nodes']))
    if data.ndim > 1:
        node_data = np.zeros((len(self.mesh['nodes']),int(self.dim)))
    else:   
        node_data = np.zeros(len(self.mesh['nodes']))
-
-   #THIS CAN BE VECTORIZED---
-   conn = np.zeros(len(self.mesh['nodes']))
-   for k,e in enumerate(self.mesh['elems']):
-     for n in e:   
-      node_data[n] += data[k]
-      conn[n] +=1
-   #------------------------------
-  
-   for n in range(len(self.mesh['nodes'])):   
-    node_data[n] /= conn[n]
-
+    
+   #This works only with uniform type of elements 
+   elem_flat = self.mesh['elems'].flat
+   np.add.at(node_data,elem_flat,np.repeat(data,len(self.mesh['elems'][0]),axis=0))
+   np.add.at(conn,elem_flat,np.ones_like(elem_flat))
+   if data.ndim > 1:
+       np.divide(node_data,conn[:,np.newaxis],out=node_data)
+   else: 
+       np.divide(node_data,conn,out=node_data)
+   #-----------------------
 
    if len(indices) > 0: 
     node_data = node_data[indices]
-
 
    return node_data
 

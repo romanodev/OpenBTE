@@ -16,7 +16,8 @@ def generate_rta3D(**argv):
  Dphi = 2.0*np.pi/n_phi
  phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
  Dtheta = np.pi/n_theta
- theta = np.linspace(0,np.pi,n_theta)
+ theta = np.linspace(Dtheta/2,np.pi-Dtheta/2,n_theta,endpoint=True)
+
  polar = np.array([np.sin(phi),np.cos(phi),np.ones(n_phi)]).T
  azimuthal = np.array([np.sin(theta),np.sin(theta),np.cos(theta)]).T
  direction = np.einsum('lj,kj->lkj',azimuthal,polar)
@@ -57,40 +58,42 @@ def generate_rta3D(**argv):
  n_mfp = len(mfp)
  temp_coeff = np.zeros((n_mfp,n_phi*n_theta))
  kappa_directional = np.zeros((n_mfp,n_phi*n_theta,3)) 
+ kappa_directional2 = np.zeros((n_mfp,n_phi*n_theta,3)) 
 
- #We perform three separate linear interpolations
- a= time.time()
- for m in range(n_mfp_bulk):
+ a = time.time()
+ #NEW---
+ a1,a2,m1,m2 = fast_interpolation(r,mfp_sampled,bound='extent')
+ b1,b2,p1,p2 = fast_interpolation(phi_bulk,phi,bound='periodic')
+ c1,c2,t1,t2 = fast_interpolation(theta_bulk,theta,bound='extent')
 
-     (m1,a1,m2,a2) = interpolate(mfp_sampled,r[m],bounds='extent')
-     (p1,b1,p2,b2) = interpolate(phi,phi_bulk[m],bounds='periodic',period=2*np.pi)
-     (t1,c1,t2,c2) = interpolate(theta,theta_bulk[m],bounds='periodic')
+ index_1 =  t1 * n_phi + p1; u1 = b1*c1
+ index_2 =  t1 * n_phi + p2; u2 = b2*c1
+ index_3 =  t2 * n_phi + p1; u3 = b1*c2
+ index_4 =  t2 * n_phi + p2; u4 = b2*c2
 
-     index_1 =  t1 * n_phi + p1; u1 = b1*c1
-     index_2 =  t1 * n_phi + p2; u2 = b2*c1
-     temp_coeff[m1,index_1] += tc[m]*a1*u1
-     temp_coeff[m1,index_2] += tc[m]*a1*u2
-     temp_coeff[m2,index_1] += tc[m]*a2*u1
-     temp_coeff[m2,index_2] += tc[m]*a2*u2
-     kappa_directional[m1,index_1] += Jc[m]*a1*u1
-     kappa_directional[m1,index_2] += Jc[m]*a1*u2
-     kappa_directional[m2,index_1] += Jc[m]*a2*u1
-     kappa_directional[m2,index_2] += Jc[m]*a2*u2
+ #Interpolate temperature----
+ temp_coeff2 = np.zeros((n_mfp,n_phi*n_theta))
+ np.add.at(temp_coeff2,(m1,index_1),a1*u1*tc)
+ np.add.at(temp_coeff2,(m1,index_2),a1*u2*tc)
+ np.add.at(temp_coeff2,(m2,index_1),a2*u1*tc)
+ np.add.at(temp_coeff2,(m2,index_2),a2*u2*tc)
+ np.add.at(temp_coeff2,(m1,index_3),a1*u3*tc)
+ np.add.at(temp_coeff2,(m1,index_4),a1*u4*tc)
+ np.add.at(temp_coeff2,(m2,index_3),a2*u3*tc)
+ np.add.at(temp_coeff2,(m2,index_4),a2*u4*tc)
 
-     index_3 =  t2 * n_phi + p1; u3 = b1*c2
-     index_4 =  t2 * n_phi + p2; u4 = b2*c2
-     temp_coeff[m1,index_3] += tc[m]*a1*u3
-     temp_coeff[m1,index_4] += tc[m]*a1*u4
-     temp_coeff[m2,index_3] += tc[m]*a2*u3
-     temp_coeff[m2,index_4] += tc[m]*a2*u4
-     kappa_directional[m1,index_3] += Jc[m]*a1*u3
-     kappa_directional[m1,index_4] += Jc[m]*a1*u4
-     kappa_directional[m2,index_3] += Jc[m]*a2*u3
-     kappa_directional[m2,index_4] += Jc[m]*a2*u4
-
-
- rhs_average = mfp_sampled*mfp_sampled/3
+ #Interpolate flux----
+ np.add.at(kappa_directional2,(m1, index_1),Jc*(a1*u1)[:,np.newaxis])
+ np.add.at(kappa_directional2,(m1, index_2),Jc*(a1*u2)[:,np.newaxis])
+ np.add.at(kappa_directional2,(m2, index_1),Jc*(a2*u1)[:,np.newaxis])
+ np.add.at(kappa_directional2,(m2, index_2),Jc*(a2*u2)[:,np.newaxis])
+ np.add.at(kappa_directional2,(m1, index_3),Jc*(a1*u3)[:,np.newaxis])
+ np.add.at(kappa_directional2,(m1, index_4),Jc*(a1*u4)[:,np.newaxis])
+ np.add.at(kappa_directional2,(m2, index_3),Jc*(a2*u3)[:,np.newaxis])
+ np.add.at(kappa_directional2,(m2, index_4),Jc*(a2*u4)[:,np.newaxis])
  
+ rhs_average = mfp_sampled*mfp_sampled/3
+
 
  return {'tc':temp_coeff,\
          'sigma':kappa_directional,\
@@ -101,4 +104,4 @@ def generate_rta3D(**argv):
          'mfp_sampled':mfp_sampled,\
          'model':np.array([9])}
 
-
+   

@@ -48,7 +48,6 @@ def generate_rta2DSym(**argv):
  phi_bulk[np.where(phi_bulk < 0) ] = 2*np.pi + phi_bulk[np.where(phi_bulk <0)]
  kappa = data['kappa']
 
-
  mfp_sampled = np.logspace(np.log10(mfp_0)*1.01,np.log10(mfp_max),n_mfp,endpoint=True)#min MFP = 1e-1 nm
  
  #-----------------------
@@ -57,37 +56,20 @@ def generate_rta2DSym(**argv):
  temp_coeff = np.zeros((n_mfp,n_phi))
  kappa_directional = np.zeros((n_mfp,n_phi,2)) 
 
- interp = np.zeros((n_mfp,n_phi))
  lo = 0
-
-
- #Find the first indexed
- bb = time.time()
 
  #Interpolation in the MFPs
  r_cut = r[r>mfp_0]
  tc_cut = tc[r>mfp_0]
  Jc_cut = Jc[r>mfp_0]
  phi_cut = phi_bulk[r>mfp_0]
- m2 = np.argmax(mfp_sampled > r_cut[:,np.newaxis],axis=1)
- m1 = m2-1
- a2 = (r_cut-mfp_sampled[m1])/ (mfp_sampled[m2]-mfp_sampled[m1])
- a1 = 1-a2
 
- #Interpolation in theta---
- p2 = np.argmax(phi > phi_cut[:,np.newaxis],axis=1)
- p1 = p2-1
- b2 = (phi_cut-phi[p1])/Dphi
+ #Interpolation in the MFPs
+ a1,a2,m1,m2 = fast_interpolation(r_cut,mfp_sampled)
 
- #adjust origin
- a = np.where(p2==0)[0] #this can be either regions
- p1[a] = n_phi -1
+ #Interpolation in phi---
+ b1,b2,p1,p2 = fast_interpolation(phi_cut,phi,bound='periodic')
 
- p2[a] = 0
- phi_cut[phi_cut < Dphi/2] += 2*np.pi #TO CHECK
- b2[a] = (phi_cut[a] - phi[-1])/Dphi
- b1 = 1-b2
- 
  #CHECKED
  np.add.at(temp_coeff,(m1, p1),a1*b1*tc_cut)
  np.add.at(temp_coeff,(m1, p2),a1*b2*tc_cut)

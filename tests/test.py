@@ -12,5 +12,4 @@ def rta2D():
 
 def test_function():
 
-
     assert np.allclose(rta2D(),load_data('solver')['kappa'])
