@@ -28,7 +28,7 @@ class Plot(object):
    self.dim = int(self.mesh['meta'][2])
 
    if argv.setdefault('user',False):
-    argv['model'](self.material,self.solver,self.mesh)   
+    argv['user_model'].plot(self.material,self.solver,self.mesh)   
    else:    
     model = argv['model'].split('/')[0]
     if model == 'structure':

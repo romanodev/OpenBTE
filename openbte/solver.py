@@ -169,7 +169,8 @@ class Solver(object):
          
          if argv.setdefault('user',False):
             argv['n_serial'] = self.n_serial
-            data = argv['solve'](**argv)
+
+            data = argv['user_model'].solve(**argv)
 
          elif self.model[0:3] == 'mfp' or \
             self.model[0:3] == 'Gra' :

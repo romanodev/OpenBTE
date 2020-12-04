@@ -26,21 +26,14 @@ class Geometry(object):
    else:    
     if argv.setdefault('user',False):
 
-     lx,ly,lz = argv['structure'].generate_structure()
+     #Generate structure
+     lx,ly,lz = argv['user_model'].generate_structure()
      argv['bounding_box'] = [lx,ly,lz]
 
      self.import_mesh(**argv)
-   
-     #Create elem map--
-     #argv.update({'centroids':self.elem_centroids})
-     #if 'interface' in argv.keys():
-     # interface = argv['interface']
-     # argv.update(interface['options'])
-     # argv.update({'centroids':self.elem_centroids})
-     # self.elem_mat_map = interface['structure'](**argv)
-     #else: 
-     self.elem_mat_map = np.zeros(len(self.elems)) #omhogeneous material
-     #------------------
+
+     #Generate pattern
+     self.elem_mat_map = argv['user_model'].generate_pattern(self)
 
     else:
      Mesher(argv) #this create mesh.msh
