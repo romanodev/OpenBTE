@@ -4,7 +4,7 @@ import plotly.graph_objs as go
 import numpy as np
 import sys
 from .utils import *
-
+import time
 
 
 def plotly_trisurf(nodes, simplices, data,name,units,visible=False):
@@ -38,10 +38,14 @@ def add_data(nodes,elems,name,data,units,buttons,fig,nv):
       return  plotly_data
 
 
-def plot_results(data,nodes,elems,**argv):
+def plot_results(master,**argv):
 
    
+   data  = master['variables']
+   nodes = master['nodes']
+   elems = master['elems']
 
+  
    size = [max(nodes[:,i]) - min(nodes[:,i])  for i in range(3)] 
    dim = 2   if size[2] == 0 else 3
 
@@ -57,28 +61,19 @@ def plot_results(data,nodes,elems,**argv):
    fig = go.Figure()
    current = 0
    #plotly_tot_tmp = {}
-   
+  
    for key,value in data.items():
      if value['data'].ndim == 1: #scalar
       plotly_data = add_data(nodes,elems,value['name'],value['data'],value['units'],buttons,fig,nv)
-      #plotly_tot_tmp[value['name']] = go.Figureplotly_data
      elif value['data'].ndim == 2 : #vector 
          plotly_data = add_data(nodes,elems,value['name'] + '(x)',value['data'][:,0],value['units'],buttons,fig,nv)
-         #plotly_tot_tmp[value['name'] + '(x)'] = plotly_data
          plotly_data = add_data(nodes,elems,value['name'] + '(y)',value['data'][:,1],value['units'],buttons,fig,nv)
-         #plotly_tot_tmp[value['name'] + '(y)'] = plotly_data
          if dim == 3: 
              plotly_data = add_data(nodes,elems,value['name']+ '(z)',value['data'][:,2],value['units'],buttons,fig,nv)
-         #    plotly_tot_tmp[value['name'] + '(z)'] = plotly_data
 
          mag = [np.linalg.norm(value) for value in value['data']]
          plotly_data = add_data(nodes,elems,value['name'] + '(mag.)',mag,value['units'],buttons,fig,nv)
-         #plotly_tot_tmp[value['name'] + '(mag.)'] = plotly_data
 
-   #add extra data----------
-   #plotly_tot = {'sample_0':{'variables':plotly_tot_tmp,'size':size}}
-   #plotly_tot = {'sample_0':fig}
-   
    
    #-----------------------
 
