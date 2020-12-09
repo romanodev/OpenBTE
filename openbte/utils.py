@@ -194,6 +194,7 @@ def download_file(file_id,filename):
 def generate_frame(**argv):
 
 
+    argv.setdefault('bounding_box',[0,0,0])
     Lx = float(argv.setdefault('lx',argv['bounding_box'][0]))
     Ly = float(argv.setdefault('ly',argv['bounding_box'][1]))
     frame = []

@@ -217,8 +217,7 @@ class Geometry(object):
       self.intk.append(normal*area/vol1)
       self.intk.append(-normal*area/vol2)
 
-     if not (l1 == l2) and  (not (ll in self.side_list['Interface'])):
-     #if not (l1 == l2):
+     if not (l1 == l2) :#and (not ll in self.side_list['Interface']) :
        self.i.append(l1)   
        self.j.append(l2)   
        self.i.append(l2)   
@@ -234,11 +233,10 @@ class Geometry(object):
         self.sb.append(ll)
         self.db.append(normal*area/vol1)
    
-
    self.k = np.array(self.k).T
    self.db = np.array(self.db).T
    self.intk = np.array(self.intk).T
-  
+ 
    self.ij = ij
 
 

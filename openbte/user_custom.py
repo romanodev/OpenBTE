@@ -4,16 +4,17 @@ import subprocess,os
 
 class UserStructure(object):
 
-    def __init__(self,generator,**argv):
+    def __init__(self,**argv):
 
-      self.generator = generator   
       self.argv = argv
-      if 'pattern' in argv.keys():
-         self.pattern = True 
+
+
 
     def generate_structure(self):
-   
-       return self.generator(**self.argv)   
+  
+       if 'structure' in argv.keys():  
+        
+         return self.generator(**self.argv)   
 
 
     def generate_pattern(self,mesh):
@@ -24,9 +25,10 @@ class UserStructure(object):
             return np.zeros(len(self.elems))
 
     def solve(self,**argv):
-   
-       argv.update(self.argv)  
-       return self.argv['solve'](**argv)
+  
+       self.argv.update(argv)  
+
+       return self.argv['solve'](**self.argv)
 
     def plot(self,mat,solver,mesh):
    

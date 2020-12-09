@@ -176,9 +176,9 @@ def solve_mfp(**argv):
 
 
         if argv['thermalizing']:
-         RHS = -np.einsum('c,nc->nc',TB,Gbm2) if len(mesh['db']) > 0 else  np.zeros((argv['n_serial'],argv['n_parallel'],0))   
+         RHS = -np.einsum('c,nc->nc',TB,Gbm2) if len(mesh['db']) > 0 else  np.zeros((argv['n_parallel'],0))   
         else:
-         RHS = -np.einsum('mc,nc->mnc',TB,Gbm2) if len(mesh['db']) > 0 else  np.zeros((argv['n_serial'],argv['n_parallel'],0))   
+         RHS = -np.einsum('mc,nc->mnc',TB,Gbm2) if len(mesh['db']) > 0 else  np.zeros((argv['n_parallel'],0))   
 
         for n,q in enumerate(argv['rr']):
            
@@ -209,7 +209,7 @@ def solve_mfp(**argv):
               
                 if not argv['thermalizing']:
                  B = DeltaT +  mfp[m]*(P[n] +  get_boundary(RHS[m,n],mesh['eb'],n_elems))
-                else: 
+                else:
                  B = DeltaT +  mfp[m]*(P[n] +  get_boundary(RHS[n],mesh['eb'],n_elems))
                 A = get_m(Master,np.concatenate((mfp[m]*Gm[n],mfp[m]*D[n]+np.ones(n_elems)))[conversion])
                 if not argv['keep_lu']:
@@ -341,7 +341,7 @@ def solve_mfp(**argv):
 
    
 
-    output =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J,'kappa_mode':kappa-np.dot(mesh['kappa_mask'],DeltaT),'pseudo':compute_grad(DeltaTB,argv),'DeltaT':DeltaTB}
+    output =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J,'kappa_mode':kappa-np.dot(mesh['kappa_mask'],DeltaT),'DeltaT':DeltaTB}
     #if argv['multiscale']:   
     #    output.update({'suppression_diffusive':Supd,'suppression_ballistic':Supb})
 

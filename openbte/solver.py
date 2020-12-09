@@ -168,6 +168,7 @@ class Solver(object):
          argv['kappa_factor'] = self.kappa_factor
          
          if argv.setdefault('user',False):
+
             argv['n_serial'] = self.n_serial
 
             data = argv['user_model'].solve(**argv)
