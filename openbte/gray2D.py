@@ -27,6 +27,7 @@ def generate_gray2D(**argv):
 
  tc = temp_coeff/np.sum(temp_coeff)
 
+
  #Final----
  return {'tc':tc,\
          'sigma':kappa_directional,\

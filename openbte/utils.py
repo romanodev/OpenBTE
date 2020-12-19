@@ -1,7 +1,7 @@
 from mpi4py import MPI
 from google_drive_downloader import GoogleDriveDownloader as gdd
 import numpy as np
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon,Point
 from shapely.geometry import MultiPolygon,LineString
 import shapely
 from shapely.ops import cascaded_union
@@ -190,6 +190,46 @@ def download_file(file_id,filename):
 
       gdd.download_file_from_google_drive(file_id=file_id,
                                            dest_path='./' + filename,showsize=True,overwrite=True)
+
+
+
+def compute_neighbors(mesh,elem):
+  
+    guess = []
+
+    for side in mesh['elem_side_map_vec'][elem]:
+        for elem_2 in mesh['side_elem_map_vec'][side]:
+            if not elem_2 in guess:
+               guess.append(elem_2)
+               
+    return guess
+                
+
+
+def find_elem(mesh,p,guess):
+ 
+    #First try in guess--
+    for ne in guess:
+     elem  = mesh['elems'][ne][0:mesh['side_per_elem'][ne]] 
+     nodes = mesh['nodes'][elem][:,0:2] 
+     polygon = Polygon(mesh['nodes'][elem][0:mesh['side_per_elem'][ne],0:2])
+     if polygon.contains(Point(p[0],p[1])):
+      return ne,nodes[:,0],nodes[:,1]
+    #------------------      
+
+    #Find among all elements
+    for ne in range(len(mesh['elems'])):
+
+     elem  = mesh['elems'][ne][0:mesh['side_per_elem'][ne]]  
+     nodes = mesh['nodes'][elem][:,0:2]
+
+     polygon = Polygon(nodes)
+     if polygon.contains(Point(p[0],p[1])):
+      return ne,nodes[:,0],nodes[:,1]
+
+    return -1
+        
+
 
 def generate_frame(**argv):
 

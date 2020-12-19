@@ -84,33 +84,38 @@ class Solver(object):
         #IMPORT MATERIAL---------------------------
         if os.path.isfile('material.npz'):
           names = {0:'material'}  
-        elif os.path.isfile('mat_0.npz'):
-           names = {0:'mat_0',1:'mat_1'}  
-        else:   
-           names = {0:'dummy'} #this is when we read it from within the script
+        #elif os.path.isfile('mat_0.npz'):
+        #   names = {0:'mat_0',1:'mat_1'}  
+        #else:   
+        #   names = {0:'dummy'} #this is when we read it from within the script
       
         self.mat = {}
-        for key,value in names.items():    
-         if comm.rank == 0:   
+        #for key,value in names.items():    
+        if comm.rank == 0:   
           #data = argv['material'].data if 'material' in argv.keys() else dd.io.load(value)
 
           if 'material' in argv.keys():
             data = argv['material']
           else:            
-            data = load_data(value)  
+            data = load_data('material')  
        
-          data['kappa'] = data['kappa'][0:self.dim,0:self.dim] 
+          #data['kappa'] = data['kappa'][0:self.dim,0:self.dim] #This should be not necessary
           if data['model'][0] == 10 : #full
            data['B'] = np.einsum('i,ij->ij',data['scale'],data['B'].T + data['B'])
-         else: data = None
 
-         self.mat.update({key:create_shared_memory_dict(data)})
-         self.set_model(self.mat[key]['model'][0])
-        argv['mat'] = self.mat[0]
+
+        else: data = None
+
+        self.mat = create_shared_memory_dict(data)
+        self.set_model(self.mat['model'])
         #----------------------
 
         #Build elem_kappa_mapi
-        self.elem_kappa_map = np.array([ list(self.mat[i]['kappa'])  for i in self.mesh['elem_mat_map']])
+        if self.mat['kappa'].ndim == 3:
+         self.elem_kappa_map = np.array([ list(self.mat['kappa'][i])  for i in self.mesh['elem_mat_map']])
+        else:
+         self.elem_kappa_map = np.array([ list(self.mat['kappa'])  for i in self.mesh['elem_mat_map']])
+            
         self.mesh['elem_kappa_map'] = self.elem_kappa_map
 
 
@@ -118,9 +123,9 @@ class Solver(object):
 
         if comm.rank == 0 and self.verbose: self.bulk_info()
 
-        if self.model[0:3] == 'mfp' or self.model[0:3] == 'rta' or self.model[0:3] == 'Gra':
-         self.n_serial = self.mat[0]['tc'].shape[0]  
-         self.n_parallel = self.mat[0]['tc'].shape[1]  
+        if self.model[0:3] == 'mfp' or self.model[0:3] == 'rta' or self.model[0:3] == 'Gra' or self.model == 'user':
+         self.n_serial = self.mat['tc'].shape[0]  
+         self.n_parallel = self.mat['tc'].shape[1]  
          block =  self.n_serial//comm.size
          self.ff = range(block*comm.rank,self.n_serial) if comm.rank == comm.size-1 else range(block*comm.rank,block*(comm.rank+1))
          if comm.rank == 0 and self.verbose: self.mfp_info()
@@ -130,7 +135,7 @@ class Solver(object):
           self.only_fourier = True
 
         elif self.model == 'full': 
-         self.n_parallel = len(self.mat[0]['tc'])
+         self.n_parallel = len(self.mat['tc'])
          if comm.rank == 0 and self.verbose: self.full_info() 
         #------------------------------------------
 
@@ -166,7 +171,13 @@ class Solver(object):
          argv['rr'] = self.rr
          argv['n_parallel'] = self.n_parallel
          argv['kappa_factor'] = self.kappa_factor
-         
+
+         #if argv.setdefault('user',False):
+         argv['mat'] = self.mat
+         #else: 
+         # argv['mat'] = self.mat[0]
+
+
          if argv.setdefault('user',False):
 
             argv['n_serial'] = self.n_serial
@@ -262,15 +273,24 @@ class Solver(object):
 
   def bulk_info(self):
 
-          #print('                        MATERIAL                 ')   
-          #print(colored(' -----------------------------------------------------------','green'))
-          print(colored('  Model:                                   ','green')+ self.model,flush=True)
+           #print('                        MATERIAL                 ')   
+           #print(colored(' -----------------------------------------------------------','green'))
+           print(colored('  Model:                                   ','green')+ self.model,flush=True)
 
-          for key,value in self.mat.items():
-           print(colored('  Bulk Thermal Conductivity (xx) [W/m/K]:  ','green')+ str(round(self.mat[key]['kappa'][0,0],2)),flush=True)
-           print(colored('  Bulk Thermal Conductivity (yy) [W/m/K]:  ','green')+ str(round(self.mat[key]['kappa'][1,1],2)),flush=True)
-           if self.dim == 3:
-            print(colored('  Bulk Thermal Conductivity (zz)[W/m/K]:   ','green')+ str(round(self.mat[key]['kappa'][2,2],2)),flush=True)
+          
+           if self.mat['kappa'].ndim == 3:
+              for kappa in self.mat['kappa']:    
+                print(colored('  Bulk Thermal Conductivity (xx) [W/m/K]:  ','green')+ str(round(kappa[0,0],2)),flush=True)
+                print(colored('  Bulk Thermal Conductivity (yy) [W/m/K]:  ','green')+ str(round(kappa[1,1],2)),flush=True)
+                if self.dim == 3:
+                  print(colored('  Bulk Thermal Conductivity (zz)[W/m/K]:   ','green')+ str(round(kappa[2,2],2)),flush=True)
+           else: 
+                kappa = self.mat['kappa']
+                print(colored('  Bulk Thermal Conductivity (xx) [W/m/K]:  ','green')+ str(round(kappa[0,0],2)),flush=True)
+                print(colored('  Bulk Thermal Conductivity (yy) [W/m/K]:  ','green')+ str(round(kappa[1,1],2)),flush=True)
+                if self.dim == 3:
+                  print(colored('  Bulk Thermal Conductivity (zz)[W/m/K]:   ','green')+ str(round(kappa[2,2],2)),flush=True)
+
 
            dirr = self.mesh['meta'][-1]
            if dirr == 0:
@@ -316,6 +336,9 @@ class Solver(object):
 
     elif m == 1:
      self.model = 'Gray2D'
+
+    elif m == -1:
+     self.model = 'user'
 
     elif m == 2:
      self.model = 'gray2Dsym'

@@ -28,6 +28,7 @@ class Geometry(object):
 
      #Generate structure
      lx,ly,lz = argv['user_model'].generate_structure()
+
      argv['bounding_box'] = [lx,ly,lz]
 
      self.import_mesh(**argv)
@@ -35,13 +36,14 @@ class Geometry(object):
      #Generate pattern
      self.elem_mat_map = argv['user_model'].generate_pattern(self)
 
+
     else:
      Mesher(argv) #this create mesh.msh
      self.dmin = argv['dmin']
      self.import_mesh(**argv)
      self.elem_mat_map = np.zeros(len(self.elems)) #omhogeneous material
 
-    self.update_side_interface()
+    self.update_side_interface(**argv)
     self.state = self.compute_mesh_data(**argv)
     if argv.setdefault('save',True):
      save_data('geometry',self.state)   
@@ -58,13 +60,35 @@ class Geometry(object):
         d1 = normal * np.dot(normal,d)
         self.bconn.append(d1)
 
- def update_side_interface(self):
+ def update_side_interface(self,**argv):
 
+  #Find interface sides---    
   interface_sides = []
   for ll in self.side_list['active']:
      (k1,k2) = self.side_elem_map[ll]
      if not self.elem_mat_map[k1] == self.elem_mat_map[k2]:
              interface_sides.append(ll)
+
+
+  #remove active sides---
+  #if argv.setdefault('carved',False):
+  # for elem in np.where(self.elem_mat_map == 0)[0]:
+  #  for side in self.elems[elem]:
+  #    if side in self.side_list['active']:
+  #     self.side_list['active'].remove(side)
+
+  # self.side_list['Boundary'] += interface_sides
+  # self.side_list['active'] += interface_sides
+
+   #Just cut inside material
+  # for side in interface_sides:
+  #   (elem_a,elem_b) = self.side_elem_map[side]
+  #   if self.elem_mat_map[elem_a] == 0:
+  #      self.side_elem_map[side] = [elem_b,elem_b]
+  #   else:   
+  #      self.side_elem_map[side] = [elem_a,elem_a]
+
+  #else:
   interface_sides = np.array(interface_sides)
   self.side_list['Interface'] = interface_sides  
 
@@ -165,12 +189,16 @@ class Geometry(object):
           'interface_sides':np.array(self.side_list['Interface']),
           'periodic_sides':np.array(self.side_list['Periodic']),
           'boundary_sides':np.array(self.side_list['Boundary']),
-          'n_side_per_elem': np.array([len(i)  for i in self.elems]),
+          #'n_side_per_elem': np.array([len(i)  for i in self.elems]),
           'n_non_boundary_side_per_elem': np.array(self.n_non_boundary_side_per_elem,dtype=np.int),
           'pp':np.array(self.pp),\
           'side_per_elem':np.array(self.side_per_elem),\
           'applied_gradient':np.array(self.applied_grad),\
           'meta':np.asarray([self.n_elems,self.kappa_factor,self.dim,len(self.nodes),len(self.side_list['active']),dirr],np.float64)}
+
+
+
+        
 
 
 
@@ -217,7 +245,7 @@ class Geometry(object):
       self.intk.append(normal*area/vol1)
       self.intk.append(-normal*area/vol2)
 
-     if not (l1 == l2) :#and (not ll in self.side_list['Interface']) :
+     if not (l1 == l2)  and (not ll in self.side_list['Interface']) :
        self.i.append(l1)   
        self.j.append(l2)   
        self.i.append(l2)   
@@ -227,7 +255,6 @@ class Geometry(object):
        self.k.append(normal*area/vol1)
        self.k.append(-normal*area/vol2)
      else:
-
        if ll in self.side_list['Boundary']:
         self.eb.append(l1)
         self.sb.append(ll)

@@ -26,7 +26,13 @@ class Material(object):
  def __init__(self,**argv):
 
    save = argv.setdefault('save',True)
-   model = argv['model']
+
+   if argv.setdefault('user',False) :
+      model = 'user'
+   else:   
+     model = argv['model']
+
+
    source = argv.setdefault('source','local')
    if source == 'database':
     if comm.rank == 0:
@@ -36,10 +42,10 @@ class Material(object):
 
         argv['basename'] = basename
 
-        #shutil.copyfile(filename,os.getcwd() + '/' + model[:3] +'.npz')
    if source == 'unlisted':
     if comm.rank == 0:
       download_file(argv['file_id'],'rta.npz')
+
 
    if model == 'full':
      if comm.rank == 0:
@@ -47,7 +53,11 @@ class Material(object):
 
    elif model == 'mfp2DSym':
       data = generate_mfp2DSym(**argv)
-   
+  
+   elif model == 'user':
+
+     data = argv['user_model'].material()
+
    elif model == 'fourier':
       
       kappa = np.eye(3)
