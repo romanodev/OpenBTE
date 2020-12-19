@@ -298,6 +298,8 @@ def get_kappa_map(mesh,kappa):
         if kappa.ndim == 2: 
           kappa = np.tile(kappa,(n_elems,1,1))
 
+
+    kappa = kappa[:,:dim,:dim]
     return kappa
 
 

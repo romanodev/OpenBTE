@@ -12,4 +12,10 @@ def rta2D():
 
 def test_function():
 
+
     assert np.allclose(rta2D(),load_data('solver')['kappa'])
+
+
+if __name__ == '__main__':
+
+    rta2D()
