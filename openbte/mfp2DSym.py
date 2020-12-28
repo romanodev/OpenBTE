@@ -29,7 +29,7 @@ def get_linear_indexes(mfp,value):
 
 
 
-def generate_mfp2DSym(**argv):
+def mfp2DSym(**argv):
 
  #load data
  data = load_data('mfp')

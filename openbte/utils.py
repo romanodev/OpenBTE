@@ -178,6 +178,11 @@ def save_data(fh, namedict):
                                                  #np.asanyarray(v),
                                                  #allow_pickle=True)
 
+def load(fh):
+
+    return  {f:load_data(f) for f in fh}
+
+
 def load_data(fh):
 
      if os.path.isfile(fh + '.npz'):
@@ -509,6 +514,18 @@ def shared_array(value):
     return create_shared_memory_dict(data)['dummy']
 
 
+def get_kappa_map_from_mat(**argv):
+
+        mat_map = argv['geometry']['elem_mat_map']
+        kappa =   argv['material']['kappa']
+
+        kappa = np.array(kappa)
+        if kappa.ndim == 3:
+         return np.array([ list(kappa[i])  for i in mat_map])
+        else:
+         return np.array([ list(kappa)  for i in mat_map])
+            
+
 
 def create_shared_memory_dict(varss):
 
@@ -518,7 +535,6 @@ def create_shared_memory_dict(varss):
           for var,value in varss.items():
 
            if type(value) == list: value = np.array(value)   
-           
            if value.dtype == np.int64:
               data_type = 0
               itemsize = MPI.INT.Get_size()

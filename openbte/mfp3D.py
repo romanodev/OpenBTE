@@ -8,8 +8,6 @@ comm = MPI.COMM_WORLD
 
 
 
-
-
 def get_linear_indexes(mfp,value):
 
 
@@ -30,7 +28,7 @@ def get_linear_indexes(mfp,value):
 
 
 
-def generate_mfp3D(**argv): 
+def mfp3D(**argv): 
 
    #load data
    if argv.setdefault('read_from_file',True):

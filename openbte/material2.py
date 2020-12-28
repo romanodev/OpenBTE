@@ -1,7 +1,8 @@
 import numpy as np
 import os
 import math
-from .full_model import *
+#from .database import *
+from .full_model import generate_full
 from .utils import *
 from .mfp2DSym import *
 from .mfp2D import *
@@ -11,14 +12,28 @@ from .rta2DSym import *
 from .rta3D import *
 from mpi4py import MPI
 import shutil
+#import pickle
+#import lzma
+#import gzip
+#import bz2
+
+
+
 
 comm = MPI.COMM_WORLD
 
-def Material(**argv):
+class Material(object):
 
-   model = argv['model']
+ def __init__(self,**argv):
 
-   #set up database
+   save = argv.setdefault('save',True)
+
+   if argv.setdefault('user',False) :
+      model = 'user'
+   else:   
+     model = argv['model']
+
+
    source = argv.setdefault('source','local')
    if source == 'database':
     if comm.rank == 0:
@@ -32,20 +47,17 @@ def Material(**argv):
     if comm.rank == 0:
       download_file(argv['file_id'],'rta.npz')
 
-   if model == 'rta2DSym':
-     if comm.rank == 0:
-      data = rta2DSym(**argv)
 
-   elif argv.setdefault('save',True):
+   if model == 'full':
      if comm.rank == 0:
-         save_data(argv.setdefault('output_filename','material'),data)   
-
-   elif model == 'full':
-     if comm.rank == 0:
-      data = full(**argv)
+      data = generate_full(**argv)
 
    elif model == 'mfp2DSym':
-      data = mfp2DSym(**argv)
+      data = generate_mfp2DSym(**argv)
+  
+   elif model == 'user':
+
+     data = argv['user_model'].material()
 
    elif model == 'fourier':
       
@@ -59,32 +71,31 @@ def Material(**argv):
       data = {'kappa':kappa,'model':[0]}
 
    elif model == 'mfp2D':
-      data = mfp2D(**argv)
+      data = generate_mfp2D(**argv)
 
    elif model == 'gray2DSym':
-      data = mfp2DSym(**argv)
+      data = generate_mfp2DSym(**argv)
 
    elif model == 'gray2D':
-      data = gray2D(**argv)
+      data = generate_gray2D(**argv)
 
    elif model == 'gray3D':
-      data = mfp3D(**argv)
-   
+      data = generate_mfp3D(**argv)
+
    elif model == 'mfp3D':
-      data = mfp3D(**argv)
+      data = generate_mfp3D(**argv)
+
+   elif model == 'rta2DSym':
+     if comm.rank == 0:
+      data = generate_rta2DSym(**argv)
 
    elif model == 'rta3D':
      if comm.rank == 0:
-      data = rta3D(**argv)
+      data = generate_rta3D(**argv)
 
-   else:   
-      print('No model recognized')
-      quit()
-
-   if comm.rank == 0:
-    return data
-
- 
-
-
-
+   if save :
+     if comm.rank == 0:
+         save_data(argv.setdefault('output_filename','material'),data)   
+   else:
+     if comm.rank == 0:
+      self.state = data

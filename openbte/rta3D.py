@@ -4,10 +4,8 @@ import scipy
 from .utils import *
 import time
 
-def generate_rta3D(**argv):
+def rta3D(**argv):
 
- #Import data----
- #Get options----
 
  #Compute directions---------------
  n_phi = int(argv.setdefault('n_phi',48))

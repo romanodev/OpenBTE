@@ -55,10 +55,13 @@ extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',\
     'sphinx.ext.mathjax',\
     'recommonmark',\
+    'sphinxcontrib.bibtex',\
     'sphinx.ext.napoleon',\
     'sphinx.ext.viewcode',\
     'nbsphinx']
 
+bibtex_bibfiles = ['refs.bib']
+bibtex_default_style = 'plain'
 
 #nbsphinx_prolog = r"""
 #.. raw:: html

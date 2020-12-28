@@ -13,7 +13,7 @@ import matplotlib.pylab as plt
 
 class Mesher(object):
 
- def __init__(self,argv):
+ def __init__(self,**argv):
 
   argv['dmin'] = 0
   model = argv.setdefault('model','lattice')

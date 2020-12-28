@@ -3,7 +3,7 @@ import numpy as np
 from .utils import *
 
 
-def generate_gray2D(**argv):
+def gray2D(**argv):
 
  #Import data----
  kappa_bulk = argv['kappa']

@@ -3,11 +3,9 @@ import numpy as np
 import scipy
 from .utils import *
 import time
-from mpi4py import MPI
-comm = MPI.COMM_WORLD
 
 
-def generate_rta2DSym(**argv):
+def rta2DSym(**argv):
 
  #Import data----
  #Get options----

@@ -17,6 +17,19 @@ from cachetools.keys import hashkey
 
 comm = MPI.COMM_WORLD
 
+
+def fourier_info(data):
+
+          print('                        FOURIER                 ',flush=True)   
+          print(colored(' -----------------------------------------------------------','green'),flush=True)
+          print(colored('  Iterations:                              ','green') + str(int(data[2])),flush=True)
+          print(colored('  Relative error:                          ','green') + '%.1E' % (data[1]),flush=True)
+          print(colored('  Fourier Thermal Conductivity [W/m/K]:    ','green') + str(round(data[0],3)),flush=True)
+          print(colored(' -----------------------------------------------------------','green'),flush=True)
+          print(" ")
+
+
+
 @cached(cache={}, key=lambda F, k: hashkey(k))
 def get_SU(F,k):
      return splu(k*F + sp.eye(F.shape[0]))
@@ -44,31 +57,52 @@ def fix(F,B):
    return scale
 
 
-def solve_fourier_single(kappa,**argv):
+def solve_fourier_single(argv):
 
-   mesh = argv['mesh']
-   dim = int(mesh['meta'][2])
-   n_elems = int(mesh['meta'][0])
+   data = None
 
-   kappa = -1 #it means that it will take the map from mesh
+   if comm.rank == 0:
 
-   F,B = assemble(mesh,kappa)
+    mesh = argv['geometry']
+    dim = int(mesh['meta'][2])
+    n_elems = int(mesh['meta'][0])
 
-   if argv.setdefault('fix',True): 
+    kappa = -1 #it means that it will take the map from mesh
+
+    F,B = assemble(mesh,kappa)
+
+    if argv.setdefault('fix',True): 
        scale = fix(F,B)
-   else:
+    else:
        scale = []
 
-   meta,temp,grad =  solve_convergence(argv,kappa,B,splu(F),scale=scale)
+    meta,temp,grad =  solve_convergence(argv,kappa,B,splu(F),scale=scale)
 
-   kappa_map = get_kappa_map(mesh,kappa)
+    kappa_map = get_kappa_map(mesh,kappa)
 
-   flux = -np.einsum('cij,cj->ci',kappa_map,grad)
-   return {'flux_fourier':flux,'temperature_fourier':temp,'meta':np.array(meta),'grad':grad}
+    flux = -np.einsum('cij,cj->ci',kappa_map,grad)
 
+    fourier_info(meta)
+   
+    #data = {'Temperature Fourier':{'units':'K','data':temp,'increment':-mesh['applied_gradient']},\
+    #            'Flux Fourier'       :{'units':'W/m/m','data':flux,'increment':[0,0,0]}}
+
+    #data = {0:{'units':'K','data':temp,'increment':-mesh['applied_gradient']},\
+    #        1       :{'units':'W/m/m','data':flux,'increment':[0,0,0]}}
+
+    data = {'meta':meta,'flux':flux,'temperature':temp}
+
+
+   argv['fourier'] = create_shared_memory_dict(data)
+
+
+   #data = create_shared_memory_dict(data)
+   #quit()
+   #return  {'variables':variables,'kappa_fourier':meta[0]}
 
 
 def get_kappa(mesh,i,j,ll,kappa):
+
 
    if i == j:
     return np.array(kappa[i])
@@ -83,7 +117,18 @@ def get_kappa(mesh,i,j,ll,kappa):
    kj = np.dot(normal,np.dot(kappa_j,normal))
    w  = mesh['interp_weigths'][ll]
 
-   kappa_loc = kj*kappa_i/(ki*(1-w) + kj*w)
+   if ll in mesh['interface_sides']:
+     dist   = mesh['dists'][ll,0:dim]*1e-9
+
+     h = 0.882e9
+
+     #B = ki*kj/h/np.linalg.norm(dist)
+     B = 0
+
+   else:  
+     B = 0
+
+   kappa_loc = kj*kappa_i/(ki*(1-w) + kj*w + B)
 
    return kappa_loc
 
@@ -158,7 +203,7 @@ def compute_grad_data(mesh,dummy):
 
 def compute_grad(temp,**argv):
 
-   mesh = argv['mesh'] 
+   mesh = argv['geometry'] 
    
    rr = compute_grad_data(mesh,1)
 
@@ -177,9 +222,9 @@ def compute_secondary_flux(temp,kappa_map,**argv):
    gradT = compute_grad(temp,**argv)
    #--------------
 
-   mesh = argv['mesh'] 
+   mesh = argv['geometry'] 
    dim = int(mesh['meta'][2])
-   n_elems = len(argv['mesh']['elems'])
+   n_elems = len(mesh['elems'])
 
    #-----------SAVE some time--------------------------------------
    v_non_orth = {}
@@ -214,9 +259,7 @@ def compute_secondary_flux(temp,kappa_map,**argv):
 
 def compute_diffusive_thermal_conductivity(temp,kappa_map,**argv):
     
-
-
-   mesh = argv['mesh']  
+   mesh = argv['geometry']  
 
    dim = int(mesh['meta'][2])
    kappa_eff = 0
@@ -246,9 +289,13 @@ def compute_diffusive_thermal_conductivity(temp,kappa_map,**argv):
 
 def solve_convergence(argv,kappa,B,SU,log=False,scale=[]):
 
+
+    argv.setdefault('max_fourier_error',1e-6) 
+    argv.setdefault('max_fourier_iter',10) 
+
     C  = np.zeros_like(B)
 
-    mesh = argv['mesh']  
+    mesh = argv['geometry']  
 
     kappa_map = get_kappa_map(mesh,kappa)
 
@@ -263,7 +310,6 @@ def solve_convergence(argv,kappa,B,SU,log=False,scale=[]):
         RHS = B + C
     
         if len(scale) > 0: RHS *=scale
-
 
         temp = SU.solve(RHS)
         temp = temp - (max(temp)+min(temp))/2.0

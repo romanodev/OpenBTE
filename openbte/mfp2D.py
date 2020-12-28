@@ -28,7 +28,7 @@ def get_linear_indexes(mfp,value):
    
 
 
-def generate_mfp2D(**argv):
+def mfp2D(**argv):
 
  #load data
  if argv.setdefault('read_from_file',True):

@@ -48,7 +48,7 @@ def energy_conserving(W):
 
  return W
 
-def generate_full(**argv):
+def full(**argv):
 
  filename = 'full.npz'
 

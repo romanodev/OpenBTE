@@ -1,4 +1,3 @@
-
 OpenBTE documentation
 ===================================
 
@@ -69,6 +68,14 @@ NOTE: a multiscale model is coming soon (check back in a few days)
    :caption: Scripts
 
    scripts
+
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Theory
+
+   theory
+
 
 .. toctree::
    :maxdepth: 2
