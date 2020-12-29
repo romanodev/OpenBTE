@@ -686,7 +686,7 @@ def compute_side_areas(nodes,sides,dim):
   if dim == 2:
    side_areas = [  np.linalg.norm(nodes[s[1]] - nodes[s[0]]) for s in sides ]
   else:     
-   p = self.nodes[sides]
+   p =nodes[sides]
    side_areas = np.linalg.norm(np.cross(p[:,0]-p[:,1],p[:,0]-p[:,2]),keepdims=True,axis=1).T[0]/2
 
   return side_areas 

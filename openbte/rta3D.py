@@ -56,7 +56,6 @@ def rta3D(**argv):
  n_mfp = len(mfp)
  temp_coeff = np.zeros((n_mfp,n_phi*n_theta))
  kappa_directional = np.zeros((n_mfp,n_phi*n_theta,3)) 
- kappa_directional2 = np.zeros((n_mfp,n_phi*n_theta,3)) 
 
  a = time.time()
  #NEW---
@@ -71,27 +70,27 @@ def rta3D(**argv):
 
  #Interpolate temperature----
  temp_coeff2 = np.zeros((n_mfp,n_phi*n_theta))
- np.add.at(temp_coeff2,(m1,index_1),a1*u1*tc)
- np.add.at(temp_coeff2,(m1,index_2),a1*u2*tc)
- np.add.at(temp_coeff2,(m2,index_1),a2*u1*tc)
- np.add.at(temp_coeff2,(m2,index_2),a2*u2*tc)
- np.add.at(temp_coeff2,(m1,index_3),a1*u3*tc)
- np.add.at(temp_coeff2,(m1,index_4),a1*u4*tc)
- np.add.at(temp_coeff2,(m2,index_3),a2*u3*tc)
- np.add.at(temp_coeff2,(m2,index_4),a2*u4*tc)
+ np.add.at(temp_coeff,(m1,index_1),a1*u1*tc)
+ np.add.at(temp_coeff,(m1,index_2),a1*u2*tc)
+ np.add.at(temp_coeff,(m2,index_1),a2*u1*tc)
+ np.add.at(temp_coeff,(m2,index_2),a2*u2*tc)
+ np.add.at(temp_coeff,(m1,index_3),a1*u3*tc)
+ np.add.at(temp_coeff,(m1,index_4),a1*u4*tc)
+ np.add.at(temp_coeff,(m2,index_3),a2*u3*tc)
+ np.add.at(temp_coeff,(m2,index_4),a2*u4*tc)
 
  #Interpolate flux----
- np.add.at(kappa_directional2,(m1, index_1),Jc*(a1*u1)[:,np.newaxis])
- np.add.at(kappa_directional2,(m1, index_2),Jc*(a1*u2)[:,np.newaxis])
- np.add.at(kappa_directional2,(m2, index_1),Jc*(a2*u1)[:,np.newaxis])
- np.add.at(kappa_directional2,(m2, index_2),Jc*(a2*u2)[:,np.newaxis])
- np.add.at(kappa_directional2,(m1, index_3),Jc*(a1*u3)[:,np.newaxis])
- np.add.at(kappa_directional2,(m1, index_4),Jc*(a1*u4)[:,np.newaxis])
- np.add.at(kappa_directional2,(m2, index_3),Jc*(a2*u3)[:,np.newaxis])
- np.add.at(kappa_directional2,(m2, index_4),Jc*(a2*u4)[:,np.newaxis])
+ np.add.at(kappa_directional,(m1, index_1),Jc*(a1*u1)[:,np.newaxis])
+ np.add.at(kappa_directional,(m1, index_2),Jc*(a1*u2)[:,np.newaxis])
+ np.add.at(kappa_directional,(m2, index_1),Jc*(a2*u1)[:,np.newaxis])
+ np.add.at(kappa_directional,(m2, index_2),Jc*(a2*u2)[:,np.newaxis])
+ np.add.at(kappa_directional,(m1, index_3),Jc*(a1*u3)[:,np.newaxis])
+ np.add.at(kappa_directional,(m1, index_4),Jc*(a1*u4)[:,np.newaxis])
+ np.add.at(kappa_directional,(m2, index_3),Jc*(a2*u3)[:,np.newaxis])
+ np.add.at(kappa_directional,(m2, index_4),Jc*(a2*u4)[:,np.newaxis])
+
  
  rhs_average = mfp_sampled*mfp_sampled/3
-
 
  return {'tc':temp_coeff,\
          'sigma':kappa_directional,\

@@ -135,6 +135,7 @@ def Solver(**argv):
             
             print_bulk_info(mat,mesh)
             print_mpi_info()
+            print_grid_info(mesh,mat)
         
         argv['geometry'] = create_shared_memory_dict(mesh)
 
@@ -173,38 +174,34 @@ def print_mpi_info():
           print(" ")
 
 
-def full_info(self):
-          print(colored('  Number of modes:                         ','green')+ str(self.n_parallel),flush=True)
-
-
-def mfp_info(self):
-          print(colored('  Number of MFP:                           ','green')+ str(self.n_serial),flush=True)
-          print(colored('  Number of Solid Angles:                  ','green')+ str(self.n_parallel),flush=True)
 
 
 
+def print_grid_info(mesh,mat):
 
-def mesh_info(self):
+          dim     = int(mesh['meta'][2])
+          n_elems = len(mesh['elems'])
+          print('                          GRID                 ')   
+          print(colored(' -----------------------------------------------------------','green'))
+          print(colored('  Dimension:                               ','green') + str(dim),flush=True)
+          print(colored('  Size along X [nm]:                       ','green')+ str(round(mesh['size'][0],2)),flush=True)
+          print(colored('  Size along y [nm]:                       ','green')+ str(round(mesh['size'][1],2)),flush=True)
+          if dim == 3:
+           print(colored('  Size along z [nm]:                       ','green')+ str(round(mesh['size'][2],2)),flush=True)
+          print(colored('  Number of Elements:                      ','green') + str(n_elems),flush=True)
+          print(colored('  Number of Sides:                         ','green') + str(len(mesh['active_sides'])),flush=True)
+          print(colored('  Number of Nodes:                         ','green') + str(len(mesh['nodes'])),flush=True)
+          print(colored('  Number of MFP:                           ','green')+ str(mat['tc'].shape[0]),flush=True)
+          print(colored('  Number of Solid Angles:                  ','green')+ str(mat['tc'].shape[1]),flush=True)
 
-          #print('                        SPACE GRID                 ')   
-          #print(colored(' -----------------------------------------------------------','green'))
-          print(colored('  Dimension:                               ','green') + str(self.dim),flush=True)
-          print(colored('  Size along X [nm]:                       ','green')+ str(round(self.mesh['size'][0],2)),flush=True)
-          print(colored('  Size along y [nm]:                       ','green')+ str(round(self.mesh['size'][1],2)),flush=True)
-          if self.dim == 3:
-           print(colored('  Size along z [nm]:                       ','green')+ str(round(self.mesh['size'][2],2)),flush=True)
-          print(colored('  Number of Elements:                      ','green') + str(self.n_elems),flush=True)
-          print(colored('  Number of Sides:                         ','green') + str(len(self.mesh['active_sides'])),flush=True)
-          print(colored('  Number of Nodes:                         ','green') + str(len(self.mesh['nodes'])),flush=True)
-
-          if self.dim == 3:
-           filling = np.sum(self.mesh['volumes'])/self.mesh['size'][0]/self.mesh['size'][1]/self.mesh['size'][2]
+          if dim == 3:
+           filling = np.sum(mesh['volumes'])/mesh['size'][0]/mesh['size'][1]/mesh['size'][2]
           else: 
-           filling = np.sum(self.mesh['volumes'])/self.mesh['size'][0]/self.mesh['size'][1]
+           filling = np.sum(mesh['volumes'])/mesh['size'][0]/mesh['size'][1]
           print(colored('  Computed porosity:                       ','green') + str(round(1-filling,3)),flush=True)
           
-          #print(colored(' -----------------------------------------------------------','green'))
-          #print(" ")
+          print(colored(' -----------------------------------------------------------','green'))
+          print(" ")
 
 
 
