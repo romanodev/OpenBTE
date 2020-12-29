@@ -11,9 +11,16 @@ import time
 import sys
 import scipy
 from matplotlib.pylab import *
-from cachetools import cached
+from cachetools import cached,LRUCache
 from cachetools.keys import hashkey
 comm = MPI.COMM_WORLD
+      
+cache_compute_lu = LRUCache(maxsize=10000)
+
+def clear_BTE_cache():
+
+  cache_compute_lu.clear()
+
       
 def get_m(Master,data):
     
@@ -48,15 +55,10 @@ def print_multiscale(argv,MM):
         print(colored(' -----------------------------------------------------------','green'),flush=True)
 
 
-@cached(cache={}, key=lambda data,indices:hashkey(indices))
+@cached(cache=cache_compute_lu, key=lambda data,indices:hashkey(indices))
 def compute_lu(A,indices):
 
  return sp.linalg.splu(A)
-
-@cached(cache={}, key=lambda data,indices:hashkey(indices))
-def compute_spilu(A,indices):
-
- return sp.linalg.spilu(A)
 
 
 

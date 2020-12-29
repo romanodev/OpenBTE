@@ -97,7 +97,9 @@ def prepare_data(argv):
             variables[3]    = {'name':'Flux BTE'       ,'units':'W/m/m','data':argv['bte']['flux'],'increment':[0,0,0]}
               
 
-          argv['data'] = {'variables':variables,'kappa_fourier':argv['fourier']['meta'][0],'kappa':argv['bte']['kappa']}
+          argv['data'] = {'variables':variables,'kappa_fourier':argv['fourier']['meta'][0]}
+          if 'bte' in argv.keys():
+            argv['data']['kappa'] = argv['bte']['kappa']  
 
 
 
@@ -159,6 +161,9 @@ def Solver(**argv):
         if comm.rank == 0 and argv.setdefault('save',True):
            save_data(argv.setdefault('filename','solver'),argv['data'])   
 
+        #Clear cache
+        clear_fourier_cache() 
+        clear_BTE_cache() 
         if argv['verbose'] and comm.rank == 0:
            print(' ',flush=True)   
            print(colored('                 OpenBTE ended successfully','green'),flush=True)

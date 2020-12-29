@@ -11,12 +11,24 @@ import scikits.umfpack as um
 import sys
 #from shapely.geometry import LineString
 import scipy
-from cachetools import cached
+from cachetools import cached,LRUCache
 from cachetools.keys import hashkey
-
 
 comm = MPI.COMM_WORLD
 
+cache_assemble = LRUCache(maxsize=1000)
+cache_compute_grad_data = LRUCache(maxsize=10000)
+cache_get_SU = LRUCache(maxsize=10000)
+cache_get_decomposed_directions = LRUCache(maxsize=10000)
+
+
+def clear_fourier_cache():
+
+   if comm.rank == 0:
+    cache_assemble.clear()
+    cache_compute_grad_data.clear()
+    cache_get_SU.clear()
+    cache_get_decomposed_directions.clear()
 
 def fourier_info(data):
 
@@ -30,7 +42,7 @@ def fourier_info(data):
 
 
 
-@cached(cache={}, key=lambda F, k: hashkey(k))
+@cached(cache=cache_get_SU, key=lambda F, k: hashkey(k))
 def get_SU(F,k):
      return splu(k*F + sp.eye(F.shape[0]))
 
@@ -54,6 +66,7 @@ def fix(F,B):
    F[n,n] = 1
    B[n] = 0   
 
+
    return scale
 
 
@@ -69,12 +82,7 @@ def solve_fourier_single(argv):
 
     kappa = -1 #it means that it will take the map from mesh
 
-    F,B = assemble(mesh,kappa)
-
-    if argv.setdefault('fix',True): 
-       scale = fix(F,B)
-    else:
-       scale = []
+    F,B,scale = assemble(mesh,kappa)
 
     meta,temp,grad =  solve_convergence(argv,kappa,B,splu(F),scale=scale)
 
@@ -84,21 +92,11 @@ def solve_fourier_single(argv):
 
     fourier_info(meta)
    
-    #data = {'Temperature Fourier':{'units':'K','data':temp,'increment':-mesh['applied_gradient']},\
-    #            'Flux Fourier'       :{'units':'W/m/m','data':flux,'increment':[0,0,0]}}
-
-    #data = {0:{'units':'K','data':temp,'increment':-mesh['applied_gradient']},\
-    #        1       :{'units':'W/m/m','data':flux,'increment':[0,0,0]}}
-
     data = {'meta':meta,'flux':flux,'temperature':temp}
 
 
    argv['fourier'] = create_shared_memory_dict(data)
 
-
-   #data = create_shared_memory_dict(data)
-   #quit()
-   #return  {'variables':variables,'kappa_fourier':meta[0]}
 
 
 def get_kappa(mesh,i,j,ll,kappa):
@@ -147,9 +145,8 @@ def get_kappa_tensor(mesh,ll,kappa):
     return rot   
 
 
-@cached(cache={}, key=lambda mesh,kappa_ll:hashkey(kappa_ll))
+@cached(cache=cache_get_decomposed_directions, key=lambda mesh,kappa_ll:hashkey(kappa_ll))
 def get_decomposed_directions(mesh,kappa_ll):
-
      
     ll,kappa = unpack(kappa_ll)
 
@@ -178,7 +175,7 @@ def compute_laplacian(temp,**argv):
 
 
 
-@cached(cache={},key=lambda mesh,dummy:dummy)
+@cached(cache=cache_compute_grad_data,key=lambda mesh,dummy:dummy)
 def compute_grad_data(mesh,dummy):
 
      #Compute deltas-------------------   
@@ -313,7 +310,6 @@ def solve_convergence(argv,kappa,B,SU,log=False,scale=[]):
 
         temp = SU.solve(RHS)
         temp = temp - (max(temp)+min(temp))/2.0
-        #print(min(temp),max(temp))
 
         kappa_eff = compute_diffusive_thermal_conductivity(temp,kappa_map,**argv)
         #quit()
@@ -349,7 +345,7 @@ def get_kappa_map(mesh,kappa):
     return kappa
 
 
-@cached(cache={}, key=lambda mesh, kappa: hashkey(kappa))
+@cached(cache=cache_assemble, key=lambda mesh, kappa: hashkey(kappa))
 def assemble(mesh,kappa):
 
 
@@ -370,6 +366,7 @@ def assemble(mesh,kappa):
       if not i == j:
      
        kappa_loc = get_kappa(mesh,i,j,ll,kappa_map)
+       
        (v_orth,dummy) = get_decomposed_directions(mesh,get_key(ll,kappa_loc))
 
        iff.append(i)
@@ -391,7 +388,10 @@ def assemble(mesh,kappa):
 
     F = sp.csc_matrix((np.array(dff),(np.array(iff),np.array(jff))),shape = (n_elems,n_elems))
 
-    return F,B
+    #This scale the matrix and fixed zero temperature to a random point
+    scale = fix(F,B)
+
+    return F,B,scale
 
 
 

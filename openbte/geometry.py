@@ -175,19 +175,19 @@ def compute_interpolation_weigths(data):
 
   #from here: http://geomalgorithms.com/a05-_intersect-1.html
 
-  acs = data['active_sides']
-  e1 =  data['side_elem_map_vec'][acs,0]
+  net_sides=data['active_sides'][~np.isin(data['active_sides'],data['boundary_sides'])] #Get only the nonboundary sides
+
+  e1 =  data['side_elem_map_vec'][net_sides,0]
 
   w =  np.zeros((len(data['sides']),3))
 
-  w[acs] = data['centroids'][e1] - data['nodes'][data['sides'][acs,0]]
+  w[net_sides] = data['centroids'][e1] - data['nodes'][data['sides'][net_sides,0]]
 
   tmp  = np.einsum('ui,ui->u',data['face_normals'],data['dists'])
   tmp2 = np.einsum('ui,ui->u',data['face_normals'],w)
 
-  
   interp_weigths = np.zeros(len(data['sides']))
-  interp_weigths[acs]   = 1+tmp2[acs]/tmp[acs] #this is the relative distance with the centroid of the second element
+  interp_weigths[net_sides]   = 1+tmp2[net_sides]/tmp[net_sides] #this is the relative distance with the centroid of the second element
 
 
   #check----------------------------------
