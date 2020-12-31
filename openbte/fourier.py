@@ -9,7 +9,6 @@ import time
 from scipy.sparse.linalg import lgmres
 import scikits.umfpack as um
 import sys
-#from shapely.geometry import LineString
 import scipy
 from cachetools import cached,LRUCache
 from cachetools.keys import hashkey
@@ -76,7 +75,10 @@ def solve_fourier_single(argv):
 
    if comm.rank == 0:
 
+
     mesh = argv['geometry']
+
+    mesh['elem_kappa_map'] = get_kappa_map_from_mat(**argv)
     dim = int(mesh['meta'][2])
     n_elems = int(mesh['meta'][0])
 
@@ -323,6 +325,7 @@ def solve_convergence(argv,kappa,B,SU,log=False,scale=[]):
 
 def get_kappa_map(mesh,kappa):
 
+
     n_elems = len(mesh['elems'])
     dim = int(mesh['meta'][2])
 
@@ -340,14 +343,12 @@ def get_kappa_map(mesh,kappa):
         if kappa.ndim == 2: 
           kappa = np.tile(kappa,(n_elems,1,1))
 
-
     kappa = kappa[:,:dim,:dim]
     return kappa
 
 
 @cached(cache=cache_assemble, key=lambda mesh, kappa: hashkey(kappa))
 def assemble(mesh,kappa):
-
 
     kappa_map = get_kappa_map(mesh,kappa)
 

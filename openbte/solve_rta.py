@@ -35,8 +35,6 @@ def get_boundary(RHS,eb,n_elems):
     else: 
       return np.zeros(n_elems)  
 
-    #for c,i in enumerate(eb): RHS_tmp[i] += RHS[c]
-
     return RHS_tmp
 
 
@@ -108,7 +106,7 @@ def solve_rta(argv):
       GG = create_shared_memory_dict(data)['GG']
  
     #Bulk properties---
-    G = np.einsum('qj,jn->qn',mat['VMFP'][rr],mesh['k'],optimize=True)
+    G = np.einsum('qj,jn->qn',F[rr],mesh['k'],optimize=True)
     Gp = G.clip(min=0); Gm = G.clip(max=0)
     D = np.zeros((len(rr),len(mesh['elems'])))
 

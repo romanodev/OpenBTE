@@ -36,9 +36,6 @@ def Material(**argv):
      if comm.rank == 0:
       data = rta2DSym(**argv)
 
-   elif argv.setdefault('save',True):
-     if comm.rank == 0:
-         save_data(argv.setdefault('output_filename','material'),data)   
 
    elif model == 'full':
      if comm.rank == 0:
@@ -80,6 +77,11 @@ def Material(**argv):
    else:   
       print('No model recognized')
       quit()
+
+
+   if argv.setdefault('save',True):
+     if comm.rank == 0:
+         save_data(argv.setdefault('output_filename','material'),data)   
 
    if comm.rank == 0:
     return data

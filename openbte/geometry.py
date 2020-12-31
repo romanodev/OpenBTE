@@ -12,7 +12,6 @@ import numpy.testing as npt
 from statistics import mean
 from scipy.ndimage.interpolation import shift
 from collections import Counter
-from .user_custom import *
 from matplotlib.pylab import *
 
 comm = MPI.COMM_WORLD
@@ -647,6 +646,10 @@ def Geometry(**argv):
    data = import_mesh(**argv)
 
    compute_data(data)
+
+   if argv.setdefault('save',True):
+     save_data(argv.setdefault('output_filename','geometry'),data)   
+
 
    return data
 

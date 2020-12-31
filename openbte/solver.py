@@ -153,7 +153,10 @@ def Solver(**argv):
         if not argv['only_fourier']:
 
            if get_model(argv['material']['model'])[0:3] == 'rta':   
-               solve_rta(argv) 
+               solve_rta(argv)
+           else:    
+               solve_full(argv)
+
         
         #Prepare variables--
         prepare_data(argv)
@@ -196,8 +199,13 @@ def print_grid_info(mesh,mat):
           print(colored('  Number of Elements:                      ','green') + str(n_elems),flush=True)
           print(colored('  Number of Sides:                         ','green') + str(len(mesh['active_sides'])),flush=True)
           print(colored('  Number of Nodes:                         ','green') + str(len(mesh['nodes'])),flush=True)
-          print(colored('  Number of MFP:                           ','green')+ str(mat['tc'].shape[0]),flush=True)
-          print(colored('  Number of Solid Angles:                  ','green')+ str(mat['tc'].shape[1]),flush=True)
+
+
+          if mat['model'][0:3] == 'rta':   
+           print(colored('  Number of MFP:                           ','green')+ str(mat['tc'].shape[0]),flush=True)
+           print(colored('  Number of Solid Angles:                  ','green')+ str(mat['tc'].shape[1]),flush=True)
+          else : 
+           print(colored('  Number of wave vectors:                  ','green')+ str(mat['tc'].shape[0]),flush=True)
 
           if dim == 3:
            filling = np.sum(mesh['volumes'])/mesh['size'][0]/mesh['size'][1]/mesh['size'][2]
