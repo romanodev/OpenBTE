@@ -60,16 +60,6 @@ def compute_lu(A,indices):
 
 
 
-def solve(argv,A,B,indices):
-
-    if not argv['keep_lu']:
-        X = sp.linalg.spsolve(A,B,use_umfpack=True)
-    else: 
-        X = compute_lu(A,indices).solve(B)
-
-    return X 
-
-
 
 def solve_rta(argv):
 
@@ -80,6 +70,7 @@ def solve_rta(argv):
     mfp = mat['mfp_sampled']*1e9
     sigma = mat['sigma']*1e9
     dim = int(mesh['meta'][2])
+    F = mat['VMFP']
 
     #Get discretization----
     n_serial,n_parallel = sigma.shape[:2]
@@ -122,7 +113,7 @@ def solve_rta(argv):
     if len(mesh['db']) > 0: #boundary
      tmp = np.einsum('rj,jn->rn',mat['VMFP'][rr],mesh['db'],optimize=True)  
      Gbp2 = tmp.clip(min=0); Gbm2 = tmp.clip(max=0);
-
+ 
      np.add.at(D.T,mesh['eb'],Gbp2.T)
      TB = DeltaT[mesh['eb']]
 
@@ -134,7 +125,6 @@ def solve_rta(argv):
     del G,Gp
     #----------------------------------------------------
 
-    lu =  {}
     kappa_vec = [fourier['meta'][0]]
     kappa_old = kappa_vec[-1]
     error = 1
@@ -159,9 +149,32 @@ def solve_rta(argv):
     conversion = np.asarray(Master.data-1,np.int) 
 
     J = np.zeros((n_elems,dim))
+   
+    lu = {}
+    def solve(argv,A,B,indices):
 
-    a = time.time()
+     if not argv['keep_lu']:
+         X = sp.linalg.spsolve(A,B,use_umfpack=True)
+     else: 
+         
+         if indices in lu:
+            ll = lu[indices]
+         else:   
+            ll = sp.linalg.splu(A)
+            lu[indices] = ll
+
+         X = ll.solve(B)
+
+     return X 
+
+
+
+
+
+
     while kk < argv['max_bte_iter'] and error > argv['max_bte_error']:
+        a = time.time()
+        
         if argv['multiscale']: tf,tfg = solve_fourier(mat['mfp_average'],DeltaT,argv)
         #Multiscale scheme-----------------------------
         diffusive = 0
@@ -201,10 +214,25 @@ def solve_rta(argv):
            for m in range(n_serial)[idx::-1]:
                
                  #-------------------------
+                 #b= time.time()
                  B = DeltaT +  mfp[m]*(P[n] +get_boundary(RHS[n],mesh['eb'],n_elems))
                  A = get_m(Master,np.concatenate((mfp[m]*Gm[n],mfp[m]*D[n]+np.ones(n_elems)))[conversion])
+
+                 #if (q,m) in lu.keys():
+                 #   ll = lu[(q,m)]
+                 #else: 
+                     
+                 #   ll= sp.linalg.splu(A)
+                 #   lu[(q,m)] = ll
+
+                 #X = lu.setdefault((q,m),sp.linalg.splu(A)).solve(B)
+                 #X = ll.solve(B)
+
+
                  X = solve(argv,A,B,(q,m))
                  kappap[m,q] = np.dot(mesh['kappa_mask'],X)
+                 #print(time.time()-b)
+
                  #-------------------------
  
                  if argv['multiscale']:
@@ -267,6 +295,7 @@ def solve_rta(argv):
 
         Mp[0] = diffusive
         Mp[1] = bal
+        print(time.time()-a)
 
         #Centering--
         #DeltaT = DeltaT - (max(DeltaT)+min(DeltaT))/2.0

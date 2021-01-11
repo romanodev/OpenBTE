@@ -13,6 +13,7 @@ class TestClass(object):
       mat = Material(source='database',filename='Si',temperature=300,model='rta2DSym',save=False)
       geo = Geometry(model='lattice',lx = 10,ly = 10, step = 1, base = [[0,0]],porosity=0.2,shape='square',save=False,delete_gmsh_files=True)
       sol = Solver(geometry = geo,material=mat,save=False)
+
       if comm.rank == 0:
        assert np.allclose(sol['kappa'],load_data('solver_rta2DSym')['kappa'])
 
@@ -24,4 +25,7 @@ class TestClass(object):
        sol = Solver(geometry = geo,material=mat,save=False,max_bte_iter=10)
        if comm.rank == 0:
         assert np.allclose(sol['kappa'],load_data('solver_rta3D')['kappa'])
+
+
+
 

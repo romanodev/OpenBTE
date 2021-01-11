@@ -16,6 +16,7 @@ from .solve_rta import *
 from .solve_full import *
 import pkg_resources  
 from .fourier import *
+import warnings
 
 comm = MPI.COMM_WORLD
 
@@ -201,11 +202,13 @@ def print_grid_info(mesh,mat):
           print(colored('  Number of Nodes:                         ','green') + str(len(mesh['nodes'])),flush=True)
 
 
-          if mat['model'][0:3] == 'rta':   
-           print(colored('  Number of MFP:                           ','green')+ str(mat['tc'].shape[0]),flush=True)
-           print(colored('  Number of Solid Angles:                  ','green')+ str(mat['tc'].shape[1]),flush=True)
-          else : 
-           print(colored('  Number of wave vectors:                  ','green')+ str(mat['tc'].shape[0]),flush=True)
+          with warnings.catch_warnings():
+            warnings.simplefilter(action='ignore', category=FutureWarning)
+            if mat['model'][0:3] == 'rta':   
+             print(colored('  Number of MFP:                           ','green')+ str(mat['tc'].shape[0]),flush=True)
+             print(colored('  Number of Solid Angles:                  ','green')+ str(mat['tc'].shape[1]),flush=True)
+            else : 
+             print(colored('  Number of wave vectors:                  ','green')+ str(mat['tc'].shape[0]),flush=True)
 
           if dim == 3:
            filling = np.sum(mesh['volumes'])/mesh['size'][0]/mesh['size'][1]/mesh['size'][2]
