@@ -139,22 +139,26 @@ def Solver(**argv):
             print_bulk_info(mat,mesh)
             print_mpi_info()
             print_grid_info(mesh,mat)
-        
+
+        #load geometry---
         argv['geometry'] = create_shared_memory_dict(mesh)
 
+        #load material---
         argv['material'] = create_shared_memory_dict(mat)
 
         argv['geometry']['elem_kappa_map'] = get_kappa_map_from_mat(**argv)   
 
-
         #Solve fourier--
-        solve_fourier_single(argv)
+        argv['fourier'] = create_shared_memory_dict(solve_fourier_single(argv))
 
         #Solve bte--
         if not argv['only_fourier']:
 
-           if get_model(argv['material']['model'])[0:3] == 'rta':   
+           if get_model(argv['material']['model'])[0:3] == 'rta':  
+               a = time.time()
                solve_rta(argv)
+               print(time.time()-a)
+
            else:    
                solve_full(argv)
 

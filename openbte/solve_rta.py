@@ -295,7 +295,6 @@ def solve_rta(argv):
 
         Mp[0] = diffusive
         Mp[1] = bal
-        print(time.time()-a)
 
         #Centering--
         #DeltaT = DeltaT - (max(DeltaT)+min(DeltaT))/2.0

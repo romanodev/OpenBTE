@@ -92,16 +92,17 @@ class Plot(object):
     return nodes,replace
 
    replace = {}  
-   for i in range(int(self.mesh['dim'])):
+   for i in range(int(self.mesh['meta'][2])):
      nodes,replace = repeat_cell(i,repeat[i],size[i],nodes,replace)
    #---------------------------------------------------
 
    #Repeat elements----------
-   unit_cell = self.mesh['elems'].copy()
-   
+   unit_cell = np.array(self.mesh['elems']).copy()
+  
    elems = self.mesh['elems'] 
    for i in range(np.prod(repeat)-1):
      elems = np.vstack((elems,unit_cell+(i+1)*(n_nodes)))
+
    #------------------------
 
    #duplicate variables---
@@ -168,7 +169,7 @@ class Plot(object):
     
      if value['data'].ndim == 2:
 
-       if self.mesh['dim'] == 2:
+       if self.dim == 2:
         t = np.zeros_like(value['data'])
         value['data'] = np.concatenate((value['data'],t),axis=1)[:,:3]
        output.append(value['data'])
@@ -182,7 +183,7 @@ class Plot(object):
 
    data = eval(strc)
 
-   if self.mesh['dim'] == 3:
+   if self.dim == 3:
    
     vtk = VtkData(UnstructuredGrid(self.mesh['nodes'],tetra=self.mesh['elems']),data)
    else :
@@ -204,7 +205,7 @@ class Plot(object):
        node_data = np.zeros(len(self.mesh['nodes']))
     
    #This works only with uniform type of elements 
-   elem_flat = self.mesh['elems'].flat
+   elem_flat = np.array(self.mesh['elems']).flat
    np.add.at(node_data,elem_flat,np.repeat(data,len(self.mesh['elems'][0]),axis=0))
    np.add.at(conn,elem_flat,np.ones_like(elem_flat))
 

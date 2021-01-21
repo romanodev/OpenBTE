@@ -32,17 +32,50 @@ where we used the relationship :math:`\delta(\alpha x) = |\alpha|^{-1} \delta(x)
    |i\rangle = |...,n_\lambda,n_{\lambda'},n_{\lambda''}  ,... \rangle ,\,\ 
    |f\rangle = |...,n_\lambda-1,n_{\lambda'}-1,n_{\lambda''}+1,... \rangle 
     
+and the Hamiltian reads as
+
+.. math::
+
+   \hat{H} = \Phi_0 + \frac{1}{2}\sum_{\kappa \alpha} m_\kappa  \left(\dot{\hat{u}}_{\alpha}^k\right)^2 + \frac{1}{2} \sum_{\kappa\alpha\kappa'\alpha'}\phi_{\alpha\alpha'}^{\kappa\kappa'} \hat{u}_\alpha^{\kappa} \hat{u}_{\alpha'}^{\kappa'}+ \\ + \frac{1}{6} \sum_{s s' s'' \alpha \alpha' \alpha''l l'l''}\phi_{\alpha\alpha'\alpha''}^{sl s'l's''l''} \hat{u}_\alpha^{sl} \hat{u}_{\alpha'}^{s'l'} \hat{u}_{\alpha''}^{s''l''} + ...
+
+
+The Fourier transform of of the displacement operator is
+
+.. math::
+
+ \hat{\mathbf{u}}(sl) = \sum_\mathbf{q} \hat{\mathbf{u}}(s\mathbf{q}) e^{i\mathbf{q}\cdot \mathbf{r}(sl)}
+ 
+ 
+.. math::
+
+ \hat{u}_{s\alpha}(k) = \sum_l \hat{u}_{s\alpha}(l) e^{-i\mathbf{q}_k\cdot \mathbf{r}_l}
    
 
 
+   
 
 
+The displacements :math:`u_\alpha^\kappa` are calculated using the eignvalue problem
 
 
+.. math::
+
+  \sum_{\alpha's'} \frac{\tilde{\phi}_{\alpha\alpha'}^{ss'} (\mathbf{q})}{\sqrt{m_s {m_s'}}} u_{\alpha'}^{s'} = \omega^{2} u_\alpha^{s} 
+
+where :math:`\tilde{f}` denotes a Fourier transform and now the indices :math:`s,s'` runs within a single unit-cell.  
+
+The displacement can be written as
+
+.. math::
+
+   \hat{u}_\alpha^{\kappa} =   \left[\frac{\hbar}{2m_k}\right]^{\frac{1}{2}}\sum_j \int \left[ \omega(\mathbf{q}j) \right]^{-\frac{1}{2}}  \left[ \hat{a}(\mathbf{q}j) + \hat{a} (\mathbf{-q}j) \right]) W_{\alpha}^{\kappa}(\mathbf{q}j)   e^{i \mathbf{q} \cdot \mathbf{r}_k} \frac{d\mathbf{q}}{\left(2 \pi \right)^3},
 
 
+or :math:`\hat{u}_\alpha^{\kappa} = \sum_j\mathcal{F}^{-1}\left[ \hat{u}_\alpha^{\kappa}(\mathbf{q}j)  \right]` where
 
+.. math::
 
+   \hat{u}_\alpha^{sl}(\mathbf{q}j) =  \left[\frac{\hbar}{2m_k}\right]^{\frac{1}{2}} \left[ \omega(\mathbf{q}j) \right]^{-\frac{1}{2}}  \left[ \hat{a}(\mathbf{q}j) + \hat{a} (\mathbf{-q}j) \right]) W_{\alpha}^{\kappa}(\mathbf{q}j) 
 
 .. _notes: https://ollehellman.github.io/program/thermal_conductivity.html
 

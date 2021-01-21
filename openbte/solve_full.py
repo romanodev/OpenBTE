@@ -2,198 +2,195 @@ from __future__ import absolute_import
 import numpy as np
 from scipy.sparse.linalg import splu
 from termcolor import colored, cprint 
-from .utils import *
-from .fourier import *
-from mpi4py import MPI
+from openbte.utils import *
 import scipy.sparse as sp
 import time
 import sys
 import scipy
+from cachetools import cached
+from scipy.sparse.linalg import gmres
+import scipy.sparse.linalg as spla
+from matplotlib.pyplot import *
+from openbte.utils import *
+from mpi4py import MPI
 
 comm = MPI.COMM_WORLD
 
-      
-def get_m(Master,data):
-    
-    Master.data = data
-    return Master
-
-def get_boundary(RHS,eb,n_elems):
-
-    if len(eb)  > 0:
-     RHS_tmp = np.zeros(n_elems) 
-     np.add.at(RHS_tmp,eb,RHS)
-    else: 
-      return np.zeros(n_elems)  
 
 
-    return RHS_tmp
 
+def sparse_dense_product(i,j,data,X):
+     '''
+     This solves B_ucc' X_uc' -> A_uc
+
+     B_ucc' : sparse in cc' and dense in u. Data is its vectorized data COO descrition
+     X      : dense matrix
+     '''
+
+     tmp = np.zeros_like(X)
+     np.add.at(tmp.T,i,data.T * X.T[j])   
+
+     return tmp
 
 
 def solve_full(argv):
 
-    mesh    = argv['geometry']
-    mat     = argv['material']
-    fourier = argv['fourier']
-    n_elems = len(mesh['elems'])
+   #here you go---------------------------
+   max_bte_iter   =  10000
+   max_bte_error = 1e-6
 
-    #Post processing
-    sigma = mat['sigma']*1e9
-    W     = mat['W']
-
-  
-    #print(compute_kappa_iter(W,sigma,mat['alpha'][0]))
-    
-
-    #print(compute_kappa(np.diag(np.diag(W)),sigma)/mat['alpha'][0])
-    #quit()
-    B     = -np.einsum('i,ij->ij',1/np.diag(W),W-np.diag(np.diag(W)))
-    Wod   = -(W-np.diag(np.diag(W)))
-    H     = np.einsum('i,ij->ij',1/np.diag(W),Wod)
-    F     = np.einsum('i,ij->ij',1/np.diag(W),sigma)
-
-    #print(max(np.linalg.norm(F,axis=1)))
-    #quit()
-    tc = mat['tc']
-
- #------------------
-    n_parallel = len(sigma)
-    block =  n_parallel//comm.size
-    rr = range(block*comm.rank,n_parallel) if comm.rank == comm.size-1 else range(block*comm.rank,block*(comm.rank+1))
+   #---------------------------
 
 
-    if comm.rank == 0 and argv['verbose']:
-       print(flush=True)
-       print('      Iter    Thermal Conductivity [W/m/K]      Error ''',flush=True)
-       print(colored(' -----------------------------------------------------------','green'),flush=True)
+   #Import data---
+   mesh    = argv['geometry']
+   mat     = argv['material']
+   f = argv['fourier']
+   factor  = mat['alpha'][0][0]
+   W       = mat['W'] 
+   Wdiag   = np.diag(W)
+   sigma   = mat['sigma']*1e9
+   Wod     = W-np.diag(np.diag(W))
 
-    if comm.rank == 0:   
-      if len(mesh['db']) > 0:
-       Gb   = np.einsum('qj,jn->qn',sigma,mesh['db'],optimize=True)
-       Gbp2 = Gb.clip(min=0);
-       with np.errstate(divide='ignore', invalid='ignore'):
-         tot = 1/Gb.clip(max=0).sum(axis=0); tot[np.isinf(tot)] = 0
-       data = {'GG': np.einsum('qs,s->qs',Gbp2,tot)}
-       del tot, Gbp2
-      else: data = {'GG':np.zeros(1)}
-    else: data = None
-    GG = create_shared_memory_dict(data)['GG']
 
-    #MAIN MATRIX
-    G = np.einsum('qj,jn->qn',F[rr],mesh['k'],optimize=True)
-    Gp = G.clip(min=0); Gm = G.clip(max=0)
-    D = np.zeros((len(rr),n_elems))
-    np.add.at(D.T,mesh['i'],Gp.T)
+   #parallel set up------------
+   n_parallel = len(sigma)
+   block =  n_parallel//comm.size
+   rr = range(block*comm.rank,n_parallel) if comm.rank == comm.size-1 else range(block*comm.rank,block*(comm.rank+1))
+   n_block = len(rr)
 
-    DeltaT = fourier['temperature'].copy()
-    TB = np.zeros(len(mesh['eb']))
-    if len(mesh['db']) > 0: #boundary
-      tmp = np.einsum('rj,jn->rn',F[rr],mesh['db'],optimize=True) 
-      Gbp2 = tmp.clip(min=0); Gbm2 = tmp.clip(max=0);
-      np.add.at(D.T,mesh['eb'],Gbp2.T)
-      TB = DeltaT[mesh['eb']]
-    #Periodic---
-    sss = np.asarray(mesh['pp'][:,0],dtype=int)
-    P = np.zeros((len(rr),n_elems))
-    np.add.at(P.T,mesh['i'][sss],-(mesh['pp'][:,1]*Gm[:,sss]).T)
-    del G,Gp
-    #----------------------------------------------------
-     
-    #Shared objects
-    Xs = shared_array(np.tile(fourier['temperature'],(n_parallel,1)) if comm.rank == 0 else None)
-    DeltaTs = shared_array(np.tile(fourier['temperature'],(n_parallel,1)) if comm.rank == 0 else None)
-    Xs_old = shared_array(np.tile(fourier['temperature'],(n_parallel,1)) if comm.rank == 0 else None)
-    Xs_old[:,:] = Xs[:,:].copy()
-    TB_old = TB.copy()
 
-    
-    im = np.concatenate((mesh['i'],list(np.arange(n_elems))))
-    jm = np.concatenate((mesh['j'],list(np.arange(n_elems))))
-    lu = {} 
-    kappa_vec = [fourier['meta'][0]]
-    kappa_old = kappa_vec[-1]
-    kappa_tot = np.zeros(1)
+   n_elems = len(mesh['elems'])
+   X0 = np.tile(f['temperature'],(W.shape[0],1))
+   grad_fourier = f['grad']
+
+   #preparation
+   G = np.einsum('qj,jn->qn',sigma[rr],mesh['k'],optimize=True)
+   Gp = G.clip(min=0); Gm = G.clip(max=0)
+   n_elems = len(mesh['elems'])
+   D = np.zeros((n_block,n_elems))
+   np.add.at(D.T,mesh['i'],Gp.T)
+
+   #Boundary----
+   if len(mesh['db']) > 0: #boundary
+
+      Gb = np.einsum('qj,jn->qn',sigma,mesh['db'],optimize=True)
+      Gbp2 = Gb.clip(min=0); Gbm2 = Gb.clip(max=0);
+      np.add.at(D.T,mesh['eb'],Gbp2[rr].T)
+      tot = 1/Gb.clip(max=0).sum(axis=0); 
+      GG  = np.einsum('qs,s->qs',Gbp2,tot)
+
+   #Periodic---
+   sss = np.asarray(mesh['pp'][:,0],dtype=int)
+   P = np.zeros_like(D)
+   np.add.at(P.T,mesh['i'][sss],-(mesh['pp'][:,1]*Gm[:,sss]).T)
+   del G,Gp,Gbp2,tot
+   #-------
+
+   i = mesh['i']
+   j = mesh['j']
+   im = np.concatenate((mesh['i'],list(np.arange(n_elems))))
+   jm = np.concatenate((mesh['j'],list(np.arange(n_elems))))
+   data = np.concatenate((Gm,D+Wdiag[rr,None]),axis=1)
+   X  = shared_array(np.tile(f['temperature'],(W.shape[0],1)))
+   R  = shared_array(np.zeros_like(X))
+   OP = shared_array(np.zeros_like(X))
+   #--------------------
+
+   Winv = load_data('Winv')['Winv']
+
+   CT = Wdiag/np.sum(Wdiag)
+
+   kappa_mask = mesh['kappa_mask']/factor
+   kappa_old  = f['meta'][0]
+   eb = mesh['eb']
+
+   (nm,n_elems) = X.shape
+
+   #Post processing---
+
+   def get_boundary(X):
+
+      B = np.zeros((n_block,n_elems)) 
+      #For now this is global--
+      TB =  np.einsum('us,us->s',X[:,eb],GG)
+      tmp = np.einsum('c,uc->cu',TB,Gbm2)
+      #------------------------
+      np.add.at(B.T,eb,tmp[:,rr])
+
+      return B
+
+   def L(X):
+
+       OP[rr,:] = np.multiply(D,X[rr]) + sparse_dense_product(i,j,Gm,X[rr]) + np.matmul(W[rr,:],X) - get_boundary(X)
+
+       comm.Barrier() 
+
+       return OP
+
+   def residual(X):
+
+     R = L(X) 
+     R[rr,:] -= P
+     comm.Barrier()
+
+     return -R
+
+   @cached(cache={})
+   def get_lu(q):
+        A = sp.csc_matrix((data[q],(im,jm)),shape=(n_elems,n_elems),dtype=np.float64)
+        return sp.linalg.splu(A)
+
+
+   def compute_kappa(X):
+      kappa = np.zeros(1)
+      kappap = np.einsum('u,uc,c->',sigma[rr,0],X[rr],kappa_mask)
+      comm.Allreduce([np.array([kappap]),MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
+      comm.Barrier()
+      return kappa[0]
+
+
+
+   if comm.rank == 0:
+    print(flush=True)
+    print('      Iter    Thermal Conductivity [W/m/K]     Residual''',flush=True)
+    print(colored(' -----------------------------------------------------------','green'),flush=True)
+
+   def solve_FULL(X,kappa_old):
+
+    X_old = X.copy()   
     kk = 0
     error = 1
-    alpha=1
-    
-    nm = len(rr)
-    a = time.time()
-    while kk < argv['max_bte_iter'] and error > argv['max_bte_error']:
-    
-      DeltaTs = np.matmul(H[rr],alpha*Xs + (1-alpha)*Xs_old)
+    error_old = 1
+    while kk < max_bte_iter and error > max_bte_error:
+      B        = -np.dot(Wod[rr],X) + P  + get_boundary(X)
+      X[rr,:]  = np.array([get_lu(n).solve(B[n]) for n,q in enumerate(rr)])
 
       comm.Barrier()
+      kappa = compute_kappa(X)
+      R     = residual(X)
 
-      Xs_old[rr,:] = Xs[rr,:].copy()
-  
-      RHS = -np.einsum('c,nc->nc',alpha*TB + (1-alpha)*TB_old,Gbm2) if len(mesh['db']) > 0 else np.zeros(n_elems)
-
-      #RHS_tmp = np.zeros((nm,n_elems))
-      #if len(mesh['eb'])  > 0:
-      #   np.add.at(RHS_tmp,mesh['eb'],RHS[n])
-
-
-      TBp = np.zeros_like(TB)
-      kappa,kappap = np.zeros((2,n_parallel))
-
-      Master = sp.csc_matrix((np.arange(len(im))+1,(im,jm)),shape=(n_elems,n_elems),dtype=np.float64)
-      conversion = np.asarray(Master.data-1,np.int) 
-
-      for n,q in enumerate(rr):
-
-          RHS_tmp = np.zeros(n_elems)
-          if len(mesh['eb'])  > 0:
-            np.add.at(RHS_tmp,mesh['eb'],RHS[n])
-
-          #CORE-----
-          Master.data = np.concatenate((Gm[n],D[n]+np.ones(n_elems)))[conversion]
-          B = DeltaTs[n] + P[n] + RHS_tmp
-          Xs[q] = (lu[q] if q in lu.keys() else lu.setdefault(q,sp.linalg.splu(Master))).solve(B)
-
-          if len(mesh['eb']) > 0:
-           np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-Xs[q,mesh['eb']]*GG[q,:])
-          
-          kappap[q] += np.dot(mesh['kappa_mask'],Xs[q])
-
-     
-
-      TB_old = TB.copy()
-      comm.Allreduce([kappap,MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
-      comm.Allreduce([TBp,MPI.DOUBLE],[TB,MPI.DOUBLE],op=MPI.SUM)
-      kappa_totp = np.array([np.einsum('q,q->',sigma[rr,0],kappa[rr])])/mat['alpha'][0]
-
-      comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
-      comm.Barrier()
-  
+      error = abs(kappa_old-kappa)/abs(kappa)
+      error_old = error
+      kappa_old = kappa
+      if comm.rank == 0:
+       print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa,np.linalg.norm(R,ord='fro')),flush=True)
       kk +=1
-      error = abs(kappa_old-kappa_tot[0])/abs(kappa_tot[0])
-      kappa_old = kappa_tot[0]
-      kappa_vec.append(kappa_tot[0])
-      if argv['verbose'] and comm.rank == 0:   
-        print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error),flush=True)
+      comm.Barrier()
+      X_old = X.copy()
 
 
-    if argv['verbose'] and comm.rank == 0:
-      print(colored(' -----------------------------------------------------------','green'),flush=True)
-
-    comm.Barrier()
-    print(time.time()-a)
-    T = np.einsum('qc,q->c',Xs,tc)
-    J = np.einsum('qj,qc->cj',sigma,Xs)*1e-18
-
-    return {'kappa_vec':kappa_vec,'temperature':T,'flux':J}
+    return X,kappa
+     
+   X,kappa = solve_FULL(X,kappa_old)
 
 
+   T = np.einsum('qc,q->c',X,tc)
+   J = np.einsum('qj,qc->cj',sigma,X)*1e-18
 
+   return {'kappa':kappa,'temperature':T,'flux':J}
 
-
-
-
-
-
-
+   
 
 
 

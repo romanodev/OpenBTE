@@ -94,10 +94,10 @@ def solve_fourier_single(argv):
 
     fourier_info(meta)
    
-    data = {'meta':meta,'flux':flux,'temperature':temp}
+    data = {'meta':meta,'flux':flux,'temperature':temp,'grad':grad}
 
-
-   argv['fourier'] = create_shared_memory_dict(data)
+   return data
+   #argv['fourier'] = create_shared_memory_dict(data)
 
 
 

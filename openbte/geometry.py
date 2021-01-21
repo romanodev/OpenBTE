@@ -140,6 +140,7 @@ def compute_boundary_condition_data(data):
 
     #-------THIS
     kappa_factor = data['size'][gradir]/area_flux
+
     data['kappa_mask']= -np.array(np.sum(B_with_area_old.todense(),axis=0))[0]*kappa_factor*1e-18
     data['periodic_side_values'] = [periodic_side_values[ll]  for ll in data['periodic_sides']]
     data['pp'] = np.array(pp)
@@ -641,7 +642,9 @@ def compute_data(data):
 def Geometry(**argv):
 
  if comm.rank == 0 :
-   Mesher(**argv) 
+
+   if not argv.setdefault('create_mesh',False):  
+    Mesher(**argv) 
 
    data = import_mesh(**argv)
 
