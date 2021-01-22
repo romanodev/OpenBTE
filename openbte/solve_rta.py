@@ -38,9 +38,9 @@ def get_boundary(RHS,eb,n_elems):
     return RHS_tmp
 
 
-def print_multiscale(argv,MM):
+def print_multiscale(n_serial,n_parallel,MM):
 
-        total = argv['n_serial']*argv['n_parallel']
+        total = n_serial*n_parallel
 
         print(flush=True)
         print('                  Multiscale Diagnostics        ''',flush=True)
@@ -190,7 +190,7 @@ def solve_rta(argv):
            
            #Get ballistic kappa
            if argv['multiscale']:
-              kappap_f[:,q] = np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:argv['dim']],tfg)
+              kappap_f[:,q] = np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:dim],tfg)
 
               #------------------------------------------------------
               B = DeltaT +  mfp[-1]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems))
@@ -201,13 +201,13 @@ def solve_rta(argv):
 
               idx = np.argwhere(np.diff(np.sign(kappap_b[:,q] - kappap_f[:,q]))).flatten()+1
               if len(idx) == 0:
-                 idx = argv['n_serial']-1
+                 idx = n_serial-1
               elif len(idx) > 1:
                  idx = idx[-1] #take the last one to be on the safe side
               else:   
                  idx = idx[0]
 
-              idx = min([idx,argv['n_serial']])
+              idx = min([idx,n_serial])
 
            else: idx = n_serial-1
 
@@ -218,20 +218,8 @@ def solve_rta(argv):
                  B = DeltaT +  mfp[m]*(P[n] +get_boundary(RHS[n],mesh['eb'],n_elems))
                  A = get_m(Master,np.concatenate((mfp[m]*Gm[n],mfp[m]*D[n]+np.ones(n_elems)))[conversion])
 
-                 #if (q,m) in lu.keys():
-                 #   ll = lu[(q,m)]
-                 #else: 
-                     
-                 #   ll= sp.linalg.splu(A)
-                 #   lu[(q,m)] = ll
-
-                 #X = lu.setdefault((q,m),sp.linalg.splu(A)).solve(B)
-                 #X = ll.solve(B)
-
-
                  X = solve(argv,A,B,(q,m))
                  kappap[m,q] = np.dot(mesh['kappa_mask'],X)
-                 #print(time.time()-b)
 
                  #-------------------------
  
@@ -244,14 +232,14 @@ def solve_rta(argv):
                    #Vectorize
                    kappap[:m+1,q] = kappap_f[:m+1,q]
                    diffusive += m+1
-                   Xm = tf[:m+1] - np.einsum('m,i,mci->mc',mat['mfp_sampled'][:m+1],mat['VMFP'][q,:argv['dim']],tfg[:m+1])
+                   Xm = tf[:m+1] - np.einsum('m,i,mci->mc',mat['mfp_sampled'][:m+1],mat['VMFP'][q,:dim],tfg[:m+1])
 
                    DeltaTp += np.einsum('mc,m->c',Xm,mat['tc'][:m+1,q])  
                   
                    if len(mesh['eb']) > 0:
                     np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('mc,mc->c',Xm[:,mesh['eb']],GG[:m+1,q]))
                    
-                   Jp += np.einsum('mc,mj->cj',Xm,sigma[:m+1,q,0:argv['dim']])*1e-18
+                   Jp += np.einsum('mc,mj->cj',Xm,sigma[:m+1,q,0:dim])*1e-18
                    break
 
                  DeltaTp += X*mat['tc'][m,q]
@@ -276,13 +264,13 @@ def solve_rta(argv):
                    abs(kappap[m-1,q] - kappap_b[m-1,q])/abs(kappap[m-1,q]) < argv['multiscale_error_ballistic'] and  m > int(len(mat['mfp_sampled'])/2):
 
                    kappap[m:,q] = kappap_b[m:,q]
-                   bal += argv['n_serial']-m
+                   bal += n_serial-m
                    DeltaTp += X_bal*np.sum(mat['tc'][m:,q])
 
                    if len(mesh['eb']) > 0:
                     np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('c,mc->c',X_bal[mesh['eb']],GG[m:,q]))
 
-                   Jp += np.einsum('c,j->cj',X_bal,np.sum(sigma[m:,q,0:argv['dim']],axis=0))*1e-18
+                   Jp += np.einsum('c,j->cj',X_bal,np.sum(sigma[m:,q,0:dim],axis=0))*1e-18
                    break
 
                DeltaTp += X*mat['tc'][m,q]
@@ -290,7 +278,7 @@ def solve_rta(argv):
                if len(mesh['eb'])>0:
                 np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
 
-               Jp += np.einsum('c,j->cj',X,sigma[m,q,0:argv['dim']])*1e-18
+               Jp += np.einsum('c,j->cj',X,sigma[m,q,0:dim])*1e-18
           
 
         Mp[0] = diffusive
@@ -317,7 +305,8 @@ def solve_rta(argv):
         comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([kappaf_totp,MPI.DOUBLE],[kappaf_tot,MPI.DOUBLE],op=MPI.SUM)
 
-        if argv['multiscale'] and comm.rank == 0: print_multiscale(argv,MM) 
+
+        if argv['multiscale'] and comm.rank == 0: print_multiscale(n_serial,n_parallel,MM) 
 
         kk +=1
         error = abs(kappa_old-kappa_tot[0])/abs(kappa_tot[0])
@@ -332,6 +321,7 @@ def solve_rta(argv):
 
 
 
+   
     kappaf -=np.dot(mesh['kappa_mask'],DeltaT_old)
     kappa -=np.dot(mesh['kappa_mask'],DeltaT_old)
     bte =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J,'kappa_mode':kappa,'kappa_mode_f':kappaf,\

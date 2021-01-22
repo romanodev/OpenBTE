@@ -90,6 +90,25 @@ def print_logo():
 def prepare_data(argv):
 
 
+   variables = {}
+   for key,value in self.solver['variables'].items():
+     if value['data'].ndim == 1: #scalar
+         variables[value['name']] = {'data':value['data'],'units':value['units']}
+     elif value['data'].ndim == 2 : #vector 
+         variables[value['name'] + '(x)'] = {'data':value['data'][:,0],'units':value['units']}
+         variables[value['name'] + '(y)'] = {'data':value['data'][:,1],'units':value['units']}
+         if self.dim == 3: 
+          variables[value['name'] + '(z)'] = {'data':value['data'][:,2],'units':value['units']}
+
+         mag = [np.linalg.norm(value) for value in value['data']]
+         variables[value['name'] + '(mag.)'] = {'data':mag,'units':value['units']}
+   return variables      
+    
+
+          
+
+
+
           variables = {0:{'name':'Temperature Fourier','units':'K','data':argv['fourier']['temperature'],'increment':-argv['geometry']['applied_gradient']},\
                        1:{'name':'Flux Fourier'       ,'units':'W/m/m','data':argv['fourier']['flux'],'increment':[0,0,0]}}
 
@@ -155,18 +174,13 @@ def Solver(**argv):
         if not argv['only_fourier']:
 
            if get_model(argv['material']['model'])[0:3] == 'rta':  
-               a = time.time()
                solve_rta(argv)
-               print(time.time()-a)
-
            else:    
                solve_full(argv)
 
         
-        #Prepare variables--
-        prepare_data(argv)
-
         if comm.rank == 0 and argv.setdefault('save',True):
+           prepare_data(argv)
            save_data(argv.setdefault('filename','solver'),argv['data'])   
 
         #Clear cache
@@ -208,7 +222,7 @@ def print_grid_info(mesh,mat):
 
           with warnings.catch_warnings():
             warnings.simplefilter(action='ignore', category=FutureWarning)
-            if mat['model'][0:3] == 'rta':   
+            if mat['model'] in [8,9]:   
              print(colored('  Number of MFP:                           ','green')+ str(mat['tc'].shape[0]),flush=True)
              print(colored('  Number of Solid Angles:                  ','green')+ str(mat['tc'].shape[1]),flush=True)
             else : 

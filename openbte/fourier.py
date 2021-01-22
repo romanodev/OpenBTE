@@ -97,7 +97,6 @@ def solve_fourier_single(argv):
     data = {'meta':meta,'flux':flux,'temperature':temp,'grad':grad}
 
    return data
-   #argv['fourier'] = create_shared_memory_dict(data)
 
 
 
@@ -274,6 +273,7 @@ def compute_diffusive_thermal_conductivity(temp,kappa_map,**argv):
     (v_orth,v_non_orth) = get_decomposed_directions(mesh,get_key(ll,kappa_loc))
 
     deltaT = temp[i] - temp[j] - 1
+
     kappa_eff -= v_orth *  deltaT * area
 
     if 'grad' in argv.keys():
@@ -399,24 +399,26 @@ def assemble(mesh,kappa):
 
 def solve_fourier(kappa,DeltaT,argv):
 
+    mesh = argv['geometry']
     argv['DeltaT'] = DeltaT
+    dim = int(mesh['meta'][2])
 
-    n_elems = len(argv['mesh']['elems'])
+    n_serial = len(kappa)
+    n_elems = len(mesh['elems'])
 
-    tf = shared_array(np.zeros((argv['n_serial'],argv['n_elems'])) if comm.rank == 0 else None)
-    tfg = shared_array(np.zeros((argv['n_serial'],argv['n_elems'],argv['dim'])) if comm.rank == 0 else None)
+    tf = shared_array(np.zeros((n_serial,n_elems)) if comm.rank == 0 else None)
+    tfg = shared_array(np.zeros((n_serial,n_elems,dim)) if comm.rank == 0 else None)
 
     if comm.rank == 0:
-     dim = int(argv['mesh']['meta'][2])
 
 
-     F,B = assemble(argv['mesh'],tuple(map(tuple,np.eye(dim))))
+     F,B,scale = assemble(mesh,tuple(map(tuple,np.eye(dim))))
 
      ratio_old = 0
      ratio = np.zeros_like(kappa)
      for m,k in enumerate(kappa):
          
-         BB = k*B+argv['DeltaT']
+         BB = k*B+DeltaT
          meta,tf[m,:],tfg[m,:,:] = solve_convergence(argv\
                                                         ,k*np.eye(dim),BB,\
                                                          get_SU(F,k))
@@ -432,7 +434,7 @@ def solve_fourier(kappa,DeltaT,argv):
 
      #Regularize---
      if argv.setdefault('experimental_multiscale',False):
-      kappa_map = get_kappa_map(argv['mesh'],np.eye(dim))
+      kappa_map = get_kappa_map(mesh,np.eye(dim))
       ratio_0 = compute_diffusive_thermal_conductivity(DeltaT,kappa_map,**argv)
       grad_DeltaT = compute_grad(DeltaT,**argv)
     

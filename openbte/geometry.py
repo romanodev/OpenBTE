@@ -16,7 +16,7 @@ from matplotlib.pylab import *
 
 comm = MPI.COMM_WORLD
 
-def compute_boundary_condition_data(data):
+def compute_boundary_condition_data(data,**argv):
 
     
     side_elem_map = data['side_elem_map_vec']
@@ -131,15 +131,24 @@ def compute_boundary_condition_data(data):
            total_area += data['areas'][ll]
 
        elif abs(normal[1]) == 1:
-           if dta['dim'] == 2:  
+           if data['dim'] == 2:  
             area_flux = data['size'][0]
            else:
             area_flux = data['size'][0]*data['size'][2]
+           total_area += data['areas'][ll]
+
+       else : #along z
+           area_flux = data['size'][0]*data['size'][1]
+           total_area += data['areas'][ll]
+
 
        flux_sides.append(ll)
 
     #-------THIS
-    kappa_factor = data['size'][gradir]/area_flux
+    if argv.setdefault('contact_area','box') == 'box':
+      kappa_factor = data['size'][gradir]/area_flux
+    else:  
+      kappa_factor = data['size'][gradir]/total_area
 
     data['kappa_mask']= -np.array(np.sum(B_with_area_old.todense(),axis=0))[0]*kappa_factor*1e-18
     data['periodic_side_values'] = [periodic_side_values[ll]  for ll in data['periodic_sides']]
@@ -614,7 +623,7 @@ def import_mesh(**argv):
    #------------------
 
 
-def compute_data(data):
+def compute_data(data,**argv):
 
    compute_face_normals(data)
 
@@ -628,7 +637,7 @@ def compute_data(data):
 
    compute_interpolation_weigths(data)
    
-   compute_boundary_condition_data(data)
+   compute_boundary_condition_data(data,**argv)
 
    #Some adjustement--
    data['meta'] = np.asarray([len(data['elems']),data['kappa_factor'],data['dim'],len(data['nodes']),len(data['active_sides']),data['direction']],np.float64)
@@ -648,7 +657,7 @@ def Geometry(**argv):
 
    data = import_mesh(**argv)
 
-   compute_data(data)
+   compute_data(data,**argv)
 
    if argv.setdefault('save',True):
      save_data(argv.setdefault('output_filename','geometry'),data)   

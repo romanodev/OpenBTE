@@ -31,14 +31,16 @@ class Plot(object):
     argv['user_model'].plot(self.material,self.solver,self.mesh)   
    else:    
     model = argv['model'].split('/')[0]
-    if model == 'structure':
-     self.duplicate_cells(**argv)
-     self.plot_structure(**argv)
+    #if model == 'structure':
+    # self.duplicate_cells(**argv)
+    # self.plot_structure(**argv)
 
-    elif model == 'maps':
+    if model == 'maps':
      self.get_node_data()
-     self.get_surface_nodes()
+     if self.dim == 3:
+      self.get_surface_nodes()
      self.duplicate_cells(**argv)
+
      self.plot_maps(**argv)
 
     elif model == 'matplotlib':
@@ -58,6 +60,10 @@ class Plot(object):
    nodes = np.round(self.mesh['nodes'],4)
    n_nodes = len(nodes)
    repeat = argv.setdefault('repeat',[1,1,1])
+   #Correction in the case of user's mistake
+   if self.dim == 2:
+     repeat[2]  = 1  
+   #--------------------  
    size = self.mesh['size']
 
    #Create periodic vector
@@ -108,10 +114,10 @@ class Plot(object):
    #duplicate variables---
    for n,(key, value) in enumerate(self.solver['variables'].items()):  
      unit_cell = value['data'].copy() 
-     for nz in range(repeat[0]):
+     for nz in range(repeat[2]):
       for ny in range(repeat[1]):
-       for nx in range(repeat[2]):
-           if nx + ny + nz > 0:   
+       for nx in range(repeat[0]):
+           if nx + ny + nz > 0:  
             inc = value['increment'][0]*nx + value['increment'][1]*ny + value['increment'][2]*nz
             tmp = unit_cell - inc
             if value['data'].ndim == 1:
@@ -241,12 +247,13 @@ class Plot(object):
 
 
  
- def plot_structure(self,**argv):
+ #def plot_structure(self,**argv):
 
-    data = {0:{'name':'Structure','units':'','data':np.zeros(len(self.mesh['nodes'] if self.dim == 2 else self.indices))}}
+ #   data = {0:{'name':'Structure','units':'','data':np.zeros(len(self.mesh['nodes'] if self.dim == 2 else self.indices))}}
    
-    plot_results(data,np.array(self.mesh['nodes']) if self.dim == 2 else self.surface_nodes,\
-                                        np.array(self.mesh['elems']) if self.dim == 2 else self.surface_sides,**argv)
+ #   self.fig = plot_results(data,**argv)
+    #plot_results(data,np.array(self.mesh['nodes']) if self.dim == 2 else self.surface_nodes,\
+    #                                    np.array(self.mesh['elems']) if self.dim == 2 else self.surface_sides,**argv)
 
 
  def plot_maps(self,**argv):
@@ -256,12 +263,42 @@ class Plot(object):
    if len(self.solver['variables'])> 2:
     argv.update({'bte':self.solver['kappa'][-1]})
 
-   #if self.dim == 3: self.get_surface_nodes()
+   data = {'variables': self.unrolled_variables()  ,'nodes':self.mesh['nodes'],'elems':self.mesh['elems']}
+
+   if argv.setdefault('write_data',False):
+
+    bb = str(round(argv['bte'],2))+' W/m/K' if 'bte' in argv.keys() else '--'
+    meta = 'Bulk: ' + str(round(argv['bulk'],2)) +' W/m/K <br>Fourier: ' +  str(round(argv['fourier'],2)) + ' W/m/K <br>BTE:' + bb
+    data['meta'] = meta
+    save_data(argv.setdefault('output_filename','sample'),data)
 
 
-   data = {'variables':self.solver['variables'],'nodes':self.mesh['nodes'],'elems':self.mesh['elems']}
-   if argv.setdefault('save_plot',False):
-       dd.io.save('plot.h5',data)
+   if argv.setdefault('show',True):
+    self.fig = plot_results(data,**argv)
 
-   self.fig = plot_results(data,**argv)
+
+ def unrolled_variables(self):
+
+   #Enchance variables----
+   variables = {}
+   for key,value in self.solver['variables'].items():
+     if value['data'].ndim == 1: #scalar
+         variables[value['name']] = {'data':value['data'],'units':value['units']}
+     elif value['data'].ndim == 2 : #vector 
+         variables[value['name'] + '(x)'] = {'data':value['data'][:,0],'units':value['units']}
+         variables[value['name'] + '(y)'] = {'data':value['data'][:,1],'units':value['units']}
+         if self.dim == 3: 
+          variables[value['name'] + '(z)'] = {'data':value['data'][:,2],'units':value['units']}
+
+         mag = [np.linalg.norm(value) for value in value['data']]
+         variables[value['name'] + '(mag.)'] = {'data':mag,'units':value['units']}
+   return variables      
+    
+
+
+
+
+
+
+
 
