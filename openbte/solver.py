@@ -88,38 +88,35 @@ def print_logo():
 
 
 def prepare_data(argv):
+        
+  #Original Description--
+  tmp = {0:{'name':'Temperature Fourier','units':'K','data':argv['fourier']['temperature'],'increment':-argv['geometry']['applied_gradient']},\
+               1:{'name':'Flux Fourier'       ,'units':'W/m/m','data':argv['fourier']['flux'],'increment':[0,0,0]}}
 
-
-   variables = {}
-   for key,value in self.solver['variables'].items():
-     if value['data'].ndim == 1: #scalar
-         variables[value['name']] = {'data':value['data'],'units':value['units']}
-     elif value['data'].ndim == 2 : #vector 
-         variables[value['name'] + '(x)'] = {'data':value['data'][:,0],'units':value['units']}
-         variables[value['name'] + '(y)'] = {'data':value['data'][:,1],'units':value['units']}
-         if self.dim == 3: 
-          variables[value['name'] + '(z)'] = {'data':value['data'][:,2],'units':value['units']}
-
-         mag = [np.linalg.norm(value) for value in value['data']]
-         variables[value['name'] + '(mag.)'] = {'data':mag,'units':value['units']}
-   return variables      
-    
-
-          
-
-
-
-          variables = {0:{'name':'Temperature Fourier','units':'K','data':argv['fourier']['temperature'],'increment':-argv['geometry']['applied_gradient']},\
-                       1:{'name':'Flux Fourier'       ,'units':'W/m/m','data':argv['fourier']['flux'],'increment':[0,0,0]}}
-
-          if 'bte' in argv.keys():
-            variables[2]    = {'name':'Temperature BTE','units':'K','data':argv['bte']['temperature'],'increment':-argv['geometry']['applied_gradient']}
-            variables[3]    = {'name':'Flux BTE'       ,'units':'W/m/m','data':argv['bte']['flux'],'increment':[0,0,0]}
+  if 'bte' in argv.keys():
+      tmp[2]    = {'name':'Temperature BTE','units':'K','data':argv['bte']['temperature'],'increment':-argv['geometry']['applied_gradient']}
+      tmp[3]    = {'name':'Flux BTE'       ,'units':'W/m/m','data':argv['bte']['flux'],'increment':[0,0,0]}
               
+  #Here we unroll variables for later use--
+  variables = {}
+  for key,value in tmp.items():
+      
+     if value['data'].ndim == 1: #scalar
+         variables[value['name']] = {'data':value['data'],'units':value['units'],'increment':value['increment']}
+     elif value['data'].ndim == 2 : #vector 
+         variables[value['name'] + '(x)'] = {'data':value['data'][:,0],'units':value['units'],'increment':value['increment']}
+         variables[value['name'] + '(y)'] = {'data':value['data'][:,1],'units':value['units'],'increment':value['increment']}
+         if argv['dim'] == 3: 
+             variables[value['name'] + '(z)'] = {'data':value['data'][:,2],'units':value['units'],'increment':value['increment']}
+         mag = np.array([np.linalg.norm(value) for value in value['data']])
+         variables[value['name'] + '(mag.)'] = {'data':mag,'units':value['units'],'increment':value['increment']}
+  argv['variables'] = variables
 
-          argv['data'] = {'variables':variables,'kappa_fourier':argv['fourier']['meta'][0]}
-          if 'bte' in argv.keys():
-            argv['data']['kappa'] = argv['bte']['kappa']  
+
+  argv['data'] = {'variables':variables,'bulk':argv['material']['kappa'][0,0] ,'fourier':argv['fourier']['meta'][0]}
+
+  if 'bte' in argv.keys():
+     argv['data']['kappa'] = argv['bte']['kappa'][-1]  
 
 
 
@@ -179,8 +176,9 @@ def Solver(**argv):
                solve_full(argv)
 
         
+        argv['dim'] =  int(argv['geometry']['meta'][2])
+        prepare_data(argv)
         if comm.rank == 0 and argv.setdefault('save',True):
-           prepare_data(argv)
            save_data(argv.setdefault('filename','solver'),argv['data'])   
 
         #Clear cache

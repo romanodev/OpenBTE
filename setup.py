@@ -37,7 +37,7 @@ setup(name='openbte',
                          'rta2mfp=openbte.rta2mfp:main',\
                          'bundle_data=openbte.bundle_data:main',\
                          'gui=openbte.gui:main',\
-                         'app=openbte.app:main',\
+                         'app=openbte.app:App',\
                          'OpenBTE=openbte.openbte:main'],
       },
       zip_safe=False)

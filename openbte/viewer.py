@@ -7,12 +7,12 @@ from .utils import *
 import time
 
 
-def plot_results(master,**argv):
+def plot_results(solver,geometry):
 
 
-   data  = master['variables']
-   nodes = master['nodes']
-   elems = master['elems']
+   data  = solver['variables']
+   nodes = geometry['nodes']
+   elems = geometry['elems']
    size  = [max(nodes[:,i]) - min(nodes[:,i])  for i in range(3)] 
    dim   = 2   if size[2] == 0 else 3
 
@@ -61,12 +61,12 @@ def plot_results(master,**argv):
         'yanchor': 'top'})
 
 
-   if argv.setdefault('large',False):
-       x1 = 700
-       x2 = 500
-   else:    
-       x1 = 400
-       x2 = 450
+   #if argv.setdefault('large',False):
+   #    x1 = 700
+   #    x2 = 500
+   #else:    
+   x1 = 400
+   x2 = 450
 
    fig.update_layout(width=x1,height=x2,autosize=True,margin=dict(t=20, b=10, l=00, r=20),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
 
@@ -84,7 +84,13 @@ def plot_results(master,**argv):
 
    #axis = dict(ticktext=[],tickvals= [],showbackground=False)
 
-   bb = str(round(argv['bte'],2))+' W/m/K' if 'bte' in argv.keys() else '--'
+   bb = str(round(solver['bte'],2))+' W/m/K' if 'bte' in solver.keys() else '--'
+
+   meta  = 'Bulk: ' + str(round(solver['bulk'],2)) +' W/m/K<br>Fourier: '\
+                    +       str(round(solver['fourier'],2)) + ' W/m/K<br>BTE:' \
+                    +       bb
+
+
 
    fig.add_annotation(
             x=0.97,
@@ -92,7 +98,8 @@ def plot_results(master,**argv):
             xref='paper',
             showarrow=False,
             yref='paper',
-            text=master['meta'],align='left')
+            text=meta,align='left')
+
 
    #fig.add_annotation(annotations)
 
@@ -125,10 +132,9 @@ def plot_results(master,**argv):
 
    # plotly.io.to_image(fig,format='png')
    #fig.write_image("test.png",scale=5)
-   if argv.setdefault('show',True):
-    if 'google.colab' in sys.modules:
+   if 'google.colab' in sys.modules:
      fig.show(renderer='colab')
-    else:
+   else:
      fig.show(renderer='browser')
 
 

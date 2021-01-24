@@ -115,7 +115,12 @@ def get_dd_layout():
  return style
 
 
-def main():
+def App(**argv):
+
+ #load data--
+ data_tot     = argv['bundle'] if 'bundle' in argv.keys() else load_data('bundle')
+
+
 
  server = flask.Flask(__name__) # define flask app.server
 
@@ -176,11 +181,15 @@ def main():
        key_sample = list(data_tot.keys())[int(sample)]
        data = data_tot[key_sample]
        name = list(data['variables'].keys())[int(variable)]
-       variable  =  data['variables'][name]
+       variable  = data['variables'][name]
        elems     = np.array(data['elems'])
        nodes     = np.array(data['nodes'])
-       text      = data['meta']
-       data = variable['data']
+       node_data      = variable['data']
+
+       bb = str(round(data['bte'],2))+' W/m/K' if 'bte' in data.keys() else '--'
+       text  = 'Bulk: ' + str(round(data['bulk'],2)) +' W/m/K<br>Fourier: '\
+                    +       str(round(data['fourier'],2)) + ' W/m/K<br>BTE:' \
+                    +       bb
 
        z = np.zeros(len(nodes))  if np.shape(nodes)[1] == 2 else nodes[:,2]
 
@@ -189,7 +198,7 @@ def main():
                          z=z,
                          colorscale='Viridis',
                          colorbar_title = '[' + variable['units'] + ']' if len(variable['units']) > 0 else "",
-                         intensity = data,
+                         intensity = node_data,
                          colorbar=dict(len=0.5),
                          intensitymode='vertex',
                          i=elems[:,0],
@@ -222,25 +231,29 @@ def main():
     input_value = pathname[1:]
 
     #load data--
-    data = load_data('bundle')
+    #data = load_data('bundle')
 
-    variables =[ key  for key,value in  data[list(data.keys())[0]]['variables'].items()]
-
+    variables = data_tot[list(data_tot.keys())[0]]['variables'].keys()
+     
+    #variables = [key  for key,value in  data[list(data.keys())[0]]['solver']['variables'].items()]
 
     #Get size-----------------
     size = 3*[0]
-    for sample in data:
-      nodes = data[sample]['nodes']
-      size = [  max([size[i],(max(nodes[:,i]) - min(nodes[:,i]))])  for i in range(3)]
+
+    for sample,v in data_tot.items():
+
+      nodes = v['nodes']
+      
+      size  = [max([size[i],(max(nodes[:,i]) - min(nodes[:,i]))])  for i in range(3)]
 
 
-    options_samples=[{'label': s, 'value': str(n)} for n,s in enumerate(data)]
+    options_samples=[{'label': s, 'value': str(n)} for n,s in enumerate(data_tot)]
     options_variables=[{'label': s, 'value': str(n)} for n,s in enumerate(variables)]
  
 
-    data['size'] = size
+    data_tot['size'] = size
 
-    return data,options_samples,options_variables
+    return data_tot,options_samples,options_variables
 
 
 #---------------------------------------------------------------------
