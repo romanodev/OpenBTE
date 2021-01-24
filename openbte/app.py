@@ -5,20 +5,19 @@ import plotly.io as pio
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-import webbrowser
 from threading import Timer
 import dash_bootstrap_components as dbc 
-import deepdish
 import flask
 from dash.dependencies import Input, Output
 import gzip
 import pickle
 import plotly.express as px
 import pandas as pd
-from google_drive_downloader import GoogleDriveDownloader as gdd
 import json
 import os
+from mpi4py import MPI
 
+comm = MPI.COMM_WORLD
 
 def load_data(fh):
 
@@ -117,15 +116,14 @@ def get_dd_layout():
 
 def App(**argv):
 
- #load data--
- data_tot     = argv['bundle'] if 'bundle' in argv.keys() else load_data('bundle')
+ if comm.rank == 0:
+  #load data--
+  data_tot     = argv['bundle'] if 'bundle' in argv.keys() else load_data('bundle')
+
+  server = flask.Flask(__name__) # define flask app.server
 
 
-
- server = flask.Flask(__name__) # define flask app.server
-
-
- d_sample = html.Div([
+  d_sample = html.Div([
     dcc.Dropdown(
         id='samples',
         value=0,
@@ -133,10 +131,10 @@ def App(**argv):
         clearable=False,
         searchable=False
     ),
- ])
+  ])
 
 
- d_variable = html.Div([
+  d_variable = html.Div([
     dcc.Dropdown(
         id='variables',
         value=0,
@@ -144,38 +142,37 @@ def App(**argv):
         clearable=False,
         searchable=False
     ),
- ])
+  ])
 
 
- fig_dcc = dcc.Graph(id='master',figure=go.Figure(layout=get_layout()),style={'left':'15%','width':'70%','hight':'70%','bottom':'15%','position':'absolute','background-color':'black'})
+  fig_dcc = dcc.Graph(id='master',figure=go.Figure(layout=get_layout()),style={'left':'15%','width':'70%','hight':'70%','bottom':'15%','position':'absolute','background-color':'black'})
 
- external_stylesheets=[dbc.themes.CYBORG]
+  external_stylesheets=[dbc.themes.CYBORG]
 
- app = dash.Dash(__name__, external_stylesheets=external_stylesheets,server=server)
+  app = dash.Dash(__name__, external_stylesheets=external_stylesheets,server=server)
 
- dd_sample = html.Div( children = [d_sample],style = {'left':'1%','height':'10%','width':'25%','bottom':'88%','position':'absolute'})
- dd_variable = html.Div( children = [d_variable],style = {'left':'28%','height':'10%','width':'25%','bottom':'88%','position':'absolute'})
+  dd_sample = html.Div( children = [d_sample],style = {'left':'1%','height':'10%','width':'25%','bottom':'88%','position':'absolute'})
+  dd_variable = html.Div( children = [d_variable],style = {'left':'28%','height':'10%','width':'25%','bottom':'88%','position':'absolute'})
 
- hidden = html.Div(id='intermediate-value', style={'display': 'none'})
+  hidden = html.Div(id='intermediate-value', style={'display': 'none'})
 
- url = dcc.Location(id='url', refresh=True)
-
-
- img = html.Div(html.Img(src=app.get_asset_url('logo.png'), style={'width':'18%','left':'80%','bottom':'88%','position':'absolute'}))
-
- div1 = html.Div(style = {'left':'25%','height':'70%','width':'50%','bottom':'15%',"border":"2px white solid",'position':'absolute'},children=[fig_dcc,dd_sample,dd_variable,hidden,url]);
-
- app.layout = html.Div(children = [div1,img],style = {'height': '100vh','width': '100%',"border":"2px white solid"})
-
- #---------------------------------------------------------------------
+  url = dcc.Location(id='url', refresh=True)
 
 
- @app.callback(
+  img = html.Div(html.Img(src=app.get_asset_url('logo.png'), style={'width':'18%','left':'80%','bottom':'88%','position':'absolute'}))
+
+  div1 = html.Div(style = {'left':'25%','height':'70%','width':'50%','bottom':'15%',"border":"2px white solid",'position':'absolute'},children=[fig_dcc,dd_sample,dd_variable,hidden,url]);
+
+  app.layout = html.Div(children = [div1,img],style = {'height': '100vh','width': '100%',"border":"2px white solid"})
+
+  #---------------------------------------------------------------------
+
+
+  @app.callback(
     Output('master','figure'),
     Input('samples','value'), Input('variables','value'),Input('intermediate-value','children'),prevent_initial_call=True
- )
-
- def plot(sample,variable,data_tot):
+  )
+  def plot(sample,variable,data_tot):
 
 
        key_sample = list(data_tot.keys())[int(sample)]
@@ -208,7 +205,7 @@ def App(**argv):
                          showscale = True,
                          visible=True)
 
-       fig = go.Figure(data=plotly_data,layout=get_layout(data_tot['size']))
+       fig = go.Figure(data=plotly_data,layout=get_layout(data['size']))
 
        fig.add_annotation(
             x=1,
@@ -222,42 +219,35 @@ def App(**argv):
 
 
 
- @app.callback(
+  @app.callback(
     [Output('intermediate-value', 'children'),Output('samples','options'),Output('variables','options')],
     [Input('url','search')],prevent_initial_call=True
- )
- def update_output_div(pathname):
+  )
+  def update_output_div(pathname):
   
     input_value = pathname[1:]
 
-    #load data--
-    #data = load_data('bundle')
-
     variables = data_tot[list(data_tot.keys())[0]]['variables'].keys()
      
-    #variables = [key  for key,value in  data[list(data.keys())[0]]['solver']['variables'].items()]
 
     #Get size-----------------
-    size = 3*[0]
-
-    for sample,v in data_tot.items():
-
-      nodes = v['nodes']
-      
-      size  = [max([size[i],(max(nodes[:,i]) - min(nodes[:,i]))])  for i in range(3)]
+    #size = 3*[0]
+    #for sample,v in data_tot.items():
+    #  nodes = v['nodes']
+    #  size  = [max([size[i],(max(nodes[:,i]) - min(nodes[:,i]))])  for i in range(3)]
 
 
     options_samples=[{'label': s, 'value': str(n)} for n,s in enumerate(data_tot)]
     options_variables=[{'label': s, 'value': str(n)} for n,s in enumerate(variables)]
  
 
-    data_tot['size'] = size
+    #data_tot['size'] = size
 
     return data_tot,options_samples,options_variables
 
 
-#---------------------------------------------------------------------
+  #---------------------------------------------------------------------
 
- app.run_server(host='localhost',port=8000)
+  app.run_server(host='localhost',port=8000)
 
 

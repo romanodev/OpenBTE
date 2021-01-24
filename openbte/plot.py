@@ -200,7 +200,7 @@ def Plot(**argv):
 
      return {'nodes'    :geometry['nodes'],\
              'elems'    :geometry['elems'],\
-             'variables':solver['variables'],'bulk':solver['bulk'],'fourier':solver['fourier'],'bte':solver['kappa']}   
+             'variables':solver['variables'],'bulk':solver['bulk'],'fourier':solver['fourier'],'bte':solver['kappa'],'size':geometry['size']}   
 
 
 

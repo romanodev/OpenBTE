@@ -13,6 +13,8 @@ import math
 import pickle
 import gzip
 
+
+
 os.environ['H5PY_DEFAULT_READONLY']='1'
 
 comm = MPI.COMM_WORLD
@@ -166,17 +168,9 @@ def create_line_list(pp,points,lines,store,lx,ly,step_label = 'h'):
 
 def save_data(fh, namedict):
 
-     with gzip.GzipFile(fh + '.npz', 'w') as f:
+     if comm.rank == 0:
+      with gzip.GzipFile(fh + '.npz', 'w') as f:
             pickle.dump(namedict, f,protocol=pickle.HIGHEST_PROTOCOL)
-
-     #pickle.sa
-     #with zipfile.ZipFile(fh + '.npz', mode="w", compression=zipfile.ZIP_DEFLATED,
-      #                    allowZip64=True) as zf:
-      #   for k, v in namedict.items():
-      #       with zf.open(k + '.npy', 'w', force_zip64=True) as buf:
-      #           np.lib.npyio.format.write_array(buf,
-                                                 #np.asanyarray(v),
-                                                 #allow_pickle=True)
 
 def load(fh):
 
@@ -185,6 +179,7 @@ def load(fh):
 
 def load_data(fh):
 
+    if comm.rank == 0:
      if os.path.isfile(fh + '.npz'):
       with gzip.open(fh + '.npz', 'rb') as f:
           return pickle.load(f)
