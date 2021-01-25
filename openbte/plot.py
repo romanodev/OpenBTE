@@ -146,6 +146,11 @@ def duplicate_cells(geometry,solver,repeat):
    geometry['elems'] = elems
    geometry['nodes'] = nodes
 
+   #return the new side
+   size = [geometry['size'][i] *repeat[i]   for i in range(dim)]
+
+   return size
+
 
 def get_node_data(solver,geometry):
 
@@ -192,16 +197,20 @@ def Plot(**argv):
      if dim == 3:
       get_surface_nodes(solver,geometry)
 
-     duplicate_cells(geometry,solver,repeat)
+     size = duplicate_cells(geometry,solver,repeat)
 
 
      if argv.setdefault('show',True):
         plot_results(solver,geometry)
 
-     return {'nodes'    :geometry['nodes'],\
+     output ={'nodes'    :geometry['nodes'],\
              'elems'    :geometry['elems'],\
-             'variables':solver['variables'],'bulk':solver['bulk'],'fourier':solver['fourier'],'bte':solver['kappa'],'size':geometry['size']}   
+             'variables':solver['variables'],'bulk':solver['bulk'],'fourier':solver['fourier'],'size':size,'direction':['x','y','z'][np.argmax(geometry['applied_gradient'])]}
 
+     if 'kappa' in solver.keys():
+         output.update({'bte':solver['kappa']}) 
+
+     return output
 
 
    elif model == 'vtu':

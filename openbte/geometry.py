@@ -662,7 +662,6 @@ def Geometry(**argv):
    if argv.setdefault('save',True):
      save_data(argv.setdefault('output_filename','geometry'),data)   
 
-
    return data
 
 

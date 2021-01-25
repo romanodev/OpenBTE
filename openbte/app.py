@@ -26,24 +26,25 @@ def load_data(fh):
 
           return pickle.load(f)
 
-df = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/gapminderDataFiveYear.csv')
 
 def get_layout(size = []):
- 
-
-
 
 
  sl = True
  dim = 2   if size[2] == 0 else 3
  x = 1;y=size[1]/size[0]
  z= 1 if dim == 2 else size[2]/size[0]
+
  axis = dict(
           backgroundcolor="rgb(230, 230,230)",
           gridcolor="rgb(255, 255, 255)",
           zerolinecolor="rgb(255, 255, 255)",
           showbackground=False
          )
+
+ xaxis = axis.copy();xaxis['title']=' x [nm]'
+ yaxis = axis.copy();yaxis['title']=' y [nm]'
+ zaxis = axis.copy();zaxis['title']=' z [nm]'
 
  font=dict(
         family="Courier New, monospace",
@@ -57,9 +58,9 @@ def get_layout(size = []):
     aspectratio=dict(x= x, \
                      y= y, \
                      z= z),
-    xaxis=dict(axis),
-    yaxis=dict(axis),
-    zaxis=dict(axis))
+    xaxis= xaxis,
+    yaxis= yaxis,
+    zaxis= zaxis)
 
 
  #camera
@@ -73,9 +74,6 @@ def get_layout(size = []):
  layout = dict(font=font,\
                #title=title,\
                autosize=True,\
-               #width=800,\
-               #height=500,
-               #showlegend=False,\
                scene=scene,\
                uirevision='static',\
                scene_camera = camera,\
@@ -176,10 +174,14 @@ def App(**argv):
        nodes     = np.array(data['nodes'])
        node_data      = variable['data']
 
+
        bb = str(round(data['bte'],2))+' W/m/K' if 'bte' in data.keys() else '--'
        text  = 'Bulk: ' + str(round(data['bulk'],2)) +' W/m/K<br>Fourier: '\
                     +       str(round(data['fourier'],2)) + ' W/m/K<br>BTE:' \
-                    +       bb
+                    + bb +'<br>' + \
+                    'Gradient applied along ' +  data['direction']
+
+
 
        z = np.zeros(len(nodes))  if np.shape(nodes)[1] == 2 else nodes[:,2]
 
@@ -207,6 +209,7 @@ def App(**argv):
             showarrow=False,
             yref='paper',
             text=text,align='left')
+
 
        return  fig
 
