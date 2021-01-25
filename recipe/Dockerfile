@@ -29,7 +29,7 @@ RUN useradd -ms /bin/bash openbte
 
 ENV OMPI_MCA_btl_vader_single_copy_mechanism none 
 
-ENV OMPI_MCA_btl_base_warn_component_unused none
+ENV OMPI_MCA_btl_base_warn_component_unused 0
 
 USER openbte
 

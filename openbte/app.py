@@ -32,44 +32,25 @@ def get_layout(size = []):
  
 
 
+
+
+ sl = True
+ dim = 2   if size[2] == 0 else 3
+ x = 1;y=size[1]/size[0]
+ z= 1 if dim == 2 else size[2]/size[0]
+ axis = dict(
+          backgroundcolor="rgb(230, 230,230)",
+          gridcolor="rgb(255, 255, 255)",
+          zerolinecolor="rgb(255, 255, 255)",
+          showbackground=False
+         )
+
  font=dict(
         family="Courier New, monospace",
         size=12,
         #color="#7f7f7f"
         color="gray"
        )
- 
-
-
- if len(size) == 0:
-   x = 1;y=1;z=1
-   axis = dict(
-          backgroundcolor="rgb(230, 230,230)",
-          showline=False,
-          zeroline=False,
-          visible=False,
-          showgrid=False,
-          ticks='',
-          showticklabels=False,
-          gridcolor="rgb(255, 255, 255)",
-          zerolinecolor="rgb(255, 255, 255)",
-          showbackground=False
-         )
-
-
-
- #camera
- else:  
-  sl = True
-  dim = 2   if size[2] == 0 else 3
-  x = 1;y=size[1]/size[0]
-  z= 1 if dim == 2 else size[2]/size[0]
-  axis = dict(
-          backgroundcolor="rgb(230, 230,230)",
-          gridcolor="rgb(255, 255, 255)",
-          zerolinecolor="rgb(255, 255, 255)",
-          showbackground=False
-         )
 
  # Update 3D scene options
  scene = dict(
@@ -92,8 +73,8 @@ def get_layout(size = []):
  layout = dict(font=font,\
                #title=title,\
                autosize=True,\
-               #width='50%',\
-               height=500,\
+               #width=800,\
+               #height=500,
                #showlegend=False,\
                scene=scene,\
                uirevision='static',\
@@ -105,13 +86,6 @@ def get_layout(size = []):
                plot_bgcolor='rgba(0,0,0,0)')
 
  return layout
-
-
-def get_dd_layout():
-
- style={}
-
- return style
 
 
 def App(**argv):
@@ -127,7 +101,7 @@ def App(**argv):
     dcc.Dropdown(
         id='samples',
         value=0,
-        style = get_dd_layout(),
+        style = {},
         clearable=False,
         searchable=False
     ),
@@ -138,14 +112,31 @@ def App(**argv):
     dcc.Dropdown(
         id='variables',
         value=0,
-        style= get_dd_layout(),
+        style= {},
         clearable=False,
         searchable=False
     ),
   ])
 
 
-  fig_dcc = dcc.Graph(id='master',figure=go.Figure(layout=get_layout()),style={'left':'15%','width':'70%','hight':'70%','bottom':'15%','position':'absolute','background-color':'black'})
+
+  #Init figure---
+  fig = go.Figure()
+  fig.update_xaxes(showline=False,gridcolor='rgba(0,0,0,0)',zerolinecolor='rgba(0,0,0,0)')
+  fig.update_yaxes(showline=False,gridcolor='rgba(0,0,0,0)',zerolinecolor='rgba(0,0,0,0)')
+
+  fig.update_layout(
+    plot_bgcolor='rgba(0,0,0,0)',
+    paper_bgcolor='rgba(0,0,0,0)',
+    font_color='rgba(0,0,0,0)',
+  
+  )
+  #-------------
+
+  fig.update_xaxes(showline=False)
+
+  fig_dcc = dcc.Graph(id='master',figure=fig,style={'left':'15%','width':'70%','height':'70%','bottom':'10%','position':'absolute'})
+
 
   external_stylesheets=[dbc.themes.CYBORG]
 
@@ -161,9 +152,11 @@ def App(**argv):
 
   img = html.Div(html.Img(src=app.get_asset_url('logo.png'), style={'width':'18%','left':'80%','bottom':'88%','position':'absolute'}))
 
-  div1 = html.Div(style = {'left':'25%','height':'70%','width':'50%','bottom':'15%',"border":"2px white solid",'position':'absolute'},children=[fig_dcc,dd_sample,dd_variable,hidden,url]);
+  #div1 = html.Div(style = {'left':'25%','height':'70%','width':'50%','bottom':'15%',"border":"2px white solid",'position':'absolute'},children=[fig_dcc,dd_sample,dd_variable,hidden,url]);
 
-  app.layout = html.Div(children = [div1,img],style = {'height': '100vh','width': '100%',"border":"2px white solid"})
+  #app.layout = html.Div(children = [div1,img],style = {'height': '100vh','width': '100%',"border":"2px white solid"})
+  #app.layout = html.Div(children = [fig_dcc,dd_sample,dd_variable,hidden,url  ,img],style = {'height': '100vh','width': '100%',"border":"2px white solid"})
+  app.layout = html.Div(children = [fig_dcc,dd_sample,dd_variable,hidden,url  ,img],style = {'height': '100vh','width': '100%','position':'absolute'})
 
   #---------------------------------------------------------------------
 
@@ -228,20 +221,11 @@ def App(**argv):
     input_value = pathname[1:]
 
     variables = data_tot[list(data_tot.keys())[0]]['variables'].keys()
-     
-
-    #Get size-----------------
-    #size = 3*[0]
-    #for sample,v in data_tot.items():
-    #  nodes = v['nodes']
-    #  size  = [max([size[i],(max(nodes[:,i]) - min(nodes[:,i]))])  for i in range(3)]
-
 
     options_samples=[{'label': s, 'value': str(n)} for n,s in enumerate(data_tot)]
     options_variables=[{'label': s, 'value': str(n)} for n,s in enumerate(variables)]
  
 
-    #data_tot['size'] = size
 
     return data_tot,options_samples,options_variables
 
