@@ -23,7 +23,7 @@ comm = MPI.COMM_WORLD
 
 def get_model(m):
 
-    models = ['Fourier','Gray2D','gray2DSym','gray3D','mfp2D','mfp2DSym','mfp3D','rta2D','rta2DSym','rta3D','full']
+    models = ['Fourier','gray2D','gray2DSym','gray3D','mfp2D','mfp2DSym','mfp3D','rta2D','rta2DSym','rta3D','full']
 
     return models[m[0]]
 
@@ -93,7 +93,7 @@ def prepare_data(argv):
   tmp = {0:{'name':'Temperature Fourier','units':'K','data':argv['fourier']['temperature'],'increment':-argv['geometry']['applied_gradient']},\
                1:{'name':'Flux Fourier'       ,'units':'W/m/m','data':argv['fourier']['flux'],'increment':[0,0,0]}}
 
-  if 'bte' in argv.keys():
+  if not argv.setdefault('only_fourier',False):
       tmp[2]    = {'name':'Temperature BTE','units':'K','data':argv['bte']['temperature'],'increment':-argv['geometry']['applied_gradient']}
       tmp[3]    = {'name':'Flux BTE'       ,'units':'W/m/m','data':argv['bte']['flux'],'increment':[0,0,0]}
               
@@ -111,7 +111,6 @@ def prepare_data(argv):
          mag = np.array([np.linalg.norm(value) for value in value['data']])
          variables[value['name'] + '(mag.)'] = {'data':mag,'units':value['units'],'increment':value['increment']}
   argv['variables'] = variables
-
 
   argv['data'] = {'variables':variables,'bulk':argv['material']['kappa'][0,0] ,'fourier':argv['fourier']['meta'][0]}
 
@@ -170,10 +169,21 @@ def Solver(**argv):
         #Solve bte--
         if not argv['only_fourier']:
 
-           if get_model(argv['material']['model'])[0:3] == 'rta':  
+           mat_model = get_model(argv['material']['model'])
+
+           if mat_model in ['rta2DSym','rta2D','rta3D'] :
                solve_rta(argv)
-           else:    
+
+           elif mat_model == 'full':    
                solve_full(argv)
+
+           elif mat_model in ['gray2D','mfp2DSym']:    
+               solve_mfp(argv)
+
+           else:
+               print('No model coded')
+               quit()
+
 
         
         argv['dim'] =  int(argv['geometry']['meta'][2])

@@ -8,7 +8,7 @@ def gray2D(**argv):
  #Import data----
  kappa_bulk = argv['kappa']
  kappa = argv['kappa']*np.eye(2)
- mfp_bulk = argv['mfp']*1e-9
+ mfp_bulk = argv['mfp']
  n_phi = int(argv.setdefault('n_phi',48))
  Dphi = 2*np.pi/n_phi
  phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
@@ -19,11 +19,11 @@ def gray2D(**argv):
 
  kappa_directional = np.zeros((1,n_phi,2))
  temp_coeff = np.zeros((1,n_phi))
+ temp_coeff[0,:] = 1/n_phi
  suppression = np.zeros((1,n_phi,1)) 
  for p in range(n_phi): 
     kappa_directional[0,p] += kappa_bulk/mfp_bulk * polar_ave[p]/n_phi*2
     suppression[0,p,0]         += 1/mfp_bulk * polar_ave[p,0]/n_phi*2
-    temp_coeff[0,p] +=  kappa_bulk/mfp_bulk/mfp_bulk*Dphi
 
  tc = temp_coeff/np.sum(temp_coeff)
 

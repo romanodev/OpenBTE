@@ -35,6 +35,7 @@ def mfp2DSym(**argv):
  data = load_data('mfp')
  Kacc = data['Kacc']
  mfp_bulk  = data['mfp']
+
  kappa_bulk = Kacc[-1]
  kappa_bulk = np.zeros_like(Kacc)
  kappa_bulk[0] = Kacc[0]

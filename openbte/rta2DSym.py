@@ -18,7 +18,9 @@ def rta2DSym(**argv):
  #Create sampled MFPs
  #Polar Angle---------
  Dphi = 2*np.pi/n_phi
- phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+ #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+ phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
+
  
  polar_ave = np.array([np.sin(phi),np.cos(phi),np.zeros(n_phi)]).T
 

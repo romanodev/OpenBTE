@@ -79,7 +79,6 @@ def solve_rta(argv):
     #----------------
 
 
-
     if comm.rank == 0 and argv['verbose']:
        print(flush=True)
        print('      Iter    Thermal Conductivity [W/m/K]      Error ''',flush=True)
@@ -101,7 +100,6 @@ def solve_rta(argv):
     Gp = G.clip(min=0); Gm = G.clip(max=0)
     D = np.zeros((len(rr),len(mesh['elems'])))
 
-    #for n,i in enumerate(mesh['i']):  D[:,i] += Gp[:,n]
     np.add.at(D.T,mesh['i'],Gp.T)
 
     DeltaT = fourier['temperature'].copy()
@@ -109,11 +107,9 @@ def solve_rta(argv):
     #--------------------------
 
     #---boundary----------------------
-    TB = np.zeros((n_serial,len(mesh['eb'])))   
     if len(mesh['db']) > 0: #boundary
      tmp = np.einsum('rj,jn->rn',mat['VMFP'][rr],mesh['db'],optimize=True)  
      Gbp2 = tmp.clip(min=0); Gbm2 = tmp.clip(max=0);
- 
      np.add.at(D.T,mesh['eb'],Gbp2.T)
      TB = DeltaT[mesh['eb']]
 
@@ -124,6 +120,45 @@ def solve_rta(argv):
     np.add.at(P.T,mesh['i'][sss],-(mesh['pp'][:,1]*Gm[:,sss]).T)
     del G,Gp
     #----------------------------------------------------
+
+    def sparse_dense_product(i,j,B,X):
+     '''
+     This solves B_ucc' X_uc' -> A_uc
+
+     B_ucc' : sparse in cc' and dense in u. Data is its vectorized data COO descrition
+     X      : dense matrix
+     '''
+
+     tmp = np.zeros_like(X)
+     np.add.at(tmp.T,i,B.T * X.T[j])   
+
+     return tmp
+
+    def compute_residual(X):
+
+       R = np.zeros_like(X)
+
+       DeltaT = np.zeros(n_elems)
+       TB = np.zeros(len(mesh['eb']))
+       for m in range(n_serial):
+         for q in range(n_parallel):
+           DeltaT += mat['tc'][m,q]*X[q,m]
+           np.add.at(TB,np.arange(mesh['eb'].shape[0]),-X[q,m,mesh['eb']]*GG[m,q])
+      
+       #Boundary----------
+       RHS = -np.einsum('c,nc->cn',TB,Gbm2) 
+       B   =  np.zeros((n_elems,n_parallel))
+       np.add.at(B,mesh['eb'],RHS)
+       #------------------
+       R = X-DeltaT
+
+       for m in range(n_serial):
+           R[:,m,:] += mfp[m]*(sparse_dense_product(mesh['i'],mesh['j'],Gm,X[:,m,:]) + np.einsum('uc,uc->uc',D,X[:,m,:]) - P - B.T)
+
+       R  = R.reshape((n_serial*n_parallel,n_elems))
+
+       return np.linalg.norm(R,ord='fro')
+
 
     kappa_vec = [fourier['meta'][0]]
     kappa_old = kappa_vec[-1]
@@ -151,6 +186,7 @@ def solve_rta(argv):
     J = np.zeros((n_elems,dim))
    
     lu = {}
+
     def solve(argv,A,B,indices):
 
      if not argv['keep_lu']:
@@ -167,10 +203,16 @@ def solve_rta(argv):
 
      return X 
 
+    gradT = compute_grad(fourier['temperature'],**argv)  
+    a = np.einsum('m,ui,ci->umc',mfp,F,gradT)
+    
+    #X_tot  = fourier['temperature'][None,None,...] - a
+    
+    X_tot = np.tile(fourier['temperature'],(n_parallel,n_serial,1))
+    #compute_residual(X_tot)
 
 
-
-
+    #quit()
 
     while kk < argv['max_bte_iter'] and error > argv['max_bte_error']:
         a = time.time()
@@ -193,7 +235,7 @@ def solve_rta(argv):
               kappap_f[:,q] = np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:dim],tfg)
 
               #------------------------------------------------------
-              B = DeltaT +  mfp[-1]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems))
+              B = DeltaT + mfp[-1]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems))
               A = get_m(Master,np.concatenate((mfp[-1]*Gm[n],mfp[-1]*D[n]+np.ones(n_elems)))[conversion])
               X_bal = solve(argv,A,B,(q,-1))
               kappap_b[:,q] = np.dot(mesh['kappa_mask'],X_bal)
@@ -213,15 +255,12 @@ def solve_rta(argv):
 
            for m in range(n_serial)[idx::-1]:
                
-                 #-------------------------
-                 #b= time.time()
-                 B = DeltaT +  mfp[m]*(P[n] +get_boundary(RHS[n],mesh['eb'],n_elems))
+                 #-----------------------------------------
+                 B = DeltaT +  mfp[m]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems))
                  A = get_m(Master,np.concatenate((mfp[m]*Gm[n],mfp[m]*D[n]+np.ones(n_elems)))[conversion])
-
                  X = solve(argv,A,B,(q,m))
                  kappap[m,q] = np.dot(mesh['kappa_mask'],X)
-
-                 #-------------------------
+                 #-----------------------------------------
  
                  if argv['multiscale']:
                   error = abs(kappap[m,q] - kappap_f[m,q])/abs(kappap[m,q])
@@ -247,13 +286,15 @@ def solve_rta(argv):
                  if len(mesh['eb']) > 0:
                   np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
 
+                  
+                 X_tot[q,m] = X.copy() 
                  Jp += np.einsum('c,j->cj',X,sigma[m,q,0:dim])*1e-18
                 
  
            for m in range(n_serial)[idx+1:]:
 
                #----------------------------------------------------
-               B = DeltaT +  mfp[m]*(P[n] +get_boundary(RHS[n],mesh['eb'],n_elems))
+               B = DeltaT +  mfp[m]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems))
                A = get_m(Master,np.concatenate((mfp[m]*Gm[n],mfp[m]*D[n]+np.ones(n_elems)))[conversion])
                X = solve(argv,A,B,(q,m))
                kappap[m,q] = np.dot(mesh['kappa_mask'],X)
@@ -305,12 +346,13 @@ def solve_rta(argv):
         comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([kappaf_totp,MPI.DOUBLE],[kappaf_tot,MPI.DOUBLE],op=MPI.SUM)
 
+        error = compute_residual(X_tot)
 
         if argv['multiscale'] and comm.rank == 0: print_multiscale(n_serial,n_parallel,MM) 
 
         kk +=1
-        error = abs(kappa_old-kappa_tot[0])/abs(kappa_tot[0])
-        kappa_old = kappa_tot[0]
+        #error = abs(kappa_old-kappa_tot[0])/abs(kappa_tot[0])
+        #kappa_old = kappa_tot[0]
         kappa_vec.append(kappa_tot[0])
         if argv['verbose'] and comm.rank == 0:   
          print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error),flush=True)
@@ -320,8 +362,6 @@ def solve_rta(argv):
       print(colored(' -----------------------------------------------------------','green'),flush=True)
 
 
-
-   
     kappaf -=np.dot(mesh['kappa_mask'],DeltaT_old)
     kappa -=np.dot(mesh['kappa_mask'],DeltaT_old)
     bte =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J,'kappa_mode':kappa,'kappa_mode_f':kappaf,\

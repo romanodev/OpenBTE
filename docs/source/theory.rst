@@ -43,7 +43,7 @@ The Fourier transform of of the displacement operator is
 
 .. math::
 
- \hat{\mathbf{u}}(sl) = \sum_\mathbf{q} \hat{\mathbf{u}}(s\mathbf{q}) e^{i\mathbf{q}\cdot \mathbf{r}(sl)}
+ \hat{\mathbf{u}}^{sl} = \int_{B.Z.}\frac{d\mathbf{q}}{\left(2\pi\right)^3} \hat{\mathbf{u}}(\mathbf{q}) e^{i\mathbf{q}\cdot \mathbf{r}^{sl}}
  
  
 .. math::
