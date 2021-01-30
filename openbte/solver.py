@@ -11,7 +11,7 @@ import sys
 from shapely.geometry import LineString
 import profile
 import scipy
-from .solve_mfp import *
+#from .solve_mfp import *
 from .solve_rta import *
 from .solve_full import *
 import pkg_resources  
@@ -115,7 +115,7 @@ def prepare_data(argv):
   argv['data'] = {'variables':variables,'bulk':argv['material']['kappa'][0,0] ,'fourier':argv['fourier']['meta'][0]}
 
   if 'bte' in argv.keys():
-     argv['data']['kappa'] = argv['bte']['kappa'][-1]  
+     argv['data']['kappa_bte'] = argv['bte']['kappa'][-1]  
 
 
 
@@ -169,16 +169,14 @@ def Solver(**argv):
         #Solve bte--
         if not argv['only_fourier']:
 
+            
            mat_model = get_model(argv['material']['model'])
 
-           if mat_model in ['rta2DSym','rta2D','rta3D'] :
+           if mat_model in ['rta2DSym','rta2D','rta3D','gray2D','mfp2DSym','mfp2D'] :
                solve_rta(argv)
 
            elif mat_model == 'full':    
                solve_full(argv)
-
-           elif mat_model in ['gray2D','mfp2DSym']:    
-               solve_mfp(argv)
 
            else:
                print('No model coded')

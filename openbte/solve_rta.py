@@ -71,17 +71,14 @@ def solve_rta(argv):
     sigma = mat['sigma']*1e9
     dim = int(mesh['meta'][2])
     F = mat['VMFP']
-
     #Get discretization----
     n_serial,n_parallel = sigma.shape[:2]
     block =  n_parallel//comm.size
     rr = range(block*comm.rank,n_parallel) if comm.rank == comm.size-1 else range(block*comm.rank,block*(comm.rank+1))
-    #----------------
-
 
     if comm.rank == 0 and argv['verbose']:
        print(flush=True)
-       print('      Iter    Thermal Conductivity [W/m/K]      Error ''',flush=True)
+       print('      Iter    Thermal Conductivity [W/m/K]      Residual ''',flush=True)
        print(colored(' -----------------------------------------------------------','green'),flush=True)
 
     if len(mesh['db']) > 0:
@@ -99,11 +96,8 @@ def solve_rta(argv):
     G = np.einsum('qj,jn->qn',F[rr],mesh['k'],optimize=True)
     Gp = G.clip(min=0); Gm = G.clip(max=0)
     D = np.zeros((len(rr),len(mesh['elems'])))
-
     np.add.at(D.T,mesh['i'],Gp.T)
-
     DeltaT = fourier['temperature'].copy()
-    #DeltaT_initial = DeltaT.copy()
     #--------------------------
 
     #---boundary----------------------
@@ -116,7 +110,6 @@ def solve_rta(argv):
     #Periodic---
     sss = np.asarray(mesh['pp'][:,0],dtype=int)
     P = np.zeros((len(rr),n_elems))
-    #for (_,v),ss in zip(mesh['pp'],sss): P[:,mesh['i'][ss]] -= Gm[:,ss].copy()*v
     np.add.at(P.T,mesh['i'][sss],-(mesh['pp'][:,1]*Gm[:,sss]).T)
     del G,Gp
     #----------------------------------------------------
@@ -150,10 +143,9 @@ def solve_rta(argv):
        B   =  np.zeros((n_elems,n_parallel))
        np.add.at(B,mesh['eb'],RHS)
        #------------------
-       R = X-DeltaT
 
        for m in range(n_serial):
-           R[:,m,:] += mfp[m]*(sparse_dense_product(mesh['i'],mesh['j'],Gm,X[:,m,:]) + np.einsum('uc,uc->uc',D,X[:,m,:]) - P - B.T)
+           R[:,m,:] = (sparse_dense_product(mesh['i'],mesh['j'],Gm,X[:,m,:]) + np.einsum('uc,uc->uc',D,X[:,m,:]) - P - B.T) + (X[:,m,:]-DeltaT)/mfp[m]
 
        R  = R.reshape((n_serial*n_parallel,n_elems))
 
@@ -174,16 +166,13 @@ def solve_rta(argv):
     kappab,kappap_b = np.zeros((2,n_serial,n_parallel))
     transitionp = np.zeros(n_parallel)
     transition = 1e4 * np.ones(n_parallel)
-
     mat['tc'] = mat['tc']/np.sum(mat['tc'])
-
     im = np.concatenate((mesh['i'],list(np.arange(n_elems))))
     jm = np.concatenate((mesh['j'],list(np.arange(n_elems))))
-
     Master = sp.csc_matrix((np.arange(len(im))+1,(im,jm)),shape=(n_elems,n_elems),dtype=np.float64)
-    conversion = np.asarray(Master.data-1,np.int) 
-
+    conversion = np.asarray(Master.data-1,np.int)
     J = np.zeros((n_elems,dim))
+
    
     lu = {}
 
@@ -204,11 +193,10 @@ def solve_rta(argv):
      return X 
 
     gradT = compute_grad(fourier['temperature'],**argv)  
-    a = np.einsum('m,ui,ci->umc',mfp,F,gradT)
-    
+
+    #a = np.einsum('m,ui,ci->umc',mfp,F,gradT)
     #X_tot  = fourier['temperature'][None,None,...] - a
-    
-    X_tot = np.tile(fourier['temperature'],(n_parallel,n_serial,1))
+    #X_tot = np.tile(fourier['temperature'],(n_parallel,n_serial,1))
     #compute_residual(X_tot)
 
 
@@ -218,6 +206,7 @@ def solve_rta(argv):
         a = time.time()
         
         if argv['multiscale']: tf,tfg = solve_fourier(mat['mfp_average'],DeltaT,argv)
+
         #Multiscale scheme-----------------------------
         diffusive = 0
         bal = 0
@@ -253,15 +242,16 @@ def solve_rta(argv):
 
            else: idx = n_serial-1
 
+           idx = n_serial-1
            for m in range(n_serial)[idx::-1]:
                
                  #-----------------------------------------
-                 B = DeltaT +  mfp[m]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems))
-                 A = get_m(Master,np.concatenate((mfp[m]*Gm[n],mfp[m]*D[n]+np.ones(n_elems)))[conversion])
+                 B = (DeltaT +  mfp[m]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems)))
+                 A = get_m(Master,np.concatenate(((mfp[m]*Gm[n]),(mfp[m]*D[n]+np.ones(n_elems))))[conversion])
                  X = solve(argv,A,B,(q,m))
                  kappap[m,q] = np.dot(mesh['kappa_mask'],X)
                  #-----------------------------------------
- 
+
                  if argv['multiscale']:
                   error = abs(kappap[m,q] - kappap_f[m,q])/abs(kappap[m,q])
                   if error < argv['multiscale_error_fourier'] and m <= transition[q]:
@@ -272,7 +262,7 @@ def solve_rta(argv):
                    kappap[:m+1,q] = kappap_f[:m+1,q]
                    diffusive += m+1
                    Xm = tf[:m+1] - np.einsum('m,i,mci->mc',mat['mfp_sampled'][:m+1],mat['VMFP'][q,:dim],tfg[:m+1])
-
+                   #X_tot[q,:m+1] = Xm
                    DeltaTp += np.einsum('mc,m->c',Xm,mat['tc'][:m+1,q])  
                   
                    if len(mesh['eb']) > 0:
@@ -286,8 +276,7 @@ def solve_rta(argv):
                  if len(mesh['eb']) > 0:
                   np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
 
-                  
-                 X_tot[q,m] = X.copy() 
+                 #X_tot[q,m] = X.copy() 
                  Jp += np.einsum('c,j->cj',X,sigma[m,q,0:dim])*1e-18
                 
  
@@ -307,6 +296,8 @@ def solve_rta(argv):
                    kappap[m:,q] = kappap_b[m:,q]
                    bal += n_serial-m
                    DeltaTp += X_bal*np.sum(mat['tc'][m:,q])
+
+                   #X_tot[q,m:] = X_bal
 
                    if len(mesh['eb']) > 0:
                     np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('c,mc->c',X_bal[mesh['eb']],GG[m:,q]))
@@ -346,13 +337,13 @@ def solve_rta(argv):
         comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([kappaf_totp,MPI.DOUBLE],[kappaf_tot,MPI.DOUBLE],op=MPI.SUM)
 
-        error = compute_residual(X_tot)
+        #error = compute_residual(X_tot)
 
         if argv['multiscale'] and comm.rank == 0: print_multiscale(n_serial,n_parallel,MM) 
 
         kk +=1
-        #error = abs(kappa_old-kappa_tot[0])/abs(kappa_tot[0])
-        #kappa_old = kappa_tot[0]
+        error = abs(kappa_old-kappa_tot[0])/abs(kappa_tot[0])
+        kappa_old = kappa_tot[0]
         kappa_vec.append(kappa_tot[0])
         if argv['verbose'] and comm.rank == 0:   
          print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error),flush=True)

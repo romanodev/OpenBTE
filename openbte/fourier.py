@@ -41,9 +41,10 @@ def fourier_info(data):
 
 
 
-@cached(cache=cache_get_SU, key=lambda F, k: hashkey(k))
-def get_SU(F,k):
-     return splu(k*F + sp.eye(F.shape[0]))
+@cached(cache=cache_get_SU, key=lambda bundle, k: hashkey(k))
+def get_SU(bundle,k):
+
+     return splu(k*bundle[0] + np.diag(bundle[1]))
 
 def get_key(ll,kappa):
 
@@ -75,11 +76,12 @@ def solve_fourier_single(argv):
 
    if comm.rank == 0:
 
-
     mesh = argv['geometry']
 
     mesh['elem_kappa_map'] = get_kappa_map_from_mat(**argv)
+    
     dim = int(mesh['meta'][2])
+    
     n_elems = int(mesh['meta'][0])
 
     kappa = -1 #it means that it will take the map from mesh
@@ -367,7 +369,7 @@ def assemble(mesh,kappa):
       if not i == j:
      
        kappa_loc = get_kappa(mesh,i,j,ll,kappa_map)
-       
+      
        (v_orth,dummy) = get_decomposed_directions(mesh,get_key(ll,kappa_loc))
 
        iff.append(i)
@@ -391,7 +393,7 @@ def assemble(mesh,kappa):
 
     #This scale the matrix and fixed zero temperature to a random point
     scale = fix(F,B)
-
+    #scale = np.ones(n_elems)
     return F,B,scale
 
 
@@ -411,7 +413,6 @@ def solve_fourier(kappa,DeltaT,argv):
 
     if comm.rank == 0:
 
-
      F,B,scale = assemble(mesh,tuple(map(tuple,np.eye(dim))))
 
      ratio_old = 0
@@ -419,18 +420,16 @@ def solve_fourier(kappa,DeltaT,argv):
      for m,k in enumerate(kappa):
          
          BB = k*B+DeltaT
-         meta,tf[m,:],tfg[m,:,:] = solve_convergence(argv\
-                                                        ,k*np.eye(dim),BB,\
-                                                         get_SU(F,k))
+         meta,tf[m,:],tfg[m,:,:] = solve_convergence(argv,k*np.eye(dim),BB,get_SU([F,scale],k),scale=scale)
          kappaf = meta[0]
          ratio[m] = kappaf/k
 
-         if m > int(len(kappa)/4):
-           error = abs((ratio[m]-ratio[m-1]))/ratio[m]
-           if error < 1e-2:
-             tf[m:,:]  = tf[m-1]; tfg[m:,:,:] = tfg[m-1]
-             ratio[m:] = ratio[m]
-             break
+         #if m > int(len(kappa)/4):
+         #  error = abs((ratio[m]-ratio[m-1]))/ratio[m]
+         #  if error < 1e-2:
+         #    tf[m:,:]  = tf[m-1]; tfg[m:,:,:] = tfg[m-1]
+         #    ratio[m:] = ratio[m]
+         #    break
 
      #Regularize---
      if argv.setdefault('experimental_multiscale',False):

@@ -15,7 +15,7 @@ class TestClass(object):
       sol = Solver(geometry = geo,material=mat,save=False)
 
       if comm.rank == 0:
-       assert np.allclose(sol['kappa'],load_data('solver_rta2DSym')['kappa'])
+       assert np.allclose(sol['kappa_bte'],load_data('solver_rta2DSym')['kappa_bte'])
 
 
     def test_rta3D(self):
@@ -24,7 +24,17 @@ class TestClass(object):
        geo = Geometry(model='lattice',lx = 10,ly = 10, lz=2,step = 2, base = [[0,0]],porosity=0.2,shape='square',save=False,delete_gmsh_files=True)
        sol = Solver(geometry = geo,material=mat,save=False,max_bte_iter=10)
        if comm.rank == 0:
-        assert np.allclose(sol['kappa'],load_data('solver_rta3D')['kappa'])
+        assert np.allclose(sol['kappa_bte'],load_data('solver_rta3D')['kappa_bte'])
+
+    def test_gray2D(self):
+
+       mat = Material(model='gray2D',mfp=1e-7,kappa=130,save=False) 
+       geo = Geometry(model='lattice',lx = 10,ly = 10, lz=0,step = 0.5, base = [[0,0]],porosity=0.2,shape='square',delete_gmsh_files=True,direction='x',save = False)
+       sol = Solver(geometry = geo,material=mat,save=False,max_bte_iter=10)
+       if comm.rank == 0:
+        assert np.allclose(sol['kappa_bte'],load_data('solver_gray2D')['kappa_bte'])
+
+
 
 
 

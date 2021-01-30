@@ -181,7 +181,6 @@ def Plot(**argv):
 
   if comm.rank == 0:
 
-
    #import data-------------------------------
    geometry     = argv['geometry'] if 'geometry' in argv.keys() else load_data('geometry')
    solver       = argv['solver']   if 'geometry' in argv.keys() else load_data('solver')
@@ -199,9 +198,8 @@ def Plot(**argv):
 
      size = duplicate_cells(geometry,solver,repeat)
 
-
      if argv.setdefault('show',True):
-        plot_results(solver,geometry)
+        plot_results(solver,geometry,**argv)
 
      output ={'nodes'    :geometry['nodes'],\
              'elems'    :geometry['elems'],\
@@ -225,7 +223,7 @@ def Plot(**argv):
 
    elif model == 'kappa_mode':
 
-        plot_mode_kappa(**argv)
+      plot_mode_kappa(**argv)
 
 
 

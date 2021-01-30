@@ -94,4 +94,33 @@ Interactive examples can be run in Google Colab
     <iframe src="_static/plotly_2.html" height="475px" width="65%"  display= inline-block  ></iframe>
    
 
+3) Simple gray model
+#########################################
+
+Sometimes you might just want to do some quick calculations using the gray model. In this case no file is needed to create the `Material` object; only the bulk MFP and bulk thermal conductivity need to be specified.
+
+
+.. code-block:: python
+
+  from openbte import Material,Geometry,Solver,Plot
+
+  Material(model='gray2D',mfp=1e-7,kappa=130) #mfp in nm
+
+  Geometry(model='lattice',lx = 10,ly = 10, lz=0,step = 0.5, base = [[0,0]],porosity=0.2,shape='square',delete_gmsh_files=True,direction='x')
+
+  Solver(multiscale=False,max_bte_iter=30)
+
+  Plot(model='maps')
+
+.. raw:: html
+
+    <iframe src="_static/plotly_3.html" height="475px" width="65%"  display= inline-block  ></iframe>
+   
+
+
+
+  
+
+
+
 

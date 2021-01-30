@@ -7,12 +7,12 @@ from .utils import *
 import time
 
 
-def plot_results(solver,geometry):
+def plot_results(solver,geometry,**argv):
 
 
    data  = solver['variables']
    nodes = geometry['nodes']
-   elems = geometry['elems']
+   elems = np.array(geometry['elems'])
    size  = [max(nodes[:,i]) - min(nodes[:,i])  for i in range(3)] 
    dim   = 2   if size[2] == 0 else 3
 
@@ -84,7 +84,7 @@ def plot_results(solver,geometry):
 
    #axis = dict(ticktext=[],tickvals= [],showbackground=False)
 
-   bb = str(round(solver['bte'],2))+' W/m/K' if 'bte' in solver.keys() else '--'
+   bb = str(round(solver['kappa_bte'],2))+' W/m/K' if 'kappa_bte' in solver.keys() else '--'
 
    meta  = 'Bulk: ' + str(round(solver['bulk'],2)) +' W/m/K<br>Fourier: '\
                     +       str(round(solver['fourier'],2)) + ' W/m/K<br>BTE:' \
@@ -126,9 +126,9 @@ def plot_results(solver,geometry):
    fig.update_layout(scene_camera=camera)
    fig.update_layout(updatemenus=updatemenus)
 
-   #if argv.setdefault('write_html',False):
-   # fig.write_html("plotly.html")
-       #plotly.io.write_json(fig,'ff.json')
+   if argv.setdefault('write_html',False):
+    fig.write_html("plotly.html")
+   #plotly.io.write_json(fig,'ff.json')
 
    # plotly.io.to_image(fig,format='png')
    #fig.write_image("test.png",scale=5)

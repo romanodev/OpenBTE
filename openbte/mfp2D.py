@@ -25,7 +25,6 @@ def get_linear_indexes(mfp,value):
       if (value <= mfp[m+1]) and (value >= mfp[m]) :
         aj = (value-mfp[m])/(mfp[m+1]-mfp[m]) 
         return m,1-aj,m+1,aj  
-   
 
 
 def mfp2D(**argv):
@@ -69,8 +68,8 @@ def mfp2D(**argv):
  nm = n_phi * n_mfp
  #Polar Angle---------
  Dphi = 2*np.pi/n_phi
- #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
- phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
+ phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+ #phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
  polar = np.array([np.sin(phi),np.cos(phi)]).T
  fphi= np.sinc(Dphi/2.0/np.pi)
  polar_ave = polar*fphi
@@ -156,7 +155,7 @@ def mfp2D(**argv):
          'phi':phi,\
          'directions': polar  ,\
          'sampling': np.array([n_phi,n_mfp]),\
-         'model':np.array([5]),\
+         'model':np.array([4]),\
          'suppression':np.zeros(1),\
          'kappam':kappa_bulk}
 
