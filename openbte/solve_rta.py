@@ -242,7 +242,6 @@ def solve_rta(argv):
 
            else: idx = n_serial-1
 
-           idx = n_serial-1
            for m in range(n_serial)[idx::-1]:
                
                  #-----------------------------------------
