@@ -14,6 +14,61 @@ import pickle
 import gzip
 
 
+def cg(L, b,**argv):
+
+    #PARSE---------------------------------------
+    x  = argv.setdefault('x0',np.zeros_like(b))  
+    M  = argv.setdefault('M',lambda x: x.copy())  
+    max_error  = argv.setdefault('error',1e-4)  
+    callback  = argv.setdefault('callback',None) 
+    verbose  = argv.setdefault('verbose',True) 
+    
+    #-------------------------------------------
+    n = len(b)
+    r = b - L(x)
+    z = M(r)
+    p = z
+    r_k_norm = np.dot(r, z)
+    r_0_norm = r_k_norm
+    error = 1
+    for i in range(2*n):
+        Ap = L(p)
+        alpha = r_k_norm / np.dot(p, Ap)
+        x += alpha * p
+        r -= alpha * Ap
+        z = M(r)
+        r_kplus1_norm = np.dot(r, z)
+
+        error = r_kplus1_norm/r_0_norm
+        if not callback == None:
+            kappa = callback(x) 
+
+        if verbose:
+         print("Iter : % 4i, Kappa: % 5.3E  Error : % 5.2E" %(i, kappa,error))
+        if error < max_error:
+         break
+        if i == 100:
+            break
+
+        beta = r_kplus1_norm / r_k_norm
+        r_k_norm = r_kplus1_norm
+        p = z + beta * p
+    return x
+
+def compute_kappa(W,b):
+
+
+ L   = lambda x: np.dot(W,x)
+ M   = lambda x: x/np.sqrt(np.diag(W))
+
+ def callback(x):
+     return np.dot(x,b)
+
+ x0     = b.copy()/np.diag(W)
+ x  = cg(L,b,M=M,x0=x0,callback=callback,verbose = False)
+
+ return callback(x)
+
 
 os.environ['H5PY_DEFAULT_READONLY']='1'
 

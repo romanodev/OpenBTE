@@ -5,7 +5,37 @@ from .utils import *
 import time
 
 
+
+
+def rta_no_interpolation(**argv):
+
+
+    data = load_data(argv.setdefault('basename','rta'))
+
+    mfp_0 = 1e-10
+    mfp_max = 1e-4
+    mfp_bulk = np.einsum('ki,k->ki',data['v'],data['tau']) #the minimum MFP is calculated on the real MFP
+    I = np.where(np.linalg.norm(mfp_bulk,axis=1) > mfp_0)[0]
+    tau = data['tau'][I]
+    v = data['v'][I]
+    C = data['C'][I]
+    f = np.divide(np.ones_like(tau),tau, out=np.zeros_like(tau), where=tau!=0)
+    kappam = np.einsum('u,u,u,u->u',tau,C,v[:,0],v[:,0]) 
+    Wdiag = C*f
+    Jc = np.einsum('k,ki->ki',C,v[:,:2])
+    nm = len(Wdiag)
+
+    return  {  'Wdiag':Wdiag,\
+               'sigma':Jc,\
+               'kappa':data['kappa'],\
+               'model':np.array([11])}
+
+
 def rta2DSym(**argv):
+
+ if not argv.setdefault('interpolation',True):   
+
+     return rta_no_interpolation(**argv)
 
  #Import data----
  #Get options----
@@ -20,7 +50,6 @@ def rta2DSym(**argv):
  Dphi = 2*np.pi/n_phi
  #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
  phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
-
  
  polar_ave = np.array([np.sin(phi),np.cos(phi),np.zeros(n_phi)]).T
 
@@ -30,7 +59,6 @@ def rta2DSym(**argv):
 
  #small cut on MFPs
  mfp_0 = 1e-10
- mfp_max = 1e-4
  mfp_bulk = np.einsum('ki,k->ki',data['v'],data['tau']) #the minimum MFP is calculated on the real MFP
  I = np.where(np.linalg.norm(mfp_bulk,axis=1) > mfp_0)[0]
  tau = data['tau'][I]
@@ -48,6 +76,7 @@ def rta2DSym(**argv):
  phi_bulk[np.where(phi_bulk < 0) ] = 2*np.pi + phi_bulk[np.where(phi_bulk <0)]
  kappa = data['kappa']
 
+ mfp_max = np.max(mfp_bulk*1.01)
  mfp_sampled = np.logspace(np.log10(mfp_0)*1.01,np.log10(mfp_max),n_mfp,endpoint=True)#min MFP = 1e-1 nm
  
  #-----------------------

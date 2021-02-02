@@ -47,7 +47,7 @@ def energy_conserving(W):
 
 def full(**argv):
 
- filename = 'full.npz'
+ filename = argv.setdefault('input_filename','full.npz')
 
  print(' ')
  print('Importing ' + filename + ' ... ',end= '')
@@ -101,33 +101,6 @@ def full(**argv):
  print(' done')
  print(' ')
  #----------
- #test
- #Adinv = np.diag(1/np.diag(W))
- #Aod = W - np.diag(np.diag(W))
- #Add = np.einsum('ij,i->ij',Aod,1/np.diag(W))
- #x0 = np.einsum('lk,kj->lj',Adinv,sigma)
- #x_old = np.zeros_like(x0)
- #for n in range(40):
- #    print(n) 
- #    x = x0 - np.einsum('kl,lj->kj',Add,x_old)
- #    print(np.einsum('li,lj->ij',sigma,x)/data['alpha'])
- #    x_old = x.copy()
- #quit()
- #----------
-
- #postprocessing----
- #a = time.time()
- #B = -np.einsum('i,ij->ij',1/np.diag(W),W-np.diag(np.diag(W)))
- #Wod = -(W-np.diag(np.diag(W)))
- #F = np.einsum('i,ij->ij',1/np.diag(W),sigma)
- #Wd = np.tril(Wod)
- #B = np.empty_like(Wd)
- #B[Wd.nonzero()] = Wd[Wd.nonzero()]
- #------------------
-
-
- #data = {'tc':tc,'VMFP':F[:,:2],'sigma':sigma[:,:2],'kappa':kappa,'B':B,'scale':1/np.diag(W),'model':[10],'alpha':data['alpha']}
- #data = {'tc':tc,'VMFP':F[:,:2],'sigma':sigma[:,:2],'kappa':kappa,'B':B}
 
  data = {'tc':tc,'W':W,'sigma':sigma[:,:dim],'kappa':kappa[:dim,:dim],'model':[10],'alpha':data['alpha']}
 

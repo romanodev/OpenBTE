@@ -11,22 +11,20 @@ import sys
 from shapely.geometry import LineString
 import profile
 import scipy
-#from .solve_mfp import *
 from .solve_rta import *
 from .solve_full import *
+from .solve_exp import *
 import pkg_resources  
 from .fourier import *
 import warnings
 
 comm = MPI.COMM_WORLD
 
-
 def get_model(m):
 
-    models = ['Fourier','gray2D','gray2DSym','gray3D','mfp2D','mfp2DSym','mfp3D','rta2D','rta2DSym','rta3D','full']
+    models = ['Fourier','gray2D','gray2DSym','gray3D','mfp2D','mfp2DSym','mfp3D','rta2D','rta2DSym','rta3D','full','exp']
 
     return models[m[0]]
-
 
 
 def print_bulk_info(mat,mesh):
@@ -178,6 +176,9 @@ def Solver(**argv):
            elif mat_model == 'full':    
                solve_full(argv)
 
+           elif mat_model == 'exp':    
+               solve_exp(argv)
+
            else:
                print('No model coded')
                quit()
@@ -208,8 +209,6 @@ def print_mpi_info():
 
 
 
-
-
 def print_grid_info(mesh,mat):
 
           dim     = int(mesh['meta'][2])
@@ -232,7 +231,7 @@ def print_grid_info(mesh,mat):
              print(colored('  Number of MFP:                           ','green')+ str(mat['tc'].shape[0]),flush=True)
              print(colored('  Number of Solid Angles:                  ','green')+ str(mat['tc'].shape[1]),flush=True)
             else : 
-             print(colored('  Number of wave vectors:                  ','green')+ str(mat['tc'].shape[0]),flush=True)
+             print(colored('  Number of wave vectors:                  ','green')+ str(mat['sigma'].shape[0]),flush=True)
 
           if dim == 3:
            filling = np.sum(mesh['volumes'])/mesh['size'][0]/mesh['size'][1]/mesh['size'][2]

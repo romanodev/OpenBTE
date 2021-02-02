@@ -36,7 +36,6 @@ def Material(**argv):
      if comm.rank == 0:
       data = rta2DSym(**argv)
 
-
    elif model == 'full':
      if comm.rank == 0:
       data = full(**argv)
