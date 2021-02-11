@@ -99,21 +99,27 @@ def prepare_data(argv):
   variables = {}
   for key,value in tmp.items():
       
-     if value['data'].ndim == 1: #scalar
-         variables[value['name']] = {'data':value['data'],'units':value['units'],'increment':value['increment']}
-     elif value['data'].ndim == 2 : #vector 
-         variables[value['name'] + '(x)'] = {'data':value['data'][:,0],'units':value['units'],'increment':value['increment']}
-         variables[value['name'] + '(y)'] = {'data':value['data'][:,1],'units':value['units'],'increment':value['increment']}
-         if argv['dim'] == 3: 
-             variables[value['name'] + '(z)'] = {'data':value['data'][:,2],'units':value['units'],'increment':value['increment']}
-         mag = np.array([np.linalg.norm(value) for value in value['data']])
-         variables[value['name'] + '(mag.)'] = {'data':mag,'units':value['units'],'increment':value['increment']}
+     #if value['data'].ndim == 1: #scalar
+     variables[value['name']] = {'data':value['data'],'units':value['units'],'increment':value['increment']}
+     #elif value['data'].ndim == 2 : #vector 
+     #    variables[value['name'] + '(x)'] = {'data':value['data'][:,0],'units':value['units'],'increment':value['increment']}
+     #    variables[value['name'] + '(y)'] = {'data':value['data'][:,1],'units':value['units'],'increment':value['increment']}
+     #    if argv['dim'] == 3: 
+     #        variables[value['name'] + '(z)'] = {'data':value['data'][:,2],'units':value['units'],'increment':value['increment']}
+     #    mag = np.array([np.linalg.norm(value) for value in value['data']])
+     #    variables[value['name'] + '(mag.)'] = {'data':mag,'units':value['units'],'increment':value['increment']}
   argv['variables'] = variables
 
   argv['data'] = {'variables':variables,'bulk':argv['material']['kappa'][0,0] ,'fourier':argv['fourier']['meta'][0]}
 
   if 'bte' in argv.keys():
-     argv['data']['kappa_bte'] = argv['bte']['kappa'][-1]  
+     argv['data']['kappa_bte']  = argv['bte']['kappa'][-1]  
+     if 'kappa_mode' in argv['bte']:
+       argv['data']['kappa_mode'] = argv['bte']['kappa_mode']
+     if 'kappa_mode_f' in argv['bte']:
+       argv['data']['kappa_mode_f'] = argv['bte']['kappa_mode_f']
+     if 'kappa_0' in argv['bte']:
+       argv['data']['kappa_0'] = argv['bte']['kappa_0']
 
 
 
@@ -146,8 +152,8 @@ def Solver(**argv):
             print(colored(' -----------------------------------------------------------','green'),flush=True)
             print_options(**argv)
 
-            mesh = argv['geometry'] if 'geometry' in argv.keys() else load_data('geometry')
-            mat  = argv['material'] if 'material' in argv.keys() else load_data('material')
+            mesh = argv['geometry'] if 'geometry' in argv.keys() else load_data(argv.setdefault('geometry_file','geometry'))
+            mat  = argv['material'] if 'material' in argv.keys() else load_data(argv.setdefault('material_file','material'))
             
             print_bulk_info(mat,mesh)
             print_mpi_info()
@@ -182,7 +188,6 @@ def Solver(**argv):
            else:
                print('No model coded')
                quit()
-
 
         
         argv['dim'] =  int(argv['geometry']['meta'][2])

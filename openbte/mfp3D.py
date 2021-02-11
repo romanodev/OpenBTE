@@ -77,14 +77,6 @@ def mfp3D(**argv):
    nm = n_phi * n_mfp * n_theta
    #------------------------------------------
 
-   #data = load_data('mfp')
-   #kappa_bulk = data['K']
-   #mfp_bulk = data['mfp']
-   #I = np.where(mfp_bulk > 0)
-   #kappa_bulk = kappa_bulk[I]
-   #mfp_bulk = mfp_bulk[I]
-   #kappa = data['kappa']
-   #-----------------------
 
    n_mfp_bulk = len(mfp_bulk)
 

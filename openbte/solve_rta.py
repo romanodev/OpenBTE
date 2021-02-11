@@ -13,6 +13,8 @@ import scipy
 from matplotlib.pylab import *
 from cachetools import cached,LRUCache
 from cachetools.keys import hashkey
+
+from matplotlib.pylab import *
 comm = MPI.COMM_WORLD
       
 cache_compute_lu = LRUCache(maxsize=10000)
@@ -127,6 +129,17 @@ def solve_rta(argv):
 
      return tmp
 
+    def compute_upwind_projected_gradient(X,m,q):
+
+         return sparse_dense_product(mesh['i'],mesh['j'],Gm[q],X) + np.einsum('c,c->c',D[q],X) - P[q]
+
+    def compute_partial_residual(X,m,q,B):
+
+       R = mfp[m]*compute_upwind_projected_gradient(X,m,q) + X - B
+
+       return np.linalg.norm(R)/np.linalg.norm(X)
+       
+
     def compute_residual(X):
 
        R = np.zeros_like(X)
@@ -162,7 +175,7 @@ def solve_rta(argv):
     Mp = np.zeros(2)
     kappa,kappap = np.zeros((2,n_serial,n_parallel))
     kappaf,kappap_f = np.zeros((2,n_serial,n_parallel))
-    kappa0,kappap_0 = np.zeros((2,n_serial,n_parallel))
+    kappa_0,kappap_0 = np.zeros((2,n_serial,n_parallel))
     kappab,kappap_b = np.zeros((2,n_serial,n_parallel))
     transitionp = np.zeros(n_parallel)
     transition = 1e4 * np.ones(n_parallel)
@@ -220,8 +233,10 @@ def solve_rta(argv):
         for n,q in enumerate(rr):
            
            #Get ballistic kappa
+           kappap_0[:,q]   =   -np.einsum('c,m,i,ci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:dim],compute_grad(DeltaT,**argv))
            if argv['multiscale']:
-              kappap_f[:,q] = np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:dim],tfg)
+              kappap_f[:,q] =    np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:dim],tfg)
+             
 
               #------------------------------------------------------
               B = DeltaT + mfp[-1]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems))
@@ -244,17 +259,19 @@ def solve_rta(argv):
 
            for m in range(n_serial)[idx::-1]:
                
-                 #-----------------------------------------
-                 B = (DeltaT +  mfp[m]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems)))
-                 A = get_m(Master,np.concatenate(((mfp[m]*Gm[n]),(mfp[m]*D[n]+np.ones(n_elems))))[conversion])
+                 #----------------------------------------
+                 B = DeltaT +  mfp[m]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems))
+                 data = np.concatenate((mfp[m]*Gm[n],mfp[m]*D[n]+np.ones(n_elems)))
+                 A = get_m(Master,data[conversion])
                  X = solve(argv,A,B,(q,m))
                  kappap[m,q] = np.dot(mesh['kappa_mask'],X)
                  #-----------------------------------------
 
                  if argv['multiscale']:
-                  error = abs(kappap[m,q] - kappap_f[m,q])/abs(kappap[m,q])
-                  if error < argv['multiscale_error_fourier'] and m <= transition[q]:
 
+                  error = abs(kappap[m,q] - kappap_f[m,q])/abs(kappap[m,q])
+                  #error = 1e8
+                  if error < argv['multiscale_error_fourier'] and m <= transition[q]:
                    transitionp[q] = m  if argv.setdefault('transition',False) else 1e4
    
                    #Vectorize
@@ -295,7 +312,7 @@ def solve_rta(argv):
                    kappap[m:,q] = kappap_b[m:,q]
                    bal += n_serial-m
                    DeltaTp += X_bal*np.sum(mat['tc'][m:,q])
-
+                   
                    #X_tot[q,m:] = X_bal
 
                    if len(mesh['eb']) > 0:
@@ -310,7 +327,7 @@ def solve_rta(argv):
                 np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
 
                Jp += np.einsum('c,j->cj',X,sigma[m,q,0:dim])*1e-18
-          
+           #quit() 
 
         Mp[0] = diffusive
         Mp[1] = bal
@@ -326,7 +343,7 @@ def solve_rta(argv):
         comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([kappap,MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([kappap_b,MPI.DOUBLE],[kappab,MPI.DOUBLE],op=MPI.SUM)
-        comm.Allreduce([kappap_0,MPI.DOUBLE],[kappa0,MPI.DOUBLE],op=MPI.SUM)
+        comm.Allreduce([kappap_0,MPI.DOUBLE],[kappa_0,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([kappap_f,MPI.DOUBLE],[kappaf,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([Mp,MPI.DOUBLE],[MM,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([transitionp,MPI.DOUBLE],[transition,MPI.DOUBLE],op=MPI.SUM)
@@ -355,7 +372,7 @@ def solve_rta(argv):
     kappaf -=np.dot(mesh['kappa_mask'],DeltaT_old)
     kappa -=np.dot(mesh['kappa_mask'],DeltaT_old)
     bte =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J,'kappa_mode':kappa,'kappa_mode_f':kappaf,\
-                'kappa_mode_b':kappab-np.dot(mesh['kappa_mask'],DeltaT_old)}
+            'kappa_mode_b':kappab-np.dot(mesh['kappa_mask'],DeltaT_old),'kappa_0':kappa_0}
     argv['bte'] = bte
 
 

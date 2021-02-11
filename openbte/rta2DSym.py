@@ -48,11 +48,12 @@ def rta2DSym(**argv):
  #Create sampled MFPs
  #Polar Angle---------
  Dphi = 2*np.pi/n_phi
- #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
- phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
- 
+ phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+ #phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
  polar_ave = np.array([np.sin(phi),np.cos(phi),np.zeros(n_phi)]).T
 
+
+ 
  #Import data-----------
  
  data = load_data(argv.setdefault('basename','rta'))
@@ -76,7 +77,7 @@ def rta2DSym(**argv):
  phi_bulk[np.where(phi_bulk < 0) ] = 2*np.pi + phi_bulk[np.where(phi_bulk <0)]
  kappa = data['kappa']
 
- mfp_max = np.max(mfp_bulk*1.01)
+ mfp_max = np.max(mfp_bulk)
  mfp_sampled = np.logspace(np.log10(mfp_0)*1.01,np.log10(mfp_max),n_mfp,endpoint=True)#min MFP = 1e-1 nm
  
  #-----------------------

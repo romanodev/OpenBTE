@@ -127,7 +127,6 @@ def App(**argv):
     plot_bgcolor='rgba(0,0,0,0)',
     paper_bgcolor='rgba(0,0,0,0)',
     font_color='rgba(0,0,0,0)',
-  
   )
   #-------------
 

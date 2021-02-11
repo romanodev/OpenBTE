@@ -94,7 +94,10 @@ def full(**argv):
  print('Computing kappa bulk ...')
 
  #kappa = np.einsum('ui,uq,qj->ij',sigma,np.linalg.pinv(W),sigma)/data['alpha']
- kappa = compute_kappa(W*data['alpha'],sigma)
+ 
+ k_xx  = compute_kappa(W*data['alpha'],sigma[:,0])
+ k_yy  = compute_kappa(W*data['alpha'],sigma[:,1])
+ kappa = np.array([[k_xx,0],[0,k_yy]])
 
 
  print(kappa)

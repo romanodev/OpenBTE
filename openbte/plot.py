@@ -29,7 +29,7 @@ def write_vtu(solver,geometry):
     
      if value['data'].ndim == 2:
 
-       if self.dim == 2:
+       if dim == 2:
         t = np.zeros_like(value['data'])
         value['data'] = np.concatenate((value['data'],t),axis=1)[:,:3]
        output.append(value['data'])

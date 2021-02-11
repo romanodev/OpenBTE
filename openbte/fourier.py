@@ -56,21 +56,10 @@ def unpack(data):
     return data[0],np.array(data[1])
 
 
-def fix(F,B):
-
-   n_elems = F.shape[0]
-   scale = 1/F.max(axis=0).toarray()[0]
-   n = np.random.randint(n_elems)
-   scale[n] = 0
-   F.data = F.data * scale[F.indices]
-   F[n,n] = 1
-   B[n] = 0   
-
-
-   return scale
 
 
 def solve_fourier_single(argv):
+   """ Solve Fourier with a single set of kappa """
 
    data = None
 
@@ -79,10 +68,6 @@ def solve_fourier_single(argv):
     mesh = argv['geometry']
 
     mesh['elem_kappa_map'] = get_kappa_map_from_mat(**argv)
-    
-    dim = int(mesh['meta'][2])
-    
-    n_elems = int(mesh['meta'][0])
 
     kappa = -1 #it means that it will take the map from mesh
 
@@ -179,7 +164,7 @@ def compute_laplacian(temp,**argv):
 
 
 @cached(cache=cache_compute_grad_data,key=lambda mesh,dummy:dummy)
-def compute_grad_data(mesh,dummy):
+def compute_grad_data(mesh,TB):
 
      #Compute deltas-------------------   
      rr = []
@@ -187,16 +172,18 @@ def compute_grad_data(mesh,dummy):
        rr.append(i*[0])
 
      #this is wrong
-
      for ll in mesh['active_sides'] :
       kc1,kc2 = mesh['side_elem_map_vec'][ll]
-      ind1 = list(mesh['elem_side_map_vec'][kc1]).index(ll)
-      ind2 = list(mesh['elem_side_map_vec'][kc2]).index(ll)
+      ind1    = list(mesh['elem_side_map_vec'][kc1]).index(ll)
+      ind2    = list(mesh['elem_side_map_vec'][kc2]).index(ll)
+
+      delta = 0
       if ll in mesh['periodic_sides']:
          delta = mesh['periodic_side_values'][list(mesh['periodic_sides']).index(ll)]
       else: delta = 0  
-      rr[kc1][ind1] = [kc2,kc1,delta] 
-      rr[kc2][ind2] = [kc1,kc2,-delta] 
+
+      rr[kc1][ind1] = [kc2,kc1, delta] 
+      rr[kc2][ind2] = [kc1,kc2,-delta]
  
      return rr
 
@@ -204,12 +191,21 @@ def compute_grad_data(mesh,dummy):
 def compute_grad(temp,**argv):
 
    mesh = argv['geometry'] 
-   
+
    rr = compute_grad_data(mesh,1)
 
    diff_temp = [[temp[j[0]]-temp[j[1]]+j[2] for j in f] for f in rr]
-   
+
+   #Add boundary
+   #if 'TB' in argv.keys():
+   # TB  = argv['TB']
+   # for n,(eb,sb) in enumerate(zip(*(mesh['eb'],mesh['sb']))):
+   #   ind               = list(mesh['elem_side_map_vec'][eb]).index(sb)
+   #   diff_temp[eb][ind] = temp[eb]-TB[n]
+
    gradT = np.array([np.einsum('js,s->j',mesh['weigths'][k,:,:mesh['n_non_boundary_side_per_elem'][k]],np.array(dt)) for k,dt in enumerate(diff_temp)])
+
+
    return gradT
 
 
@@ -392,10 +388,9 @@ def assemble(mesh,kappa):
     F = sp.csc_matrix((np.array(dff),(np.array(iff),np.array(jff))),shape = (n_elems,n_elems))
 
     #This scale the matrix and fixed zero temperature to a random point
-    scale = fix(F,B)
-    #scale = np.ones(n_elems)
+    #scale = fix_instability(F,B)
+    scale = np.ones(n_elems)
     return F,B,scale
-
 
 
 
@@ -424,12 +419,12 @@ def solve_fourier(kappa,DeltaT,argv):
          kappaf = meta[0]
          ratio[m] = kappaf/k
 
-         #if m > int(len(kappa)/4):
-         #  error = abs((ratio[m]-ratio[m-1]))/ratio[m]
-         #  if error < 1e-2:
-         #    tf[m:,:]  = tf[m-1]; tfg[m:,:,:] = tfg[m-1]
-         #    ratio[m:] = ratio[m]
-         #    break
+         if m > int(len(kappa)/4):
+           error = abs((ratio[m]-ratio[m-1]))/ratio[m]
+           if error < 1e-2:
+             tf[m:,:]  = tf[m-1]; tfg[m:,:,:] = tfg[m-1]
+             ratio[m:] = ratio[m]
+             break
 
      #Regularize---
      if argv.setdefault('experimental_multiscale',False):
@@ -440,9 +435,9 @@ def solve_fourier(kappa,DeltaT,argv):
       #Regularize gradient
       for m1 in range(len(kappa))[::-1]:
         error = (ratio[m1] - ratio_0)/ratio[m1]
+        
         if (ratio[m1] - ratio_0)/ratio[m1] < 1e-1 and abs(ratio[m1]-ratio[m1-1])/ratio[m1] < 1e-1:
             tfg[:m1+1,:,:] = grad_DeltaT
-            tf[:m1+1,:] = DeltaT
             break
 
       #Regularize average temperature
@@ -452,6 +447,7 @@ def solve_fourier(kappa,DeltaT,argv):
             tf[:m1+1,:] = DeltaT
             break
      #-----------------
+
 
     comm.Barrier()
     return tf,tfg

@@ -1,6 +1,7 @@
 from mpi4py import MPI
 from google_drive_downloader import GoogleDriveDownloader as gdd
 import numpy as np
+from termcolor import colored, cprint 
 from shapely.geometry import Polygon,Point
 from shapely.geometry import MultiPolygon,LineString
 import shapely
@@ -12,6 +13,69 @@ import io,zipfile
 import math
 import pickle
 import gzip
+
+
+
+def ggmres(L,X,compute_kappa,residual,k,rr,max_ggmres_iter,tolerance):
+
+      def compute_norm_D(A,D):
+       return np.sqrt(np.einsum('ij,i,ij->',A,D,A))
+
+      if comm.rank == 0:
+       print(' ')
+       print(colored('                        G-GMRES','green'),flush=True)
+       print(colored(' -----------------------------------------------------------','green'),flush=True)
+
+      h = np.zeros(k+1)
+
+      def arnoldi(Q,H):
+
+       for j in range(k):
+         #Arnoldi-------------------------------------
+         V         = L(Q[j]) #shared
+         hp         = np.einsum('ikj,k,kj->i',Q[:,rr,:],DD[rr],V[rr])
+         comm.Allreduce([np.array([hp]),MPI.DOUBLE],[h,MPI.DOUBLE],op=MPI.SUM)
+
+         H[:,j]    = h
+         V[rr]    -= np.einsum('ikj,i->kj',Q[:,rr],H[:,j])
+         comm.Barrier()
+         H[j+1,j]  = compute_norm_D(V,DD)
+         Q[j+1]    = V/H[j+1,j]   
+
+       return Q,H
+  
+      r = 1e6
+      kk = 0
+      while kk < max_ggmres_iter and r > tolerance:
+
+       X0 = X
+       R = residual(X0) #shared
+
+       #Compute WEIGHTS------------------------------
+       DD = np.mean(np.absolute(R),axis=1)
+       #---------------------------------------------  
+
+       R0   = compute_norm_D(R,DD)
+       Q = shared_array(np.zeros((k+1,X.shape[0],X.shape[1])))
+       Q[0] = R/R0
+       H = np.zeros((k+1,k))
+       beta2 = np.zeros(k+1);beta2[0] = R0
+
+       Q,H = arnoldi(Q,H)
+       #--------------
+       comm.Barrier() 
+       c   = np.linalg.lstsq(H,beta2)[0]
+       X   = shared_array(X0 + np.einsum('knm,k->nm',Q[:-1],c))
+       r   = np.linalg.norm(residual(X),ord='fro')
+       kappa = compute_kappa(X)
+     
+       if comm.rank == 0:
+        print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa,r),flush=True)
+
+       kk +=1
+       Q[:,:,:] = 0
+
+      return X,kappa
 
 
 def cg(L, b,**argv):
@@ -55,6 +119,23 @@ def cg(L, b,**argv):
         p = z + beta * p
     return x
 
+
+
+def fix_instability(F,B,scale=True):
+
+   n_elems = F.shape[0]
+   if scale:
+    scale = 1/F.max(axis=0).toarray()[0]
+   else: 
+    scale = np.ones(n_elems)   
+   n = np.random.randint(n_elems)
+   scale[n] = 0
+   F.data = F.data * scale[F.indices]
+   F[n,n] = 1
+   B[n] = 0   
+
+   return scale
+
 def compute_kappa(W,b):
 
 
@@ -64,7 +145,7 @@ def compute_kappa(W,b):
  def callback(x):
      return np.dot(x,b)
 
- x0     = b.copy()/np.diag(W)
+ x0 = b.copy()/np.diag(W)
  x  = cg(L,b,M=M,x0=x0,callback=callback,verbose = False)
 
  return callback(x)

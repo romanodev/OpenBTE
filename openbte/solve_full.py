@@ -18,65 +18,6 @@ from mpi4py import MPI
 comm = MPI.COMM_WORLD
 
 
-def ggmres(L,X,compute_kappa,residual,k,rr):
-
-      def compute_norm_D(A,D):
-       return np.sqrt(np.einsum('ij,i,ij->',A,D,A))
-
-      if comm.rank == 0:
-       print(' ')
-       print(colored('                        G-GMRES','green'),flush=True)
-       print(colored(' -----------------------------------------------------------','green'),flush=True)
-
-      h = np.zeros(k+1)
-
-      def arnoldi(Q,H):
-
-       for j in range(k):
-         #Arnoldi-------------------------------------
-         V         = L(Q[j]) #shared
-
-         hp         = np.einsum('ikj,k,kj->i',Q[:,rr,:],DD[rr],V[rr])
-         comm.Allreduce([np.array([hp]),MPI.DOUBLE],[h,MPI.DOUBLE],op=MPI.SUM)
-
-         H[:,j]    = h
-         V[rr]    -= np.einsum('ikj,i->kj',Q[:,rr],H[:,j])
-         comm.Barrier()
-         H[j+1,j]  = compute_norm_D(V,DD)
-         Q[j+1]    = V/H[j+1,j]   
-
-       return Q,H
-
-      for kk in range(100):
-       a = time.time()   
-
-       X0 = X
-       R = residual(X0) #shared
-
-       #Compute WEIGHTS------------------------------
-       DD = np.mean(np.absolute(R),axis=1)
-       #---------------------------------------------  
-
-       R0   = compute_norm_D(R,DD)
-       Q = shared_array(np.zeros((k+1,X0.shape[0],X0.shape[1])))
-       Q[0] = R/R0
-       H = np.zeros((k+1,k))
-       beta2 = np.zeros(k+1);beta2[0] = R0
-
-       Q,H = arnoldi(Q,H)
-       #--------------
-       comm.Barrier() 
-       c   = np.linalg.lstsq(H,beta2)[0]
-       X   = shared_array(X0 + np.einsum('knm,k->nm',Q[:-1],c))
-       r   = np.linalg.norm(residual(X),ord='fro')
-       kappa = compute_kappa(X)
-
-
-       if comm.rank == 0:
-        print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa,r),flush=True)
-
-
-      return X,kappa
   
 
 
@@ -97,9 +38,10 @@ def sparse_dense_product(i,j,data,X):
 def solve_full(argv):
 
    #here you go---------------------------
-   max_bte_iter   =  10000
-   max_bte_error = 1e-6
-   GGMRES = argv.setdefault('ggmres',False)
+   max_bte_iter   =  argv.setdefault('max_bte_iter',100)
+   max_ggmres_iter   =  argv.setdefault('max_ggmres_iter',100)
+   tolerance = argv.setdefault('tolerance',1e-13)
+   GGMRES = argv.setdefault('ggmres',True)
 
    #---------------------------
 
@@ -163,9 +105,8 @@ def solve_full(argv):
    OP = shared_array(np.zeros_like(X))
    #--------------------
 
-   Winv = load_data('Winv')['Winv']
+   #Winv = load_data('Winv')['Winv']
 
-   CT = Wdiag/np.sum(Wdiag)
 
    kappa_mask = mesh['kappa_mask']/factor
    kappa_old  = f['meta'][0]
@@ -237,78 +178,47 @@ def solve_full(argv):
     print('      Iter    Thermal Conductivity [W/m/K]     Residual''',flush=True)
     print(colored(' -----------------------------------------------------------','green'),flush=True)
 
-
-   def solve_RTA(X,kappa_old):
-    X_old = X.copy()   
-    kk = 0
-    error = 1
-    error_old = 1
-    while kk < max_bte_iter and error > max_bte_error:
-      B        = P  + get_boundary(X) + np.einsum('vc,v,u->uc',X,CT,Wdiag)
-      X[rr,:]  = np.array([get_lu(n).solve(B[n]) for n,q in enumerate(rr)])
-
-      comm.Barrier()
-      kappa = compute_kappa(X)
-      R     = residual_rta(X)
-
-      error = abs(kappa_old-kappa)/abs(kappa)
-      if error/error_old > 2 and GGMRES and kk > 0:
-         return X_old,kappa_old 
-      error_old = error
-      kappa_old = kappa
-      if comm.rank == 0:
-       print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa,np.linalg.norm(R,ord='fro')),flush=True)
-      kk +=1
-      comm.Barrier()
-      X_old = X.copy()
-
-    return X,kappa
-
-     
+   alpha = argv.setdefault('alpha',1)  
    def solve_FULL(X,kappa_old):
     X_old = X.copy()   
     kk = 0
     error = 1
     error_old = 1
-    while kk < max_bte_iter and error > max_bte_error:
-      B        = -np.dot(Wod[rr],X) + P  + get_boundary(X)
-      X[rr,:]  = np.array([get_lu(n).solve(B[n]) for n,q in enumerate(rr)])
+    r_old = 1e4
+    while kk < max_bte_iter and r_old > tolerance:
 
-      comm.Barrier()
+      #B =  np.einsum('vc,v,u->uc',X_old,CT,Wdiag)[rr] + P + get_boundary(X_old)
+      B        = -np.dot(Wod[rr],X_old) + P  + get_boundary(X_old)
+      X[rr,:]  =  np.array([get_lu(n).solve(B[n]) for n,q in enumerate(rr)])
+      
       kappa = compute_kappa(X)
       R     = residual(X)
-
-      error = abs(kappa_old-kappa)/abs(kappa)
-      if error/error_old > 2 and GGMRES and kk > 0:
-         return X_old,kappa_old 
-      error_old = error
-      kappa_old = kappa
+      r = np.linalg.norm(R,ord='fro')
+      if r > r_old and GGMRES and kk > 0:
+         return X_old,kappa_old,True 
+      r_old = r
       if comm.rank == 0:
-       print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa,np.linalg.norm(R,ord='fro')),flush=True)
+       print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa,r,flush=True))
       kk +=1
       comm.Barrier()
-      X_old = X.copy()
+      X_old = alpha*X.copy()+ (1-alpha)*X_old
 
 
-    return X,kappa
+    return X,kappa,False
     
+   X,kappa,gg = solve_FULL(X,kappa_old)
 
+   if gg:
+    X,kappa = ggmres(L,X,compute_kappa,residual,20,rr,max_ggmres_iter,tolerance)
 
+   comm.Barrier()
+   T = np.einsum('qc,q->c',X,CT)
+   J = np.einsum('qj,qc->cj',sigma,X)*1e-18/factor
 
-   #X = X - np.einsum('ui,ci->uc',WS,gradT)   
+   bte =  {'kappa':[kappa],'temperature':T,'flux':J}
+ 
+   argv['bte'] = bte
 
-   X,kappa = solve_RTA(X,kappa_old)
-
-   #X,kappa = solve_FULL(X,kappa_old)
-
-   quit()
-
-   X,kappa = ggmres(L,X,compute_kappa,residual,20,rr)
-
-   T = np.einsum('qc,q->c',X,tc)
-   J = np.einsum('qj,qc->cj',sigma,X)*1e-18
-
-   return {'kappa':kappa,'temperature':T,'flux':J}
 
    
 

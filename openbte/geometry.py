@@ -53,15 +53,17 @@ def compute_boundary_condition_data(data,**argv):
 
     tmp = list(data['periodic_sides']) + list(data['inactive_sides'])
 
+    DeltaT = 1
     for kl,ll in enumerate(tmp) :
      Ee1,e2 = side_elem_map[ll]
      normal = face_normals[ll]  
      tmp = np.dot(normal,flux_dir)
 
+
      if tmp < - delta :
-        side_value[ll] = -1.0
+        side_value[ll] = -DeltaT
      if tmp > delta :
-        side_value[ll] = +1.0
+        side_value[ll] = +DeltaT
      
 
     side_periodic_value = np.zeros((nsides,2))
