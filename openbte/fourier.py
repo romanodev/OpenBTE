@@ -30,7 +30,6 @@ def clear_fourier_cache():
     cache_get_decomposed_directions.clear()
 
 def fourier_info(data):
-
           print('                        FOURIER                 ',flush=True)   
           print(colored(' -----------------------------------------------------------','green'),flush=True)
           print(colored('  Iterations:                              ','green') + str(int(data[2])),flush=True)
@@ -56,8 +55,6 @@ def unpack(data):
     return data[0],np.array(data[1])
 
 
-
-
 def solve_fourier_single(argv):
    """ Solve Fourier with a single set of kappa """
 
@@ -79,7 +76,8 @@ def solve_fourier_single(argv):
 
     flux = -np.einsum('cij,cj->ci',kappa_map,grad)
 
-    fourier_info(meta)
+    if argv['verbose']:
+     fourier_info(meta)
    
     data = {'meta':meta,'flux':flux,'temperature':temp,'grad':grad}
 
@@ -388,8 +386,8 @@ def assemble(mesh,kappa):
     F = sp.csc_matrix((np.array(dff),(np.array(iff),np.array(jff))),shape = (n_elems,n_elems))
 
     #This scale the matrix and fixed zero temperature to a random point
-    #scale = fix_instability(F,B)
-    scale = np.ones(n_elems)
+    scale = fix_instability(F,B)
+    #scale = np.ones(n_elems)
     return F,B,scale
 
 

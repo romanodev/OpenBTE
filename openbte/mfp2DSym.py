@@ -32,7 +32,9 @@ def get_linear_indexes(mfp,value):
 def mfp2DSym(**argv):
 
  #load data
+ 
  data = load_data('mfp')
+
  Kacc = data['Kacc']
  mfp_bulk  = data['mfp']
 

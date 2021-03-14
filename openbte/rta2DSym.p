@@ -31,7 +31,7 @@ def rta_no_interpolation(**argv):
                'model':np.array([11])}
 
 
-def rta2DSym(**argv):
+def mg2DSym(**argv):
 
  if not argv.setdefault('interpolation',True):   
 
@@ -77,8 +77,7 @@ def rta2DSym(**argv):
 
  mfp_max = argv.setdefault('mfp_max',np.max(mfp_bulk)*10)
  mfp_min = argv.setdefault('mfp_min',mfp_0)
-
- mfp_sampled = np.logspace(np.log10(mfp_0)*1.01,np.log10(mfp_max),n_mfp,endpoint=True)#min MFP = 1e-1 nm
+ mfp_sampled = np.logspace(np.log10(mfp_min)*1.01,np.log10(mfp_max),n_mfp,endpoint=True)#min MFP = 1e-1 nm
 
  
  #-----------------------
@@ -119,6 +118,17 @@ def rta2DSym(**argv):
 
  assert(abs(np.sum(temp_coeff)) -1 < 1e-5)
  #Adjusment for numerical stability temp_coeff /= np.sum(temp_coeff)
+
+ #MG---
+
+ print(np.shape(temp_coeff))
+
+ 
+ 
+
+ quit()
+
+
 
  rhs_average = mfp_sampled*mfp_sampled/2
 

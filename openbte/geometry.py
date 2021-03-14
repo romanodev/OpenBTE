@@ -151,6 +151,8 @@ def compute_boundary_condition_data(data,**argv):
       kappa_factor = data['size'][gradir]/area_flux
     else:  
       kappa_factor = data['size'][gradir]/total_area
+    print(total_area)
+    print(area_flux)
 
     data['kappa_mask']= -np.array(np.sum(B_with_area_old.todense(),axis=0))[0]*kappa_factor*1e-18
     data['periodic_side_values'] = [periodic_side_values[ll]  for ll in data['periodic_sides']]
@@ -605,6 +607,7 @@ def import_mesh(**argv):
    data.update({'elem_mat_map':np.zeros(len(elems))})
 
    data.update({'dim':dim})
+   data.update({'dmin':argv['dmin']})
    data.update({'pairs':pairs})
    #aa = np.array([side_elem_map[ll]  for ll in range(len(sides))]) 
    data.update({'elem_side_map_vec': np.array([elem_side_map[ll]  for ll in range(len(elems))]) })
@@ -642,9 +645,13 @@ def compute_data(data,**argv):
    compute_boundary_condition_data(data,**argv)
 
    #Some adjustement--
-   data['meta'] = np.asarray([len(data['elems']),data['kappa_factor'],data['dim'],len(data['nodes']),len(data['active_sides']),data['direction']],np.float64)
+
+
+   data['meta'] = np.asarray([len(data['elems']),data['kappa_factor'],data['dim'],len(data['nodes']),len(data['active_sides']),data['direction'],data['dmin']],np.float64)
+   
    del data['direction']
    del data['dim']
+   del data['dmin']
    del data['kappa_factor']
 
 
@@ -655,8 +662,7 @@ def Geometry(**argv):
  if comm.rank == 0 :
 
    if not argv.setdefault('create_mesh',False):  
-    Mesher(**argv) 
-
+    Mesher(argv) 
    data = import_mesh(**argv)
 
    compute_data(data,**argv)

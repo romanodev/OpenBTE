@@ -86,8 +86,8 @@ def plot_results(solver,geometry,**argv):
 
    bb = str(round(solver['kappa_bte'],2))+' W/m/K' if 'kappa_bte' in solver.keys() else '--'
 
-   meta  = 'Bulk: ' + str(round(solver['bulk'],2)) +' W/m/K<br>Fourier: '\
-                    +       str(round(solver['fourier'],2)) + ' W/m/K<br>BTE:' \
+   meta  = 'Bulk: ' + str(round(solver['kappa_bulk'],2)) +' W/m/K<br>Fourier: '\
+                    +       str(round(solver['kappa_fourier'],2)) + ' W/m/K<br>BTE:' \
                     +       bb
 
 

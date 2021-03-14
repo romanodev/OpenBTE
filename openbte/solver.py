@@ -4,6 +4,7 @@ from scipy.sparse.linalg import splu
 from termcolor import colored, cprint 
 from .utils import *
 from mpi4py import MPI
+import sys
 import scipy.sparse as sp
 import time
 from scipy.sparse.linalg import lgmres
@@ -13,7 +14,7 @@ import profile
 import scipy
 from .solve_rta import *
 from .solve_full import *
-from .solve_exp import *
+from .solve_mg import *
 import pkg_resources  
 from .fourier import *
 import warnings
@@ -22,9 +23,20 @@ comm = MPI.COMM_WORLD
 
 def get_model(m):
 
-    models = ['Fourier','gray2D','gray2DSym','gray3D','mfp2D','mfp2DSym','mfp3D','rta2D','rta2DSym','rta3D','full','exp']
+    models = ['Fourier','gray2D','gray2DSym','gray3D','mfp2D','mfp2DSym','mfp3D','rta2D','rta2DSym','rta3D','full','mg2DSym']
+
 
     return models[m[0]]
+
+def fourier_info(argv):
+          print('                        FOURIER                 ',flush=True)   
+          print(colored(' -----------------------------------------------------------','green'),flush=True)
+          #print(colored('  Iterations:                              ','green') + str(int(data[2])),flush=True)
+          #print(colored('  Relative error:                          ','green') + '%.1E' % (data[1]),flush=True)
+          #print(colored('  Fourier Thermal Conductivity [W/m/K]:    ','green') + str(round(data[0],3)),flush=True)
+          print(colored(' -----------------------------------------------------------','green'),flush=True)
+          print(" ")
+
 
 
 def print_bulk_info(mat,mesh):
@@ -110,7 +122,8 @@ def prepare_data(argv):
      #    variables[value['name'] + '(mag.)'] = {'data':mag,'units':value['units'],'increment':value['increment']}
   argv['variables'] = variables
 
-  argv['data'] = {'variables':variables,'bulk':argv['material']['kappa'][0,0] ,'fourier':argv['fourier']['meta'][0]}
+  dirr = int(argv['geometry']['meta'][-1])
+  argv['data'] = {'variables':variables,'kappa_bulk':argv['material']['kappa'][dirr,dirr] ,'kappa_fourier':argv['fourier']['meta'][0]}
 
   if 'bte' in argv.keys():
      argv['data']['kappa_bte']  = argv['bte']['kappa'][-1]  
@@ -143,21 +156,24 @@ def Solver(**argv):
         argv.setdefault('deviational',False)
         argv.setdefault('max_fourier_error',1e-5)
         #----------------------------
-         
+       
+
         mesh = None 
         mat = None 
-        if comm.rank == 0 and argv['verbose']:
-            print_logo()
-            print('                         SYSTEM                 ',flush=True)   
-            print(colored(' -----------------------------------------------------------','green'),flush=True)
-            print_options(**argv)
+        if comm.rank == 0 :
+            if argv['verbose']:
+             print_logo()
+             print('                         SYSTEM                 ',flush=True)   
+             print(colored(' -----------------------------------------------------------','green'),flush=True)
+             print_options(**argv)
 
             mesh = argv['geometry'] if 'geometry' in argv.keys() else load_data(argv.setdefault('geometry_file','geometry'))
             mat  = argv['material'] if 'material' in argv.keys() else load_data(argv.setdefault('material_file','material'))
             
-            print_bulk_info(mat,mesh)
-            print_mpi_info()
-            print_grid_info(mesh,mat)
+            if argv['verbose']:
+             print_bulk_info(mat,mesh)
+             print_mpi_info()
+             print_grid_info(mesh,mat)
 
         #load geometry---
         argv['geometry'] = create_shared_memory_dict(mesh)
@@ -170,13 +186,13 @@ def Solver(**argv):
         #Solve fourier--
         argv['fourier'] = create_shared_memory_dict(solve_fourier_single(argv))
 
+        
         #Solve bte--
         if not argv['only_fourier']:
 
-            
            mat_model = get_model(argv['material']['model'])
 
-           if mat_model in ['rta2DSym','rta2D','rta3D','gray2D','mfp2DSym','mfp2D'] :
+           if mat_model in ['rta2DSym','rta2D','rta3D','mfp2DSym','mfp2D','gray2D','gray2DSym','mg2DSym'] :
                solve_rta(argv)
 
            elif mat_model == 'full':    
@@ -184,6 +200,9 @@ def Solver(**argv):
 
            elif mat_model == 'exp':    
                solve_exp(argv)
+
+           #elif mat_model in ['mg2DSym']:    
+           #    solve_mg(argv)
 
            else:
                print('No model coded')
@@ -199,9 +218,9 @@ def Solver(**argv):
         clear_fourier_cache() 
         clear_BTE_cache() 
         if argv['verbose'] and comm.rank == 0:
-           print(' ',flush=True)   
-           print(colored('                 OpenBTE ended successfully','green'),flush=True)
-           print(' ',flush=True)  
+         print(' ',flush=True)   
+         print(colored('                 OpenBTE ended successfully','green'),flush=True)
+         print(' ',flush=True)  
 
 
         return argv['data']

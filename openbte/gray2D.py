@@ -23,7 +23,6 @@ def gray2D(**argv):
  suppression = np.zeros((1,n_phi,1)) 
  for p in range(n_phi): 
     kappa_directional[0,p] += kappa_bulk/mfp_bulk * polar_ave[p]/n_phi*2
-    suppression[0,p,0]         += 1/mfp_bulk * polar_ave[p,0]/n_phi*2
 
  tc = temp_coeff/np.sum(temp_coeff)
 
@@ -36,7 +35,7 @@ def gray2D(**argv):
          'VMFP':polar_ave,\
          'mfp_sampled':np.array([mfp_bulk]),\
          'model':np.array([1]),\
-         'suppression':suppression,\
+         'suppression':np.zeros(1),\
          'phi': phi  ,\
          'directions': polar  ,\
          'kappam':np.array([kappa_bulk])}

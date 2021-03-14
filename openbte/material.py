@@ -4,9 +4,11 @@ import math
 from .full_model import *
 from .utils import *
 from .mfp2DSym import *
+from .mg2DSym import *
 from .mfp2D import *
 from .mfp3D import *
 from .gray2D import *
+from .gray2DSym import *
 from .rta2DSym import *
 from .rta3D import *
 from mpi4py import MPI
@@ -22,11 +24,11 @@ def Material(**argv):
    source = argv.setdefault('source','local')
    if source == 'database':
     if comm.rank == 0:
-        basename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + \
-                  '/openbte/materials/' + model[:3] + '_' +  argv['filename'] + \
+        filename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + \
+                  '/openbte/materials/rta_' +  argv['filename'] + \
                   '_' + str(argv['temperature']) 
 
-        argv['basename'] = basename
+        argv['filename'] = filename
 
    if source == 'unlisted':
     if comm.rank == 0:
@@ -58,13 +60,17 @@ def Material(**argv):
       data = mfp2D(**argv)
 
    elif model == 'gray2DSym':
-      data = mfp2DSym(**argv)
+      data = gray2DSym(**argv)
+
+   elif model == 'mg2DSym':
+     if comm.rank == 0:
+      data = mg2DSym(**argv)
 
    elif model == 'gray2D':
       data = gray2D(**argv)
 
-   elif model == 'gray3D':
-      data = mfp3D(**argv)
+   #elif model == 'gray3D':
+   #   data = mfp3D(**argv)
    
    elif model == 'mfp3D':
       data = mfp3D(**argv)

@@ -13,7 +13,7 @@ import matplotlib.pylab as plt
 
 class Mesher(object):
 
- def __init__(self,**argv):
+ def __init__(self,argv):
 
   argv['dmin'] = 0
   model = argv.setdefault('model','lattice')
@@ -50,6 +50,7 @@ class Mesher(object):
     self.generate_mesh_2D(argv)
   else:   
     self.generate_mesh_3D(argv)
+
 
 
  def generate_bulk_3D(self,argv):

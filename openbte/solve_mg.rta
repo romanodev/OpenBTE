@@ -76,8 +76,6 @@ def solve_rta(argv):
     F = mat['VMFP']
     #Get discretization----
     n_serial,n_parallel = sigma.shape[:2]
-
-
     block =  n_parallel//comm.size
     rr = range(block*comm.rank,n_parallel) if comm.rank == comm.size-1 else range(block*comm.rank,block*(comm.rank+1))
 
@@ -90,9 +88,15 @@ def solve_rta(argv):
       if comm.rank == 0: 
        Gb   = np.einsum('mqj,jn->mqn',mat['sigma'],mesh['db'],optimize=True)
        Gbp2 = Gb.clip(min=0);
-       with np.errstate(divide='ignore', invalid='ignore'):
+       if not argv.setdefault('mg',False):
+        with np.errstate(divide='ignore', invalid='ignore'):
           tot = 1/Gb.clip(max=0).sum(axis=0).sum(axis=0); tot[np.isinf(tot)] = 0
           data = {'GG': np.einsum('mqs,s->mqs',Gbp2,tot)}
+       else:
+        with np.errstate(divide='ignore', invalid='ignore'):
+          tot = 1/Gb.clip(max=0).sum(axis=1); tot[np.isinf(tot)] = 0
+          data = {'GG': np.einsum('mqs,ms->mqs',Gbp2,tot)}
+
        del tot, Gbp2
       else: data = None
       GG = create_shared_memory_dict(data)['GG']
@@ -111,6 +115,8 @@ def solve_rta(argv):
      Gbp2 = tmp.clip(min=0); Gbm2 = tmp.clip(max=0);
      np.add.at(D.T,mesh['eb'],Gbp2.T)
      TB = DeltaT[mesh['eb']]
+     if argv.setdefault('mg',False):
+       TB = np.tile(TB,(n_serial,1))
 
     #Periodic---
     sss = np.asarray(mesh['pp'][:,0],dtype=int)
@@ -231,7 +237,10 @@ def solve_rta(argv):
         Jp = np.zeros_like(J)
         kappa_bal,kappa_balp = np.zeros((2,n_parallel))
 
-        RHS = -np.einsum('c,nc->nc',TB,Gbm2) if len(mesh['db']) > 0 else  np.zeros((argv['n_parallel'],0)) 
+        if not argv.setdefault('mg',False):
+         RHS = -np.einsum('c,nc->nc',TB,Gbm2) if len(mesh['db']) > 0 else  np.zeros((argv['n_parallel'],0)) 
+        else: 
+         RHS = -np.einsum('mc,nc->mnc',TB,Gbm2) if len(mesh['db']) > 0 else  np.zeros((argv['n_parallel'],0)) 
 
         for n,q in enumerate(rr):
            
@@ -240,6 +249,7 @@ def solve_rta(argv):
            if argv['multiscale']:
               kappap_f[:,q] =    np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:dim],tfg)
              
+
               #------------------------------------------------------
               B = DeltaT + mfp[-1]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems))
               A = get_m(Master,np.concatenate((mfp[-1]*Gm[n],mfp[-1]*D[n]+np.ones(n_elems)))[conversion])
@@ -262,7 +272,11 @@ def solve_rta(argv):
            for m in range(n_serial)[idx::-1]:
                
                  #----------------------------------------
-                 B = DeltaT +  mfp[m]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems))
+                 if not argv.setdefault('mg',False):
+                  B = DeltaT +  mfp[m]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems))
+                 else: 
+                  B = DeltaT +  mfp[m]*(P[n] + get_boundary(RHS[m,n],mesh['eb'],n_elems))
+
                  data = np.concatenate((mfp[m]*Gm[n],mfp[m]*D[n]+np.ones(n_elems)))
                  A = get_m(Master,data[conversion])
                  X = solve(argv,A,B,(q,m))
@@ -292,7 +306,10 @@ def solve_rta(argv):
 
                  if len(mesh['eb']) > 0:
                      
-                  np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
+                  if not argv.setdefault('mg',False):
+                   np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
+                  else: 
+                   np.add.at(TBp[m],np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
 
                  #X_tot[q,m] = X.copy() 
                  Jp += np.einsum('c,j->cj',X,sigma[m,q,0:dim])*1e-18
@@ -356,6 +373,7 @@ def solve_rta(argv):
         comm.Allreduce([kappaf_totp,MPI.DOUBLE],[kappaf_tot,MPI.DOUBLE],op=MPI.SUM)
 
 
+        print(np.min(TB),np.max(TB))
         #error = compute_residual(X_tot)
 
         if argv['multiscale'] and comm.rank == 0: print_multiscale(n_serial,n_parallel,MM) 

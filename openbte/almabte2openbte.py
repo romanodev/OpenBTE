@@ -5,6 +5,12 @@ from .utils import *
 def main():
 
  filename = sys.argv[1]
+ if len(sys.argv) == 3:
+    output = sys.argv[2]
+ else  :
+    output = 'rta'
+
+
  tmp = np.loadtxt(filename,skiprows=1,delimiter=',')
  nq = int(np.max(tmp[:,0]))+1
  nb = int(np.max(tmp[:,1]))+1
@@ -18,4 +24,4 @@ def main():
 
  data = {'C':C,'tau':tau,'v':v,'kappa':kappa,'f':w/2.0/np.pi}
 
- save_data('rta',data)   
+ save_data(output,data)   

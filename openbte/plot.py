@@ -8,10 +8,37 @@ from .viewer import *
 import matplotlib
 from matplotlib.pylab import *
 from .kappa_mode import *
+from .suppression import *
 from scipy.spatial import distance
 import numpy.ma as ma
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
+
+
+def expand_variables(solver,dim):
+
+  #Here we unroll variables for later use--
+  variables = {}
+  for key,value in solver['variables'].items():
+  
+     if value['data'].ndim == 1: #scalar
+       variables[key] = {'data':value['data'],'units':value['units'],'increment':value['increment']}
+       n_elems = len(value['data'])
+     elif value['data'].ndim == 2 : #vector 
+         variables[key + '(x)'] = {'data':value['data'][:,0],'units':value['units'],'increment':value['increment']}
+         variables[key + '(y)'] = {'data':value['data'][:,1],'units':value['units'],'increment':value['increment']}
+         if dim == 3: 
+             variables[key + '(z)'] = {'data':value['data'][:,2],'units':value['units'],'increment':value['increment']}
+         mag = np.array([np.linalg.norm(value) for value in value['data']])
+         variables[key + '(mag.)'] = {'data':mag,'units':value['units'],'increment':value['increment']}
+
+  variables['structure'] = {'data':np.zeros(n_elems),'units':'','increment':[0,0,0]}       
+  solver['variables'] = variables
+
+
+
+
+
 
 def write_vtu(solver,geometry):
 
@@ -179,6 +206,7 @@ def get_node_data(solver,geometry):
 
 def Plot(**argv):
 
+
   if comm.rank == 0:
 
    #import data-------------------------------
@@ -189,6 +217,8 @@ def Plot(**argv):
    model = argv['model']
 
    if model == 'maps':
+
+     expand_variables(solver,dim) #this is needed to get the component-wise data for plotly
 
      get_node_data(solver,geometry)
      repeat = argv.setdefault('repeat',[1,1,1])
@@ -203,10 +233,13 @@ def Plot(**argv):
 
      output ={'nodes'    :geometry['nodes'],\
              'elems'    :geometry['elems'],\
-             'variables':solver['variables'],'bulk':solver['bulk'],'fourier':solver['fourier'],'size':size,'direction':['x','y','z'][np.argmax(geometry['applied_gradient'])]}
+             'variables':solver['variables'],'bulk':solver['kappa_bulk'],'fourier':solver['kappa_fourier'],'size':size,'direction':['x','y','z'][np.argmax(geometry['applied_gradient'])]}
 
      if 'kappa' in solver.keys():
-         output.update({'bte':solver['kappa']}) 
+         output.update({'bte':solver['kappa_bte']}) 
+
+     if argv.setdefault('save_sample',False):
+       save_data('sample',output)
 
      return output
 
@@ -220,6 +253,10 @@ def Plot(**argv):
      duplicate_cells(geometry,solver,repeat)
 
      write_vtu(solver,geometry)  
+
+   elif model == 'suppression':
+
+      return plot_suppression(**argv)
 
    elif model == 'kappa_mode':
 

@@ -24,7 +24,7 @@ def rta3D(**argv):
 
  #Import data-----------
 
- data = load_data(argv.setdefault('basename','rta'))
+ data = load_data(argv.setdefault('filename','rta'))
 
  
  f = np.divide(np.ones_like(data['tau']), data['tau'], out=np.zeros_like(data['tau']), where=data['tau']!=0)

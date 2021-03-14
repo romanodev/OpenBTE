@@ -31,7 +31,8 @@ def get_layout(size = []):
 
 
  sl = True
- dim = 2   if size[2] == 0 else 3
+
+ dim = 2   if len(size) == 2 else 3
  x = 1;y=size[1]/size[0]
  z= 1 if dim == 2 else size[2]/size[0]
 
@@ -92,7 +93,6 @@ def App(**argv):
   #load data--
   data_tot     = argv['bundle'] if 'bundle' in argv.keys() else load_data('bundle')
 
-  server = flask.Flask(__name__) # define flask app.server
 
 
   d_sample = html.Div([
@@ -117,6 +117,9 @@ def App(**argv):
   ])
 
 
+  external_stylesheets=[dbc.themes.CYBORG]
+  server = flask.Flask(__name__) # define flask app.server
+  app = dash.Dash(__name__, external_stylesheets=external_stylesheets,server=server)
 
   #Init figure---
   fig = go.Figure()
@@ -135,9 +138,7 @@ def App(**argv):
   fig_dcc = dcc.Graph(id='master',figure=fig,style={'left':'15%','width':'70%','height':'70%','bottom':'10%','position':'absolute'})
 
 
-  external_stylesheets=[dbc.themes.CYBORG]
 
-  app = dash.Dash(__name__, external_stylesheets=external_stylesheets,server=server)
 
   dd_sample = html.Div( children = [d_sample],style = {'left':'1%','height':'10%','width':'25%','bottom':'88%','position':'absolute'})
   dd_variable = html.Div( children = [d_variable],style = {'left':'28%','height':'10%','width':'25%','bottom':'88%','position':'absolute'})
@@ -153,7 +154,7 @@ def App(**argv):
 
   #app.layout = html.Div(children = [div1,img],style = {'height': '100vh','width': '100%',"border":"2px white solid"})
   #app.layout = html.Div(children = [fig_dcc,dd_sample,dd_variable,hidden,url  ,img],style = {'height': '100vh','width': '100%',"border":"2px white solid"})
-  app.layout = html.Div(children = [fig_dcc,dd_sample,dd_variable,hidden,url  ,img],style = {'height': '100vh','width': '100%','position':'absolute'})
+  layout = html.Div(children = [fig_dcc,dd_sample,dd_variable,hidden,url  ,img],style = {'height': '100vh','width': '100%','position':'absolute'})
 
   #---------------------------------------------------------------------
 
@@ -199,6 +200,7 @@ def App(**argv):
                          showscale = True,
                          visible=True)
 
+
        fig = go.Figure(data=plotly_data,layout=get_layout(data['size']))
 
        fig.add_annotation(
@@ -232,8 +234,11 @@ def App(**argv):
     return data_tot,options_samples,options_variables
 
 
-  #---------------------------------------------------------------------
+  app.layout = layout
+  if argv.setdefault('show',False):
+   app.run_server(host='localhost',port=8000)
 
-  app.run_server(host='localhost',port=8000)
+  return app
+
 
 

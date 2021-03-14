@@ -50,7 +50,7 @@ def plot_mode_kappa(**argv):
  sol = load_data('solver')
  T_sampled = sol['kappa_mode']
 
- kappa_fourier = sol['kappa_fourier']
+ kappa_fourier = sol['fourier']
 
  #Interpolation to get kappa mode
  ratio = kappa_fourier/kappa[0,0]
@@ -90,9 +90,11 @@ def plot_mode_kappa(**argv):
   fig.add_labels('Frequency [THz]','Mean Free Path [$\mu$m]')
   fig.finalize(grid=True,yscale='log',write = True,show=True,ylim=[1e-4,1e2])
 
+ data = {'kappa_nano':kappa_nano,'mfp_nano':mfp_nano[:,dirr],'kappa_fourier':kappa_fourier,'mfp_bulk':mfp_bulk[:,dirr],'f':f}
  if argv.setdefault('save',True):
-     data = {'kappa_nano':kappa_nano,'mfp_nano':mfp_nano[:,dirr],'kappa_fourier':kappa_bulk*ratio,'mfp_bulk':mfp_bulk[:,dirr],'f':f}
      save_data('kappa_mode',data)
+
+ return data
 
 
 if __name__ == "__main__":
