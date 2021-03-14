@@ -7,7 +7,7 @@ from mpi4py import MPI
 import scipy.sparse as sp
 import time
 from scipy.sparse.linalg import lgmres
-import scikits.umfpack as um
+#import scikits.umfpack as um
 import sys
 import scipy
 from cachetools import cached,LRUCache
