@@ -195,7 +195,7 @@ def solve_rta(argv):
     def solve(argv,A,B,indices):
 
      if not argv['keep_lu']:
-         X = sp.linalg.spsolve(A,B,use_umfpack=True)
+         X = sp.linalg.spsolve(A,B)
      else: 
          
          if indices in lu:
