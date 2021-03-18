@@ -58,6 +58,7 @@ def unpack(data):
 def solve_fourier_single(argv):
    """ Solve Fourier with a single set of kappa """
 
+
    data = None
 
    if comm.rank == 0:
