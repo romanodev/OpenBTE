@@ -37,13 +37,14 @@ def plot_suppression(**argv):
 
 
  m1 = 5
- l1 = 20
+ l1 = 2
  l2 = int(n_phi/2)-l1
  l3 = int(n_phi/2)+l1
  l4 = int(n_phi)  -l1
  
  Sm = np.zeros(n_mfp)
- 
+
+
  for n in range(np.shape(T_sampled)[0])[l1:l2]:
   for m in range(np.shape(T_sampled)[1]):
     Sm[m] += S[n,m]
@@ -52,7 +53,6 @@ def plot_suppression(**argv):
     Sm[m] += S[n,m]
 
  Sm = Sm/(n_phi-4*l1)
-
 
  if argv.setdefault('show',True):
   fig = MakeFigure()

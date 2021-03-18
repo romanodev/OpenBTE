@@ -43,7 +43,9 @@ def fourier_info(data):
 @cached(cache=cache_get_SU, key=lambda bundle, k: hashkey(k))
 def get_SU(bundle,k):
 
-     return splu(k*bundle[0] + np.diag(bundle[1]))
+     A = k*bundle[0] + sp.diags(bundle[1],format='csc')
+    
+     return splu(A)
 
 def get_key(ll,kappa):
 
