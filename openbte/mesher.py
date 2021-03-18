@@ -24,7 +24,7 @@ class Mesher(object):
    shapes = get_shape(argv)
 
    polygons = [translate_shape(shapes[n],i) for n,i in enumerate(argv['base'])]
-   argv.update({'polygons':np.array(polygons)})
+   argv.update({'polygons':np.array(polygons,dtype=object)})
    repeat_merge_scale(argv)
 
   elif model == 'custom':
