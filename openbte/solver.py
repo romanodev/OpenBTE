@@ -14,7 +14,6 @@ import profile
 import scipy
 from .solve_rta import *
 from .solve_full import *
-from .solve_mg import *
 import pkg_resources  
 from .fourier import *
 import warnings

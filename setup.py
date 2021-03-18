@@ -2,11 +2,11 @@ from setuptools import setup,find_packages
 import os
 
 setup(name='openbte',
-      version='1.123',
+      version='2.0',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',
-      classifiers=['Programming Language :: Python :: 3.6'],
+      classifiers=['Programming Language :: Python :: 3.7'],
       #long_description=open('README.rst').read(),
       install_requires=['shapely',
                         'pyvtk',
