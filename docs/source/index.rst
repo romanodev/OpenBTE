@@ -70,7 +70,7 @@ NOTE: a multiscale model is coming soon (check back in a few days)
    scripts
 
 
-.. toctree::
+#.. toctree::
    :maxdepth: 2
    :caption: Theory
 
