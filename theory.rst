@@ -25,7 +25,6 @@ Let's consider a crystal with atoms in the unit cell labelled with :math:`s` and
 
 
 
-
 Given the periodicity of the system, the displacement can be Fourier transformed, i.e.
 
 
@@ -127,7 +126,7 @@ and the Hamiltian reads as
 
 .. math::
 
-  \hat{H}_2 = \frac{1}{2}\int_{\mathrm{BZ}}\frac{d\mathbf{q}}{\Omega_{\mathrm{BZ}}}\int_{\mathrm{BZ}}\frac{d\mathbf{q'}}{\Omega_{\mathrm{BZ}}} \sum_{\alpha\alpha' ss'} \underbrace{\sum_h \phi_{\alpha\alpha'}^{ssh} e^{-i \mathbf{q}\cdot \Delta \mathbf{R}_h}}_{\phi_{\alpha\alpha'}^{ss'}(\mathbf{q})} \overbrace{\sum_l e^{i\mathbf{R}_{l}\cdot \left(\mathbf{q} + \mathbf{q}' \right)}}^{\Omega_{\mathrm{BZ}}\delta(\mathbf{q}+\mathbf{q}')} \hat{u}_{\alpha'}^s (\mathbf{q})  \hat{u}_\alpha^{s'}(\mathbf{q}')  
+  \hat{H}_2 = \frac{1}{2}\int_{\mathrm{BZ}}\frac{d\mathbf{q}}{\Omega_{\mathrm{BZ}}}\int_{\mathrm{BZ}}\frac{d\mathbf{q'}}{\Omega_{\mathrm{BZ}}} \sum_{\alpha\alpha' ss'} \underbrace{\sum_{h'} \phi_{\alpha\alpha'}^{ss'h'} e^{i \mathbf{q}'\cdot \Delta \mathbf{R}_h   }}_{\phi_{\alpha\alpha'}^{ss'}(\mathbf{q})} \overbrace{\sum_l e^{i\mathbf{R}_l\cdot \left(\mathbf{q} + \mathbf{q}' \right)}}^{\Omega_{\mathrm{BZ}}\delta(\mathbf{q}+\mathbf{q}')} \hat{u}_\alpha^s (\mathbf{q})  \hat{u}_{\alpha'}^{s'}(\mathbf{q}')  
 
 Lastly, we note that :math:`\hat{\mathbf{u}}^s(\mathbf{q}) = \hat{\mathbf{u}}^{s \dagger}(-\mathbf{q})`. The final form of the harmonic Hamiltonian thus is
 
@@ -203,6 +202,56 @@ The Hamiltonian is then
 .. math::
 
   \hat{H}_2 = \sum_p \int_{\mathrm{BZ}} \frac{d\mathbf{q}}{\Omega_{\mathrm{BZ}}} \hbar\omega_p(\mathbf{q}) \left[\frac{1}{2} + \hat{N}_p(\mathbf{q})\right]
+
+
++++++++++++++++++++++++++++++++++++++++
+The anharmonic component
++++++++++++++++++++++++++++++++++++++++
+
+.. math::
+
+  \hat{H}_3 = \frac{1}{6}\int_{\mathrm{BZ}}\frac{d\mathbf{q}}{\Omega_{\mathrm{BZ}}}\int_{\mathrm{BZ}}\frac{d\mathbf{q'}} {\Omega_{\mathrm{BZ}}}\int_{\mathrm{BZ}}\frac{d\mathbf{q''}}{\Omega_{\mathrm{BZ}}}    \sum_{\alpha\alpha'\alpha'' ss's''}\underbrace{\sum_{h'h''} \phi_{\alpha\alpha'\alpha''}^{sls'h's''h''} e^{\mathbf{q}' \cdot \Delta \mathbf{R}_{h'} + \mathbf{q}'' \cdot \Delta \mathbf{R}_{h''} }}_{\phi_{\alpha\alpha'\alpha''}^{ss's''}(\mathbf{q}',\mathbf{q''})} \underbrace{\sum_l  e^{i \mathbf{R}_l \left(\mathbf{q} + \mathbf{q}' + \mathbf{q}'' \right)}}_{\Omega_{BZ}\sum_k \delta(\mathbf{q} + \mathbf{q'} + \mathbf{q''} - \mathbf{Q}_k)} \hat{u}_{\alpha}^s (\mathbf{q})  \hat{u}_{\alpha'}^{s'}(\mathbf{q}') \hat{u}_{\alpha''}^{s''}(\mathbf{q}'')
+
+
+.. math::
+
+  \hat{H}_3 = \frac{1}{6}\int_{\mathrm{BZ}}\frac{d\mathbf{q'}}{\Omega_{\mathrm{BZ}}}\int_{\mathrm{BZ}}\frac{d\mathbf{q''}}{\Omega_{\mathrm{BZ}}}    \sum_{\alpha\alpha'\alpha'' ss's''} \phi_{\alpha\alpha'\alpha''}^{ss's''}(\mathbf{q}',\mathbf{q''}) \sum_{k: \mathbf{Q}_k - \mathbf{q}'-\mathbf{q}'' \in BZ} \hat{u}_{\alpha}^s (\mathbf{Q}_k - \mathbf{q}'-\mathbf{q}'')  \hat{u}_{\alpha'}^{s'}(\mathbf{q}') \hat{u}_{\alpha''}^{s''}(\mathbf{q}'')
+
+for simplicity, we make a change of variables
+
+
+.. math::
+
+  \hat{H}_3 = \frac{1}{6}\int_{\mathrm{BZ}}\frac{d\mathbf{q}}{\Omega_{\mathrm{BZ}}}\int_{\mathrm{BZ}}\frac{d\mathbf{q'}}{\Omega_{\mathrm{BZ}}}    \sum_{\alpha\alpha'\alpha'' ss's''} \phi_{\alpha\alpha'\alpha''}^{ss's''}(\mathbf{q},\mathbf{q'}) \hat{u}_{\alpha}^{s}(\mathbf{q}) \hat{u}_{\alpha'}^{s'}(\mathbf{q}') \sum_{k: \mathbf{Q}_k - \mathbf{q}-\mathbf{q}' \in BZ} \hat{u}_{\alpha''}^{s''} (\mathbf{Q}_k - \mathbf{q}-\mathbf{q}')
+
+Let's now write in terms of the phonon amplitude
+
+
+.. math::
+
+  \hat{H}_3 = \frac{1}{6}\int_{\mathrm{BZ}}\frac{d\mathbf{q}}{\Omega_{\mathrm{BZ}}}\int_{\mathrm{BZ}}\frac{d\mathbf{q'}}{\Omega_{\mathrm{BZ}}}    \sum_{\alpha\alpha'\alpha'' ss's''pp'p''}\frac{\phi_{\alpha\alpha'\alpha''}^{ss's''}(\mathbf{q},\mathbf{q'}) }{\sqrt{m_s m_{s'}m_{s''}}} e_{\alpha p}^{s}(\mathbf{q}) A_p(\mathbf{q}) e_{\alpha'p'}^{s'}(\mathbf{q}') A_{p'}(\mathbf{q}') \sum_{k: \mathbf{Q}_k - \mathbf{q}-\mathbf{q}' \in BZ} e_{\alpha'' p''}^{s''}(\mathbf{Q}_k - \mathbf{q}-\mathbf{q}')  A_{p''}(\mathbf{Q}_k - \mathbf{q}-\mathbf{q}')
+
+
+Then, we rewrite it in terms of the creation and annihiliation of operators
+
+
+.. math::
+
+  \hat{H}_3 = \frac{i\hbar^{\frac{3}{2}}}{6 X 2^{\frac{3}{2}}}\int_{\mathrm{BZ}}\frac{d\mathbf{q}}{\Omega_{\mathrm{BZ}}}\int_{\mathrm{BZ}}\frac{d\mathbf{q'}}{\Omega_{\mathrm{BZ}}}  \sum_{k: \mathbf{Q}_k - \mathbf{q}-\mathbf{q}' \in BZ}  \sum_{\alpha\alpha'\alpha'' ss's''pp'p''}\frac{\mathcal{F}_{\alpha\alpha'\alpha''}^{ss's''}(\mathbf{q},\mathbf{q'},\mathbf{Q}_k)}{ \omega_p(\mathbf{q}) \omega_{p'}(\mathbf{q}')  \omega_{p''}(\mathbf{Q}_k - \mathbf{q}-\mathbf{q}')   }  \left[a_p^{\dagger}(\mathbf{q}) - a_p(-\mathbf{q})\right] \left[a_{p'}^{\dagger}(\mathbf{q}') - a_{p'}(-\mathbf{q}')\right] \left[a_{p''}^{\dagger}(\mathbf{Q}_k -\mathbf{q} - \mathbf{q}'  ) - a_{p''}((\mathbf{q}+\mathbf{q}'-\mathbf{Q}_k)\right]
+ 
+
+where
+
+.. math::
+
+  \mathcal{F}_{\alpha\alpha'\alpha''}^{ss's''}(\mathbf{q},\mathbf{q}',\mathbf{q}'') = \sum_k \frac{\phi_{\alpha\alpha'\alpha''}^{ss's''}(\mathbf{q},\mathbf{q'})e_{\alpha p}^s(\mathbf{q}) e_{\alpha' p'}^s(\mathbf{q}') e_{\alpha'' p''}^s(\mathbf{q''})}{\sqrt{m_s m_{s'} m_{s''} }  }\delta(\mathbf{q} + \mathbf{q} + \mathbf{q}'' - \mathbf{Q}_k)
+
+
+.. math::
+
+  \hat{H}_3 = \frac{\hbar^{\frac{3}{2}}}{3! 2^{\frac{3}{2}}}\int_{\mathrm{BZ}}\frac{d\mathbf{q}}{\Omega_{\mathrm{BZ}}}\int_{\mathrm{BZ}}\frac{d\mathbf{q'}}{\Omega_{\mathrm{BZ}}} \int_{\mathrm{BZ}}\frac{d\mathbf{q''}}{\Omega_{\mathrm{BZ}}} \sum_{\alpha\alpha'\alpha'' ss's''pp'p''}\frac{\mathcal{F}_{\alpha\alpha'\alpha''}^{ss's''}(\mathbf{q},\mathbf{q'},\mathbf{q}'')}{ \omega_p(\mathbf{q}) \omega_{p'}(\mathbf{q}')  \omega_{p''}(\mathbf{q}'')   }  \left[a_p^{\dagger}(-\mathbf{q}) + a_p(\mathbf{q})\right] \left[a_{p'}^{\dagger}(-\mathbf{q}') + a_{p'}(\mathbf{q}')\right] \left[a_{p''}^{\dagger}(-\mathbf{q}'') + a_{p''}(\mathbf{q}'')\right]
+ 
+
 
 
 

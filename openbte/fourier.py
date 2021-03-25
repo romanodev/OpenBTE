@@ -196,6 +196,7 @@ def compute_grad(temp,**argv):
    rr = compute_grad_data(mesh,1)
 
    diff_temp = [[temp[j[0]]-temp[j[1]]+j[2] for j in f] for f in rr]
+   
 
    #Add boundary
    #if 'TB' in argv.keys():
@@ -287,7 +288,6 @@ def compute_diffusive_thermal_conductivity(temp,kappa_map,**argv):
 
 def solve_convergence(argv,kappa,B,SU,log=False,scale=[]):
 
-
     argv.setdefault('max_fourier_error',1e-6) 
     argv.setdefault('max_fourier_iter',10) 
 
@@ -301,6 +301,7 @@ def solve_convergence(argv,kappa,B,SU,log=False,scale=[]):
     dim = int(mesh['meta'][2])
     grad = np.zeros((n_elems,dim))
 
+    
     n_iter = 0;kappa_old = 0;error = 1  
     while error > argv['max_fourier_error'] and \
                   n_iter < argv['max_fourier_iter'] :
@@ -313,7 +314,7 @@ def solve_convergence(argv,kappa,B,SU,log=False,scale=[]):
         temp = temp - (max(temp)+min(temp))/2.0
 
         kappa_eff = compute_diffusive_thermal_conductivity(temp,kappa_map,**argv)
-        #quit()
+
         error = abs((kappa_eff - kappa_old)/kappa_eff)
         kappa_old = kappa_eff
         n_iter +=1
@@ -389,8 +390,8 @@ def assemble(mesh,kappa):
     F = sp.csc_matrix((np.array(dff),(np.array(iff),np.array(jff))),shape = (n_elems,n_elems))
 
     #This scale the matrix and fixed zero temperature to a random point
-    scale = fix_instability(F,B)
-    #scale = np.ones(n_elems)
+    #scale = fix_instability(F,B)
+    scale = np.ones(n_elems)
     return F,B,scale
 
 
@@ -417,6 +418,7 @@ def solve_fourier(kappa,DeltaT,argv):
          
          BB = k*B+DeltaT
          meta,tf[m,:],tfg[m,:,:] = solve_convergence(argv,k*np.eye(dim),BB,get_SU([F,scale],k),scale=scale)
+         #meta,tf[m,:],tfg[m,:,:] = solve_convergence(argv,k*np.eye(dim),BB,splu(k*F),scale=scale)
          kappaf = meta[0]
          ratio[m] = kappaf/k
 

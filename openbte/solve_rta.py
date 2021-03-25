@@ -220,7 +220,6 @@ def solve_rta(argv):
 
     while kk < argv['max_bte_iter'] and error > argv['max_bte_error']:
         a = time.time()
-        
         if argv['multiscale']: tf,tfg = solve_fourier(mat['mfp_average'],DeltaT,argv)
 
         #Multiscale scheme-----------------------------
@@ -233,13 +232,15 @@ def solve_rta(argv):
 
         RHS = -np.einsum('c,nc->nc',TB,Gbm2) if len(mesh['db']) > 0 else  np.zeros((argv['n_parallel'],0)) 
 
+        #mm = np.zeros_like(n_parallel)
         for n,q in enumerate(rr):
            
+           error_old = 1e24        
            #Get ballistic kappa
            kappap_0[:,q]   =   -np.einsum('c,m,i,ci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:dim],compute_grad(DeltaT,**argv))
            if argv['multiscale']:
               kappap_f[:,q] =    np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:dim],tfg)
-             
+        
               #------------------------------------------------------
               B = DeltaT + mfp[-1]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems))
               A = get_m(Master,np.concatenate((mfp[-1]*Gm[n],mfp[-1]*D[n]+np.ones(n_elems)))[conversion])
@@ -258,23 +259,37 @@ def solve_rta(argv):
               idx = min([idx,n_serial])
 
            else: idx = n_serial-1
-
+         
+           #idx=n_serial-1
            for m in range(n_serial)[idx::-1]:
-               
+            
                  #----------------------------------------
                  B = DeltaT +  mfp[m]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems))
                  data = np.concatenate((mfp[m]*Gm[n],mfp[m]*D[n]+np.ones(n_elems)))
                  A = get_m(Master,data[conversion])
-                 X = solve(argv,A,B,(q,m))
+                 X = solve(argv,A,B,(q,m)) 
                  kappap[m,q] = np.dot(mesh['kappa_mask'],X)
                  #-----------------------------------------
 
                  if argv['multiscale']:
 
-                  error = abs(kappap[m,q] - kappap_f[m,q])/abs(kappap[m,q])
+                  S  = (kappap[m,q]   -np.dot(mesh['kappa_mask'],DeltaT))/mfp[m]/F[q,0]
+                  Sf = (kappap_f[m,q] -np.dot(mesh['kappa_mask'],DeltaT))/mfp[m]/F[q,0]
+
+                  #error = abs(kappap[m,q] - kappap_f[m,q])/abs(kappap[m,q])
+                  error = abs(S - Sf)/abs(S)
+                  #error = 0
+                  #if error < error_old:
+                  #  error_old = error
+                  #else:  
+
+                  #if kk == 1:
                   #error = 1e8
-                  if error < argv['multiscale_error_fourier'] and m <= transition[q]:
-                   transitionp[q] = m  if argv.setdefault('transition',False) else 1e4
+                  if error < argv['multiscale_error_fourier']:# and m <= transition[q]:
+
+                   
+                   #mm[q] = m     
+                   transitionp[q] = m if argv.setdefault('transition',False) else 1e4
    
                    #Vectorize
                    kappap[:m+1,q] = kappap_f[:m+1,q]
@@ -296,6 +311,8 @@ def solve_rta(argv):
 
                  #X_tot[q,m] = X.copy() 
                  Jp += np.einsum('c,j->cj',X,sigma[m,q,0:dim])*1e-18
+                 #if m == 0:
+                 #   print(kappap[:m+1,q]) 
                 
  
            for m in range(n_serial)[idx+1:]:
@@ -355,7 +372,6 @@ def solve_rta(argv):
         comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([kappaf_totp,MPI.DOUBLE],[kappaf_tot,MPI.DOUBLE],op=MPI.SUM)
 
-
         #error = compute_residual(X_tot)
 
         if argv['multiscale'] and comm.rank == 0: print_multiscale(n_serial,n_parallel,MM) 
@@ -367,12 +383,18 @@ def solve_rta(argv):
         if argv['verbose'] and comm.rank == 0:   
          print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error),flush=True)
 
+        #plot(mm,ls=None,marker='o')
+        #legend(['24-BTE','24-FOURIER','48-BTE','48-FOURIER'])
+        #show()
 
     if argv['verbose'] and comm.rank == 0:
       print(colored(' -----------------------------------------------------------','green'),flush=True)
 
 
+
     kappaf -=np.dot(mesh['kappa_mask'],DeltaT_old)
+    
+    #print(kappaf)
     kappa -=np.dot(mesh['kappa_mask'],DeltaT_old)
     bte =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J,'kappa_mode':kappa,'kappa_mode_f':kappaf,\
             'kappa_mode_b':kappab-np.dot(mesh['kappa_mask'],DeltaT_old),'kappa_0':kappa_0}
