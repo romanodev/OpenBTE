@@ -2,4 +2,4 @@
 
 
 docker build -t romanodev/openbte .
-docker push romanodev/openbte
+#docker push romanodev/openbte

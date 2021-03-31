@@ -95,7 +95,10 @@ def solve_rta(argv):
           data = {'GG': np.einsum('mqs,s->mqs',Gbp2,tot)}
        del tot, Gbp2
       else: data = None
-      GG = create_shared_memory_dict(data)['GG']
+      if comm.size > 1:
+       GG = create_shared_memory_dict(data)['GG']
+      else: 
+       GG = data['GG']
  
     #Bulk properties---
     G = np.einsum('qj,jn->qn',F[rr],mesh['k'],optimize=True)
@@ -284,7 +287,6 @@ def solve_rta(argv):
                   #else:  
 
                   #if kk == 1:
-                  #error = 1e8
                   if error < argv['multiscale_error_fourier']:# and m <= transition[q]:
 
                    

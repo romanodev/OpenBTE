@@ -174,18 +174,35 @@ def Solver(**argv):
              print_mpi_info()
              print_grid_info(mesh,mat)
 
-        #load geometry---
-        argv['geometry'] = create_shared_memory_dict(mesh)
+        if comm.size > 1:
 
-        #load material---
-        argv['material'] = create_shared_memory_dict(mat)
+         #load geometry---
+         argv['geometry'] = create_shared_memory_dict(mesh)
+ 
+         #load material---
+         argv['material'] = create_shared_memory_dict(mat)
 
-        argv['geometry']['elem_kappa_map'] = get_kappa_map_from_mat(**argv)   
+         argv['geometry']['elem_kappa_map'] = get_kappa_map_from_mat(**argv)   
 
-        #Solve fourier--
-        argv['fourier'] = create_shared_memory_dict(solve_fourier_single(argv))
+         #Solve fourier--
+         argv['fourier'] = create_shared_memory_dict(solve_fourier_single(argv))
 
-        
+        else:
+
+         #load geometry---
+         argv['geometry'] = mesh
+ 
+         #load material---
+         argv['material'] = mat
+
+         argv['geometry']['elem_kappa_map'] = get_kappa_map_from_mat(**argv)
+
+         #Solve fourier--
+         argv['fourier'] = solve_fourier_single(argv)
+       
+
+
+
         #Solve bte--
         if not argv['only_fourier']:
 

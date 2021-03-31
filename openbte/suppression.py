@@ -103,7 +103,7 @@ def plot_suppression(**argv):
      nm = 40
      fig = MakeFigure()
      #phis = range(n_phi)
-     phis = [0]
+     phis = [12]
      for p in phis:
       #fig.add_plot(mfp_sampled[:nm]*1e-3,T_sampled[p,:nm],color='k')
       #fig.add_plot(mfp_sampled[:nm]*1e-3,T_sampled_f[p,:nm],color='r')
