@@ -235,7 +235,6 @@ def solve_rta(argv):
 
         RHS = -np.einsum('c,nc->nc',TB,Gbm2) if len(mesh['db']) > 0 else  np.zeros((argv['n_parallel'],0)) 
 
-        #mm = np.zeros_like(n_parallel)
         for n,q in enumerate(rr):
            
            error_old = 1e24        
@@ -263,7 +262,6 @@ def solve_rta(argv):
 
            else: idx = n_serial-1
          
-           #idx=n_serial-1
            for m in range(n_serial)[idx::-1]:
             
                  #----------------------------------------
@@ -276,21 +274,10 @@ def solve_rta(argv):
 
                  if argv['multiscale']:
 
-                  S  = (kappap[m,q]   -np.dot(mesh['kappa_mask'],DeltaT))/mfp[m]/F[q,0]
-                  Sf = (kappap_f[m,q] -np.dot(mesh['kappa_mask'],DeltaT))/mfp[m]/F[q,0]
-
-                  #error = abs(kappap[m,q] - kappap_f[m,q])/abs(kappap[m,q])
-                  error = abs(S - Sf)/abs(S)
-                  #error = 0
-                  #if error < error_old:
-                  #  error_old = error
-                  #else:  
-
-                  #if kk == 1:
+                  error = abs(kappap[m,q] - kappap_f[m,q])/abs(kappap[m,q])
                   if error < argv['multiscale_error_fourier']:# and m <= transition[q]:
-
-                   
-                   #mm[q] = m     
+              
+                   mm[q] = m     
                    transitionp[q] = m if argv.setdefault('transition',False) else 1e4
    
                    #Vectorize
@@ -308,13 +295,9 @@ def solve_rta(argv):
                  DeltaTp += X*mat['tc'][m,q]
 
                  if len(mesh['eb']) > 0:
-                     
                   np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
 
-                 #X_tot[q,m] = X.copy() 
                  Jp += np.einsum('c,j->cj',X,sigma[m,q,0:dim])*1e-18
-                 #if m == 0:
-                 #   print(kappap[:m+1,q]) 
                 
  
            for m in range(n_serial)[idx+1:]:
@@ -334,7 +317,6 @@ def solve_rta(argv):
                    bal += n_serial-m
                    DeltaTp += X_bal*np.sum(mat['tc'][m:,q])
                    
-                   #X_tot[q,m:] = X_bal
 
                    if len(mesh['eb']) > 0:
                     np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-np.einsum('c,mc->c',X_bal[mesh['eb']],GG[m:,q]))
@@ -348,7 +330,6 @@ def solve_rta(argv):
                 np.add.at(TBp,np.arange(mesh['eb'].shape[0]),-X[mesh['eb']]*GG[m,q])
 
                Jp += np.einsum('c,j->cj',X,sigma[m,q,0:dim])*1e-18
-           #quit() 
 
         Mp[0] = diffusive
         Mp[1] = bal
@@ -374,7 +355,6 @@ def solve_rta(argv):
         comm.Allreduce([kappa_totp,MPI.DOUBLE],[kappa_tot,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([kappaf_totp,MPI.DOUBLE],[kappaf_tot,MPI.DOUBLE],op=MPI.SUM)
 
-        #error = compute_residual(X_tot)
 
         if argv['multiscale'] and comm.rank == 0: print_multiscale(n_serial,n_parallel,MM) 
 
@@ -384,10 +364,7 @@ def solve_rta(argv):
         kappa_vec.append(kappa_tot[0])
         if argv['verbose'] and comm.rank == 0:   
          print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa_vec[-1],error),flush=True)
-
-        #plot(mm,ls=None,marker='o')
-        #legend(['24-BTE','24-FOURIER','48-BTE','48-FOURIER'])
-        #show()
+ 
 
     if argv['verbose'] and comm.rank == 0:
       print(colored(' -----------------------------------------------------------','green'),flush=True)
