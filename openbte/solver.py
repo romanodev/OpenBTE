@@ -199,8 +199,6 @@ def Solver(**argv):
 
          #Solve fourier--
          argv['fourier'] = solve_fourier_single(argv)
-       
-
 
 
         #Solve bte--

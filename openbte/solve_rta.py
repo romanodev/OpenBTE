@@ -241,7 +241,7 @@ def solve_rta(argv):
            #Get ballistic kappa
            kappap_0[:,q]   =   -np.einsum('c,m,i,ci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:dim],compute_grad(DeltaT,**argv))
            if argv['multiscale']:
-              kappap_f[:,q] =    np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:dim],tfg)
+              kappap_f[:,q] =    np.einsum('c,mc->m',mesh['kappa_mask'],tf) - np.einsum('c,m,i,mci->m',mesh['kappa_mask'],mfp,mat['VMFP'][q,0:dim],tfg) 
         
               #------------------------------------------------------
               B = DeltaT + mfp[-1]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems))
@@ -261,7 +261,7 @@ def solve_rta(argv):
               idx = min([idx,n_serial])
 
            else: idx = n_serial-1
-         
+        
            for m in range(n_serial)[idx::-1]:
             
                  #----------------------------------------
@@ -271,13 +271,12 @@ def solve_rta(argv):
                  X = solve(argv,A,B,(q,m)) 
                  kappap[m,q] = np.dot(mesh['kappa_mask'],X)
                  #-----------------------------------------
-
                  if argv['multiscale']:
 
                   error = abs(kappap[m,q] - kappap_f[m,q])/abs(kappap[m,q])
                   if error < argv['multiscale_error_fourier']:# and m <= transition[q]:
               
-                   mm[q] = m     
+                   #mm[q] = m     
                    transitionp[q] = m if argv.setdefault('transition',False) else 1e4
    
                    #Vectorize
@@ -372,8 +371,6 @@ def solve_rta(argv):
 
 
     kappaf -=np.dot(mesh['kappa_mask'],DeltaT_old)
-    
-    #print(kappaf)
     kappa -=np.dot(mesh['kappa_mask'],DeltaT_old)
     bte =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J,'kappa_mode':kappa,'kappa_mode_f':kappaf,\
             'kappa_mode_b':kappab-np.dot(mesh['kappa_mask'],DeltaT_old),'kappa_0':kappa_0}

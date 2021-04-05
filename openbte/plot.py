@@ -37,6 +37,43 @@ def expand_variables(solver,dim):
 
 
 
+def write_vtu_cell(solver,geometry):
+
+   dim = int(geometry['meta'][2])
+   output = []
+   strc = 'CellData('
+   for n,(key, value) in enumerate(solver['variables'].items()):
+
+     if  value['data'].shape[0] == 1:  value['data'] =  value['data'][0] #band-aid solution
+
+     name = key + '[' + value['units'] + ']'
+     if value['data'].ndim == 1:
+       strc += r'''Scalars(output[''' + str(n) + r'''],name =' ''' + name +  r''' ')'''
+       output.append(value['data'])
+    
+     if value['data'].ndim == 2:
+
+       if dim == 2:
+        t = np.zeros_like(value['data'])
+        value['data'] = np.concatenate((value['data'],t),axis=1)[:,:3]
+       output.append(value['data'])
+
+       strc += r'''Vectors(output[''' + str(n) + r'''],name =' ''' + name +  r''' ')'''
+
+     if n == len(solver['variables'])-1:
+      strc += ')'
+     else:
+      strc += ','
+
+   data = eval(strc)
+
+   if dim == 3:
+   
+    vtk = VtkData(UnstructuredGrid(geometry['nodes'],tetra=geometry['elems']),data)
+   else :
+    vtk = VtkData(UnstructuredGrid(geometry['nodes'],triangle=geometry['elems']),data)
+   
+   vtk.tofile('output','ascii')
 
 
 
@@ -248,11 +285,16 @@ def Plot(**argv):
 
      get_node_data(solver,geometry)
 
-     repeat = argv.setdefault('repeat',[1,1,1])
-
-     duplicate_cells(geometry,solver,repeat)
+     duplicate_cells(geometry,solver,argv.setdefault('repeat',[1,1,1]))
 
      write_vtu(solver,geometry)  
+
+   elif model == 'vtu_cell':
+
+     duplicate_cells(geometry,solver,argv.setdefault('repeat',[1,1,1]))
+     
+     write_vtu_cell(solver,geometry)  
+
 
    elif model == 'suppression':
 
