@@ -1,10 +1,10 @@
 
 package:
   name: "openbte"
-  version: "1.16"
+  version: "2.8"
 
 source:
-  url: ../dist/openbte-1.13.tar.gz
+  url: ../dist/openbte-2.8.tar.gz
 build:
         
   number: 1
@@ -13,7 +13,6 @@ build:
 
 requirements:
   host:
-    - deepdish
     - mpi4py
     - numpy
     - pip
@@ -27,17 +26,11 @@ requirements:
     - pandas  
     - termcolor
     - unittest2
-    - googledrivedownloader
-    - suitesparse
-    - swig  
-    - scikit-umfpack
   run:
-    - deepdish
     - future
     - mpi4py
     - plotly
     - numpy
-    - googledrivedownloader
     - python >=3.6
     - pyvtk
     - scipy
@@ -46,17 +39,14 @@ requirements:
     - unittest2
     - gmsh
     - pyqt
-    - swig  
-    - suitesparse
-    - scikit-umfpack
 
 test:
   imports:
     - openbte
 about:
   home: The package home page
-  license: GPLv2
-  license_family: GPL2
+  license: GPLv3
+  license_family: GPL3
   license_file: 
   summary: Boltzmann Transport Equation for Phonons
   doc_url: 

@@ -4,17 +4,14 @@ from scipy.sparse.linalg import splu
 from termcolor import colored, cprint 
 from .utils import *
 from .fourier import *
-#import deepdish as dd
 from mpi4py import MPI
 import scipy.sparse as sp
 import time
 import sys
 import scipy
-from matplotlib.pylab import *
 from cachetools import cached,LRUCache
 from cachetools.keys import hashkey
 
-from matplotlib.pylab import *
 comm = MPI.COMM_WORLD
       
 cache_compute_lu = LRUCache(maxsize=10000)

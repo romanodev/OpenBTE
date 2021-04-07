@@ -5,8 +5,6 @@ import numpy as np
 import os
 from .utils import *
 from .viewer import *
-import matplotlib
-from matplotlib.pylab import *
 from .kappa_mode import *
 from .suppression import *
 from scipy.spatial import distance

@@ -3,7 +3,6 @@ from numpy import inf
 import sys
 from .utils import *
 import sys
-from matplotlib.pylab import *
 
 
 def main():

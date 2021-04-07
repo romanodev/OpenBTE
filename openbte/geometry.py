@@ -12,7 +12,6 @@ import numpy.testing as npt
 from statistics import mean
 from scipy.ndimage.interpolation import shift
 from collections import Counter
-from matplotlib.pylab import *
 
 comm = MPI.COMM_WORLD
 

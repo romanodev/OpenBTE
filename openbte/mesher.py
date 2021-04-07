@@ -9,7 +9,6 @@ from .utils import *
 import subprocess
 import os
 import time
-import matplotlib.pylab as plt
 
 class Mesher(object):
 

@@ -2,8 +2,6 @@ import numpy as np
 from openbte.utils import *
 from pubeasy import MakeFigure
 
-
-
 def plot_mode_kappa(**argv):
  #-----------------------
  mat = load_data('material')
@@ -42,8 +40,6 @@ def plot_mode_kappa(**argv):
  dirr = int(mat['meta'][-1])
 
  #--------
-
-
 
 
  #Compute kappa

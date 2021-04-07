@@ -10,7 +10,6 @@ import scipy
 from cachetools import cached
 from scipy.sparse.linalg import gmres
 import scipy.sparse.linalg as spla
-from matplotlib.pyplot import *
 from openbte.utils import *
 from openbte.fourier import *
 from mpi4py import MPI

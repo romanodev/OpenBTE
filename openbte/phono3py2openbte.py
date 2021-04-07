@@ -3,11 +3,9 @@ import numpy as np
 import scipy.linalg
 from scipy.linalg import pinvh
 import os
-#import deepdish as dd
 import hdfdict
 import time
 import h5py as h5
-from matplotlib.pylab import *
 from .utils import *
 
 

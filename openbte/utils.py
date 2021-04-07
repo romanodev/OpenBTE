@@ -8,7 +8,6 @@ import shapely
 from shapely.ops import cascaded_union
 import os,sys
 import functools
-import matplotlib.pylab as plt
 import io,zipfile
 import math
 import pickle
