@@ -5,7 +5,7 @@
 [![documentation](https://readthedocs.org/projects/pip/badge/?version=latest&style=plastic)](https://openbte.readthedocs.io/en/latest/)
 [![downloads](https://img.shields.io/pypi/dm/openbte?style=plastic)](https://pypi.org/project/openbte/)
 [![docker](https://img.shields.io/docker/pulls/romanodev/openbte?style=plastic)](https://hub.docker.com/r/romanodev/openbte)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](18u1ieij2Wn6WEZFN2TmMteYHAJADMdSk?usp=sharing)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg?style=plastic)](18u1ieij2Wn6WEZFN2TmMteYHAJADMdSk?usp=sharing)
 
 OpenBTE solves the Linearized Boltzmann Transport equation, with current focus on steady-state phonon transport.
 
