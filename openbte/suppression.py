@@ -35,14 +35,16 @@ def plot_suppression(**argv):
  #-----------------------------
 
  S = T_sampled/M*1e18
- Sf = T_sampled_f/M*1e18
+ if argv.setdefault('fourier',False):
+  Sf = T_sampled_f/M*1e18
+  Smf = np.mean(Sf,axis=0)
  Sm = np.mean(S,axis=0)
- Smf = np.mean(Sf,axis=0)
  
  if argv.setdefault('show',True):
   fig = MakeFigure()
   fig.add_plot(mfp_sampled*1e-3,Sm,color='k',name='bte')
-  fig.add_plot(mfp_sampled*1e-3,Smf,color='g',name='fourier')
+  if argv.setdefault('fourier',False):
+   fig.add_plot(mfp_sampled*1e-3,Smf,color='g',name='fourier')
   fig.add_labels('Mean Free Path [$\mu$ m]','Suppression')
  fig.finalize(grid=True,xscale='log',write = False,show=True,ylim=[0,1])
 
