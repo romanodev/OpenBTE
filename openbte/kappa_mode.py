@@ -1,6 +1,6 @@
 import numpy as np
 from openbte.utils import *
-from pubeasy import MakeFigure
+#from pubeasy import MakeFigure
 
 def plot_mode_kappa(**argv):
  #-----------------------

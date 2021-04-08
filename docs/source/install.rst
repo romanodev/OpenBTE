@@ -8,32 +8,9 @@ PYPI
       .. code-block:: bash
 
         apt-get update
-        apt-get install build-essential libopenmpi-dev libgmsh-dev swig libsuitesparse-dev
+        apt-get install build-essential libopenmpi-dev libgmsh-dev 
         pip install --upgrade --no-cache openbte
 
-      If you have trouble getting ``Gmsh`` via the above method, just get it from here_.      
-
-
-CONDA
-####################################
-
-
-       Install Anaconda_.
-
-       .. code-block:: bash
-
-          conda create -yn openbte
-          conda activate openbte
-          conda install -y -c gromano -c conda-forge -c ostrokach-forge openbte==1.13
-
-       For Linux, you might need these libraries:
-
-       .. code-block:: bash
-
-          apt-get update
-          apt-get install -y libglu1-mesa libxcursor1 libxft-dev libxinerama-dev
-
-       If you have trouble getting ``Gmsh`` via the above method, just get it from here_.      
 
 DOCKER
 ####################################
@@ -74,15 +51,35 @@ WINDOWS
       Use Docker after Installing MSMPI_.
 
 
-CLOUD
+MacOS
 ####################################
+ 
 
-       
-      You can run OpenBTE in Google Colab (Example_). 
+      Install Anaconda_.
+
+      Install mpi4py with
+
+      .. code-block:: bash
+         
+         conda install -c conda-forge mpi4py
+
+      Install gmsh_.      
+ 
+      Install XCode with
+
+      .. code-block:: bash
+
+         xcode-select --install
+
+      Install OpenBTE with      
+
+      .. code-block:: bash
+
+         pip install --upgrade --no-cache openbte
 
 
 
-
+      Note the you need XSelect installed.
 
 
 
@@ -90,7 +87,6 @@ CLOUD
 .. _Docker: https://docs.docker.com/engine/install/ubuntu/
 .. _Anaconda: https://docs.anaconda.com/anaconda/install/
 .. _MSMPI: https://docs.microsoft.com/en-us/message-passing-interface/microsoft-mpi
-.. _here: https://gmsh.info/
-.. _Example: https://colab.research.google.com/drive/1jBXpOagmO1SK554sdxCTUkXDt5EHo2rp?usp=sharing
+.. _gmsh: https://gmsh.info/
 
 

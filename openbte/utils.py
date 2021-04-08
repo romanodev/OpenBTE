@@ -1,5 +1,4 @@
 from mpi4py import MPI
-from google_drive_downloader import GoogleDriveDownloader as gdd
 import numpy as np
 from termcolor import colored, cprint 
 from shapely.geometry import Polygon,Point
@@ -320,11 +319,6 @@ def load_data(fh):
           return pickle.load(f)
      return -1 
 
-
-def download_file(file_id,filename):
-
-      gdd.download_file_from_google_drive(file_id=file_id,
-                                           dest_path='./' + filename,showsize=True,overwrite=True)
 
 
 
