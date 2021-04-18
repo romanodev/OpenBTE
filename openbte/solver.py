@@ -132,6 +132,8 @@ def prepare_data(argv):
        argv['data']['kappa_mode_f'] = argv['bte']['kappa_mode_f']
      if 'kappa_0' in argv['bte']:
        argv['data']['kappa_0'] = argv['bte']['kappa_0']
+     if 'tau' in argv['bte']:
+       argv['data']['tau'] = argv['bte']['tau']
 
 
 
@@ -166,8 +168,8 @@ def Solver(**argv):
              print(colored(' -----------------------------------------------------------','green'),flush=True)
              print_options(**argv)
 
-            mesh = argv['geometry'] if 'geometry' in argv.keys() else load_data(argv.setdefault('geometry_file','geometry'))
-            mat  = argv['material'] if 'material' in argv.keys() else load_data(argv.setdefault('material_file','material'))
+            mesh = argv['geometry'] if 'geometry' in argv.keys() else load_data(argv.setdefault('geometry_filename','geometry'))
+            mat  = argv['material'] if 'material' in argv.keys() else load_data(argv.setdefault('material_filename','material'))
             
             if argv['verbose']:
              print_bulk_info(mat,mesh)

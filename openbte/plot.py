@@ -296,11 +296,11 @@ def Plot(**argv):
 
    elif model == 'suppression':
 
-      return plot_suppression(**argv)
+      return write_suppression(**argv)
 
    elif model == 'kappa_mode':
 
-      plot_mode_kappa(**argv)
+      write_mode_kappa(**argv)
 
 
 

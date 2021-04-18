@@ -75,10 +75,15 @@ def rta2DSym(**argv):
  phi_bulk[np.where(phi_bulk < 0) ] = 2*np.pi + phi_bulk[np.where(phi_bulk <0)]
  kappa = data['kappa']
 
+ if argv.setdefault('diffusive',False):
+     argv.setdefault('mfp_min',1e-10)
+     argv.setdefault('mfp_max',1e-1)
+
+
  mfp_max = argv.setdefault('mfp_max',np.max(mfp_bulk)*10)
  mfp_min = argv.setdefault('mfp_min',mfp_0)
 
- mfp_sampled = np.logspace(np.log10(mfp_0)*1.01,np.log10(mfp_max),n_mfp,endpoint=True)#min MFP = 1e-1 nm
+ mfp_sampled = np.logspace(np.log10(mfp_min)*1.01,np.log10(mfp_max),n_mfp,endpoint=True)#min MFP = 1e-1 nm
 
  
  #-----------------------
@@ -94,6 +99,10 @@ def rta2DSym(**argv):
  tc_cut = tc[r>mfp_0]
  Jc_cut = Jc[r>mfp_0]
  phi_cut = phi_bulk[r>mfp_0]
+
+
+ if argv.setdefault('diffusive',False):
+    r_cut = mfp_min * np.ones_like(r_cut) 
 
  #Interpolation in the MFPs
  a1,a2,m1,m2 = fast_interpolation(r_cut,mfp_sampled)
@@ -116,6 +125,9 @@ def rta2DSym(**argv):
  lo_cut = np.sum(tc[r<mfp_0])
  
  temp_coeff *=(1+lo_cut)
+
+ 
+
 
  assert(abs(np.sum(temp_coeff)) -1 < 1e-5)
  #Adjusment for numerical stability temp_coeff /= np.sum(temp_coeff)

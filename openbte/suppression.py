@@ -1,10 +1,9 @@
 import numpy as np
 from openbte.utils import *
-#from pubeasy import MakeFigure
 
 
 
-def plot_suppression(**argv):
+def write_suppression(**argv):
 
 
  sol = load_data('solver')
@@ -40,24 +39,24 @@ def plot_suppression(**argv):
   Smf = np.mean(Sf,axis=0)
  Sm = np.mean(S,axis=0)
  
- if argv.setdefault('show',True):
-  fig = MakeFigure()
-  fig.add_plot(mfp_sampled*1e-3,Sm,color='k',name='bte')
-  if argv.setdefault('fourier',False):
-   fig.add_plot(mfp_sampled*1e-3,Smf,color='g',name='fourier')
-  fig.add_labels('Mean Free Path [$\mu$ m]','Suppression')
- fig.finalize(grid=True,xscale='log',write = False,show=True,ylim=[0,1])
+ #if argv.setdefault('show',True):
+ # fig = MakeFigure()
+ # fig.add_plot(mfp_sampled*1e-3,Sm,color='k',name='bte')
+ # if argv.setdefault('fourier',False):
+ #  fig.add_plot(mfp_sampled*1e-3,Smf,color='g',name='fourier')
+ # fig.add_labels('Mean Free Path [$\mu$ m]','Suppression')
+ #fig.finalize(grid=True,xscale='log',write = False,show=True,ylim=[0,1])
 
- if argv.setdefault('mode_resolved',False):
+ #if argv.setdefault('mode_resolved',False):
  
-     nm = n_mfp
-     phis = range(n_phi)
+ #    nm = n_mfp
+ #    phis = range(n_phi)
 
-     for p in phis:
-         fig = MakeFigure()
-         fig.add_plot(mfp_sampled[:nm]*1e-3,S[p,:nm],color='k',marker='o')
-         fig.add_plot(mfp_sampled[:nm]*1e-3,Sf[p,:nm],color='r',marker='o')
-         fig.finalize(grid=True,xscale='log',write = False,show=True)
+ #    for p in phis:
+ #        fig = MakeFigure()
+ #        fig.add_plot(mfp_sampled[:nm]*1e-3,S[p,:nm],color='k',marker='o')
+ #        fig.add_plot(mfp_sampled[:nm]*1e-3,Sf[p,:nm],color='r',marker='o')
+ #        fig.finalize(grid=True,xscale='log',write = False,show=True)
     
 
  save_data(argv.setdefault('suppression_file','suppression'),{'mfp':mfp_sampled,'suppression':Sm})

@@ -1,11 +1,10 @@
 import numpy as np
 from openbte.utils import *
-#from pubeasy import MakeFigure
 
-def plot_mode_kappa(**argv):
+def write_mode_kappa(**argv):
  #-----------------------
  mat = load_data('material')
- data = load_data('rta')
+ data = load_data(argv.setdefault('rta_material_file','rta'))
  mfp_0 = 1e-9
  #I = np.where(np.linalg.norm(mfp_bulk,axis=1) > mfp_0)[0]
  I = np.arange(len(data['tau']))
@@ -36,8 +35,8 @@ def plot_mode_kappa(**argv):
  phi = list(phi)
  #--------------------------------
 
- mat = load_data('geometry')
- dirr = int(mat['meta'][-1])
+ tmp = load_data('geometry')
+ dirr = int(tmp['meta'][-1])
 
  #--------
 
@@ -46,7 +45,7 @@ def plot_mode_kappa(**argv):
  sol = load_data('solver')
  T_sampled = sol['kappa_mode']
 
- kappa_fourier = sol['fourier']
+ kappa_fourier = sol['kappa_fourier']
 
  #Interpolation to get kappa mode
  ratio = kappa_fourier/kappa[0,0]
@@ -79,16 +78,16 @@ def plot_mode_kappa(**argv):
 
  mfp_nano[:,dirr] = T_mode
 
- if argv.setdefault('show',True):
-  fig = MakeFigure()
-  fig.add_plot(f*1e-12,mfp_nano[:,dirr]*1e6,model='scatter',color='r')
-  fig.add_plot(f*1e-12,mfp_bulk[:,dirr]*1e6,model='scatter',color='b')
-  fig.add_labels('Frequency [THz]','Mean Free Path [$\mu$m]')
-  fig.finalize(grid=True,yscale='log',write = True,show=True,ylim=[1e-4,1e2])
+ #if argv.setdefault('show',True):
+ # fig = MakeFigure()
+ # fig.add_plot(f*1e-12,mfp_nano[:,dirr]*1e6,model='scatter',color='r')
+ # fig.add_plot(f*1e-12,mfp_bulk[:,dirr]*1e6,model='scatter',color='b')
+ # fig.add_labels('Frequency [THz]','Mean Free Path [$\mu$m]')
+ # fig.finalize(grid=True,yscale='log',write = True,show=True,ylim=[1e-4,1e2])
 
- data = {'kappa_nano':kappa_nano,'mfp_nano':mfp_nano[:,dirr],'kappa_fourier':kappa_fourier,'mfp_bulk':mfp_bulk[:,dirr],'f':f}
+ data = {'kappa_nano':kappa_nano,'mfp_nano':mfp_nano[:,dirr],'kappa_fourier':kappa_fourier,'mfp_bulk':mfp_bulk[:,dirr],'f':f,'kappa_bulk':kappa_bulk}
  if argv.setdefault('save',True):
-     save_data('kappa_mode',data)
+     save_data(argv.setdefault('kappa_mode_file','kappa_mode'),data)
 
  return data
 

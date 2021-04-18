@@ -23,7 +23,7 @@ cache_get_decomposed_directions = LRUCache(maxsize=10000)
 
 def clear_fourier_cache():
 
-   if comm.rank == 0:
+    #if comm.rank == 0:
     cache_assemble.clear()
     cache_compute_grad_data.clear()
     cache_get_SU.clear()

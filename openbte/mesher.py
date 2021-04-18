@@ -634,7 +634,7 @@ class Mesher(object):
   self.merge() 
   self.points = np.array(self.points)
   self.lines = np.array(self.lines)
-  self.loops = np.array(self.loops)
+  self.loops = np.array(self.loops,dtype=object)
   
   self.apply_periodic_mesh()
  
