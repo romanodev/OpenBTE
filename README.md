@@ -9,6 +9,8 @@
 
 OpenBTE solves the Linearized Boltzmann Transport equation, with current focus on steady-state phonon transport.
 
+![Thermal Flux](bte.png "Thermal Flux")
+
 
 
 

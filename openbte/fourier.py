@@ -390,8 +390,8 @@ def assemble(mesh,kappa):
     F = sp.csc_matrix((np.array(dff),(np.array(iff),np.array(jff))),shape = (n_elems,n_elems))
 
     #This scale the matrix and fixed zero temperature to a random point
-    #scale = fix_instability(F,B)
-    scale = np.ones(n_elems)
+    scale = fix_instability(F,B)
+    #scale = np.ones(n_elems)
     return F,B,scale
 
 

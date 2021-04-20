@@ -9,7 +9,7 @@ def rta3D(**argv):
 
  #Compute directions---------------
  n_phi = int(argv.setdefault('n_phi',48))
- n_theta = int(argv.setdefault('n_phi',24))
+ n_theta = int(argv.setdefault('n_theta',24))
  n_mfp = argv.setdefault('n_mfp',50)
  Dphi = 2.0*np.pi/n_phi
  phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
@@ -26,7 +26,7 @@ def rta3D(**argv):
 
  data = load_data(argv.setdefault('filename','rta'))
 
- 
+
  f = np.divide(np.ones_like(data['tau']), data['tau'], out=np.zeros_like(data['tau']), where=data['tau']!=0)
  kappa = data['kappa']
  #--------------------------

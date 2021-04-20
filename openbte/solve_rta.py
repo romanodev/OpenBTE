@@ -289,7 +289,7 @@ def solve_rta(argv):
                  kappap[m,q] = np.dot(mesh['kappa_mask'],X)
 
                  #---------------------------------------
-                 taup[m,q] = compute_anisotropic_tau(X)
+                 #taup[m,q] = compute_anisotropic_tau(X)
                  #---------------------------------------
 
                  #-----------------------------------------
@@ -365,7 +365,7 @@ def solve_rta(argv):
         comm.Allreduce([DeltaTp,MPI.DOUBLE],[DeltaT,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([Jp,MPI.DOUBLE],[J,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([kappap,MPI.DOUBLE],[kappa,MPI.DOUBLE],op=MPI.SUM)
-        comm.Allreduce([taup,MPI.DOUBLE],[tau,MPI.DOUBLE],op=MPI.SUM)
+        #comm.Allreduce([taup,MPI.DOUBLE],[tau,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([kappap_b,MPI.DOUBLE],[kappab,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([kappap_0,MPI.DOUBLE],[kappa_0,MPI.DOUBLE],op=MPI.SUM)
         comm.Allreduce([kappap_f,MPI.DOUBLE],[kappaf,MPI.DOUBLE],op=MPI.SUM)
@@ -395,7 +395,7 @@ def solve_rta(argv):
     kappaf -=np.dot(mesh['kappa_mask'],DeltaT_old)
     kappa -=np.dot(mesh['kappa_mask'],DeltaT_old)
     bte =  {'kappa':kappa_vec,'temperature':DeltaT,'flux':J,'kappa_mode':kappa,'kappa_mode_f':kappaf,\
-            'kappa_mode_b':kappab-np.dot(mesh['kappa_mask'],DeltaT_old),'kappa_0':kappa_0,'tau':tau}
+            'kappa_mode_b':kappab-np.dot(mesh['kappa_mask'],DeltaT_old),'kappa_0':kappa_0}
     argv['bte'] = bte
 
 
