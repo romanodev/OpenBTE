@@ -10,6 +10,20 @@
 
 OpenBTE solves the Linearized Boltzmann Transport equation, with current focus on steady-state phonon transport.
 
+```python
+
+from openbte import Material,Geometry,Solver,Plot
+
+Material(filename='rta_Si_300') #Retrieves data from the database
+
+Geometry(lx = 50,ly = 50, lz=10,step=4,porosity=0.2,shape='circle') #Creates the structure
+
+Solver() #Solves the BTE
+
+Plot(model='vtu') #Creates a file which can be open with Paraview
+
+```
+
 ![Thermal Flux](bte.png "Thermal Flux")
 
 
