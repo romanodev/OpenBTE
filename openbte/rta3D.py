@@ -10,7 +10,7 @@ def rta3D(**argv):
  #Compute directions---------------
  n_phi = int(argv.setdefault('n_phi',48))
  n_theta = int(argv.setdefault('n_theta',24))
- n_mfp = argv.setdefault('n_mfp',50)
+ n_mfp = argv.setdefault('n_mfp',30)
  Dphi = 2.0*np.pi/n_phi
  phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
  Dtheta = np.pi/n_theta

@@ -642,8 +642,6 @@ def compute_data(data,**argv):
    compute_boundary_condition_data(data,**argv)
 
    #Some adjustement--
-
-
    data['meta'] = np.asarray([len(data['elems']),data['kappa_factor'],data['dim'],len(data['nodes']),len(data['active_sides']),data['direction'],data['dmin']],np.float64)
    
    del data['direction']
@@ -658,16 +656,22 @@ def Geometry(**argv):
 
  if comm.rank == 0 :
 
-   if not argv.setdefault('create_mesh',False):  
-    Mesher(argv) 
-   data = import_mesh(**argv)
+   Mesher(argv) 
 
-   compute_data(data,**argv)
+   if argv.setdefault('only_geo',False):  
 
-   if argv.setdefault('save',True):
+    return argv
+
+   else:
+
+    data = import_mesh(**argv)
+
+    compute_data(data,**argv)
+
+    if argv.setdefault('save',True):
      save_data(argv.setdefault('output_filename','geometry'),data)   
 
-   return data
+    return data
 
 
 

@@ -149,7 +149,7 @@ def Solver(**argv):
         argv.setdefault('save_state',False)
         argv.setdefault('load_state',False)
         argv.setdefault('alpha',1.0)
-        argv.setdefault('keep_lu',True)
+        argv.setdefault('keep_lu',False)
         argv.setdefault('only_fourier',False)
         argv.setdefault('max_bte_iter',20)
         argv.setdefault('max_bte_error',1e-3)

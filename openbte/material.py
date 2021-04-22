@@ -18,15 +18,19 @@ comm = MPI.COMM_WORLD
 
 def Material(**argv):
 
-   model = argv['model']
+   model = argv.setdefault('model','rta3D')
 
    #set up database
-   source = argv.setdefault('source','local')
+   source = argv.setdefault('source','database')
    if source == 'database':
     if comm.rank == 0:
-        filename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + \
+        if 'temperature' in argv.keys():
+         filename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + \
                   '/openbte/materials/rta_' +  argv['filename'] + \
                   '_' + str(argv['temperature']) 
+        else:          
+         filename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + \
+                  '/openbte/materials/' +  argv['filename']  
 
         argv['filename'] = filename
 

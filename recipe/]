@@ -25,9 +25,9 @@ RUN cd openmpi-4.0.3 && ./configure --prefix=/usr/local/openmpi && make all && m
 COPY requirements.txt .
 RUN pip install -r requirements.txt 
 
-COPY openbte-2.18.tar.gz .
-RUN pip install --no-cache openbte-2.18.tar.gz
-RUN rm openbte-2.18.tar.gz
+COPY openbte-2.17.tar.gz .
+RUN pip install --no-cache openbte-2.17.tar.gz
+RUN rm openbte-2.17.tar.gz
 
 RUN useradd -ms /bin/bash openbte
 

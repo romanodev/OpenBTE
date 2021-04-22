@@ -8,11 +8,12 @@ def get_shape(argv):
     
     #Vectorize shape if needed
     shape = argv.setdefault('shape','square') 
+    base = argv.setdefault('base',[[0,0]]) 
     if type(shape) == list:
-     assert(len(shape)==len(argv['base']))
+     assert(len(shape)==len(base))
      shapes_str = shape
     else:
-     shapes_str = len(argv['base'])*[shape]   
+     shapes_str = len(base)*[shape]   
 
     #Vectorize custom shapes if needed
     n_custom = 0
