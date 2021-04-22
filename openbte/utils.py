@@ -11,7 +11,7 @@ import io,zipfile
 import math
 import pickle
 import gzip
-
+import time
 
 
 def ggmres(L,X,compute_kappa,residual,k,rr,max_ggmres_iter,tolerance):
@@ -497,7 +497,6 @@ def repeat_merge_scale(argv):
 
   #----------------------------
   dmin = check_distances(new_poly)
-
 
   #scale-----------------------
   if argv.setdefault('relative',True):

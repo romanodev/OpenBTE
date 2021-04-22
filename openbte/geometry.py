@@ -655,7 +655,6 @@ def compute_data(data,**argv):
 def Geometry(**argv):
 
  if comm.rank == 0 :
-
    Mesher(argv) 
 
    if argv.setdefault('only_geo',False):  

@@ -44,10 +44,10 @@ class Mesher(object):
        self.add_polygons(argv)
        repeat_merge_scale(argv)
   #---------------------
-
-  if argv.setdefault('lz',0) == 0:
+  if not argv['only_geo']:
+   if argv.setdefault('lz',0) == 0:
     self.generate_mesh_2D(argv)
-  else:   
+   else:   
     self.generate_mesh_3D(argv)
 
 
