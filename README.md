@@ -8,7 +8,7 @@
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/18u1ieij2Wn6WEZFN2TmMteYHAJADMdSk?usp=sharing)
 [![Python](https://img.shields.io/pypi/pyversions/openbte)](https://www.python.org/)
 
-OpenBTE solves the Linearized Boltzmann Transport equation, with current focus on steady-state phonon transport.
+OpenBTE solves the Linearized Boltzmann Transport equation, with current focus on steady-state phonon transport. Bulk-related data is from first-principles calculations.
 
 ```python
 
