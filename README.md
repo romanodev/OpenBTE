@@ -20,7 +20,7 @@ Geometry(lx = 50,ly = 50, lz=10,step=4,porosity=0.2,shape='circle') #Creates the
 
 Solver() #Solves the BTE
 
-Plot(model='vtu',repeat=[5,1,1]) #Creates a file which can be open with Paraview
+Plot(model='vtu',repeat=[5,1,1]) #Creates a file which can be opened with Paraview
 
 ```
 
