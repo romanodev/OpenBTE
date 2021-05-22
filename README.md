@@ -24,6 +24,8 @@ Plot(model='vtu',repeat=[5,1,1]) #Creates a file which can be opened with Paravi
 
 ```
 
+Method: https://arxiv.org/abs/2105.08181
+
 ![Thermal Flux](bte.png "Thermal Flux")
 
 
