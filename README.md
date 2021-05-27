@@ -16,7 +16,7 @@ from openbte import Material,Geometry,Solver,Plot
 
 Material(filename='rta_Si_300') #Retrieves data from the database
 
-Geometry(lx = 50,ly = 50, lz=10,step=4,porosity=0.2,shape='circle') #Creates the structure
+Geometry(lx = 50,ly = 50, lz=10,step=4,porosity=0.2,shape='circle',Periodic=[True,True,False]) #Creates the structure
 
 Solver() #Solves the BTE
 
