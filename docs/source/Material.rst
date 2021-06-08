@@ -175,6 +175,32 @@ Assuming you have ``AlmaBTE`` in your current ``PATH``, this an example for ``Si
 Interface with Phono3Py
 ###############################################
 
+Phono3py_ calculates the bulk thermal conductivity using both the RTA and full scattering operator. Currently, only the former is supported. Once Phono3py is solved, the ``rta.npz`` is created by
+
+
+.. code-block:: bash
+
+   phono3pytoOpenBTE unitcell_name nx ny nz 
+
+where ``unitcell_name`` is the file of your unit cell and ``nx ny nz`` is the reciprical space discretization.
+
+Here is an example assuming you have a working installation of Phono3py:
+
+.. code-block:: bash
+
+   git clone https://github.com/phonopy/phono3py.git
+
+   cd phono3py/examples/Si-PBEsol
+
+   phono3py --dim="2 2 2" --sym-fc -c POSCAR-unitcell
+
+   phono3py --dim="2 2 2" --pa="0 1/2 1/2 1/2 0 1/2 1/2 1/2 0" -c POSCAR-unitcell --mesh="8 8 8"  --fc3 --fc2 --ts=100
+
+   Phono3py2OpenBTE POSCAR-unitcell 8 8 8 
+
+Note that ``rta.npz`` is also created in the case you want to use a RTA model.   
+
+
 
 .. _Deepdish: https://deepdish.readthedocs.io/
 .. _Phono3py: https://phonopy.github.io/phono3py/

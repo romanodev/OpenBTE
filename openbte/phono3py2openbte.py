@@ -86,54 +86,9 @@ def main():
  print('KAPPA (RTA):')
  print(kappa)
 
- #---------------------------------
-
- #FULL MATRIX----------------------------------
- fname = 'unitary-m' + tail
- #f = dd.io.load(fname)
-
- f = hdfdict.load('unitary-m' + tail)
- Q = f['unitary_matrix'][0,0]
-  
- #f = dd.io.load('coleigs-m' + tail)
- f = hdfdict.load('coleigs-m' + tail)
- D = f['collision_eigenvalues'][0]
- Dm = np.diag(D)
- Q = Q.reshape(nm,nm)
- 
- 
-
- #A = np.matmul(Q.T,np.matmul(Dm,Q))*1e12*np.pi
- 
- QT = Q.T
- A = np.matmul(QT,(D*QT).T)
- A = np.delete(A,exclude,0)
- A = np.delete(A,exclude,1)
-
-
- #a = np.einsum('ij,i->j',A,np.sqrt(C))
- #print(sum(a))
- #print(sum(np.absolute(a)))
- #show()
-
- W = np.einsum('ij,i,j->ij',A,np.sqrt(C),np.sqrt(C))*1e12*np.pi
- #W = np.einsum('ij,i,j->ij',A,1/np.sqrt(C),1/np.sqrt(C))*1e12*np.pi
-
- print('Start inversion...')
- kappa = np.einsum('li,lk,kj->ij',sigma,pinvh(W),sigma)/alpha
- print('KAPPA (FULL):')
- print(kappa)
-
- data = {'W':W,'v':v,'C':C,'kappa':kappa,'alpha':np.array([alpha])}
- #np.savez_compressed('full.npz',data)   
- #Saving data
- save_data('full',data)   
- #hdfdict.dump(data,'full.h5')
 
  data = {'C':C/alpha,'tau':tau,'v':v,'kappa':kappa}
- saveCompressed('rta.npz',**data)   
- #save_data('full',data)   
- #np.savez_compressed('rta.npz',data)   
+ save_data('rta',data)   
 
  #---------------------------------------------
 
