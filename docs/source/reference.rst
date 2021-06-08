@@ -1,18 +1,33 @@
 Reference
 ===================================
 
-The easiest way to support OpenBTE is to star its github repository.
-
-The paper on OpenBTE is coming soon. Meanwhile, if you use the code or get inspiration from it please consider this citation
+If you use the code, please consider citing:
 
 
 .. code-block:: bash
-  
-  @inproceedings{romano2019openbte,
-  title={OpenBTE: A Multiscale Solver for the Phonon Boltzmann Transport Equation},
+
+  @article{romano2021openbte,
+  title={OpenBTE: a Solver forab-initio Phonon Transport in Multidimensional Structures},
   author={Romano, Giuseppe},
-  booktitle={APS Meeting Abstracts},
-  year={2019}}
+  url={https://arxiv.org/abs/2106.02764},
+  journal={arXiv preprint arXiv:2106.02764},
+  year={2021}
+  }
+
+
+
+.. code-block:: bash
+
+  @article{romano2021efficient,
+  title={Efficient calculations of the Mode-Resolved ab-initio thermal Conductivity in nanostructures},
+  author={Romano, Giuseppe},
+  url={https://arxiv.org/abs/2105.08181},
+  journal={arXiv preprint arXiv:2105.08181},
+  year={2021}
+  }
+
+
+
 
 
 
