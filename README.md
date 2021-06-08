@@ -28,6 +28,8 @@ Method: https://arxiv.org/abs/2105.08181
 
 Code:  https://arxiv.org/abs/2106.02764
 
+Community: https://groups.google.com/g/openbte
+
 ![Thermal Flux](bte.png "Thermal Flux")
 
 
