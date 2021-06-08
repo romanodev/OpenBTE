@@ -124,7 +124,6 @@ def mfp3D(**argv):
    comm.Allreduce([kdp,MPI.DOUBLE],[kd,MPI.DOUBLE],op=MPI.SUM)
    comm.Allreduce([tcp,MPI.DOUBLE],[tc,MPI.DOUBLE],op=MPI.SUM)
 
-   
 
    #----
    kd *= 3/(4.0*np.pi)

@@ -12,110 +12,9 @@ import math
 import pickle
 import gzip
 import time
+import matplotlib.tri as mtri
 
 
-def ggmres(L,X,compute_kappa,residual,k,rr,max_ggmres_iter,tolerance):
-
-      def compute_norm_D(A,D):
-       return np.sqrt(np.einsum('ij,i,ij->',A,D,A))
-
-      if comm.rank == 0:
-       print(' ')
-       print(colored('                        G-GMRES','green'),flush=True)
-       print(colored(' -----------------------------------------------------------','green'),flush=True)
-
-      h = np.zeros(k+1)
-
-      def arnoldi(Q,H):
-
-       for j in range(k):
-         #Arnoldi-------------------------------------
-         V         = L(Q[j]) #shared
-         hp         = np.einsum('ikj,k,kj->i',Q[:,rr,:],DD[rr],V[rr])
-         comm.Allreduce([np.array([hp]),MPI.DOUBLE],[h,MPI.DOUBLE],op=MPI.SUM)
-
-         H[:,j]    = h
-         V[rr]    -= np.einsum('ikj,i->kj',Q[:,rr],H[:,j])
-         comm.Barrier()
-         H[j+1,j]  = compute_norm_D(V,DD)
-         Q[j+1]    = V/H[j+1,j]   
-
-       return Q,H
-  
-      r = 1e6
-      kk = 0
-      while kk < max_ggmres_iter and r > tolerance:
-
-       X0 = X
-       R = residual(X0) #shared
-
-       #Compute WEIGHTS------------------------------
-       DD = np.mean(np.absolute(R),axis=1)
-       #---------------------------------------------  
-
-       R0   = compute_norm_D(R,DD)
-       Q = shared_array(np.zeros((k+1,X.shape[0],X.shape[1])))
-       Q[0] = R/R0
-       H = np.zeros((k+1,k))
-       beta2 = np.zeros(k+1);beta2[0] = R0
-
-       Q,H = arnoldi(Q,H)
-       #--------------
-       comm.Barrier() 
-       c   = np.linalg.lstsq(H,beta2)[0]
-       X   = shared_array(X0 + np.einsum('knm,k->nm',Q[:-1],c))
-       r   = np.linalg.norm(residual(X),ord='fro')
-       kappa = compute_kappa(X)
-     
-       if comm.rank == 0:
-        print('{0:8d} {1:24.4E} {2:22.4E}'.format(kk,kappa,r),flush=True)
-
-       kk +=1
-       Q[:,:,:] = 0
-
-      return X,kappa
-
-
-def cg(L, b,**argv):
-
-    #PARSE---------------------------------------
-    x  = argv.setdefault('x0',np.zeros_like(b))  
-    M  = argv.setdefault('M',lambda x: x.copy())  
-    max_error  = argv.setdefault('error',1e-4)  
-    callback  = argv.setdefault('callback',None) 
-    verbose  = argv.setdefault('verbose',True) 
-    
-    #-------------------------------------------
-    n = len(b)
-    r = b - L(x)
-    z = M(r)
-    p = z
-    r_k_norm = np.dot(r, z)
-    r_0_norm = r_k_norm
-    error = 1
-    for i in range(2*n):
-        Ap = L(p)
-        alpha = r_k_norm / np.dot(p, Ap)
-        x += alpha * p
-        r -= alpha * Ap
-        z = M(r)
-        r_kplus1_norm = np.dot(r, z)
-
-        error = r_kplus1_norm/r_0_norm
-        if not callback == None:
-            kappa = callback(x) 
-
-        if verbose:
-         print("Iter : % 4i, Kappa: % 5.3E  Error : % 5.2E" %(i, kappa,error))
-        if error < max_error:
-         break
-        if i == 100:
-            break
-
-        beta = r_kplus1_norm / r_k_norm
-        r_k_norm = r_kplus1_norm
-        p = z + beta * p
-    return x
 
 
 
@@ -153,7 +52,16 @@ os.environ['H5PY_DEFAULT_READONLY']='1'
 
 comm = MPI.COMM_WORLD
 
-def fast_interpolation(fine,coarse,bound=False) :
+def fast_interpolation(fine,coarse,bound=False,scale='linear') :
+
+
+ if scale == 'log':
+   #xmin    = min([np.min(fine),np.min(coarse)]) 
+   #fine   -=xmin
+   #coarse -=xmin
+   fine    = np.log10(fine)
+   coarse  = np.log10(coarse)
+ #--------------
 
  m2 = np.argmax(coarse >= fine[:,np.newaxis],axis=1)
  m1 = m2-1
@@ -343,20 +251,21 @@ def find_elem(mesh,p,guess):
      nodes = mesh['nodes'][elem][:,0:2] 
      polygon = Polygon(mesh['nodes'][elem][0:mesh['side_per_elem'][ne],0:2])
      if polygon.contains(Point(p[0],p[1])):
-      return ne,nodes[:,0],nodes[:,1]
+      return ne,nodes[:,0],nodes[:,1],True
     #------------------      
 
     #Find among all elements
     for ne in range(len(mesh['elems'])):
 
-     elem  = mesh['elems'][ne][0:mesh['side_per_elem'][ne]]  
+     elem  = mesh['elems'][ne] 
      nodes = mesh['nodes'][elem][:,0:2]
 
      polygon = Polygon(nodes)
      if polygon.contains(Point(p[0],p[1])):
-      return ne,nodes[:,0],nodes[:,1]
+      return ne,nodes[:,0],nodes[:,1],True
 
-    return -1
+
+    return -1,-1,-1,False
         
 
 
@@ -375,11 +284,18 @@ def generate_frame(**argv):
     return frame
 
 
-def translate_shape(shape,base):
+def translate_shape(s,b,**argv):
+
+  if argv.setdefault('relative',True):
+     dx = 1
+     dy = 1
+  else:   
+     dx = argv['lx']
+     dy = argv['ly']
 
   out = []
-  for p in shape:
-    tmp = [p[0] + base[0],p[1] + base[1]]
+  for p in s:
+    tmp = [p[0] + b[0]*dx,p[1] + b[1]*dy]
     out.append(tmp)
 
   return out
@@ -415,14 +331,13 @@ def repeat_merge_scale(argv):
 
    #---------------------
   #Store only the intersecting polygons
+  a = time.time()
   final = []
-  for poly in polygons:
+  for pp,poly in enumerate(polygons):
     for kp in range(len(pbc)):
-     tmp = []
-     for p in poly:
-      cx = p[0] + pbc[kp][0]
-      cy = p[1] + pbc[kp][1]
-      tmp.append([cx,cy])
+        
+     tmp = [[ p[0] + pbc[kp][0],p[1] + pbc[kp][1] ] for p in poly] 
+
      p1 = Polygon(tmp)
      if p1.intersects(frame):
       thin = Polygon(p1).intersection(frame)
@@ -431,72 +346,64 @@ def repeat_merge_scale(argv):
        for t in tmp:
         final.append(t)
       else:
-        #final.append(thin)
         final.append(p1)
 
-  #print(list(final[0].exterior.coords))
-  #quit()
+
   #Create bulk surface---get only the exterior to avoid holes
   MP = MultiPolygon(final) 
 
   conso = cascaded_union(MP)
 
-  polygons_final = []
+  new_poly = []
   if isinstance(conso, shapely.geometry.multipolygon.MultiPolygon):
       for i in conso: 
-       #polygons_final.append(list(i.simplify(1e-2).exterior.coords))
-       polygons_final.append(list(i.exterior.coords))
+       new_poly.append(list(i.exterior.coords))
   else: 
-       polygons_final.append(list(conso.exterior.coords))
+       new_poly.append(list(conso.exterior.coords))
   
 
   #cut redundant points
-  new_poly = []
-  for poly in polygons_final:
-   N = len(poly)
-   tmp = []
-   for n in range(N):
-    p1 = poly[n]
-    p2 = poly[(n+1)%N]
-    if np.linalg.norm(np.array(p1)-np.array(p2)) >1e-4:
-     tmp.append(p1)
-   new_poly.append(tmp)
 
-  #------------------------------------------
+  if argv.setdefault('cut_redundant_point',False):
 
-  #cut points which are in line--
-
-  #cut redundant points
-  
-
-
-  #p = Polygon(polygons_final[0]).simplify(1e-2)
-  #print(len(p.exterior.coords))
-  #new_poly = polygons_final.copy()
-  discard = 1
-  while discard > 0:
-      
-   discard = 0  
    new_poly_2 = []
-   for gg,poly in enumerate(new_poly):
+   for poly in new_poly:
     N = len(poly)
     tmp = []
     for n in range(N):
-     p1 = np.array(poly[(n-1+N)%N])
-     p = np.array(poly[n])
-     p2 = np.array(poly[(n+1)%N])
-     di = np.linalg.norm(np.cross(p-p1,p-p2))
+     p1 = poly[n]
+     p2 = poly[(n+1)%N]
+     if np.linalg.norm(np.array(p1)-np.array(p2)) >1e-4:
+      tmp.append(p1)
+    new_poly2.append(tmp)
+   new_poly = new_poly2.copy()
 
-     if di >1e-5:
-        tmp.append(p)
-     else:
-        discard += 1 
-    new_poly_2.append(tmp)
-   new_poly = new_poly_2.copy()
+   #cut redundant points
+   discard = 0
+   while discard > 0:
+      
+    discard = 0  
+    new_poly_2 = []
+    for gg,poly in enumerate(new_poly):
+     N = len(poly)
+     tmp = []
+     for n in range(N):
+      p1 = np.array(poly[(n-1+N)%N])
+      p = np.array(poly[n])
+      p2 = np.array(poly[(n+1)%N])
+      di = np.linalg.norm(np.cross(p-p1,p-p2))
+
+      if di >1e-5:
+         tmp.append(p)
+      else:
+         discard += 1 
+     new_poly_2.append(tmp)
+    new_poly = new_poly_2.copy()
 
 
   #----------------------------
-  dmin = check_distances(new_poly)
+  dmin = check_distances(final)
+  #dmin = check_distances(new_poly)
 
   #scale-----------------------
   if argv.setdefault('relative',True):
@@ -509,9 +416,84 @@ def repeat_merge_scale(argv):
      g[1] *=ly
      tmp.append(g)
     polygons.append(tmp) 
+  else:  
+    polygons = new_poly.copy()
 
   argv['polygons'] = polygons
   argv['dmin'] = dmin
+
+
+
+
+
+
+def compute_line_data(mesh,solver,**argv):
+
+ data = solver['variables'][argv['variable']]['data']
+ 
+ guess = []
+ old_mat = 1
+ p_old = [-1e3,-1e3]
+ crossing = []
+ pair = []
+ p1 = np.array(argv['p1'])
+ p2 = np.array(argv['p2'])
+ N = argv['N']
+
+ L = []
+ tmp_L = []
+ output = []
+ tmp_output = []
+ already_passed = False
+ dx = []
+ for kk in range(N):
+
+   p = p1 + (p2 - p1)*kk/(N-1)
+
+   if len(dx) == 0:
+    dx.append(0)
+   else: 
+    dx.append(dx[-1] + np.linalg.norm(p-p_old))
+    
+
+   elem,x,y,found = find_elem(mesh,p,guess)
+
+   if found:
+
+    already_passed = False
+    new_elem = elem
+
+    nodes = mesh['elems'][elem]
+
+    if len(nodes) == 3:
+     d = mtri.LinearTriInterpolator(mtri.Triangulation(x, y,[[0,1,2]]),data[nodes])(p[0],p[1]).data
+    else:
+     d = interpolate.interp2d(x, y, data[nodes], kind='linear')(p[0],p[1])[0]
+
+    tmp_output.append(float(d))
+
+    tmp_L.append(dx[-1])
+
+   else:
+       if not already_passed :
+        L.append(tmp_L)   
+        output.append(tmp_output)
+        tmp_output = []
+        tmp_L = []
+        already_passed = True
+
+   guess = compute_neighbors(mesh,elem)  
+
+   old_elem = new_elem
+   p_old = p.copy()
+
+
+ L.append(tmp_L)   
+ output.append(tmp_output)
+
+
+ return L,output
+
 
 
 def check_distances(new_poly):
@@ -525,28 +507,36 @@ def check_distances(new_poly):
    #check if intersect  
    
    for p2 in range(p1+1,len(Pores)):
+   
        d = Pores[p1].distance(Pores[p2])
-       if d > 0 and d < dmin : dmin = d
-      
+       if d > 0 and d < dmin : 
+           dmin = d
+
    #top
    d = Pores[p1].distance(LineString([(-0.5,0.5),(0.5,0.5)])) 
    if d < dmin and d > 0:
      dmin = d
+     #print('upper',p1)  
 
    #left
    d = Pores[p1].distance(LineString([(0.5,0.5),(0.5,-0.5)])) 
    if d < dmin and d > 0:
      dmin = d
+     #print('right',p1)  
 
    #bottom
    d = Pores[p1].distance(LineString([(-0.5,-0.5),(0.5,-0.5)])) 
    if d < dmin and d > 0:
      dmin = d
+     #print('bottom',p1)  
   
    #left
    d = Pores[p1].distance(LineString([(-0.5,-0.5),(-0.5,0.5)])) 
    if d < dmin and d > 0:
+     #print('left',p1)  
      dmin = d
+
+   #print(dmin)
 
   return dmin
 

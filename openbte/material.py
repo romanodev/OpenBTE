@@ -1,7 +1,6 @@
 import numpy as np
 import os
 import math
-from .full_model import *
 from .utils import *
 from .mfp2DSym import *
 from .mg2DSym import *
@@ -33,18 +32,21 @@ def Material(**argv):
                   '/openbte/materials/' +  argv['filename']  
 
         argv['filename'] = filename
-
-   if source == 'unlisted':
-    if comm.rank == 0:
-      download_file(argv['file_id'],'rta.npz')
+   #if source == 'unlisted':
+   # if comm.rank == 0:
+   #   download_file(argv['file_id'],'rta.npz')
 
    if model == 'rta2DSym':
      if comm.rank == 0:
       data = rta2DSym(**argv)
 
-   elif model == 'full':
-     if comm.rank == 0:
-      data = full(**argv)
+   #elif model == 'full':
+   #  if comm.rank == 0:
+   #   data = full(**argv)
+
+   #elif model == 'MSRTA':
+   #  if comm.rank == 0:
+   #   data = msrta(**argv)
 
    elif model == 'mfp2DSym':
       data = mfp2DSym(**argv)
@@ -66,9 +68,9 @@ def Material(**argv):
    elif model == 'gray2DSym':
       data = gray2DSym(**argv)
 
-   elif model == 'mg2DSym':
-     if comm.rank == 0:
-      data = mg2DSym(**argv)
+   #elif model == 'mg2DSym':
+   #  if comm.rank == 0:
+   #   data = mg2DSym(**argv)
 
    elif model == 'gray2D':
       data = gray2D(**argv)

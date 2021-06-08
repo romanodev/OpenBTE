@@ -25,19 +25,20 @@ RUN cd openmpi-4.0.3 && ./configure --prefix=/usr/local/openmpi && make all && m
 COPY requirements.txt .
 RUN pip install -r requirements.txt 
 
-COPY openbte-2.18.tar.gz .
-RUN pip install --no-cache openbte-2.18.tar.gz
-RUN rm openbte-2.18.tar.gz
+COPY openbte-2.32.tar.gz .
+RUN pip install --no-cache openbte-2.32.tar.gz
+RUN rm openbte-2.32.tar.gz
 
-RUN useradd -ms /bin/bash openbte
+#RUN useradd -ms /bin/bash openbte
 
 ENV OMPI_MCA_btl_vader_single_copy_mechanism none 
 
 ENV OMPI_MCA_btl_base_warn_component_unused 0
+#RUN mkdir /workspace
 
-USER openbte
+#USER openbte
 
-WORKDIR /home/openbte
+#WORKDIR /home/openbte
 
 
 EXPOSE 8050

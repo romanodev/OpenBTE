@@ -101,7 +101,6 @@ def plot_results(solver,geometry,**argv):
             text=meta,align='left')
 
 
-   #fig.add_annotation(annotations)
 
    fig.update_layout(showlegend=False)
 

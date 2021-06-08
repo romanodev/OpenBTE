@@ -13,7 +13,7 @@ from shapely.geometry import LineString
 import profile
 import scipy
 from .solve_rta import *
-from .solve_full import *
+#from .solve_full import *
 import pkg_resources  
 from .fourier import *
 import warnings
@@ -22,7 +22,7 @@ comm = MPI.COMM_WORLD
 
 def get_model(m):
 
-    models = ['Fourier','gray2D','gray2DSym','gray3D','mfp2D','mfp2DSym','mfp3D','rta2D','rta2DSym','rta3D','full','mg2DSym']
+    models = ['Fourier','gray2D','gray2DSym','gray3D','mfp2D','mfp2DSym','mfp3D','rta2D','rta2DSym','rta3D']
 
 
     return models[m[0]]
@@ -56,17 +56,11 @@ def print_bulk_info(mat,mesh):
                   print(colored('  Bulk Thermal Conductivity (zz)[W/m/K]:   ','green')+ str(round(kappa[2,2],2)),flush=True)
 
            dirr = ['x','y','z']
-           print(colored('  Applied Thermal Gradient along :         ','green')+ dirr[int(mesh['meta'][-1])],flush=True)
+           print(colored('  Applied Thermal Gradient along :         ','green')+ dirr[int(mesh['meta'][-2])],flush=True)
 
 
 def print_options(**argv):
-          print(colored('  Multiscale:                              ','green')+ str(argv['multiscale']),flush=True)
-          print(colored('  Relaxation:                              ','green')+ str(argv['alpha']),flush=True)
           print(colored('  Keep Lu:                                 ','green')+ str(argv['keep_lu']),flush=True)
-          print(colored('  Load State                               ','green')+ str(argv['load_state']),flush=True)
-          print(colored('  Save State                               ','green')+ str(argv['save_state']),flush=True)
-          print(colored('  Multiscale Error (Fourier):              ','green')+ str(argv['multiscale_error_fourier']),flush=True)
-          print(colored('  Multiscale Error (Ballistic):            ','green')+ str(argv['multiscale_error_ballistic']),flush=True)
           print(colored('  Only Fourier:                            ','green')+ str(argv['only_fourier']),flush=True)
           print(colored('  Max Fourier Error:                       ','green')+ '%.1E' % (argv['max_fourier_error']),flush=True)
           print(colored('  Max Fourier Iter:                        ','green')+ str(argv['max_fourier_iter']),flush=True)
@@ -110,22 +104,15 @@ def prepare_data(argv):
   variables = {}
   for key,value in tmp.items():
       
-     #if value['data'].ndim == 1: #scalar
      variables[value['name']] = {'data':value['data'],'units':value['units'],'increment':value['increment']}
-     #elif value['data'].ndim == 2 : #vector 
-     #    variables[value['name'] + '(x)'] = {'data':value['data'][:,0],'units':value['units'],'increment':value['increment']}
-     #    variables[value['name'] + '(y)'] = {'data':value['data'][:,1],'units':value['units'],'increment':value['increment']}
-     #    if argv['dim'] == 3: 
-     #        variables[value['name'] + '(z)'] = {'data':value['data'][:,2],'units':value['units'],'increment':value['increment']}
-     #    mag = np.array([np.linalg.norm(value) for value in value['data']])
-     #    variables[value['name'] + '(mag.)'] = {'data':mag,'units':value['units'],'increment':value['increment']}
   argv['variables'] = variables
 
-  dirr = int(argv['geometry']['meta'][-1])
+  dirr = int(argv['geometry']['meta'][-2])
   argv['data'] = {'variables':variables,'kappa_bulk':argv['material']['kappa'][dirr,dirr] ,'kappa_fourier':argv['fourier']['meta'][0]}
 
+  
   if 'bte' in argv.keys():
-     argv['data']['kappa_bte']  = argv['bte']['kappa'][-1]  
+     argv['data']['kappa_bte']  = argv['bte']['kappa'] 
      if 'kappa_mode' in argv['bte']:
        argv['data']['kappa_mode'] = argv['bte']['kappa_mode']
      if 'kappa_mode_f' in argv['bte']:
@@ -134,7 +121,8 @@ def prepare_data(argv):
        argv['data']['kappa_0'] = argv['bte']['kappa_0']
      if 'tau' in argv['bte']:
        argv['data']['tau'] = argv['bte']['tau']
-
+     if 'intermediate' in argv['bte']:
+      argv['data']['intermediate'] = argv['bte']['intermediate']
 
 
 
@@ -142,19 +130,13 @@ def Solver(**argv):
 
 
         #COMMON OPTIONS------------
-        argv.setdefault('multiscale',False)
-        argv.setdefault('multiscale_error_fourier',5e-2)
-        argv.setdefault('multiscale_error_ballistic',1e-2)
         argv.setdefault('verbose',True)
-        argv.setdefault('save_state',False)
-        argv.setdefault('load_state',False)
         argv.setdefault('alpha',1.0)
         argv.setdefault('keep_lu',False)
         argv.setdefault('only_fourier',False)
         argv.setdefault('max_bte_iter',20)
         argv.setdefault('max_bte_error',1e-3)
         argv.setdefault('max_fourier_iter',20)
-        argv.setdefault('deviational',False)
         argv.setdefault('max_fourier_error',1e-5)
         #----------------------------
        
@@ -208,21 +190,10 @@ def Solver(**argv):
 
            mat_model = get_model(argv['material']['model'])
 
-           if mat_model in ['rta2DSym','rta2D','rta3D','mfp2DSym','mfp2D','gray2D','gray2DSym','mg2DSym'] :
-               solve_rta(argv)
-
-           elif mat_model == 'full':    
-               solve_full(argv)
-
-           elif mat_model == 'exp':    
-               solve_exp(argv)
-
-           #elif mat_model in ['mg2DSym']:    
-           #    solve_mg(argv)
-
-           else:
-               print('No model coded')
-               quit()
+           if 'custom' in argv.keys():
+               argv['custom'](argv)
+           else:    
+              solve_rta(argv)
 
         
         argv['dim'] =  int(argv['geometry']['meta'][2])

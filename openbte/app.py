@@ -16,6 +16,7 @@ import pandas as pd
 import json
 import os
 from mpi4py import MPI
+from openbte import Plot
 
 comm = MPI.COMM_WORLD
 
@@ -91,7 +92,8 @@ def App(**argv):
 
  if comm.rank == 0:
   #load data--
-  data_tot     = argv['bundle'] if 'bundle' in argv.keys() else load_data('bundle')
+  #data_tot     = argv['bundle'] if 'bundle' in argv.keys() else load_data('bundle')
+  data_tot = {'sample_1': Plot(model='maps',show=False)}
 
 
 
@@ -148,13 +150,14 @@ def App(**argv):
   url = dcc.Location(id='url', refresh=True)
 
 
-  img = html.Div(html.Img(src=app.get_asset_url('logo.png'), style={'width':'18%','left':'80%','bottom':'88%','position':'absolute'}))
+  #img = html.Div(html.Img(src=app.get_asset_url('logo.png'), style={'width':'18%','left':'80%','bottom':'88%','position':'absolute'}))
 
   #div1 = html.Div(style = {'left':'25%','height':'70%','width':'50%','bottom':'15%',"border":"2px white solid",'position':'absolute'},children=[fig_dcc,dd_sample,dd_variable,hidden,url]);
 
   #app.layout = html.Div(children = [div1,img],style = {'height': '100vh','width': '100%',"border":"2px white solid"})
   #app.layout = html.Div(children = [fig_dcc,dd_sample,dd_variable,hidden,url  ,img],style = {'height': '100vh','width': '100%',"border":"2px white solid"})
-  layout = html.Div(children = [fig_dcc,dd_sample,dd_variable,hidden,url  ,img],style = {'height': '100vh','width': '100%','position':'absolute'})
+  #layout = html.Div(children = [fig_dcc,dd_sample,dd_variable,hidden,url  ,img],style = {'height': '100vh','width': '100%','position':'absolute'})
+  layout = html.Div(children = [fig_dcc,dd_sample,dd_variable,hidden,url],style = {'height': '100vh','width': '100%','position':'absolute'})
 
   #---------------------------------------------------------------------
 
@@ -191,7 +194,7 @@ def App(**argv):
                          colorscale='Viridis',
                          colorbar_title = '[' + variable['units'] + ']' if len(variable['units']) > 0 else "",
                          intensity = node_data,
-                         colorbar=dict(len=0.5),
+                         colorbar=dict(len=0.5,x=0.14),
                          intensitymode='vertex',
                          i=elems[:,0],
                          j=elems[:,1],
@@ -200,16 +203,16 @@ def App(**argv):
                          showscale = True,
                          visible=True)
 
-
        fig = go.Figure(data=plotly_data,layout=get_layout(data['size']))
 
-       fig.add_annotation(
-            x=1,
-            y=0.05,
-            xref='paper',
-            showarrow=False,
-            yref='paper',
-            text=text,align='left')
+
+       #fig.add_annotation(
+       #     x=1,
+       #     y=0.05,
+       #     xref='paper',
+       #     showarrow=False,
+       #     yref='paper',
+       #     text=text,align='left')
 
 
        return  fig

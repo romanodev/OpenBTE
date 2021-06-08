@@ -21,9 +21,10 @@ class Mesher(object):
    #create polygons-----
    self.add_symmetry(argv) 
    shapes = get_shape(argv)
-
-   polygons = [translate_shape(shapes[n],i) for n,i in enumerate(argv['base'])]
+  
+   polygons = [translate_shape(shapes[n],i,**argv) for n,i in enumerate(argv['base'])]
    argv.update({'polygons':np.array(polygons,dtype=object)})
+
    repeat_merge_scale(argv)
 
   elif model == 'custom':
@@ -44,10 +45,10 @@ class Mesher(object):
        self.add_polygons(argv)
        repeat_merge_scale(argv)
   #---------------------
-  if not argv['only_geo']:
-   if argv.setdefault('lz',0) == 0:
+  #if not argv.setdefault('only_geo',False):
+  if argv.setdefault('lz',0) == 0:
     self.generate_mesh_2D(argv)
-   else:   
+  else:   
     self.generate_mesh_3D(argv)
 
 

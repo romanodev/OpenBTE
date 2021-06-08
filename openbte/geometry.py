@@ -151,6 +151,7 @@ def compute_boundary_condition_data(data,**argv):
     else:  
       kappa_factor = data['size'][gradir]/total_area
 
+    #quit()
     data['kappa_mask']= -np.array(np.sum(B_with_area_old.todense(),axis=0))[0]*kappa_factor*1e-18
     data['periodic_side_values'] = [periodic_side_values[ll]  for ll in data['periodic_sides']]
     data['pp'] = np.array(pp)

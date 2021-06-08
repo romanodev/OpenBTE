@@ -75,7 +75,7 @@ def write_vtu_cell(solver,geometry):
 
 
 
-def write_vtu(solver,geometry):
+def write_vtu(solver,geometry,**argv):
 
    dim = int(geometry['meta'][2])
    output = []
@@ -111,7 +111,7 @@ def write_vtu(solver,geometry):
    else :
     vtk = VtkData(UnstructuredGrid(geometry['nodes'],triangle=geometry['elems']),data)
    
-   vtk.tofile('output','ascii')
+   vtk.tofile(argv.setdefault('vtu_output','output'),'ascii')
 
 
 
@@ -214,6 +214,8 @@ def duplicate_cells(geometry,solver,repeat):
    return size
 
 
+
+
 def get_node_data(solver,geometry):
 
   dim = int(geometry['meta'][2])
@@ -270,14 +272,22 @@ def Plot(**argv):
              'elems'    :geometry['elems'],\
              'variables':solver['variables'],'bulk':solver['kappa_bulk'],'fourier':solver['kappa_fourier'],'size':size,'direction':['x','y','z'][np.argmax(geometry['applied_gradient'])]}
 
-     if 'kappa' in solver.keys():
-         output.update({'bte':solver['kappa_bte']}) 
+     if 'kappa_bte' in solver.keys():
+         output.update({'bte':solver['kappa_bte'][-1]}) 
 
      if argv.setdefault('save_sample',False):
        save_data('sample',output)
 
      return output
 
+   elif model == 'line':
+
+     get_node_data(solver,geometry)
+
+     duplicate_cells(geometry,solver,argv.setdefault('repeat',[1,1,1]))
+
+     return compute_line_data(geometry,solver,**argv)
+     
 
    elif model == 'vtu':
 
@@ -285,7 +295,7 @@ def Plot(**argv):
 
      duplicate_cells(geometry,solver,argv.setdefault('repeat',[1,1,1]))
 
-     write_vtu(solver,geometry)  
+     write_vtu(solver,geometry,**argv)  
 
    elif model == 'vtu_cell':
 

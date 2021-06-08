@@ -36,7 +36,7 @@ def get_shape(argv):
      areas =  [argv['porosity']* i /sum(argv['area_ratio'])  for i in argv['area_ratio']]
     else: 
      areas = argv['area_ratio']
-
+   
     #-------------------
     shapes = []
     n_custom = 0

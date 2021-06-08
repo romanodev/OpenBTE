@@ -12,9 +12,11 @@ def rta3D(**argv):
  n_theta = int(argv.setdefault('n_theta',24))
  n_mfp = argv.setdefault('n_mfp',30)
  Dphi = 2.0*np.pi/n_phi
- phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+ #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+ phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
  Dtheta = np.pi/n_theta
- theta = np.linspace(Dtheta/2,np.pi-Dtheta/2,n_theta,endpoint=True)
+ #theta = np.linspace(Dtheta/2,np.pi-Dtheta/2,n_theta,endpoint=True)
+ theta = np.linspace(0,np.pi,n_theta,endpoint=False)
 
  polar = np.array([np.sin(phi),np.cos(phi),np.ones(n_phi)]).T
  azimuthal = np.array([np.sin(theta),np.sin(theta),np.cos(theta)]).T
