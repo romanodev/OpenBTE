@@ -33,19 +33,6 @@ def fix_instability(F,B,scale=True):
 
    return scale
 
-def compute_kappa(W,b):
-
-
- L   = lambda x: np.dot(W,x)
- M   = lambda x: x/np.sqrt(np.diag(W))
-
- def callback(x):
-     return np.dot(x,b)
-
- x0 = b.copy()/np.diag(W)
- x  = cg(L,b,M=M,x0=x0,callback=callback,verbose = False)
-
- return callback(x)
 
 
 os.environ['H5PY_DEFAULT_READONLY']='1'
@@ -630,13 +617,15 @@ def shared_array(value):
 def get_kappa_map_from_mat(**argv):
 
         mat_map = argv['geometry']['elem_mat_map']
-        kappa =   argv['material']['kappa']
+        dim = int(argv['geometry']['meta'][2])
+
+        kappa = argv['material']['kappa']
 
         kappa = np.array(kappa)
         if kappa.ndim == 3:
-         return np.array([ list(kappa[i])  for i in mat_map])
+            return np.array([ list(kappa[i][:dim,:dim])  for i in mat_map])
         else:
-         return np.array([ list(kappa)  for i in mat_map])
+            return np.array([list(kappa)]*len(argv['geometry']['elems']))
             
 
 

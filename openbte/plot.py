@@ -35,84 +35,92 @@ def expand_variables(solver,dim):
 
 
 
-def write_vtu_cell(solver,geometry):
+def add_preamble(geometry,store):
 
+   store.write('# vtk DataFile Version 2.0\n')
+   store.write('OpenBTE Data\n')
+   store.write('ASCII\n')
+   store.write('DATASET UNSTRUCTURED_GRID\n')
+   store.write('POINTS ' + str(len(geometry['nodes'])) +   ' double\n')
+
+   #write points--
+   for n in range(len(geometry['nodes'])):
+       for i in range(3): 
+         store.write(str(geometry['nodes'][n,i])+' ')
+       store.write('\n')  
+
+   #write elems--
    dim = int(geometry['meta'][2])
-   output = []
-   strc = 'CellData('
+   if dim == 2: 
+      m = 3 
+      ct = '5'
+   elif dim == 3:
+      m = 4 
+      ct = '10'
+   n = m+1
+
+   n_elems = len(geometry['elems'])
+   store.write('CELLS ' + str(n_elems) + ' ' + str(n*n_elems) + ' ' +  '\n')
+   for k in range(len(geometry['elems'])):
+
+       store.write(str(m) + ' ')  
+       for i in range(n-1): 
+         store.write(str(geometry['elems'][k][i])+' ')
+       store.write('\n')  
+           
+   store.write('CELL_TYPES ' + str(n_elems) + '\n')
+   for i in range(n_elems): 
+     store.write(ct + ' ')
+   store.write('\n')  
+
+
+
+def write_vtu(solver,geometry,dof):
+
+   #Write
+   store = open('output.vtk', 'w+')
+
+   add_preamble(geometry,store)
+   
+   n_elems = len(geometry['elems'])
+   n_nodes = len(geometry['nodes'])
+   dim = int(geometry['meta'][2])
+
+   #write data
+   if dof == 'cell':
+    store.write('CELL_DATA ' + str(n_elems) + '\n')
+   else: 
+    store.write('POINT_DATA ' + str(n_nodes) + '\n')
+
    for n,(key, value) in enumerate(solver['variables'].items()):
 
-     if  value['data'].shape[0] == 1:  value['data'] =  value['data'][0] #band-aid solution
-
      name = key + '[' + value['units'] + ']'
-     if value['data'].ndim == 1:
-       strc += r'''Scalars(output[''' + str(n) + r'''],name =' ''' + name +  r''' ')'''
-       output.append(value['data'])
-    
-     if value['data'].ndim == 2:
+     if value['data'].ndim == 1: #scalar
+         strc = np.array2string(value['data'],max_line_width=1e6)
+         store.write('SCALARS ' + name + ' double\n')
+         store.write('LOOKUP_TABLE default\n')
+         for i in value['data']:
+          store.write(str(i)+' ')
+         store.write('\n') 
 
-       if dim == 2:
-        t = np.zeros_like(value['data'])
-        value['data'] = np.concatenate((value['data'],t),axis=1)[:,:3]
-       output.append(value['data'])
+     elif value['data'].ndim == 2: #tensor
+         store.write('VECTORS ' + name + ' double\n')
+         for i in value['data']:
+           strc = np.array2string(i,max_line_width=1e6)
+           if dim == 2:
+            store.write(strc[1:-1]+' 0.0 \n')
+           else: 
+            store.write(strc[1:-1]+'\n')
 
-       strc += r'''Vectors(output[''' + str(n) + r'''],name =' ''' + name +  r''' ')'''
+     elif value['data'].ndim == 3: #tensor
+         store.write('TENSORS ' + name + ' double\n')
+         for i in value['data']:
+          for j in i:
+           strc = np.array2string(j,max_line_width=1e6)
+           store.write(strc[1:-1]+'\n')
+          store.write('\n') 
 
-     if n == len(solver['variables'])-1:
-      strc += ')'
-     else:
-      strc += ','
-
-   data = eval(strc)
-
-   if dim == 3:
-   
-    vtk = VtkData(UnstructuredGrid(geometry['nodes'],tetra=geometry['elems']),data)
-   else :
-    vtk = VtkData(UnstructuredGrid(geometry['nodes'],triangle=geometry['elems']),data)
-   
-   vtk.tofile('output','ascii')
-
-
-
-def write_vtu(solver,geometry,**argv):
-
-   dim = int(geometry['meta'][2])
-   output = []
-   strc = 'PointData('
-   for n,(key, value) in enumerate(solver['variables'].items()):
-
-     if  value['data'].shape[0] == 1:  value['data'] =  value['data'][0] #band-aid solution
-
-     name = key + '[' + value['units'] + ']'
-     if value['data'].ndim == 1:
-       strc += r'''Scalars(output[''' + str(n) + r'''],name =' ''' + name +  r''' ')'''
-       output.append(value['data'])
-    
-     if value['data'].ndim == 2:
-
-       if dim == 2:
-        t = np.zeros_like(value['data'])
-        value['data'] = np.concatenate((value['data'],t),axis=1)[:,:3]
-       output.append(value['data'])
-
-       strc += r'''Vectors(output[''' + str(n) + r'''],name =' ''' + name +  r''' ')'''
-
-     if n == len(solver['variables'])-1:
-      strc += ')'
-     else:
-      strc += ','
-
-   data = eval(strc)
-
-   if dim == 3:
-   
-    vtk = VtkData(UnstructuredGrid(geometry['nodes'],tetra=geometry['elems']),data)
-   else :
-    vtk = VtkData(UnstructuredGrid(geometry['nodes'],triangle=geometry['elems']),data)
-   
-   vtk.tofile(argv.setdefault('vtu_output','output'),'ascii')
-
+   store.close()
 
 
 
@@ -223,8 +231,10 @@ def get_node_data(solver,geometry):
    data = solver['variables'][key]['data']
    #NEW-------------
    conn = np.zeros(len(geometry['nodes']))
-   if data.ndim > 1:
+   if data.ndim == 2:
        node_data = np.zeros((len(geometry['nodes']),int(dim)))
+   elif data.ndim == 3:   
+       node_data = np.zeros((len(geometry['nodes']),3,3))
    else:   
        node_data = np.zeros(len(geometry['nodes']))
     
@@ -233,8 +243,10 @@ def get_node_data(solver,geometry):
    np.add.at(node_data,elem_flat,np.repeat(data,len(geometry['elems'][0]),axis=0))
    np.add.at(conn,elem_flat,np.ones_like(elem_flat))
 
-   if data.ndim > 1:
+   if data.ndim == 2:
        np.divide(node_data,conn[:,np.newaxis],out=node_data)
+   elif data.ndim == 3:
+       np.divide(node_data,conn[:,np.newaxis,np.newaxis],out=node_data)
    else: 
        np.divide(node_data,conn,out=node_data)
    #-----------------------
@@ -291,17 +303,19 @@ def Plot(**argv):
 
    elif model == 'vtu':
 
-     get_node_data(solver,geometry)
+       if argv.setdefault('dof','nodes'):  
+        get_node_data(solver,geometry)
 
-     duplicate_cells(geometry,solver,argv.setdefault('repeat',[1,1,1]))
+       duplicate_cells(geometry,solver,argv.setdefault('repeat',[1,1,1]))
 
-     write_vtu(solver,geometry,**argv)  
+       write_vtu(solver,geometry,argv['dof'])  
+       #write_vtu(solver,geometry)  
 
-   elif model == 'vtu_cell':
+   #elif model == 'vtu_cell':
 
-     duplicate_cells(geometry,solver,argv.setdefault('repeat',[1,1,1]))
+   #  duplicate_cells(geometry,solver,argv.setdefault('repeat',[1,1,1]))
      
-     write_vtu_cell(solver,geometry)  
+   #  write_vtu_cell(solver,geometry)  
 
 
    elif model == 'suppression':

@@ -67,7 +67,13 @@ def solve_fourier_single(argv):
 
     mesh = argv['geometry']
 
-    mesh['elem_kappa_map'] = get_kappa_map_from_mat(**argv)
+    if 'kappa_map_external' in argv.keys(): #read external kappa map
+     mesh['elem_kappa_map'] = argv['kappa_map_external']
+    else: 
+     mesh['elem_kappa_map'] = get_kappa_map_from_mat(**argv)
+     #['kappa_map_external'] = mesh['elem_kappa_map']
+
+     
 
     kappa = -1 #it means that it will take the map from mesh
 
@@ -104,16 +110,13 @@ def get_kappa(mesh,i,j,ll,kappa):
    kj = np.dot(normal,np.dot(kappa_j,normal))
    w  = mesh['interp_weigths'][ll]
 
-   if ll in mesh['interface_sides']:
-     dist   = mesh['dists'][ll,0:dim]*1e-9
-
-     h = 0.882e9
-
+   #if ll in mesh['interface_sides']:
+     #dist   = mesh['dists'][ll,0:dim]*1e-9
+     #h = 0.882e9
      #B = ki*kj/h/np.linalg.norm(dist)
-     B = 0
-
-   else:  
-     B = 0
+   #  B = 0
+   #else:  
+   B = 0
 
    kappa_loc = kj*kappa_i/(ki*(1-w) + kj*w + B)
 
@@ -121,7 +124,6 @@ def get_kappa(mesh,i,j,ll,kappa):
 
 
 def get_kappa_tensor(mesh,ll,kappa):
-
 
     if np.isscalar(kappa):
        rot = kappa*np.eye(3) 
@@ -197,7 +199,6 @@ def compute_grad(temp,**argv):
 
    diff_temp = [[temp[j[0]]-temp[j[1]]+j[2] for j in f] for f in rr]
    
-
    #Add boundary
    #if 'TB' in argv.keys():
    # TB  = argv['TB']
@@ -396,64 +397,6 @@ def assemble(mesh,kappa):
 
 
 
-def solve_fourier(kappa,DeltaT,argv):
-
-    mesh = argv['geometry']
-    argv['DeltaT'] = DeltaT
-    dim = int(mesh['meta'][2])
-
-    n_serial = len(kappa)
-    n_elems = len(mesh['elems'])
-
-    tf = shared_array(np.zeros((n_serial,n_elems)) if comm.rank == 0 else None)
-    tfg = shared_array(np.zeros((n_serial,n_elems,dim)) if comm.rank == 0 else None)
-
-    if comm.rank == 0:
-
-     F,B,scale = assemble(mesh,tuple(map(tuple,np.eye(dim))))
-
-     ratio_old = 0
-     ratio = np.zeros_like(kappa)
-     for m,k in enumerate(kappa):
-         
-         BB = k*B+DeltaT
-         meta,tf[m,:],tfg[m,:,:] = solve_convergence(argv,k*np.eye(dim),BB,get_SU([F,scale],k),scale=scale)
-         #meta,tf[m,:],tfg[m,:,:] = solve_convergence(argv,k*np.eye(dim),BB,splu(k*F),scale=scale)
-         kappaf = meta[0]
-         ratio[m] = kappaf/k
-
-         if m > int(len(kappa)/4):
-           error = abs((ratio[m]-ratio[m-1]))/ratio[m]
-           if error < 1e-2:
-             tf[m:,:]  = tf[m-1]; tfg[m:,:,:] = tfg[m-1]
-             ratio[m:] = ratio[m]
-             break
-
-     #Regularize---
-     if argv.setdefault('experimental_multiscale',False):
-      kappa_map = get_kappa_map(mesh,np.eye(dim))
-      ratio_0 = compute_diffusive_thermal_conductivity(DeltaT,kappa_map,**argv)
-      grad_DeltaT = compute_grad(DeltaT,**argv)
-    
-      #Regularize gradient
-      for m1 in range(len(kappa))[::-1]:
-        error = (ratio[m1] - ratio_0)/ratio[m1]
-        
-        if (ratio[m1] - ratio_0)/ratio[m1] < 1e-1 and abs(ratio[m1]-ratio[m1-1])/ratio[m1] < 1e-1:
-            tfg[:m1+1,:,:] = grad_DeltaT
-            break
-
-      #Regularize average temperature
-      for m1 in range(len(kappa))[::-1]:
-        error = np.linalg.norm(tf[m1] - DeltaT)/np.linalg.norm(DeltaT)
-        if error < 1e-1 :
-            tf[:m1+1,:] = DeltaT
-            break
-     #-----------------
-
-
-    comm.Barrier()
-    return tf,tfg
 
 
 

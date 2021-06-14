@@ -22,8 +22,7 @@ comm = MPI.COMM_WORLD
 
 def get_model(m):
 
-    models = ['Fourier','gray2D','gray2DSym','gray3D','mfp2D','mfp2DSym','mfp3D','rta2D','rta2DSym','rta3D']
-
+    models = ['Fourier','gray2D','gray2DSym','gray3D','mfp2D','mfp2DSym','mfp3D','rta2D','rta2DSym','rta3D','custom']
 
     return models[m[0]]
 
@@ -93,12 +92,15 @@ def print_logo():
 def prepare_data(argv):
         
   #Original Description--
-  tmp = {0:{'name':'Temperature Fourier','units':'K','data':argv['fourier']['temperature'],'increment':-argv['geometry']['applied_gradient']},\
-               1:{'name':'Flux Fourier'       ,'units':'W/m/m','data':argv['fourier']['flux'],'increment':[0,0,0]}}
+  tmp = {}
+  tmp.update({0:{'name':'Temperature_Fourier','units':'K','data':argv['fourier']['temperature'],'increment':-argv['geometry']['applied_gradient']},\
+               1:{'name':'Flux_Fourier','units':'W/m/m','data':argv['fourier']['flux'],'increment':[0,0,0]},
+               2:{'name':'Thermal_Conductivity','units':'W/m/m','data':argv['geometry']['elem_kappa_map'],'increment':[0,0,0]}})
 
   if not argv.setdefault('only_fourier',False):
-      tmp[2]    = {'name':'Temperature BTE','units':'K','data':argv['bte']['temperature'],'increment':-argv['geometry']['applied_gradient']}
-      tmp[3]    = {'name':'Flux BTE'       ,'units':'W/m/m','data':argv['bte']['flux'],'increment':[0,0,0]}
+      if 'bte' in argv.keys():  
+       tmp[3]    = {'name':'Temperature_BTE','units':'K','data':argv['bte']['temperature'],'increment':-argv['geometry']['applied_gradient']}
+       tmp[4]    = {'name':'Flux_BTE'       ,'units':'W/m/m','data':argv['bte']['flux'],'increment':[0,0,0]}
               
   #Here we unroll variables for later use--
   variables = {}
@@ -183,7 +185,6 @@ def Solver(**argv):
 
          #Solve fourier--
          argv['fourier'] = solve_fourier_single(argv)
-
 
         #Solve bte--
         if not argv['only_fourier']:

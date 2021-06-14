@@ -10,6 +10,106 @@ import subprocess
 import os
 import time
 
+
+def generate_bulk_2D(argv):
+
+  direction = argv.setdefault('direction','x')
+
+  frame = generate_frame(**argv)
+  Lx = float(argv['lx'])
+  Ly = float(argv['ly'])
+
+  mesh_ext = argv['step']
+  points = []
+  lines = []
+
+  store = open("mesh.geo", 'w+')
+  store.write('h='+str(mesh_ext) + ';\n')
+
+  for k,p in enumerate(frame) :
+   store.write( 'Point('+str(k) +') = {' + str(p[0]) +','+ str(p[1])+',0,h};\n')
+
+  ll = 0
+  for k,p in enumerate(frame) :
+   p1 = k
+   p2 = (k+1)%len(frame)
+   ll += 1
+   store.write( 'Line('+str(ll) +') = {' + str(p1) +','+ str(p2)+'};\n')
+
+  strc = 'Line Loop(5) = {'
+  for p,point in enumerate(frame) :
+   strc +=str(p+1)
+   if p == len(frame)-1:
+    strc += '};\n'
+   else :
+    strc += ','
+  store.write(strc)
+
+  #Create Surface
+  strc = 'Plane Surface(10) = {5};\n'
+  store.write(strc)
+  strc = r'''Physical Surface('Matrix') = {10};'''+'\n'
+  store.write(strc)
+
+  bs = []
+  if argv.setdefault('Periodic',[True,True,True])[1] :
+    strc = r'''Physical Line('Periodic_1') = {1};''' + '\n'
+    store.write(strc)
+    strc = r'''Physical Line('Periodic_2') = {3};''' + '\n'
+    store.write(strc)
+  else:
+   if direction=='y':
+    strc = r'''Physical Line('Cold') = {2};''' + '\n'
+    store.write(strc)
+    strc = r'''Physical Line('Hot') = {4};''' +'\n'
+    store.write(strc)
+   else:
+    bs.append(1)
+    bs.append(3)
+
+  if argv.setdefault('Periodic',[True,True,True])[0] :
+    strc = r'''Physical Line('Periodic_3') = {2};''' + '\n'
+    store.write(strc)
+    strc = r'''Physical Line('Periodic_4') = {4};''' +'\n'
+    store.write(strc)
+  else:
+   if direction=='x':
+    strc = r'''Physical Line('Hot') = {2};''' + '\n'
+    store.write(strc)
+    strc = r'''Physical Line('Cold') = {4};''' +'\n'
+    store.write(strc)
+   else:
+    bs.append(2)
+    bs.append(4)
+
+
+  if len(bs) > 0:
+   strc = r'''Physical Line('Boundary') = {'''
+   for p,side in enumerate(bs) :
+    strc +=str(side)
+    if p == len(bs)-1:
+     strc += '};\n'
+    else :
+     strc += ','
+   store.write(strc)
+
+
+  strc = 'Periodic Line{1}={-3};\n'
+  store.write(strc)
+  strc = 'Periodic Line{2}={-4};\n'
+  store.write(strc)
+
+  if argv.setdefault('structured',False):
+      store.write('Transfinite Surface {10};\n')
+      store.write('Recombine Surface {10};\n')
+
+#-------------------------------------------------------
+  store.close()
+  
+  with open(os.devnull, 'w') as devnull:
+    output = subprocess.check_output("gmsh -format msh2 -2 mesh.geo -o mesh.msh".split(), stderr=devnull)
+
+
 class Mesher(object):
 
  def __init__(self,argv):
@@ -33,7 +133,7 @@ class Mesher(object):
   elif model =='bulk':
 
     if argv.setdefault('lz',0) == 0:
-     return self.generate_bulk_2D(argv)
+     return generate_bulk_2D(argv)
     else :
      return self.generate_bulk_3D(argv)
 
@@ -231,101 +331,6 @@ class Mesher(object):
       argv['base'] = tmp
 
 
-
- def generate_bulk_2D(self,argv):
-
-  direction = argv.setdefault('direction','x')
-
-  frame = generate_frame(**argv)
-  Lx = float(argv['lx'])
-  Ly = float(argv['ly'])
-
-  mesh_ext = argv['step']
-  points = []
-  lines = []
-
-  store = open("mesh.geo", 'w+')
-  store.write('h='+str(mesh_ext) + ';\n')
-
-  for k,p in enumerate(frame) :
-   store.write( 'Point('+str(k) +') = {' + str(p[0]) +','+ str(p[1])+',0,h};\n')
-
-  ll = 0
-  for k,p in enumerate(frame) :
-   p1 = k
-   p2 = (k+1)%len(frame)
-   ll += 1
-   store.write( 'Line('+str(ll) +') = {' + str(p1) +','+ str(p2)+'};\n')
-
-  strc = 'Line Loop(5) = {'
-  for p,point in enumerate(frame) :
-   strc +=str(p+1)
-   if p == len(frame)-1:
-    strc += '};\n'
-   else :
-    strc += ','
-  store.write(strc)
-
-  #Create Surface
-  strc = 'Plane Surface(10) = {5};\n'
-  store.write(strc)
-  strc = r'''Physical Surface('Matrix') = {10};'''+'\n'
-  store.write(strc)
-
-  bs = []
-  if argv.setdefault('Periodic',[True,True,True])[1] :
-    strc = r'''Physical Line('Periodic_1') = {1};''' + '\n'
-    store.write(strc)
-    strc = r'''Physical Line('Periodic_2') = {3};''' + '\n'
-    store.write(strc)
-  else:
-   if direction=='y':
-    strc = r'''Physical Line('Cold') = {2};''' + '\n'
-    store.write(strc)
-    strc = r'''Physical Line('Hot') = {4};''' +'\n'
-    store.write(strc)
-   else:
-    bs.append(1)
-    bs.append(3)
-
-  if argv.setdefault('Periodic',[True,True,True])[0] :
-    strc = r'''Physical Line('Periodic_3') = {2};''' + '\n'
-    store.write(strc)
-    strc = r'''Physical Line('Periodic_4') = {4};''' +'\n'
-    store.write(strc)
-  else:
-   if direction=='x':
-    strc = r'''Physical Line('Hot') = {2};''' + '\n'
-    store.write(strc)
-    strc = r'''Physical Line('Cold') = {4};''' +'\n'
-    store.write(strc)
-   else:
-    bs.append(2)
-    bs.append(4)
-
-
-  if len(bs) > 0:
-   strc = r'''Physical Line('Boundary') = {'''
-   for p,side in enumerate(bs) :
-    strc +=str(side)
-    if p == len(bs)-1:
-     strc += '};\n'
-    else :
-     strc += ','
-   store.write(strc)
-
-
-  strc = 'Periodic Line{1}={-3};\n'
-  store.write(strc)
-  strc = 'Periodic Line{2}={-4};\n'
-  store.write(strc)
-
-#-------------------------------------------------------
-  store.close()
-
-  
-  with open(os.devnull, 'w') as devnull:
-    output = subprocess.check_output("gmsh -format msh2 -2 mesh.geo -o mesh.msh".split(), stderr=devnull)
 
 
 
@@ -770,25 +775,6 @@ class Mesher(object):
  
     self.surfaces3D.append(tmp2)
 
-   '''
-   #Create new loops 
-   N = int(len(self.loops)/2)
-   for ll in range(N):
-    for l in self.loops[ll]:         
-     
-     i1 = self.lines[l-1][0];  i2 = self.lines[l-1][1]
-              
-     j1 = i1 + Nh; j2 = i2 + Nh
-     tmp = []
-     tmp.append(self.line_exists_ordered(i1,i2))
-     tmp.append(self.line_exists_ordered(i2,j2))   
-     tmp.append(self.line_exists_ordered(j2,j1))
-     tmp.append(self.line_exists_ordered(j1,i1))
-  
-     self.loops.append(tmp)
-     self.surfaces.append([len(self.loops)-1])
-   print(self.loops)
-   '''   
  
  #def apply_periodic_mesh(self):
 

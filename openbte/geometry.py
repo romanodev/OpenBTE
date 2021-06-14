@@ -12,6 +12,10 @@ import numpy.testing as npt
 from statistics import mean
 from scipy.ndimage.interpolation import shift
 from collections import Counter
+from matplotlib.patches import Polygon
+from matplotlib.collections import PatchCollection
+import matplotlib
+import matplotlib.pylab as plt
 
 comm = MPI.COMM_WORLD
 
@@ -116,9 +120,12 @@ def compute_boundary_condition_data(data,**argv):
        B_with_area_old[i,j] = abs(side_value[side[0]]*area)
     
 
-    #select flux sides-------------------------------
+    #Get flux sides for thermal conductivity calculations--
     flux_sides = [] #where flux goes
     total_area = 0
+    area_flux  = -1
+
+    #From Periodic sides
     for ll in data['periodic_sides']:
      e1,e2 = side_elem_map[ll]
      normal = data['face_normals'][ll]   
@@ -142,8 +149,12 @@ def compute_boundary_condition_data(data,**argv):
            area_flux = data['size'][0]*data['size'][1]
            total_area += data['areas'][ll]
 
-
        flux_sides.append(ll)
+
+
+    #From Periodic sides
+    #print(data['size'])
+    #quit()
 
     #-------THIS
     if argv.setdefault('contact_area','box') == 'box':
@@ -169,7 +180,7 @@ def compute_dists(data):
   centroids = data['centroids']
 
   for ll in data['active_sides']:
-   if not (ll in data['boundary_sides']):
+   if not (ll in (list(data['boundary_sides']) + list(data['fixed_sides']))):
     elem_1 = side_elem_map[ll][0]
     elem_2 = side_elem_map[ll][1]
     c1 = centroids[elem_1]
@@ -186,7 +197,7 @@ def compute_interpolation_weigths(data):
 
   #from here: http://geomalgorithms.com/a05-_intersect-1.html
 
-  net_sides=data['active_sides'][~np.isin(data['active_sides'],data['boundary_sides'])] #Get only the nonboundary sides
+  net_sides=data['active_sides'][~np.isin(data['active_sides'],list(data['boundary_sides'])+list(data['fixed_sides']))] #Get only the nonboundary sides
 
   e1 =  data['side_elem_map_vec'][net_sides,0]
 
@@ -201,21 +212,6 @@ def compute_interpolation_weigths(data):
   interp_weigths[net_sides]   = 1+tmp2[net_sides]/tmp[net_sides] #this is the relative distance with the centroid of the second element
 
 
-  #check----------------------------------
-  #ll = data['active_sides'][0]
-  #(e1,_) = data['side_elem_map_vec'][ll]
-  #P2 = data['nodes'][data['sides'][ll][0]]
-  #P3 = data['nodes'][data['sides'][ll][1]]
-  #P0 = data['centroids'][e1]
-  #P1 = get_next_elem_centroid(e1,ll,data)
-  #plot([P0[0],P1[0]],[P0[1],P1[1]],'r')
-  #plot([P2[0],P3[0]],[P2[1],P3[1]],'b')
-  #text(P0[0],P0[1],'P0')
-  #text(P1[0],P1[1],'P1')
-  #text(P2[0],P2[1],'P2')
-  #text(P3[0],P3[1],'P3')
-  #print(interp_weigths[ll])
-  #show()
 
   if len(data['boundary_sides']) > 0:
    interp_weigths[data['boundary_sides']] = 1
@@ -341,7 +337,6 @@ def compute_least_square_weigths(data):
      diff_dist[kc1,ind1] = dist[:dim]
 
    #We solve the pinv for a stack of matrices. We do so for each element group
-
    index3 = np.where(data['side_per_elem'] == 3)[0]
    G3 = np.linalg.pinv(diff_dist[index3,:3])
    
@@ -445,10 +440,9 @@ def import_mesh(**argv):
    elems = [list(np.array(lines[current_line + n][5:],dtype=int)-1) for n in bulk_tags]
    side_per_elem = np.array([len(e) for e in elems])
    n_elems = len(elems)
-   boundary_sides = np.array([ sorted(np.array(lines[current_line + n][5:],dtype=int)) for n in face_tags] ) -1
 
+   boundary_sides = np.array([ sorted(np.array(lines[current_line + n][5:],dtype=int)) for n in face_tags] ) -1
    #generate sides and maps---
-   node_side_map = { i:[] for i in range(len(nodes))}
    elem_side_map = { i:[] for i in range(len(elems))}
    sides = []
    tmp_indices = []
@@ -462,15 +456,18 @@ def import_mesh(**argv):
    sides,inverse = np.unique(sides,axis=0,return_inverse = True)
    for k,s in enumerate(inverse): elem_side_map[tmp_indices[k]].append(s)
 
+
+   node_side_map = { i:[] for i in range(len(nodes))}
    for s,side in enumerate(sides): 
         for t in side:
             node_side_map[t].append(s)
+
    side_elem_map = { i:[] for i in range(len(sides))}
    for key, value in elem_side_map.items():
      for v in value:   
       side_elem_map[v].append(key)    
    #----------------------------------------------------      
- 
+
    #Build relevant data
    side_areas = compute_side_areas(nodes,sides,dim) 
  
@@ -497,6 +494,7 @@ def import_mesh(**argv):
             physical_boundary.setdefault(blabels[int(lines[current_line + n][3])],[]).append(s) 
             break
 
+
    side_list = {}
    #Apply Periodic Boundary Conditions
    side_list.update({'active':list(range(len(sides)))})
@@ -506,7 +504,10 @@ def import_mesh(**argv):
    #self.pairs = [] #global (all periodic pairs)
 
    side_list.setdefault('Boundary',[])
+   side_list.setdefault('Fixed',[])
    side_list.setdefault('Interface',[])
+   side_list.setdefault('Periodic',[])
+   side_list.setdefault('Inactive',[])
    periodic_nodes = {}
 
    if argv.setdefault('delete_gmsh_files',False):
@@ -565,13 +566,20 @@ def import_mesh(**argv):
        #-----------------------------------------
         
       #Polish sides
-      [side_list.setdefault('Periodic',[]).append(i) for i in physical_boundary[contact_1]]
-      [side_list.setdefault('Inactive',[]).append(i) for i in physical_boundary[contact_2]]
+      [side_list['Periodic'].append(i) for i in physical_boundary[contact_1]]
+      [side_list['Inactive'].append(i) for i in physical_boundary[contact_2]]
 
    if 'Boundary' in physical_boundary.keys(): side_list.update({'Boundary':physical_boundary['Boundary']})
+   if 'Fixed' in physical_boundary.keys(): side_list.update({'Fixed':physical_boundary['Fixed']})
 
-   for side in side_list['Boundary'] :# + self.side_list['Hot'] + self.side_list['Cold']:
+
+
+   for side in side_list['Boundary']  :# + self.side_list['Hot'] + self.side_list['Cold']:
     side_elem_map[side].append(side_elem_map[side][0])
+
+   for side in side_list['Fixed']  :# + self.side_list['Hot'] + self.side_list['Cold']:
+    side_elem_map[side].append(side_elem_map[side][0])
+
 
    #Put boundaries at the end
    n_non_boundary_side_per_elem = []
@@ -599,15 +607,16 @@ def import_mesh(**argv):
    data.update({'active_sides':np.array(side_list['active'])})
    data.update({'n_non_boundary_side_per_elem':np.array(n_non_boundary_side_per_elem)})
    data.update({'boundary_sides':np.array(side_list['Boundary'])})
+   data.update({'fixed_sides':np.array(side_list['Fixed'])})
    data.update({'periodic_sides':np.array(side_list['Periodic'])})
    data.update({'side_periodicity':side_periodicity})
    data.update({'areas':np.array(side_areas)})
    data.update({'elem_mat_map':np.zeros(len(elems))})
 
    data.update({'dim':dim})
-   data.update({'dmin':argv['dmin']})
+   if 'dmin' in argv.keys():
+    data.update({'dmin':argv['dmin']})
    data.update({'pairs':pairs})
-   #aa = np.array([side_elem_map[ll]  for ll in range(len(sides))]) 
    data.update({'elem_side_map_vec': np.array([elem_side_map[ll]  for ll in range(len(elems))]) })
    data.update({'side_elem_map_vec': np.array([side_elem_map[ll]  for ll in range(len(sides))]) })
    data['interface_sides']= []
@@ -656,11 +665,14 @@ def compute_data(data,**argv):
 def Geometry(**argv):
 
  if comm.rank == 0 :
-   Mesher(argv) 
+
+   argv['dmin'] = 0  
+   if not argv['model'] == 'external_mesh':   
+     Mesher(argv)
 
    if argv.setdefault('only_geo',False):  
 
-    return argv
+    return argv 
 
    else:
 

@@ -17,6 +17,10 @@ comm = MPI.COMM_WORLD
 
 def Material(**argv):
 
+  if 'custom' in argv.keys():
+    data = argv['custom'](argv)
+  else:  
+
    model = argv.setdefault('model','rta3D')
 
    #set up database
@@ -32,24 +36,12 @@ def Material(**argv):
                   '/openbte/materials/' +  argv['filename']  
 
         argv['filename'] = filename
-   #if source == 'unlisted':
-   # if comm.rank == 0:
-   #   download_file(argv['file_id'],'rta.npz')
+
+
 
    if model == 'rta2DSym':
      if comm.rank == 0:
       data = rta2DSym(**argv)
-
-   #elif model == 'full':
-   #  if comm.rank == 0:
-   #   data = full(**argv)
-
-   #elif model == 'MSRTA':
-   #  if comm.rank == 0:
-   #   data = msrta(**argv)
-
-   elif model == 'mfp2DSym':
-      data = mfp2DSym(**argv)
 
    elif model == 'fourier':
       
@@ -68,15 +60,11 @@ def Material(**argv):
    elif model == 'gray2DSym':
       data = gray2DSym(**argv)
 
-   #elif model == 'mg2DSym':
-   #  if comm.rank == 0:
-   #   data = mg2DSym(**argv)
-
    elif model == 'gray2D':
       data = gray2D(**argv)
 
-   #elif model == 'gray3D':
-   #   data = mfp3D(**argv)
+    #elif model == 'gray3D':
+    #   data = mfp3D(**argv)
    
    elif model == 'mfp3D':
       data = mfp3D(**argv)
@@ -90,11 +78,11 @@ def Material(**argv):
       quit()
 
 
-   if argv.setdefault('save',True):
+  if argv.setdefault('save',True):
      if comm.rank == 0:
          save_data(argv.setdefault('output_filename','material'),data)   
 
-   if comm.rank == 0:
+  if comm.rank == 0:
     return data
 
  
