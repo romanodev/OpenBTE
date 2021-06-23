@@ -1,4 +1,4 @@
-from shapely.ops import cascaded_union
+from shapely.ops import unary_union
 from shapely.geometry import Point,LineString
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
@@ -380,13 +380,8 @@ class Mesher(object):
   #-------------------------
 
 
-  #for pore in polygons:
-  #    for p in pore:
-  #      plt.scatter(p[0],p[1])  
-  #plt.show()
-
   
-  bulk = Frame.difference(cascaded_union(polypores))
+  bulk = Frame.difference(unary_union(polypores))
   if not (isinstance(bulk, shapely.geometry.multipolygon.MultiPolygon)):
    bulk = [bulk]
 
@@ -398,12 +393,6 @@ class Mesher(object):
     pp = list(region.exterior.coords)[:-1]
     line_list = self.create_line_list(pp,points,lines,store)
 
-    #for l in lines:
-    #  p1 = points[l[0]]
-    #  p2 = points[l[1]]
-    #  plt.plot([p1[0],p2[0]],[p1[1],p2[1]])
-    #plt.show()
-    #quit()
     loops +=1
     local_loops = [loops]
     self.create_loop(loops,line_list,store)
@@ -1046,7 +1035,7 @@ class Mesher(object):
   polypores = [ Polygon(poly)  for poly in polygons]
   
   MP = MultiPolygon(polypores)
-  bulk = Frame.difference(cascaded_union(MP))
+  bulk = Frame.difference(unary_union(MP))
   if not (isinstance(bulk, shapely.geometry.multipolygon.MultiPolygon)):
    bulk = [bulk]
 

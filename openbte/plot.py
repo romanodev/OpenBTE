@@ -1,6 +1,5 @@
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
-from pyvtk import *
 import numpy as np
 import os
 from .utils import *
@@ -51,9 +50,14 @@ def add_preamble(geometry,store):
 
    #write elems--
    dim = int(geometry['meta'][2])
-   if dim == 2: 
-      m = 3 
-      ct = '5'
+   if dim == 2:
+       if len(geometry['elems'][0]) == 3: 
+        m = 3 
+        ct = '5'
+       else: 
+        m = 4 
+        ct = '9'
+
    elif dim == 3:
       m = 4 
       ct = '10'
@@ -75,9 +79,14 @@ def add_preamble(geometry,store):
 
 
 
-def write_vtu(solver,geometry,dof):
+def write_vtu(variables,geometry,dof='nodes',repeat=[1,1,1]):
+    
+   if dof=='nodes':  
+      get_node_data(variables,geometry)
 
-   #Write
+   duplicate_cells(geometry,variables,repeat)
+
+
    store = open('output.vtk', 'w+')
 
    add_preamble(geometry,store)
@@ -92,7 +101,7 @@ def write_vtu(solver,geometry,dof):
    else: 
     store.write('POINT_DATA ' + str(n_nodes) + '\n')
 
-   for n,(key, value) in enumerate(solver['variables'].items()):
+   for n,(key, value) in enumerate(variables.items()):
 
      name = key + '[' + value['units'] + ']'
      if value['data'].ndim == 1: #scalar
@@ -124,7 +133,7 @@ def write_vtu(solver,geometry,dof):
 
 
 
-def get_surface_nodes(solver,geometry):
+def get_surface_nodes(variables,geometry):
 
      sides = list(geometry['boundary_sides']) + \
                      list(geometry['periodic_sides']) + \
@@ -135,7 +144,7 @@ def get_surface_nodes(solver,geometry):
 
      triangles = np.arange(len(nodes)).reshape((len(sides),3))
      
-     for key in solver['variables'].keys():
+     for key in variables.keys():
         solver['variables'][key]['data'] = solver['variables'][key]['data'][nodes]
 
 
@@ -145,7 +154,7 @@ def get_surface_nodes(solver,geometry):
 
 
 
-def duplicate_cells(geometry,solver,repeat):
+def duplicate_cells(geometry,variables,repeat):
 
    dim = int(geometry['meta'][2])
    nodes = np.round(geometry['nodes'],4)
@@ -198,7 +207,7 @@ def duplicate_cells(geometry,solver,repeat):
    #------------------------
 
    #duplicate variables---
-   for n,(key, value) in enumerate(solver['variables'].items()):  
+   for n,(key, value) in enumerate(variables.items()):  
      unit_cell = value['data'].copy() 
      for nz in range(repeat[2]):
       for ny in range(repeat[1]):
@@ -211,7 +220,7 @@ def duplicate_cells(geometry,solver,repeat):
             else: 
              value['data'] = np.vstack((value['data'],tmp))
 
-     solver['variables'][key]['data'] = value['data']
+     variables[key]['data'] = value['data']
 
    geometry['elems'] = elems
    geometry['nodes'] = nodes
@@ -224,11 +233,15 @@ def duplicate_cells(geometry,solver,repeat):
 
 
 
-def get_node_data(solver,geometry):
+def get_node_data(variables,geometry):
+
+
+
+ if not len(variables['Temperature_Fourier']['data']) == len(geometry['nodes']):
 
   dim = int(geometry['meta'][2])
-  for key in solver['variables'].keys():
-   data = solver['variables'][key]['data']
+  for key,tmp in variables.items():
+   data = tmp['data']
    #NEW-------------
    conn = np.zeros(len(geometry['nodes']))
    if data.ndim == 2:
@@ -250,7 +263,7 @@ def get_node_data(solver,geometry):
    else: 
        np.divide(node_data,conn,out=node_data)
    #-----------------------
-   solver['variables'][key]['data'] = node_data
+   variables[key]['data'] = node_data
 
 
 def Plot(**argv):
@@ -262,9 +275,13 @@ def Plot(**argv):
    geometry     = argv['geometry'] if 'geometry' in argv.keys() else load_data('geometry')
    solver       = argv['solver']   if 'geometry' in argv.keys() else load_data('solver')
    material     = argv['material'] if 'material' in argv.keys() else load_data('material')
+   argv['solver'] = solver
+   argv['geometry'] = geometry
+   argv['material'] = material
+   
    dim = int(geometry['meta'][2])
    model = argv['model']
-
+   
    if model == 'maps':
 
      expand_variables(solver,dim) #this is needed to get the component-wise data for plotly
@@ -273,9 +290,9 @@ def Plot(**argv):
      repeat = argv.setdefault('repeat',[1,1,1])
 
      if dim == 3:
-      get_surface_nodes(solver,geometry)
+      get_surface_nodes(variables,geometry)
 
-     size = duplicate_cells(geometry,solver,repeat)
+     size = duplicate_cells(geometry,solver['variables'],repeat)
 
      if argv.setdefault('show',True):
         plot_results(solver,geometry,**argv)
@@ -294,29 +311,18 @@ def Plot(**argv):
 
    elif model == 'line':
 
+
      get_node_data(solver,geometry)
 
      duplicate_cells(geometry,solver,argv.setdefault('repeat',[1,1,1]))
 
-     return compute_line_data(geometry,solver,**argv)
+     return compute_line_data(**argv)
      
 
    elif model == 'vtu':
 
-       if argv.setdefault('dof','nodes'):  
-        get_node_data(solver,geometry)
-
-       duplicate_cells(geometry,solver,argv.setdefault('repeat',[1,1,1]))
-
-       write_vtu(solver,geometry,argv['dof'])  
-       #write_vtu(solver,geometry)  
-
-   #elif model == 'vtu_cell':
-
-   #  duplicate_cells(geometry,solver,argv.setdefault('repeat',[1,1,1]))
-     
-   #  write_vtu_cell(solver,geometry)  
-
+       write_vtu(solver['variables'],geometry,dof    = argv.setdefault('dof','cell'),\
+                                 repeat = argv.setdefault('repeat',[1,1,1]))  
 
    elif model == 'suppression':
 
@@ -324,7 +330,7 @@ def Plot(**argv):
 
    elif model == 'kappa_mode':
 
-      write_mode_kappa(**argv)
+      return write_mode_kappa(**argv)
 
 
 

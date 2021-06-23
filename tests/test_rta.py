@@ -12,7 +12,7 @@ class TestClass(object):
 
       mat = Material(source='database',filename='Si',temperature=300,model='rta2DSym',save=False)
       geo = Geometry(model='lattice',lx = 10,ly = 10, step = 1, base = [[0,0]],porosity=0.2,shape='square',save=False,delete_gmsh_files=True)
-      sol = Solver(geometry = geo,material=mat,save=False)
+      sol = Solver(geometry = geo,material=mat,save=True)
 
       if comm.rank == 0:
        assert np.allclose(sol['kappa_bte'],load_data('solver_rta2DSym')['kappa_bte'])

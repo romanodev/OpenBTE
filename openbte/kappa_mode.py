@@ -3,8 +3,11 @@ from openbte.utils import *
 
 def write_mode_kappa(**argv):
  #-----------------------
- mat = load_data('material')
+ mat      = argv['material']
+ solver      = argv['solver']
+ geometry = argv['geometry']
  data = load_data(argv.setdefault('rta_material_file','rta'))
+ #print(data)
  mfp_bulk = np.einsum('ki,k->ki',data['v'],data['tau'])
  if not (mat['model'] == 9): #not 3D
   r = np.linalg.norm(mfp_bulk[:,:2],axis=1) #we only consider the projection
@@ -30,7 +33,6 @@ def write_mode_kappa(**argv):
  #---------------------------
 
  #Compute MFPs
- mat = load_data('material')
  mfp_sampled  = mat['mfp_sampled']*1e9
  [n_phi,n_theta,n_mfp]  = mat['sampling']
  vmfp  = mat['VMFP']
@@ -46,15 +48,13 @@ def write_mode_kappa(**argv):
   theta_bulk = np.array([np.arccos((m/r[k])[2]) for k,m in enumerate(mfp_bulk)])
  #--------------------------------
 
- tmp = load_data('geometry')
- dirr = int(tmp['meta'][-1])
+ dirr = int(geometry['meta'][-1])
 
  #--------
  #Compute kappa
- sol = load_data('solver')
- T_sampled = sol['kappa_mode']
+ T_sampled = solver['kappa_mode']
 
- kappa_fourier = sol['kappa_fourier']
+ kappa_fourier = solver['kappa_fourier']
 
  #Interpolation to get kappa mode
  ratio = kappa_fourier/kappa[0,0]

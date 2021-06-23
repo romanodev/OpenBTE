@@ -127,7 +127,7 @@ def solve_rta(argv):
     im = np.concatenate((mesh['i'],list(np.arange(n_elems))))
     jm = np.concatenate((mesh['j'],list(np.arange(n_elems))))
     Master = sp.csc_matrix((np.arange(len(im))+1,(im,jm)),shape=(n_elems,n_elems),dtype=np.float64)
-    conversion = np.asarray(Master.data-1,np.int)
+    conversion = np.asarray(Master.data-1,int)
     J = np.zeros((n_elems,dim))
 
     tau,taup = np.zeros((2,n_serial,n_parallel,2))
@@ -150,7 +150,6 @@ def solve_rta(argv):
 
      return X 
 
-    intermediate = {}
     while kk < argv['max_bte_iter'] and error > argv['max_bte_error']:
 
         #Multiscale scheme-----------------------------
@@ -168,7 +167,7 @@ def solve_rta(argv):
         for n,q in enumerate(rr):
            
            for m in range(n_serial):
-            
+       
                  #----------------------------------------
                  B = DeltaT +  mfp[m]*(P[n] + get_boundary(RHS[n],mesh['eb'],n_elems))
                  data = np.concatenate((mfp[m]*Gm[n],mfp[m]*D[n]+np.ones(n_elems)))

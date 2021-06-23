@@ -63,7 +63,6 @@ def mfp2DSym(**argv):
 
  #Polar Angle---------
  Dphi = 2*np.pi/n_phi
- #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
  phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
  #--------------------
    
@@ -118,7 +117,6 @@ def mfp2DSym(**argv):
  rr = range(block*comm.rank,n_tot) if comm.rank == comm.size-1 else range(block*comm.rank,block*(comm.rank+1))
 
  #change to mfp
-
  for t in range(n_theta):
 
    for m in rr:  
@@ -134,17 +132,11 @@ def mfp2DSym(**argv):
       tcp[m1] += a1*tmp
       tcp[m2] += a2*tmp
 
-      #Suppression
-      #tmp  = dirr[t,:,0]/mfp_bulk[m]
-      #sp[m1,:,m] +=  a1 * tmp
-      #sp[m2,:,m] +=  a2 * tmp
 
    comm.Allreduce([kdp,MPI.DOUBLE],[kd,MPI.DOUBLE],op=MPI.SUM)
    comm.Allreduce([tcp,MPI.DOUBLE],[tc,MPI.DOUBLE],op=MPI.SUM)
-   #comm.Allreduce([sp,MPI.DOUBLE],[s,MPI.DOUBLE],op=MPI.SUM)
 
  kd *= 2*3/4.0/np.pi
- #s *= 3*2/4.0/np.pi
  tc /= np.sum(tc)
 
 
@@ -159,14 +151,6 @@ def mfp2DSym(**argv):
 
  #replicate bulk values---
 
- #Wod = np.tile(tc,(nm,1))
-
- #angle_map = np.arange(n_phi)
- #angle_map = np.repeat(angle_map,n_mfp)
-
- #repeat angle---
- #kappa_directional[:,:,2] = 0 #Enforce zeroflux on z (for visualization purposed)
- #F = np.einsum('m,pi->mpi',mfp,polar_ave)
  rhs_average = mfp_sampled*mfp_sampled/2
  a = np.zeros((3,3)) 
  for i in range(len(polar_ave)):

@@ -30,20 +30,13 @@ It is also possible to define an anisotropic thermal conductivity
 Gray model approximation
 -----------------------------------
 
-Within the gray model, we assume single MFP-materials. In light of new first-principles developments, this model might not be needed. However, it can be useful to understand heat transport regimes and trends. To create ``material.npz`` no prior file is needed in this case, but only two options, e.g the mean-free-path (in m) and the bulk thermal conductivity. Here is an example:
+The simplest BTE model assumes gray medium, i.e. phonons have the same MFP. To create ``material.npz`` the mean-free-path (in m) and the bulk thermal conductivity must be specified. Here is an example:
 
 .. code-block:: python
 
-   Material(model='gray2DSym',mfp=1e-8,kappa=130)
+   Material(model='gray',mfp=1e-8,kappa=130)
 
-
-There are three material models associated with this method
-
-* ``model='gray3D'``: three-dimensional domain 
-
-* ``model='gray2DSym'``: three-dimensional domain with infinite thickness
-
-* ``model='gray2D'``: two-dimensional domain
+Note that the gray model assumes 2D material, i.e. no integration over the azimuthal angle is performed.
 
 
 Mean-free-path approximation

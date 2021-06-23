@@ -4,7 +4,7 @@ from termcolor import colored, cprint
 from shapely.geometry import Polygon,Point
 from shapely.geometry import MultiPolygon,LineString
 import shapely
-from shapely.ops import cascaded_union
+from shapely.ops import unary_union
 import os,sys
 import functools
 import io,zipfile
@@ -339,7 +339,7 @@ def repeat_merge_scale(argv):
   #Create bulk surface---get only the exterior to avoid holes
   MP = MultiPolygon(final) 
 
-  conso = cascaded_union(MP)
+  conso = unary_union(MP)
 
   new_poly = []
   if isinstance(conso, shapely.geometry.multipolygon.MultiPolygon):
@@ -414,7 +414,11 @@ def repeat_merge_scale(argv):
 
 
 
-def compute_line_data(mesh,solver,**argv):
+def compute_line_data(**argv):
+
+
+ solver = argv['solver']
+ mesh = argv['geometry']
 
  data = solver['variables'][argv['variable']]['data']
  

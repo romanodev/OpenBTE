@@ -15,13 +15,6 @@ RUN tar -xzf openmpi-4.0.3.tar.gz
 
 RUN cd openmpi-4.0.3 && ./configure --prefix=/usr/local/openmpi && make all && make install && rm -f openmpi-4.0.3.tar.gz 
 
-#RUN wget http://geuz.org/gmsh/bin/Linux/gmsh-4.5.6-Linux64.tgz
-#RUN tar -xzf gmsh-4.5.6-Linux64.tgz
-#RUN cp gmsh-4.5.6-Linux64/bin/gmsh /usr/bin/
-#RUN rm -rf gmsh-4.5.6-Linux64
-#RUN rm gmsh-4.5.6-Linux64.tgz
-
-
 COPY requirements.txt .
 RUN pip install -r requirements.txt 
 

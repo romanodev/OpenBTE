@@ -96,7 +96,6 @@ def solve_fourier_single(argv):
 
 def get_kappa(mesh,i,j,ll,kappa):
 
-
    if i == j:
     return np.array(kappa[i])
    
@@ -265,7 +264,6 @@ def compute_diffusive_thermal_conductivity(temp,kappa_map,**argv):
    k_non_orth = 0
    area_tot = 0
    for ll in mesh['flux_sides']:
-
     (i,j) = mesh['side_elem_map_vec'][ll]
     area = mesh['areas'][ll]
 
@@ -274,7 +272,6 @@ def compute_diffusive_thermal_conductivity(temp,kappa_map,**argv):
     (v_orth,v_non_orth) = get_decomposed_directions(mesh,get_key(ll,kappa_loc))
 
     deltaT = temp[i] - temp[j] - 1
-
     kappa_eff -= v_orth *  deltaT * area
 
     if 'grad' in argv.keys():
@@ -284,6 +281,7 @@ def compute_diffusive_thermal_conductivity(temp,kappa_map,**argv):
      k_non_orth += np.dot(grad_ave,v_non_orth)/2 * area
     area_tot +=area
 
+   
    return (kappa_eff+k_non_orth)*mesh['meta'][1]
 
 
@@ -390,8 +388,11 @@ def assemble(mesh,kappa):
 
     F = sp.csc_matrix((np.array(dff),(np.array(iff),np.array(jff))),shape = (n_elems,n_elems))
 
+    #print(F[0,0])
+    #quit()
     #This scale the matrix and fixed zero temperature to a random point
-    scale = fix_instability(F,B)
+    scale = fix_instability(F,B,scale=False)
+    F.toarray().dump('F')
     #scale = np.ones(n_elems)
     return F,B,scale
 

@@ -32,11 +32,12 @@ def Material(**argv):
                   '/openbte/materials/rta_' +  argv['filename'] + \
                   '_' + str(argv['temperature']) 
         else:          
-         filename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + \
+         if not model == 'gray':
+          filename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + \
                   '/openbte/materials/' +  argv['filename']  
 
-        argv['filename'] = filename
-
+        if not model == 'gray':
+         argv['filename'] = filename
 
 
    if model == 'rta2DSym':
@@ -57,10 +58,10 @@ def Material(**argv):
    elif model == 'mfp2D':
       data = mfp2D(**argv)
 
-   elif model == 'gray2DSym':
-      data = gray2DSym(**argv)
+   elif model == 'mfp2DSym':
+      data = mfp2DSym(**argv)
 
-   elif model == 'gray2D':
+   elif model == 'gray':
       data = gray2D(**argv)
 
     #elif model == 'gray3D':
