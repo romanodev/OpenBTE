@@ -2,7 +2,7 @@ from setuptools import setup,find_packages
 import os
 
 setup(name='openbte',
-      version='2.37',
+      version='2.43',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',
@@ -32,9 +32,10 @@ setup(name='openbte',
                          ],
       license='GPLv3',\
       packages = ['openbte'],
-      package_data = {'openbte':['materials/*.npz']},
+      package_data = {'openbte':['materials/*.npz','efunx.yaml']},
       entry_points = {
      'console_scripts': ['AlmaBTE2OpenBTE=openbte.almabte2openbte:main',\
+                         'AlmaBTE2OpenBTE2=openbte.almabte2openbte_new:main',\
                          'Phono3py2OpenBTE=openbte.phono3py2openbte:main',\
                          'rta2mfp=openbte.rta2mfp:main',\
                          'bundle_data=openbte.bundle_data:main',\

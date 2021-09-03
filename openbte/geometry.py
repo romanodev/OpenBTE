@@ -2,7 +2,7 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import numpy as np
 from .mesher import *
-from .utils import *
+import openbte.utils as utils 
 import time
 import scipy.sparse as sp
 import itertools
@@ -152,24 +152,19 @@ def compute_boundary_condition_data(data,**argv):
        flux_sides.append(ll)
 
 
-    #From Periodic sides
-    #print(data['size'])
-    #quit()
-
     #-------THIS
     if argv.setdefault('contact_area','box') == 'box':
       kappa_factor = data['size'][gradir]/area_flux
     else:  
       kappa_factor = data['size'][gradir]/total_area
 
-    #quit()
     data['kappa_mask']= -np.array(np.sum(B_with_area_old.todense(),axis=0))[0]*kappa_factor*1e-18
-    data['periodic_side_values'] = [periodic_side_values[ll]  for ll in data['periodic_sides']]
+    data['periodic_side_values'] = np.array([periodic_side_values[ll]  for ll in data['periodic_sides']])
     data['pp'] = np.array(pp)
     data['applied_gradient'] = np.array(applied_grad)
     data['flux_sides'] = np.array(flux_sides)
     data['kappa_factor'] = kappa_factor
-
+    del data['ij']
 
 
 def compute_dists(data):
@@ -233,7 +228,8 @@ def compute_connecting_matrix(data):
    c_sides =       data['interface_sides']
 
    #Active sides-----
-   net_sides=a_sides[~np.isin(a_sides,list(b_sides)+list(c_sides))]
+   #net_sides=a_sides[~np.isin(a_sides,list(b_sides)+list(c_sides))]
+   net_sides=a_sides[~np.isin(a_sides,list(b_sides))]
    i2 = side_elem_map[net_sides].flatten()
    j2 = np.flip(side_elem_map[net_sides],1).flatten()
    common = np.einsum('u,ui->ui',side_areas[net_sides],face_normals[net_sides,:dim])
@@ -253,21 +249,21 @@ def compute_connecting_matrix(data):
    #-------------------------------------
 
    #Interface sides----
-   if len(c_sides) >0 :
-    inti2 = side_elem_map[c_sides].flatten()
-    intj2 = np.flip(side_elem_map[c_sides],1).flatten()
-    tmp = np.flip(side_elem_map[c_sides],1).flatten()
-    common = np.einsum('u,ui->ui',side_areas[c_sides],face_normals[c_sides,:dim])
-    t1 =  common/elem_volumes[side_elem_map[c_sides][:,0],None]
-    t2 =  common/elem_volumes[side_elem_map[c_sides][:,1],None]
-    intk2 = np.zeros((2*t1.shape[0],dim))
-    intk2[np.arange(t1.shape[0])*2]   =  t1
-    intk2[np.arange(t1.shape[0])*2+1] = -t2
-    intk2 = intk2.T     
-   else:
-    inti2 = []   
-    intj2 = []   
-    intk2 = []   
+   #if len(c_sides) >0 :
+   # inti2 = side_elem_map[c_sides].flatten()
+   # intj2 = np.flip(side_elem_map[c_sides],1).flatten()
+   # tmp = np.flip(side_elem_map[c_sides],1).flatten()
+   # common = np.einsum('u,ui->ui',side_areas[c_sides],face_normals[c_sides,:dim])
+   # t1 =  common/elem_volumes[side_elem_map[c_sides][:,0],None]
+   # t2 =  common/elem_volumes[side_elem_map[c_sides][:,1],None]
+   # intk2 = np.zeros((2*t1.shape[0],dim))
+   # intk2[np.arange(t1.shape[0])*2]   =  t1
+   # intk2[np.arange(t1.shape[0])*2+1] = -t2
+   # intk2 = intk2.T     
+   #else:
+   inti2 = []   
+   intj2 = []   
+   intk2 = []   
     
    #boundary sides----
    sb2 = a_sides[np.isin(a_sides,b_sides)]
@@ -275,9 +271,9 @@ def compute_connecting_matrix(data):
    db2 = face_normals[sb2,:dim].T*side_areas[sb2]/elem_volumes[eb2]
    #-------------
    
-   data['intk'] = intk2; 
-   data['inti'] = inti2;
-   data['intj'] = intj2;
+   data['intk'] = np.asarray(intk2,dtype=np.int64); 
+   data['inti'] = np.asarray(inti2,dtype=np.int64);
+   data['intj'] = np.asarray(intj2,dtype=np.int64);
    data['i']    = np.array(i2); 
    data['j']    = np.array(j2); 
    data['k']    = np.array(k2);
@@ -370,7 +366,7 @@ def compute_boundary_connection(data):
         d1 = normal * np.dot(normal,d)
         bconn.append(d1)
 
-     data.update({'bconn':bconn})
+     data.update({'bconn':np.array(bconn)})
 
 
 def compute_face_normals(data):
@@ -412,6 +408,7 @@ def import_mesh(**argv):
 
    with open('mesh.msh', 'r') as f: lines = f.readlines()
 
+   #Read physical surfaces--
    lines = [l.split()  for l in lines]
    nb = int(lines[4][0])
    current_line = 5
@@ -456,7 +453,6 @@ def import_mesh(**argv):
    sides,inverse = np.unique(sides,axis=0,return_inverse = True)
    for k,s in enumerate(inverse): elem_side_map[tmp_indices[k]].append(s)
 
-
    node_side_map = { i:[] for i in range(len(nodes))}
    for s,side in enumerate(sides): 
         for t in side:
@@ -474,7 +470,7 @@ def import_mesh(**argv):
    #Compute volumes
    elem_volumes = compute_elem_volumes(nodes,elems,dim)
 
-   data.update({'elems':elems,'sides':sides,'nodes':nodes,'volumes':elem_volumes})
+   data.update({'elems':np.array(elems),'sides':sides,'nodes':nodes,'volumes':elem_volumes})
 
    side_centroids = np.array([np.mean(nodes[i],axis=0) for i in data['sides']] )
    elem_centroids = np.array([np.mean(nodes[i],axis=0) for i in data['elems']])
@@ -569,9 +565,10 @@ def import_mesh(**argv):
       [side_list['Periodic'].append(i) for i in physical_boundary[contact_1]]
       [side_list['Inactive'].append(i) for i in physical_boundary[contact_2]]
 
+
    if 'Boundary' in physical_boundary.keys(): side_list.update({'Boundary':physical_boundary['Boundary']})
    if 'Fixed' in physical_boundary.keys(): side_list.update({'Fixed':physical_boundary['Fixed']})
-
+   if 'Interface' in physical_boundary.keys(): side_list.update({'Interface':physical_boundary['Interface']})
 
 
    for side in side_list['Boundary']  :# + self.side_list['Hot'] + self.side_list['Cold']:
@@ -616,10 +613,10 @@ def import_mesh(**argv):
    data.update({'dim':dim})
    if 'dmin' in argv.keys():
     data.update({'dmin':argv['dmin']})
-   data.update({'pairs':pairs})
+   data.update({'pairs':np.array(pairs)})
    data.update({'elem_side_map_vec': np.array([elem_side_map[ll]  for ll in range(len(elems))]) })
    data.update({'side_elem_map_vec': np.array([side_elem_map[ll]  for ll in range(len(sides))]) })
-   data['interface_sides']= []
+   data['interface_sides']= np.array(side_list['Interface'])
    direction = argv.setdefault('direction','x')
    if direction == 'x':
     data['direction'] = 0
@@ -628,8 +625,8 @@ def import_mesh(**argv):
    else: 
     data['direction'] = 2
    
-   data['size'] = size
-   data['inactive_sides'] = side_list['Inactive']
+   data['size'] = np.array(size)
+   data['inactive_sides'] = np.array(side_list['Inactive'])
 
    return data
    #------------------
@@ -660,30 +657,34 @@ def compute_data(data,**argv):
    del data['kappa_factor']
 
 
+def Geometry(**options_geometry): 
 
+    data =  geometry(options_geometry) #quick hack
 
-def Geometry(**argv):
-
- if comm.rank == 0 :
-
-   argv['dmin'] = 0  
-   if not argv['model'] == 'external_mesh':   
-     Mesher(argv)
-
-   if argv.setdefault('only_geo',False):  
-
-    return argv 
-
-   else:
-
-    data = import_mesh(**argv)
-
-    compute_data(data,**argv)
-
-    if argv.setdefault('save',True):
-     save_data(argv.setdefault('output_filename','geometry'),data)   
+    if options_geometry.setdefault('save',True) and comm.rank == 0:
+     save_data(options_geometry.setdefault('output_filename','geometry'),data)    
 
     return data
+
+def geometry(options_geometry)->'geometry':
+
+ options_geometry.setdefault('model','lattice')  
+ options_geometry.setdefault('ly',options_geometry['lx']) 
+ 
+ data = None
+ if comm.rank == 0:     
+
+   
+  options_geometry['dmin'] = 0  
+  Mesher(options_geometry)
+
+  data = import_mesh(**options_geometry)
+
+  compute_data(data,**options_geometry)
+
+
+ return utils.create_shared_memory_dict(data)
+  
 
 
 

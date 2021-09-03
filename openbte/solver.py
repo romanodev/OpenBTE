@@ -2,7 +2,7 @@ from __future__ import absolute_import
 import numpy as np
 from scipy.sparse.linalg import splu
 from termcolor import colored, cprint 
-from .utils import *
+import openbte.utils as utils
 from mpi4py import MPI
 import sys
 import scipy.sparse as sp
@@ -10,36 +10,17 @@ import time
 from scipy.sparse.linalg import lgmres
 import sys
 from shapely.geometry import LineString
-import profile
 import scipy
 from .solve_rta import *
-#from .solve_full import *
 import pkg_resources  
-from .fourier import *
+from .first_guess import first_guess
 import warnings
 
 comm = MPI.COMM_WORLD
 
-def get_model(m):
-
-    models = ['Fourier','gray2D','gray2DSym','gray3D','mfp2D','mfp2DSym','mfp3D','rta2D','rta2DSym','rta3D','custom']
-
-    return models[m[0]]
-
-def fourier_info(argv):
-          print('                        FOURIER                 ',flush=True)   
-          print(colored(' -----------------------------------------------------------','green'),flush=True)
-          #print(colored('  Iterations:                              ','green') + str(int(data[2])),flush=True)
-          #print(colored('  Relative error:                          ','green') + '%.1E' % (data[1]),flush=True)
-          #print(colored('  Fourier Thermal Conductivity [W/m/K]:    ','green') + str(round(data[0],3)),flush=True)
-          print(colored(' -----------------------------------------------------------','green'),flush=True)
-          print(" ")
-
-
-
 def print_bulk_info(mat,mesh):
 
-           print(colored('  Model:                                   ','green')+ get_model(mat['model']),flush=True)
+           #print(colored('  Model:                                   ','green')+ get_model(mat['model']),flush=True)
           
            if mat['kappa'].ndim == 3:
               for kappa in mat['kappa']:    
@@ -89,129 +70,45 @@ def print_logo():
     print(flush=True)   
 
 
-def prepare_data(argv):
-        
-  #Original Description--
-  tmp = {}
-  tmp.update({0:{'name':'Temperature_Fourier','units':'K','data':argv['fourier']['temperature'],'increment':-argv['geometry']['applied_gradient']},\
-               1:{'name':'Flux_Fourier','units':'W/m/m','data':argv['fourier']['flux'],'increment':[0,0,0]},
-               2:{'name':'Thermal_Conductivity','units':'W/m/m','data':argv['geometry']['elem_kappa_map'],'increment':[0,0,0]}})
-
-  if not argv.setdefault('only_fourier',False):
-      if 'bte' in argv.keys():  
-       tmp[3]    = {'name':'Temperature_BTE','units':'K','data':argv['bte']['temperature'],'increment':-argv['geometry']['applied_gradient']}
-       tmp[4]    = {'name':'Flux_BTE'       ,'units':'W/m/m','data':argv['bte']['flux'],'increment':[0,0,0]}
-              
-  #Here we unroll variables for later use--
-  variables = {}
-  for key,value in tmp.items():
-      
-     variables[value['name']] = {'data':value['data'],'units':value['units'],'increment':value['increment']}
-  argv['variables'] = variables
-
-  dirr = int(argv['geometry']['meta'][-2])
-  argv['data'] = {'variables':variables,'kappa_bulk':argv['material']['kappa'][dirr,dirr] ,'kappa_fourier':argv['fourier']['meta'][0]}
-
-  
-  if 'bte' in argv.keys():
-     argv['data']['kappa_bte']  = argv['bte']['kappa'] 
-     if 'kappa_mode' in argv['bte']:
-       argv['data']['kappa_mode'] = argv['bte']['kappa_mode']
-     if 'kappa_mode_f' in argv['bte']:
-       argv['data']['kappa_mode_f'] = argv['bte']['kappa_mode_f']
-     if 'kappa_0' in argv['bte']:
-       argv['data']['kappa_0'] = argv['bte']['kappa_0']
-     if 'tau' in argv['bte']:
-       argv['data']['tau'] = argv['bte']['tau']
-     if 'intermediate' in argv['bte']:
-      argv['data']['intermediate'] = argv['bte']['intermediate']
-
-
 
 def Solver(**argv):
 
+        #COMMON OPTIONS--------------------------------------
+        verbose      = argv.setdefault('verbose',True)
+        only_fourier = argv.setdefault('only_fourier',False)
+        #---------------------------------------------------
 
-        #COMMON OPTIONS------------
-        argv.setdefault('verbose',True)
-        argv.setdefault('alpha',1.0)
-        argv.setdefault('keep_lu',False)
-        argv.setdefault('only_fourier',False)
-        argv.setdefault('max_bte_iter',20)
-        argv.setdefault('max_bte_error',1e-3)
-        argv.setdefault('max_fourier_iter',20)
-        argv.setdefault('max_fourier_error',1e-5)
-        #----------------------------
-       
+        geometry = argv['geometry'] if 'geometry' in argv.keys() else utils.load_shared('geometry')
+        material = argv['material'] if 'material' in argv.keys() else utils.load_shared('material')
 
-        mesh = None 
-        mat = None 
+        #Print relevant options-----------------------------
         if comm.rank == 0 :
-            if argv['verbose']:
+            if verbose:
              print_logo()
              print('                         SYSTEM                 ',flush=True)   
              print(colored(' -----------------------------------------------------------','green'),flush=True)
-             print_options(**argv)
-
-            mesh = argv['geometry'] if 'geometry' in argv.keys() else load_data(argv.setdefault('geometry_filename','geometry'))
-            mat  = argv['material'] if 'material' in argv.keys() else load_data(argv.setdefault('material_filename','material'))
-            
-            if argv['verbose']:
-             print_bulk_info(mat,mesh)
+             print_bulk_info(material,geometry)
              print_mpi_info()
-             print_grid_info(mesh,mat)
+             print_grid_info(geometry,material)
+        #---------------------------------------------------
 
-        if comm.size > 1:
-
-         #load geometry---
-         argv['geometry'] = create_shared_memory_dict(mesh)
- 
-         #load material---
-         argv['material'] = create_shared_memory_dict(mat)
-
-         argv['geometry']['elem_kappa_map'] = get_kappa_map_from_mat(**argv)   
-
-         #Solve fourier--
-         argv['fourier'] = create_shared_memory_dict(solve_fourier_single(argv))
-
-        else:
-
-         #load geometry---
-         argv['geometry'] = mesh
- 
-         #load material---
-         argv['material'] = mat
-
-         argv['geometry']['elem_kappa_map'] = get_kappa_map_from_mat(**argv)
-
-         #Solve fourier--
-         argv['fourier'] = solve_fourier_single(argv)
-
-        #Solve bte--
-        if not argv['only_fourier']:
-
-           mat_model = get_model(argv['material']['model'])
-
-           if 'custom' in argv.keys():
-               argv['custom'](argv)
-           else:    
-              solve_rta(argv)
-
+        #Solve fourier--
+        X = first_guess(geometry,material,{})
         
-        argv['dim'] =  int(argv['geometry']['meta'][2])
-        prepare_data(argv)
-        if comm.rank == 0 and argv.setdefault('save',True):
-           save_data(argv.setdefault('filename','solver'),argv['data'])   
+        #Solve bte--
+        if not only_fourier:
+           output = solve_rta(geometry,material,X,argv)
 
-        #Clear cache
-        clear_fourier_cache() 
-        clear_BTE_cache() 
+        #prepare_data(argv)
+        if comm.rank == 0 and argv.setdefault('save',True):
+           save_data(argv.setdefault('filename','solver'),output)   
+
         if argv['verbose'] and comm.rank == 0:
          print(' ',flush=True)   
          print(colored('                 OpenBTE ended successfully','green'),flush=True)
          print(' ',flush=True)  
 
-
-        return argv['data']
+        return output
 
 
 def print_mpi_info():
@@ -239,11 +136,8 @@ def print_grid_info(mesh,mat):
 
           with warnings.catch_warnings():
             warnings.simplefilter(action='ignore', category=FutureWarning)
-            if mat['model'] in [8,9]:   
-             print(colored('  Number of MFP:                           ','green')+ str(mat['tc'].shape[0]),flush=True)
-             print(colored('  Number of Solid Angles:                  ','green')+ str(mat['tc'].shape[1]),flush=True)
-            else : 
-             print(colored('  Number of wave vectors:                  ','green')+ str(mat['sigma'].shape[0]),flush=True)
+            print(colored('  Number of MFP:                           ','green')+ str(mat['tc'].shape[0]),flush=True)
+            print(colored('  Number of Solid Angles:                  ','green')+ str(mat['tc'].shape[1]),flush=True)
 
           if dim == 3:
            filling = np.sum(mesh['volumes'])/mesh['size'][0]/mesh['size'][1]/mesh['size'][2]

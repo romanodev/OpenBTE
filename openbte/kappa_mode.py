@@ -1,128 +1,93 @@
 import numpy as np
-from openbte.utils import *
+import openbte.utils as utils
+from mpi4py import MPI
 
-def write_mode_kappa(**argv):
- #-----------------------
- mat      = argv['material']
- solver      = argv['solver']
- geometry = argv['geometry']
- data = load_data(argv.setdefault('rta_material_file','rta'))
- #print(data)
- mfp_bulk = np.einsum('ki,k->ki',data['v'],data['tau'])
- if not (mat['model'] == 9): #not 3D
-  r = np.linalg.norm(mfp_bulk[:,:2],axis=1) #we only consider the projection
- else: 
-  r = np.linalg.norm(mfp_bulk,axis=1)
+comm = MPI.COMM_WORLD
+
+def plot_kappa_mode(kappa_mode):
+
+ if comm.rank == 0:
+   from pubeasy import MakeFigure
+
+   fig = MakeFigure()
+   fig.add_plot(kappa_mode['f']*1e-12,kappa_mode['mfp_nano']*1e6,model='scatter',color='r',name='Nano')
+   fig.add_plot(kappa_mode['f']*1e-12,kappa_mode['mfp_bulk'][:,0]*1e6,model='scatter',color='b',name='Bulk')
+   fig.add_labels('Frequency [THz]','Mean Free Path [$\mu$m]')
+   fig.finalize(grid=True,yscale='log',write = True,show=True,ylim=[1e-4,1e2])
+
+
+
+def kappa_mode_2DSym(material,rta,solver)->'kappa_mode':
+
+ data = None   
+ if comm.rank == 0:
+   mfp_bulk    = material['mfp_bulk']
+   r_bulk      = material['r_bulk']
+   sigma_bulk  = material['sigma_bulk']
+   phi_bulk    = material['phi_bulk']
+   mfp_sampled = material['mfp_sampled']
+   phi         = material['phi']
+
+   mfp_nano_sampled = solver['mfp_nano_sampled'] * 1e9
+   kappa_bulk = sigma_bulk[:,0]*mfp_bulk[:,0]
+
+   n_bulk = len(mfp_bulk)
+
+   mfp_nano = np.zeros(n_bulk)
+   a1,a2,m1,m2 = utils.fast_interpolation(r_bulk,mfp_sampled,scale='linear')
+   b1,b2,p1,p2 = utils.fast_interpolation(phi_bulk,phi,bound='periodic')
+   np.add.at(mfp_nano,np.arange(n_bulk),a1*b1*mfp_nano_sampled[m1,p1])
+   np.add.at(mfp_nano,np.arange(n_bulk),a1*b2*mfp_nano_sampled[m1,p2])
+   np.add.at(mfp_nano,np.arange(n_bulk),a2*b1*mfp_nano_sampled[m2,p1])
+   np.add.at(mfp_nano,np.arange(n_bulk),a2*b2*mfp_nano_sampled[m2,p2])
+
+   kappa_nano = sigma_bulk[:,0]*mfp_nano
+
+   data = {'kappa_nano':kappa_nano,'mfp_nano':mfp_nano,'kappa_bulk':kappa_bulk,'mfp_bulk':mfp_bulk,'f':material['f']}
+   
+ return utils.create_shared_memory_dict(data)
+
+
+def kappa_mode_3D(material,rta,solver)->'kappa_mode':
+
+ if comm.rank == 0:
+   mfp_bulk    = material['mfp_bulk']
+   r_bulk      = material['r_bulk']
+   sigma_bulk  = material['sigma_bulk']
+   phi_bulk    = material['phi_bulk']
+   theta_bulk  = material['theta_bulk']
+   mfp_sampled = material['mfp_sampled']
+   phi         = material['phi']
+   theta   = material['theta']
+
+   mfp_nano_sampled = solver['mfp_nano_sampled'] * 1e9
+   kappa_bulk = sigma_bulk[:,0]*mfp_bulk[:,0]
+
+   n_bulk = len(mfp_bulk)
+   n_phi  = len(phi)
+
+   a1,a2,m1,m2 = utils.fast_interpolation(r_bulk,mfp_sampled,scale='linear')
+   b1,b2,p1,p2 = utils.fast_interpolation(phi_bulk,phi,bound='periodic')
+   c1,c2,t1,t2 = utils.fast_interpolation(theta_bulk,theta,bound='periodic')
+
+   index_1 =  t1 * n_phi + p1; 
+   index_2 =  t1 * n_phi + p2;
+   index_3 =  t2 * n_phi + p1; 
+   index_4 =  t2 * n_phi + p2; 
+
+   mfp_nano = np.zeros(n_bulk)
+   np.add.at(mfp_nano,np.arange(n_bulk),a1*c1*b1*mfp_nano_sampled[m1,index_1])
+   np.add.at(mfp_nano,np.arange(n_bulk),a1*c1*b2*mfp_nano_sampled[m1,index_2])
+   np.add.at(mfp_nano,np.arange(n_bulk),a1*c2*b1*mfp_nano_sampled[m1,index_3])
+   np.add.at(mfp_nano,np.arange(n_bulk),a1*c2*b2*mfp_nano_sampled[m1,index_4])
  
- mfp_0 = 1e-10
- I = np.where(np.linalg.norm(mfp_bulk,axis=1) > mfp_0)[0]
- r = r[I]
- #I = np.arange(len(data['tau']))
- tau = data['tau'][I]
- v = data['v'][I]
- C = data['C'][I]
- f = data['f'][I]
- #f = np.divide(np.ones_like(tau),tau, out=np.zeros_like(tau), where=tau!=0)
- kappam = np.einsum('u,u,u,u->u',tau,C,v[:,0],v[:,0]) 
- Jc = np.einsum('k,ki->ki',C,v)
- nm = len(C)
- mfp_bulk = np.einsum('ki,k->ki',v,tau)
- phi_bulk = np.array([np.arctan2(m[0],m[1]) for m in mfp_bulk[:,:2]])
- phi_bulk[np.where(phi_bulk < 0) ] = 2*np.pi + phi_bulk[np.where(phi_bulk <0)]
- kappa = data['kappa']
- #---------------------------
+   np.add.at(mfp_nano,np.arange(n_bulk),a2*c1*b1*mfp_nano_sampled[m2,index_1])
+   np.add.at(mfp_nano,np.arange(n_bulk),a2*c1*b2*mfp_nano_sampled[m2,index_2])
+   np.add.at(mfp_nano,np.arange(n_bulk),a2*c2*b1*mfp_nano_sampled[m2,index_3])
+   np.add.at(mfp_nano,np.arange(n_bulk),a2*c2*b2*mfp_nano_sampled[m2,index_4])
 
- #Compute MFPs
- mfp_sampled  = mat['mfp_sampled']*1e9
- [n_phi,n_theta,n_mfp]  = mat['sampling']
- vmfp  = mat['VMFP']
- sigma  = mat['sigma']
- sigma = sigma[:,:,0].T
- Dphi = 2*np.pi/n_phi
- phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
- phi = list(phi)
- Dtheta = np.pi/n_theta
- theta = np.linspace(Dtheta/2,np.pi-Dtheta/2,n_theta,endpoint=True)
+   kappa_nano = sigma_bulk[:,0]*mfp_nano
 
- if mat['model'] == 9 :
-  theta_bulk = np.array([np.arccos((m/r[k])[2]) for k,m in enumerate(mfp_bulk)])
- #--------------------------------
+   data =  {'kappa_nano':kappa_nano,'mfp_nano':mfp_nano,'kappa_bulk':kappa_bulk,'mfp_bulk':mfp_bulk,'f':material['f']}
 
- dirr = int(geometry['meta'][-1])
-
- #--------
- #Compute kappa
- T_sampled = solver['kappa_mode']
-
- kappa_fourier = solver['kappa_fourier']
-
- #Interpolation to get kappa mode
- ratio = kappa_fourier/kappa[0,0]
-
- T_mode = np.zeros_like(kappam)
-
- if not (mat['model'] == 9): #not 3D
-   for m in range(nm):
-     (m1,a1,m2,a2) = interpolate(mfp_sampled,r[m]*1e9,bounds='extent')
-     (p1,b1,p2,b2) = interpolate(phi,phi_bulk[m],bounds='periodic',period=2*np.pi)
-
-     T_mode[m] += T_sampled[m1,p1]*a1*b1
-     T_mode[m] += T_sampled[m1,p2]*a1*b2
-     T_mode[m] += T_sampled[m2,p1]*a2*b1
-     T_mode[m] += T_sampled[m2,p2]*a2*b2
- else: #3D Model
-     
-   for m in range(nm):
-     (m1,a1,m2,a2) = interpolate(mfp_sampled,r[m]*1e9,bounds='extent')
-     (p1,b1,p2,b2) = interpolate(phi,phi_bulk[m],bounds='periodic',period=2*np.pi)
-     (t1,c1,t2,c2) = interpolate(theta,theta_bulk[m],bounds='periodic',period=2*np.pi)
-
-     index_1 =  t1 * n_phi + p1; 
-     index_2 =  t1 * n_phi + p2;
-     index_3 =  t2 * n_phi + p1; 
-     index_4 =  t2 * n_phi + p2; 
-
-     T_mode[m] += T_sampled[m1,index_1]*a1*c1*b1
-     T_mode[m] += T_sampled[m1,index_2]*a1*c1*b2
-     T_mode[m] += T_sampled[m1,index_3]*a1*c2*b1
-     T_mode[m] += T_sampled[m1,index_4]*a1*c2*b2
-
-     T_mode[m] += T_sampled[m2,index_1]*a2*c1*b1
-     T_mode[m] += T_sampled[m2,index_2]*a2*c1*b2
-     T_mode[m] += T_sampled[m2,index_3]*a2*c2*b1
-     T_mode[m] += T_sampled[m2,index_4]*a2*c2*b2
-
-
- T_mode *=1e9
-
- kappa_nano = np.einsum('i,i,i->i',C,v[:,0],T_mode)
- kappa_bulk = np.einsum('i,i,i->i',C,v[:,0],mfp_bulk[:,0])
- kappa_nano_ori = np.einsum('ij,ji',sigma,T_sampled)*1e9
-
- print('Check:')
- print('kappa (bulk):  ' + str(round(np.sum(kappa_bulk),2)) + ' W/m/K')
- print('kappa (mode-sampled):  ' + str(round(np.sum(kappa_nano),2)) + ' W/m/K')
- print('kappa (mfp-sampled): ' + str(round(kappa_nano_ori,2)) + ' W/m/K')
-
- mfp_nano = mfp_bulk.copy()
-
- mfp_nano[:,dirr] = T_mode
-
- #if argv.setdefault('show',True):
- # fig = MakeFigure()
- # fig.add_plot(f*1e-12,mfp_nano[:,dirr]*1e6,model='scatter',color='r')
- # fig.add_plot(f*1e-12,mfp_bulk[:,dirr]*1e6,model='scatter',color='b')
- # fig.add_labels('Frequency [THz]','Mean Free Path [$\mu$m]')
- # fig.finalize(grid=True,yscale='log',write = True,show=True,ylim=[1e-4,1e2])
-
-
- data = {'kappa_nano':kappa_nano,'mfp_nano':mfp_nano[:,dirr],'kappa_fourier':kappa_fourier,'mfp_bulk':mfp_bulk[:,dirr],'f':f,'kappa_bulk':kappa_bulk}
- if argv.setdefault('save',True):
-     save_data(argv.setdefault('kappa_mode_file','kappa_mode'),data)
-
- return data
-
-
-if __name__ == "__main__":
-
- main()
+ return utils.create_shared_memory_dict(data)

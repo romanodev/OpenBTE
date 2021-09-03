@@ -13,9 +13,7 @@ import pickle
 import gzip
 import time
 import matplotlib.tri as mtri
-
-
-
+import functools
 
 
 def fix_instability(F,B,scale=True):
@@ -38,6 +36,19 @@ def fix_instability(F,B,scale=True):
 os.environ['H5PY_DEFAULT_READONLY']='1'
 
 comm = MPI.COMM_WORLD
+
+
+def extract_variables(solver):
+
+   #Create variables from data--
+   variables = {}
+   variables['Temperature_BTE']      = {'data':solver['Temperature_BTE'],'units':'K','increment':[-1,0,0]}
+   variables['Temperature_Fourier']  = {'data':solver['Temperature_Fourier'],'units':'K','increment':[-1,0,0]}
+   variables['Flux_BTE']             = {'data':solver['Flux_BTE'],'units':'W/m/m/K','increment':[0,0,0]}
+   variables['Flux_Fourier']         = {'data':solver['Flux_Fourier'],'units':'W/m/m/K','increment':[0,0,0]}
+
+   return variables
+
 
 def fast_interpolation(fine,coarse,bound=False,scale='linear') :
 
@@ -121,6 +132,7 @@ def make_polygon(Na,A):
 
 
    return poly_clip  
+
 
 
 def create_loop(loops,line_list,store):
@@ -533,44 +545,6 @@ def check_distances(new_poly):
 
 
 
-def interpolate(vector,value,bounds='extent',period = None):
-
-   n = len(vector)
-
-   if value >= vector[0] and value <= vector[-1]:
-     
-    for m in range(n-1):
-      if (value <= vector[m+1]) and (value >= vector[m]) :
-        i = m; j = m + 1 
-        break
-    aj = (value-vector[i])/(vector[j]-vector[i]) 
-    ai = 1-aj
-    return i,ai,j,aj  
-
-   else:
-
-    if bounds == 'extent': 
-     if value < vector[0]:
-       i=0;j=1;
-     elif value > vector[-1]:
-       i=n-2;j=n-1;
-     aj = (value-vector[i])/(vector[j]-vector[i]) 
-     ai = 1-aj
-     return i,ai,j,aj 
-
-    elif bounds == 'periodic':     
-     i=n-1;j=0;
-     if value < vector[0]:
-       aj = (value + period -vector[i])/(vector[j] + period -vector[i])
-     elif value > vector[-1]:
-       aj = (value - vector[-1])/(vector[0] + period - vector[-1]) 
-
-     ai = 1-aj
-     return i,ai,j,aj 
-
-
-
-
 def get_linear_indexes(mfp,value,scale,extent):
 
    if value == 0:
@@ -612,68 +586,233 @@ def get_linear_indexes(mfp,value,scale,extent):
    return i,ai,j,aj  
 
 
+def load_shared(filename):
+
+    data = None
+    if comm.rank == 0:
+      data = load_data(filename)
+    data =   create_shared_memory_dict(data)  
+
+    return data
+
+
 def shared_array(value):
 
     data = {'dummy':value}
     return create_shared_memory_dict(data)['dummy']
 
 
-def get_kappa_map_from_mat(**argv):
+def sparse_dense_product(i,j,data,X):
+   #  This solves B_ucc' X_uc' -> A_uc
 
-        mat_map = argv['geometry']['elem_mat_map']
-        dim = int(argv['geometry']['meta'][2])
+   #  B_ucc' : sparse in cc' and dense in u. Data is its vectorized data COO descrition
+   #  X      : dense matrix
+   #  '''
 
-        kappa = argv['material']['kappa']
+     tmp = np.zeros_like(X)
+     np.add.at(tmp.T,i,data.T * X.T[j])
 
-        kappa = np.array(kappa)
-        if kappa.ndim == 3:
-            return np.array([ list(kappa[i][:dim,:dim])  for i in mat_map])
-        else:
-            return np.array([list(kappa)]*len(argv['geometry']['elems']))
-            
+     return tmp
+
+def compute_polar(mfp_bulk):
+     phi_bulk = np.array([np.arctan2(m[0],m[1]) for m in mfp_bulk])
+     phi_bulk[np.where(phi_bulk < 0) ] = 2*np.pi + phi_bulk[np.where(phi_bulk <0)]
+     r = np.linalg.norm(mfp_bulk[:,:2],axis=1) #absolute values of the projection
+     return r,phi_bulk 
+
+
+def compute_spherical(mfp_bulk):
+ r = np.linalg.norm(mfp_bulk,axis=1) #absolute values of the projection
+ phi_bulk = np.array([np.arctan2(m[0],m[1]) for m in mfp_bulk])
+ phi_bulk[np.where(phi_bulk < 0) ] = 2*np.pi + phi_bulk[np.where(phi_bulk <0)]
+ theta_bulk = np.array([np.arccos((m/r[k])[2]) for k,m in enumerate(mfp_bulk)])
+
+ return r,phi_bulk,theta_bulk
 
 
 def create_shared_memory_dict(varss):
+
+       dtype = [np.int32,np.int64,np.float32,np.float64]
 
        dict_output = {}
        if comm.Get_rank() == 0:
           var_meta = {} 
           for var,value in varss.items():
+           if callable(value) or type(value) == str or type(value) == int or type(value) == float:
+              var_meta[var] = [None,None,None,None,False] 
+              continue 
+           if type(value) == list: 
+              value = np.array(value)   
 
-           if type(value) == list: value = np.array(value)   
-           if value.dtype == np.int64:
-              data_type = 0
-              itemsize = MPI.INT.Get_size()
+           #Check types
+           if   value.dtype == np.int32:
+                data_type = 0
+                itemsize = MPI.INT32_T.Get_size()
+           elif value.dtype == np.int64:
+                data_type = 1
+                itemsize = MPI.INT64_T.Get_size()
+           elif value.dtype == np.float32:
+                data_type = 2
+                itemsize = MPI.FLOAT.Get_size() 
            elif value.dtype == np.float64:
-              data_type = 1
-              itemsize = MPI.DOUBLE.Get_size() 
+                data_type = 3
+                itemsize = MPI.DOUBLE.Get_size() 
            else:
+              var_meta[var] = [None,None,None,None,False] 
               print('data type for shared memory not supported for ' + var)
-              quit()
+              continue 
 
            size = np.prod(value.shape)
            nbytes = size * itemsize
-           var_meta[var] = [value.shape,data_type,itemsize,nbytes]
+           var_meta[var] = [value.shape,data_type,itemsize,nbytes,True]
 
        else: nbytes = 0; var_meta = None
        var_meta = comm.bcast(var_meta,root=0)
 
        #ALLOCATING MEMORY---------------
        for n,(var,meta) in enumerate(var_meta.items()):
-       
-        win = MPI.Win.Allocate_shared(meta[3],meta[2], comm=comm) 
-        buf,itemsize = win.Shared_query(0)
-        assert itemsize == meta[2]
-        dt = 'i' if meta[1] == 0 else 'd'
-        output = np.ndarray(buffer=buf,dtype=dt,shape=meta[0]) 
-        if comm.rank == 0: output[:] = varss[var]
-        dict_output[var] = output
+        if meta[-1]:
+         win = MPI.Win.Allocate_shared(meta[3],meta[2], comm=comm) 
+         buf,itemsize = win.Shared_query(0)
+         assert itemsize == meta[2]
+         dt = dtype[meta[1]]
+
+         output = np.ndarray(buffer=buf,dtype=dt,shape=meta[0]) 
+         if comm.rank == 0: output[:] = varss[var]
+         dict_output[var] = output
+        else:
+            if comm.rank == 0:  
+               dict_output[var] = varss[var]   
 
        del varss
        comm.Barrier()
 
        return dict_output
 
+
+def store_shared(func,*argv):
+    """ Run the function func with positional argument argv on proc 0 and broadcast the results on all processors"""
+    if comm.rank == 0:
+        output = func(*argv)
+    else:
+        output = None
+
+    return create_shared_memory_dict(output)     
+
+
+
+
+def duplicate_cells(geometry,variables,repeat,displ):
+
+   dim = int(geometry['meta'][2])
+   nodes = np.round(geometry['nodes'],4)
+   n_nodes = len(nodes)
+   #Correction in the case of user's mistake
+   if dim == 2:
+     repeat[2]  = 1  
+   #--------------------  
+   size = geometry['size']
+
+   #Create periodic vector
+   P = []
+   for px in size[0]*np.arange(repeat[0]):
+    for py in size[1]*np.arange(repeat[1]):
+     for pz in size[2]*np.arange(repeat[2]):
+       P.append([px,py,pz])  
+   P = np.asarray(P[1:],np.float32)
+
+   #Compute periodic nodes------------------
+   pnodes = []
+   for s in list(geometry['periodic_sides'])+ list(geometry['inactive_sides']):
+     pnodes += list(geometry['sides'][s])
+   pnodes = list(np.unique(np.array(pnodes)))
+   #--------------------------------------------
+
+   #Repeat Nodes
+   #-----------------------------------------------------
+   def repeat_cell(axis,n,d,nodes,replace,displ):
+
+    tmp = nodes.copy()
+    for x in np.arange(n-1):
+     tmp[:,axis] +=  size[axis] + displ
+
+     nodes = np.vstack((nodes,tmp))
+    
+    return nodes,replace
+
+   replace = {}  
+   for i in range(int(geometry['meta'][2])):
+     nodes,replace = repeat_cell(i,repeat[i],size[i],nodes,replace,displ[i])
+   #---------------------------------------------------
+
+   #Repeat elements----------
+   unit_cell = np.array(geometry['elems']).copy()
+  
+   elems = geometry['elems'] 
+   for i in range(np.prod(repeat)-1):
+     elems = np.vstack((elems,unit_cell+(i+1)*(n_nodes)))
+
+   #duplicate variables---
+   for n,(key, value) in enumerate(variables.items()):  
+     unit_cell = value['data'].copy() 
+     for nz in range(repeat[2]):
+      for ny in range(repeat[1]):
+       for nx in range(repeat[0]):
+           if nx + ny + nz > 0:  
+            inc = value['increment'][0]*nx + value['increment'][1]*ny + value['increment'][2]*nz
+            tmp = unit_cell - inc
+            if value['data'].ndim == 1:
+             value['data'] = np.hstack((value['data'],tmp))
+            else: 
+             value['data'] = np.vstack((value['data'],tmp))
+
+     variables[key]['data'] = value['data']
+
+   geometry['elems'] = elems
+   geometry['nodes'] = nodes
+
+   #return the new side
+   size = [geometry['size'][i] *repeat[i]   for i in range(dim)]
+
+   return size
+
+
+
+
+def get_node_data(variables,geometry):
+
+
+ var0 = list(variables.keys())[0]
+
+
+ if not len(variables[var0]['data']) == len(geometry['nodes']):
+
+  dim = int(geometry['meta'][2])
+  for key,tmp in variables.items():
+   data = tmp['data']
+   #NEW-------------
+   conn = np.zeros(len(geometry['nodes']))
+   if data.ndim == 2:
+       node_data = np.zeros((len(geometry['nodes']),dim))
+   elif data.ndim == 3:   
+       node_data = np.zeros((len(geometry['nodes']),3,3))
+   else:   
+       node_data = np.zeros(len(geometry['nodes']))
+    
+   #This works only with uniform type of elements 
+   elem_flat = np.array(geometry['elems']).flat
+   np.add.at(node_data,elem_flat,np.repeat(data,len(geometry['elems'][0]),axis=0))
+   np.add.at(conn,elem_flat,np.ones_like(elem_flat))
+
+   if data.ndim == 2:
+       np.divide(node_data,conn[:,np.newaxis],out=node_data)
+   elif data.ndim == 3:
+       np.divide(node_data,conn[:,np.newaxis,np.newaxis],out=node_data)
+   else: 
+       np.divide(node_data,conn,out=node_data)
+   #-----------------------
+   variables[key]['data'] = node_data
+   
 
 def repeat_nodes_and_data(data_uc,nodes_uc,increment,repeat,size,cells_uc):
 

@@ -57,38 +57,54 @@ def unpack(data):
     return data[0],np.array(data[1])
 
 
+def get_kappa_map_from_mat(**argv):
+
+        mat_map = argv['geometry']['elem_mat_map']
+        dim = int(argv['geometry']['meta'][2])
+
+        kappa = argv['material']['kappa']
+
+        kappa = np.array(kappa)
+        if kappa.ndim == 3:
+            return np.array([ list(kappa[i][:dim,:dim])  for i in mat_map])
+        else:
+            return np.array([list(kappa)]*len(argv['geometry']['elems']))
+
+
 def solve_fourier_single(argv):
    """ Solve Fourier with a single set of kappa """
 
 
-   data = None
+   #data = None
 
-   if comm.rank == 0:
+   #if comm.rank == 0:
 
-    mesh = argv['geometry']
+   mesh = argv['geometry']
 
-    if 'kappa_map_external' in argv.keys(): #read external kappa map
+   if 'kappa_map_external' in argv.keys(): #read external kappa map
      mesh['elem_kappa_map'] = argv['kappa_map_external']
-    else: 
+   else: 
      mesh['elem_kappa_map'] = get_kappa_map_from_mat(**argv)
      #['kappa_map_external'] = mesh['elem_kappa_map']
 
-     
+    
+   kappa = -1 #it means that it will take the map from mesh
 
-    kappa = -1 #it means that it will take the map from mesh
+   F,B,scale = assemble(mesh,kappa)
 
-    F,B,scale = assemble(mesh,kappa)
+   meta,temp,grad =  solve_convergence(argv,kappa,B,splu(F),scale=scale)
 
-    meta,temp,grad =  solve_convergence(argv,kappa,B,splu(F),scale=scale)
+   kappa_map = get_kappa_map(mesh,kappa)
 
-    kappa_map = get_kappa_map(mesh,kappa)
+   flux = -np.einsum('cij,cj->ci',kappa_map,grad)
 
-    flux = -np.einsum('cij,cj->ci',kappa_map,grad)
-
-    if argv['verbose']:
+   if argv.setdefault('verbose',False):
      fourier_info(meta)
    
-    data = {'meta':meta,'flux':flux,'temperature':temp,'grad':grad}
+   data = {'meta':meta,'flux':flux,'temperature':temp,'grad':grad}
+
+
+   clear_fourier_cache()
 
    return data
 
@@ -166,7 +182,7 @@ def compute_laplacian(temp,**argv):
 
 
 @cached(cache=cache_compute_grad_data,key=lambda mesh,dummy:dummy)
-def compute_grad_data(mesh,TB):
+def compute_grad_data(mesh,jump):
 
      #Compute deltas-------------------   
      rr = []
@@ -183,6 +199,7 @@ def compute_grad_data(mesh,TB):
       if ll in mesh['periodic_sides']:
          delta = mesh['periodic_side_values'][list(mesh['periodic_sides']).index(ll)]
       else: delta = 0  
+      if jump == 0: delta= 0
 
       rr[kc1][ind1] = [kc2,kc1, delta] 
       rr[kc2][ind2] = [kc1,kc2,-delta]
@@ -194,7 +211,8 @@ def compute_grad(temp,**argv):
 
    mesh = argv['geometry'] 
 
-   rr = compute_grad_data(mesh,1)
+   argv.setdefault('jump',True)
+   rr = compute_grad_data(mesh,argv['jump'])
 
    diff_temp = [[temp[j[0]]-temp[j[1]]+j[2] for j in f] for f in rr]
    
@@ -266,7 +284,6 @@ def compute_diffusive_thermal_conductivity(temp,kappa_map,**argv):
    for ll in mesh['flux_sides']:
     (i,j) = mesh['side_elem_map_vec'][ll]
     area = mesh['areas'][ll]
-
 
     kappa_loc = get_kappa(mesh,i,j,ll,kappa_map)
     (v_orth,v_non_orth) = get_decomposed_directions(mesh,get_key(ll,kappa_loc))
@@ -388,12 +405,8 @@ def assemble(mesh,kappa):
 
     F = sp.csc_matrix((np.array(dff),(np.array(iff),np.array(jff))),shape = (n_elems,n_elems))
 
-    #print(F[0,0])
-    #quit()
-    #This scale the matrix and fixed zero temperature to a random point
     scale = fix_instability(F,B,scale=False)
-    F.toarray().dump('F')
-    #scale = np.ones(n_elems)
+
     return F,B,scale
 
 

@@ -3,14 +3,83 @@ import plotly
 import plotly.graph_objs as go
 import numpy as np
 import sys
-from .utils import *
+import openbte.utils as utils
 import time
+from mpi4py import MPI
+comm = MPI.COMM_WORLD
+
+def get_surface_nodes(variables,geometry):
+
+     sides = list(geometry['boundary_sides']) + \
+                     list(geometry['periodic_sides']) + \
+                     list(geometry['inactive_sides'])
+
+     nodes = geometry['sides'][sides].flat
 
 
-def plot_results(solver,geometry,**argv):
+     triangles = np.arange(len(nodes)).reshape((len(sides),3))
+     
+     for key in variables.keys():
+        solver['variables'][key]['data'] = solver['variables'][key]['data'][nodes]
 
 
-   data  = solver['variables']
+     geometry['nodes'] = geometry['nodes'][nodes]
+     geometry['elems'] = np.array(triangles)
+
+
+def expand_variables(data,geometry):
+
+  dim     = int(geometry['meta'][2])
+  n_elems = len(geometry['elems'])
+
+
+  #Here we unroll variables for later use--
+  variables = {}
+  for key,value in data.items():
+  
+     if value['data'].ndim == 1: #scalar
+       variables[key] = {'data':value['data'],'units':value['units'],'increment':value['increment']}
+       n_elems = len(value['data'])
+     elif value['data'].ndim == 2 : #vector 
+         variables[key + '(x)'] = {'data':value['data'][:,0],'units':value['units'],'increment':value['increment']}
+         variables[key + '(y)'] = {'data':value['data'][:,1],'units':value['units'],'increment':value['increment']}
+         if dim == 3: 
+             variables[key + '(z)'] = {'data':value['data'][:,2],'units':value['units'],'increment':value['increment']}
+         mag = np.array([np.linalg.norm(value) for value in value['data']])
+         variables[key + '(mag.)'] = {'data':mag,'units':value['units'],'increment':value['increment']}
+
+  variables['structure'] = {'data':np.zeros(n_elems),'units':'','increment':[0,0,0]}       
+
+  return variables
+ 
+
+
+
+
+
+def plot_results(solver,geometry,material,options_maps):
+
+ if comm.rank == 0:  
+   #Parse options--
+   repeat   = options_maps.setdefault('repeat',[1,1,1])
+   displ    = options_maps.setdefault('displ',[0,0,0])
+   #---------------
+
+   dim = int(geometry['meta'][2])
+
+   data = utils.extract_variables(solver)
+
+   data = expand_variables(data,geometry) #this is needed to get the component-wise data for plotly
+   
+   utils.get_node_data(data,geometry)
+
+   if np.prod(repeat) > 1:
+      utils.duplicate_cells(geometry,data,repeat,displ)
+
+   if dim == 3:
+      get_surface_nodes(variables,geometry)
+
+
    nodes = geometry['nodes']
    elems = np.array(geometry['elems'])
    size  = [max(nodes[:,i]) - min(nodes[:,i])  for i in range(3)] 
@@ -83,14 +152,14 @@ def plot_results(solver,geometry,**argv):
          )
 
    #axis = dict(ticktext=[],tickvals= [],showbackground=False)
- 
-   bb = str(round(solver['kappa_bte'][-1],2))+' W/m/K' if 'kappa_bte' in solver.keys() else '--'
 
-   meta  = 'Bulk: ' + str(round(solver['kappa_bulk'],2)) +' W/m/K<br>Fourier: '\
-                    +       str(round(solver['kappa_fourier'],2)) + ' W/m/K<br>BTE:' \
+   dirr = int(geometry['meta'][-1])
+   bb = str(round(solver['kappa'][0],2))+' W/m/K' if 'kappa' in solver.keys() else '--'
+
+   #Add thermal conductivity value------
+   meta  = 'Bulk: ' + str(round(material['kappa'][dirr,dirr],2)) +' W/m/K<br>Fourier: '\
+                    +       str(round(solver['kappa_fourier'][0],2)) + ' W/m/K<br>BTE:' \
                     +       bb
-
-
 
    fig.add_annotation(
             x=0.97,
@@ -99,6 +168,8 @@ def plot_results(solver,geometry,**argv):
             showarrow=False,
             yref='paper',
             text=meta,align='left')
+   #-------------------------------------
+
 
 
 
@@ -125,8 +196,8 @@ def plot_results(solver,geometry,**argv):
    fig.update_layout(scene_camera=camera)
    fig.update_layout(updatemenus=updatemenus)
 
-   if argv.setdefault('write_html',False):
-    fig.write_html("plotly.html")
+   #if argv.setdefault('write_html',False):
+   # fig.write_html("plotly.html")
    #plotly.io.write_json(fig,'ff.json')
 
    # plotly.io.to_image(fig,format='png')
@@ -137,5 +208,9 @@ def plot_results(solver,geometry,**argv):
      fig.show(renderer='browser')
 
 
-   return fig
+     #    output.update({'bte':solver['kappa_bte'][-1]}) 
+
+
+
+
 

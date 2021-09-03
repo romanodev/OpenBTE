@@ -15,6 +15,16 @@ import shutil
 
 comm = MPI.COMM_WORLD
 
+def database(database_material)->'rta':
+   data = None 
+   if comm.rank == 0:
+     filename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + \
+                  '/openbte/materials/' +  database_material
+   
+     data = load_data(filename)
+
+   return create_shared_memory_dict(data)
+
 def Material(**argv):
 
   if 'custom' in argv.keys():
@@ -24,25 +34,18 @@ def Material(**argv):
    model = argv.setdefault('model','rta3D')
 
    #set up database
-   source = argv.setdefault('source','database')
-   if source == 'database':
-    if comm.rank == 0:
-        if 'temperature' in argv.keys():
-         filename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + \
-                  '/openbte/materials/rta_' +  argv['filename'] + \
-                  '_' + str(argv['temperature']) 
-        else:          
-         if not model == 'gray':
-          filename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + \
-                  '/openbte/materials/' +  argv['filename']  
-
-        if not model == 'gray':
-         argv['filename'] = filename
-
+   if not model == 'gray':
+    source = argv.setdefault('source','database')
+    if source == 'database':
+         rta = database(argv['filename'])  
+    else :     
+         rta = load_data(argv['filename'])  
 
    if model == 'rta2DSym':
-     if comm.rank == 0:
-      data = rta2DSym(**argv)
+      data  = rta2DSym(rta,argv)
+
+   elif model == 'rta3D':
+      data  = rta3D(rta,argv)
 
    elif model == 'fourier':
       
@@ -55,24 +58,8 @@ def Material(**argv):
        kappa[2,2] = argv['kappa_zz']
       data = {'kappa':kappa,'model':[0]}
 
-   elif model == 'mfp2D':
-      data = mfp2D(**argv)
-
-   elif model == 'mfp2DSym':
-      data = mfp2DSym(**argv)
-
    elif model == 'gray':
-      data = gray2D(**argv)
-
-    #elif model == 'gray3D':
-    #   data = mfp3D(**argv)
-   
-   elif model == 'mfp3D':
-      data = mfp3D(**argv)
-
-   elif model == 'rta3D':
-     if comm.rank == 0:
-      data = rta3D(**argv)
+      data = gray2D(argv)
 
    else:   
       print('No model recognized')
@@ -83,8 +70,7 @@ def Material(**argv):
      if comm.rank == 0:
          save_data(argv.setdefault('output_filename','material'),data)   
 
-  if comm.rank == 0:
-    return data
+  return data
 
  
 

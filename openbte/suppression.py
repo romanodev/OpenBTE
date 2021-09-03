@@ -1,68 +1,83 @@
 import numpy as np
-from openbte.utils import *
+import openbte.utils as utils
+import matplotlib.pylab as plt
+from mpi4py import MPI
+
+comm = MPI.COMM_WORLD
+
+def suppression(solver,material,options_suppression)->'suppression':
+
+ data = None
+ if comm.rank == 0:
+
+  m1 = options_suppression.setdefault('m',0)
+  l1 = options_suppression.setdefault('l',3)
 
 
-
-def write_suppression(**argv):
-
-
- sol = load_data('solver')
- T_sampled = sol['kappa_mode'].T
-
- if argv.setdefault('fourier',False):
-  T_sampled_f = sol['kappa_mode_f'].T
-
- if argv.setdefault('zero',False):
-  T_sampled_0 = sol['kappa_0'].T
+  phi = material['phi']
+  mfp_sampled = material['mfp_sampled']
+  n_mfp = len(mfp_sampled)
+  n_phi = len(phi)
 
 
- #----------------------------------
- #Compute MFPs
- mat = load_data('material')
- mfp_sampled  = mat['mfp_sampled']*1e9
- sigma  = mat['sigma']*1e9
+  #--------------- 
+  l2 = int(n_phi/2)-l1
+  l3 = int(n_phi/2)+l1
+  l4 = int(n_phi)  -l1
 
- vmfp  = mat['VMFP']
- [n_phi,n_theta,n_mfp]  = mat['sampling']
+  #Mesh--
 
- Dphi = 2*np.pi/n_phi
- phi = np.linspace(Dphi/2,2.0*np.pi-Dphi/2,n_phi,endpoint=True)
- phi = list(phi)
- bmfp = np.linalg.norm(vmfp,axis=1)
- mfp_vec = np.outer(vmfp[:,0],mfp_sampled)
- M = mfp_vec
- #-----------------------------
+  #-----------
+  mfp_0 = 1e-10
+  mfp   = np.log10(mfp_sampled)
+  mfp  -= np.min(mfp)
+  mfp  +=1
+  #------------
 
- S = T_sampled/M*1e18
- if argv.setdefault('fourier',False):
-  Sf = T_sampled_f/M*1e18
-  Smf = np.mean(Sf,axis=0)
- Sm = np.mean(S,axis=0)
+  R, P = np.meshgrid(mfp, phi)
+  X, Y = R*np.cos(P+np.pi/2), R*np.sin(P+np.pi/2)
+  #----------
+  mfp_nano = solver['mfp_nano_sampled']
+
+  S = np.divide(mfp_nano,material['F'][:,:,0],\
+          out=np.zeros_like(mfp_nano), where=material['F'][:,:,0]!=0)*1e9
+  S = S.reshape((n_mfp,n_phi)).T
+
+  Sm = 0.5*(np.mean(S[l1:l2,m1:] + S[l3:l4,m1:],axis=0))
+
+  #Cut unnecessary data
+  S[0 :l1] = 0
+  S[l2:l3] = 0
+  S[l4:  ] = 0
+  S[:,:m1] = 0
+  
+  data = {'S':S,'X':X,'Y':Y,'mfp':mfp_sampled,'Sm':Sm}
+
+ return utils.create_shared_memory_dict(data)
+
+
+def plot_suppression(suppression):
+
+  from pubeasy import MakeFigure
+
+  Sm = suppression['Sm']
+  mfp = suppression['mfp']
+  fig = MakeFigure()
+  fig.add_plot(mfp,Sm,color='k')
+  fig.add_labels('MFP [nm]','Suppression')
+  fig.finalize(grid=True,xscale='log',write = True,show=True)
  
- #if argv.setdefault('show',True):
- # fig = MakeFigure()
- # fig.add_plot(mfp_sampled*1e-3,Sm,color='k',name='bte')
- # if argv.setdefault('fourier',False):
- #  fig.add_plot(mfp_sampled*1e-3,Smf,color='g',name='fourier')
- # fig.add_labels('Mean Free Path [$\mu$ m]','Suppression')
- #fig.finalize(grid=True,xscale='log',write = False,show=True,ylim=[0,1])
 
- #if argv.setdefault('mode_resolved',False):
- 
- #    nm = n_mfp
- #    phis = range(n_phi)
+def plot_angular_suppression(suppression):
 
- #    for p in phis:
- #        fig = MakeFigure()
- #        fig.add_plot(mfp_sampled[:nm]*1e-3,S[p,:nm],color='k',marker='o')
- #        fig.add_plot(mfp_sampled[:nm]*1e-3,Sf[p,:nm],color='r',marker='o')
- #        fig.finalize(grid=True,xscale='log',write = False,show=True)
-    
+  S  = suppression['S']
+  X  = suppression['X']
+  Y  = suppression['Y']
+  axs = plt.subplot(111,projection='3d')
+  axs.set_xlabel('X')
+  axs.set_ylabel('Y')
+  axs.plot_surface(X, Y, S,antialiased=True,cmap='viridis', edgecolor='none',vmin=0,vmax=0.5)
+  axs.set_zlim([0,1])
+  plt.show() 
 
- save_data(argv.setdefault('suppression_file','suppression'),{'mfp':mfp_sampled,'suppression':Sm})
 
- return mfp_sampled,Sm
-
-if __name__ == '__main__':
-
-    main(show=True)
