@@ -50,7 +50,7 @@ def solve_rta(geometry,material,temperatures,options_solve_rta)->'solver':
 
     X             = temperatures['data']
     kappa_fourier = temperatures['kappa'][0]
-
+    
 
     n_elems = len(geometry['elems'])
     mfp = material['mfp_sampled']*1e9
@@ -154,7 +154,7 @@ def solve_rta(geometry,material,temperatures,options_solve_rta)->'solver':
                  if len(geometry['eb']) > 0:
                   np.add.at(TBp,np.arange(geometry['eb'].shape[0]),-X[geometry['eb']]*GG[m,q])
 
-                 Jp += np.einsum('c,j->cj',X,sigma[m,q,0:dim])*1e-18
+                 Jp += np.einsum('c,j->cj',X,sigma[m,q,0:dim])*1e-9
 
         DeltaT_old = DeltaT.copy()
 
@@ -178,9 +178,21 @@ def solve_rta(geometry,material,temperatures,options_solve_rta)->'solver':
     if verbose and comm.rank == 0:
       print(colored(' -----------------------------------------------------------','green'),flush=True)
 
+
     cache_compute_lu.clear()
 
-    return {'Temperature_BTE':DeltaT,'Flux_BTE':J,'mfp_nano_sampled':kappa,'kappa':kappa_tot,'Temperature_Fourier':temperatures['data'],'Flux_Fourier':temperatures['flux'],'kappa_fourier':temperatures['kappa']}
+    #Add a dummy dimesion--
+    if dim == 2:J = np.append(J, np.zeros((n_elems,1)), axis=1)
+
+    data = {'Temperature_BTE':DeltaT,'Flux_BTE':J,'mfp_nano_sampled':kappa,'kappa':kappa_tot,'Temperature_Fourier':temperatures['data'],'Flux_Fourier':temperatures['flux'],'kappa_fourier':temperatures['kappa']}
+
+    #Compute vorticity---
+    if options_solve_rta.setdefault('compute_vorticity',False):
+        data.update({'vorticity_BTE'    :compute_vorticity(geometry,J)['vorticity']}) 
+        data.update({'vorticity_Fourier':compute_vorticity(geometry,temperatures['flux'])['vorticity']}) 
+    #-------------------
+
+    return data
 
 
 

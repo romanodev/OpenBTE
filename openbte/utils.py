@@ -12,8 +12,39 @@ import math
 import pickle
 import gzip
 import time
-import matplotlib.tri as mtri
 import functools
+
+
+
+def compute_grad_common(data,geometry):
+     """ Compute grad via least-square method """
+     jump = True
+     #Compute deltas-------------------   
+     rr = []
+
+     for i in geometry['side_per_elem']:
+       rr.append(i*[0])
+
+     #this is wrong
+     for ll in geometry['active_sides'] :
+      kc1,kc2 = geometry['side_elem_map_vec'][ll]
+      ind1    = list(geometry['elem_side_map_vec'][kc1]).index(ll)
+      ind2    = list(geometry['elem_side_map_vec'][kc2]).index(ll)
+
+      delta = 0
+      if ll in geometry['periodic_sides']:
+         delta = geometry['periodic_side_values'][list(geometry['periodic_sides']).index(ll)]
+      else: delta = 0  
+
+      if jump == 0: delta= 0
+
+      rr[kc1][ind1] = [kc2,kc1, delta] 
+      rr[kc2][ind2] = [kc1,kc2,-delta]
+
+     diff_data = [[data[j[0]]-data[j[1]]+j[2] for j in f] for f in rr]
+
+     return np.array([np.einsum('js,s->j',geometry['weigths'][k,:,:geometry['n_non_boundary_side_per_elem'][k]],np.array(dt)) for k,dt in enumerate(diff_data)])
+
 
 
 def fix_instability(F,B,scale=True):
@@ -44,10 +75,65 @@ def extract_variables(solver):
    variables = {}
    variables['Temperature_BTE']      = {'data':solver['Temperature_BTE'],'units':'K','increment':[-1,0,0]}
    variables['Temperature_Fourier']  = {'data':solver['Temperature_Fourier'],'units':'K','increment':[-1,0,0]}
-   variables['Flux_BTE']             = {'data':solver['Flux_BTE'],'units':'W/m/m/K','increment':[0,0,0]}
-   variables['Flux_Fourier']         = {'data':solver['Flux_Fourier'],'units':'W/m/m/K','increment':[0,0,0]}
+   variables['Flux_BTE']             = {'data':solver['Flux_BTE'],'units':'W/m/m','increment':[0,0,0]}
+   variables['Flux_Fourier']         = {'data':solver['Flux_Fourier'],'units':'W/m/m','increment':[0,0,0]}
+   if 'vorticity_BTE' in solver.keys():
+    variables['vorticity_BTE']       = {'data':solver['vorticity_BTE']    ,'units':'W/m/m/m','increment':[0,0,0]}
+   if 'vorticity_Fourier' in solver.keys():
+    variables['vorticity_Fourier']   = {'data':solver['vorticity_Fourier'],'units':'W/m/m/m','increment':[0,0,0]}
+
 
    return variables
+
+
+def compute_vorticity(geometry,J):
+   """Compute vorticity (only for 2D cases)"""
+
+   data = None  
+   if comm.rank == 0:
+    vorticity = np.zeros((len(geometry['elems']),3))
+    grad_x = compute_grad_common(J[:,0],geometry)
+    grad_y = compute_grad_common(J[:,1],geometry)
+    #Defines only for 2D
+    vorticity[:,2] = grad_y[:,0]-grad_x[:,1]
+    data = {'vorticity':vorticity*1e9} #W/m/m/m
+    
+   return create_shared_memory_dict(data)
+    
+  
+
+
+
+def expand_variables(data,geometry):
+
+  dim     = int(geometry['meta'][2])
+  n_elems = len(geometry['elems'])
+
+
+  #Here we unroll variables for later use--
+  variables = {}
+  for key,value in data.items():
+  
+     if value['data'].ndim == 1: #scalar
+       variables[key] = {'data':value['data'],'units':value['units'],'increment':value['increment']}
+       n_elems = len(value['data'])
+     elif value['data'].ndim == 2 : #vector 
+         variables[key + '(x)'] = {'data':value['data'][:,0],'units':value['units'],'increment':value['increment']}
+         variables[key + '(y)'] = {'data':value['data'][:,1],'units':value['units'],'increment':value['increment']}
+         #if dim == 3: 
+         variables[key + '(z)'] = {'data':value['data'][:,2],'units':value['units'],'increment':value['increment']}
+         mag = np.array([np.linalg.norm(value) for value in value['data']])
+         variables[key + '(mag.)'] = {'data':mag,'units':value['units'],'increment':value['increment']}
+
+  variables['structure'] = {'data':np.zeros(n_elems),'units':'','increment':[0,0,0]}       
+
+  return variables
+ 
+
+
+
+
+
 
 
 def fast_interpolation(fine,coarse,bound=False,scale='linear') :
@@ -224,8 +310,10 @@ def load_data(fh):
      if os.path.isfile(fh + '.npz'):
       with gzip.open(fh + '.npz', 'rb') as f:
           return pickle.load(f)
+     print("Can't load " + fh)
+     quit()
      return -1 
-
+    comm.Barrier()
 
 
 
@@ -424,78 +512,6 @@ def repeat_merge_scale(argv):
 
 
 
-
-
-def compute_line_data(**argv):
-
-
- solver = argv['solver']
- mesh = argv['geometry']
-
- data = solver['variables'][argv['variable']]['data']
- 
- guess = []
- old_mat = 1
- p_old = [-1e3,-1e3]
- crossing = []
- pair = []
- p1 = np.array(argv['p1'])
- p2 = np.array(argv['p2'])
- N = argv['N']
-
- L = []
- tmp_L = []
- output = []
- tmp_output = []
- already_passed = False
- dx = []
- for kk in range(N):
-
-   p = p1 + (p2 - p1)*kk/(N-1)
-
-   if len(dx) == 0:
-    dx.append(0)
-   else: 
-    dx.append(dx[-1] + np.linalg.norm(p-p_old))
-    
-
-   elem,x,y,found = find_elem(mesh,p,guess)
-
-   if found:
-
-    already_passed = False
-    new_elem = elem
-
-    nodes = mesh['elems'][elem]
-
-    if len(nodes) == 3:
-     d = mtri.LinearTriInterpolator(mtri.Triangulation(x, y,[[0,1,2]]),data[nodes])(p[0],p[1]).data
-    else:
-     d = interpolate.interp2d(x, y, data[nodes], kind='linear')(p[0],p[1])[0]
-
-    tmp_output.append(float(d))
-
-    tmp_L.append(dx[-1])
-
-   else:
-       if not already_passed :
-        L.append(tmp_L)   
-        output.append(tmp_output)
-        tmp_output = []
-        tmp_L = []
-        already_passed = True
-
-   guess = compute_neighbors(mesh,elem)  
-
-   old_elem = new_elem
-   p_old = p.copy()
-
-
- L.append(tmp_L)   
- output.append(tmp_output)
-
-
- return L,output
 
 
 
@@ -793,7 +809,7 @@ def get_node_data(variables,geometry):
    #NEW-------------
    conn = np.zeros(len(geometry['nodes']))
    if data.ndim == 2:
-       node_data = np.zeros((len(geometry['nodes']),dim))
+       node_data = np.zeros((len(geometry['nodes']),3))
    elif data.ndim == 3:   
        node_data = np.zeros((len(geometry['nodes']),3,3))
    else:   

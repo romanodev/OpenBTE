@@ -6,12 +6,12 @@ from .utils import *
 from .viewer import *
 from .kappa_mode import *
 from .suppression import *
+from .line_data import*
 from .vtu import *
 from scipy.spatial import distance
 import numpy.ma as ma
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
-
 
 
 
@@ -37,13 +37,12 @@ def Plot(**argv):
 
      return output
 
-   #elif model == 'line':
+   elif model == 'line':
 
-   #  get_node_data(solver,geometry)
+     line_data = compute_line_data(solver,geometry,argv)
 
-   #  duplicate_cells(geometry,solver,argv.setdefault('repeat',[1,1,1]))
-
-   #  return compute_line_data(**argv)
+     if argv.setdefault('show',False):
+        plot_line_data(line_data) 
      
 
    elif model == 'vtu':

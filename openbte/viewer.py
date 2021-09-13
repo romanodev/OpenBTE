@@ -27,36 +27,6 @@ def get_surface_nodes(variables,geometry):
      geometry['elems'] = np.array(triangles)
 
 
-def expand_variables(data,geometry):
-
-  dim     = int(geometry['meta'][2])
-  n_elems = len(geometry['elems'])
-
-
-  #Here we unroll variables for later use--
-  variables = {}
-  for key,value in data.items():
-  
-     if value['data'].ndim == 1: #scalar
-       variables[key] = {'data':value['data'],'units':value['units'],'increment':value['increment']}
-       n_elems = len(value['data'])
-     elif value['data'].ndim == 2 : #vector 
-         variables[key + '(x)'] = {'data':value['data'][:,0],'units':value['units'],'increment':value['increment']}
-         variables[key + '(y)'] = {'data':value['data'][:,1],'units':value['units'],'increment':value['increment']}
-         if dim == 3: 
-             variables[key + '(z)'] = {'data':value['data'][:,2],'units':value['units'],'increment':value['increment']}
-         mag = np.array([np.linalg.norm(value) for value in value['data']])
-         variables[key + '(mag.)'] = {'data':mag,'units':value['units'],'increment':value['increment']}
-
-  variables['structure'] = {'data':np.zeros(n_elems),'units':'','increment':[0,0,0]}       
-
-  return variables
- 
-
-
-
-
-
 def plot_results(solver,geometry,material,options_maps):
 
  if comm.rank == 0:  
@@ -69,7 +39,7 @@ def plot_results(solver,geometry,material,options_maps):
 
    data = utils.extract_variables(solver)
 
-   data = expand_variables(data,geometry) #this is needed to get the component-wise data for plotly
+   data = utils.expand_variables(data,geometry) #this is needed to get the component-wise data for plotly
    
    utils.get_node_data(data,geometry)
 

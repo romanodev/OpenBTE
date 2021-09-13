@@ -16,12 +16,7 @@ def first_guess(geometry,material,options_first_guess)->'temperatures':
 
     f = fourier.solve_fourier_single(argv)
 
-    if options_first_guess.setdefault('add_gradient',False):
-     X = f['temperature'][np.newaxis,:]-np.einsum('uj,cj->uc',material['F'],f['grad'])*1e9*0
-    else:
-     X = f['temperature']
-
-    data =  {'data':X,'kappa':[f['meta'][0]],'flux':f['flux']}
+    data =  {'data':f['temperature'],'kappa':[f['meta'][0]],'flux':f['flux'],'gradT':f['grad']}
     
    return utils.create_shared_memory_dict(data)
 

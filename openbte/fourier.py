@@ -96,7 +96,14 @@ def solve_fourier_single(argv):
 
    kappa_map = get_kappa_map(mesh,kappa)
 
-   flux = -np.einsum('cij,cj->ci',kappa_map,grad)
+   flux = -np.einsum('cij,cj->ci',kappa_map,grad)*1e9
+
+   #add an extra dimension if needed
+
+   dim = int(mesh['meta'][2])
+   n_elems = len(mesh['elems'])
+   if dim == 2:flux = np.append(flux, np.zeros((n_elems,1)), axis=1)
+
 
    if argv.setdefault('verbose',False):
      fourier_info(meta)
@@ -335,6 +342,7 @@ def solve_convergence(argv,kappa,B,SU,log=False,scale=[]):
         kappa_old = kappa_eff
         n_iter +=1
         C,grad = compute_secondary_flux(temp,kappa_map,**argv)
+
 
     return [kappa_eff,error,n_iter],temp,grad 
 

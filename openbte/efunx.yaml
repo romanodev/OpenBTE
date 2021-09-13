@@ -1,26 +1,29 @@
 ---
-  functions:
-   - almabte2openbte/almabte2openbte
-   - rta2DSym/rta2DSym
-   - rta3D/rta3D
-   - gray2D/gray2D
-   - geometry/geometry
-   - first_guess/first_guess
-   - solve_rta/solve_rta
-   - kappa_mode/kappa_mode_2DSym
-   - material/database
-   - kappa_mode/kappa_mode_3D
-   - kappa_mode/plot_kappa_mode
-   - suppression/suppression
-   - suppression/plot_suppression
-   - suppression/plot_angular_suppression
-   - vtu/vtu
-   - viewer/plot_results
-  workflows:
-   - kappa2DSym         : database,rta2DSym,geometry,first_guess,solve_rta,kappa_mode_2DSym   
-   - kappa2DSym_abte    : almabte2openbte,rta2DSym,geometry,first_guess,solve_rta,kappa_mode_2DSym   
-   - kappa3D            : almabte2openbte,rta3D,geometry,first_guess,solve_rta,kappa_mode_3D  
-   - kappa2dGray        : gray2D,geometry,first_guess,solve_rta
+  openbte:
+   functions:
+     - almabte2openbte:almabte2openbte
+     - rta2DSym:rta2DSym
+     - rta3D:rta3D
+     - gray2D:gray2D
+     - geometry:geometry
+     - first_guess:first_guess
+     - solve_rta:solve_rta
+     - kappa_mode:kappa_mode_2DSym
+     - line_data:plot_line_data
+     - compute_line_data:compute_line_data
+     - material:database
+     - kappa_mode:kappa_mode_3D
+     - kappa_mode:plot_kappa_mode
+     - suppression:suppression
+     - suppression:plot_suppression
+     - suppression:plot_angular_suppression
+     - vtu:vtu
+     - viewer:plot_results
+   workflows:
+    - kappa2DSym         : database,rta2DSym,geometry,first_guess,solve_rta,kappa_mode_2DSym   
+    - kappa2DSym_abte    : almabte2openbte,rta2DSym,geometry,first_guess,solve_rta,kappa_mode_2DSym   
+    - kappa3D            : almabte2openbte,rta3D,geometry,first_guess,solve_rta,kappa_mode_3D  
+    - kappa2dGray        : gray2D,geometry,first_guess,solve_rta
 
     
 

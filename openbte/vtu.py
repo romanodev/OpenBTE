@@ -103,7 +103,7 @@ def vtu(material,solver,geometry,options_vtu):
          for i in value['data']:
            strc = np.array2string(i,max_line_width=1e6)
            if dim == 2:
-            store.write(strc[1:-1]+' 0.0 \n')
+            store.write(strc[1:-1] +'\n')
            else: 
             store.write(strc[1:-1]+'\n')
 

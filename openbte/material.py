@@ -2,10 +2,10 @@ import numpy as np
 import os
 import math
 from .utils import *
-from .mfp2DSym import *
-from .mg2DSym import *
-from .mfp2D import *
-from .mfp3D import *
+#from .mfp2DSym import *
+#from .mg2DSym import *
+#from .mfp2D import *
+#from .mfp3D import *
 from .gray2D import *
 from .gray2DSym import *
 from .rta2DSym import *
@@ -27,6 +27,7 @@ def database(database_material)->'rta':
 
 def Material(**argv):
 
+  argv.setdefault('filename','rta')  
   if 'custom' in argv.keys():
     data = argv['custom'](argv)
   else:  

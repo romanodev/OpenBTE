@@ -1,7 +1,8 @@
 import sys
 import numpy as np
 import openbte.utils as utils
-
+from mpi4py import MPI
+comm = MPI.COMM_WORLD
 def gray2D(options_material)->'material':
 
  data = None
