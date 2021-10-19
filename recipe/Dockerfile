@@ -18,9 +18,9 @@ RUN cd openmpi-4.0.3 && ./configure --prefix=/usr/local/openmpi && make all && m
 COPY requirements.txt .
 RUN pip install -r requirements.txt 
 
-COPY openbte-2.44.tar.gz .
-RUN pip install --no-cache openbte-2.44.tar.gz
-RUN rm openbte-2.44.tar.gz
+COPY openbte-2.45.tar.gz .
+RUN pip install --no-cache openbte-2.45.tar.gz
+RUN rm openbte-2.45.tar.gz
 
 
 COPY efunx-8.tar.gz .

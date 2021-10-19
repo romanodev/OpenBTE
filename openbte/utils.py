@@ -14,14 +14,11 @@ import gzip
 import time
 import functools
 
-
-
 def compute_grad_common(data,geometry):
      """ Compute grad via least-square method """
      jump = True
      #Compute deltas-------------------   
      rr = []
-
      for i in geometry['side_per_elem']:
        rr.append(i*[0])
 
@@ -391,10 +388,8 @@ def repeat_merge_scale(argv):
 
   polygons = argv['polygons']
 
-
   lx = argv['lx']   
   ly = argv['ly']   
-  
   
   if argv.setdefault('relative',True):
     dx = 1;dy=1
@@ -418,22 +413,30 @@ def repeat_merge_scale(argv):
 
    #---------------------
   #Store only the intersecting polygons
-  a = time.time()
+  extended_base = []
   final = []
   for pp,poly in enumerate(polygons):
+
     for kp in range(len(pbc)):
         
-     tmp = [[ p[0] + pbc[kp][0],p[1] + pbc[kp][1] ] for p in poly] 
+     new_base = [argv['base'][pp][i]+pbc[kp][i] for i in range(2)]
 
-     p1 = Polygon(tmp)
-     if p1.intersects(frame):
-      thin = Polygon(p1).intersection(frame)
-      if isinstance(thin, shapely.geometry.multipolygon.MultiPolygon):
-       tmp = list(thin)
-       for t in tmp:
-        final.append(t)
-      else:
-        final.append(p1)
+
+     if not new_base in extended_base: #periodicity takes back to original shape
+
+      tmp = [[ p[0] + pbc[kp][0],p[1] + pbc[kp][1] ] for p in poly] 
+
+      p1 = Polygon(tmp)
+      if p1.intersects(frame):
+       extended_base.append(new_base)
+
+       thin = Polygon(p1).intersection(frame)
+       if isinstance(thin, shapely.geometry.multipolygon.MultiPolygon):
+        tmp = list(thin)
+        for t in tmp:
+         final.append(t)
+       else:
+         final.append(p1)
 
 
   #Create bulk surface---get only the exterior to avoid holes
@@ -447,7 +450,15 @@ def repeat_merge_scale(argv):
        new_poly.append(list(i.exterior.coords))
   else: 
        new_poly.append(list(conso.exterior.coords))
-  
+
+  #Find the closest centroids--
+  extended_base = np.array(extended_base)
+  tmp = np.zeros_like(extended_base)
+  for n,p in enumerate(new_poly):
+     index = np.argmin(np.linalg.norm(extended_base - np.mean(p,axis=0)[np.newaxis,...],axis=1))
+     tmp[n] = extended_base[index]
+  extended_base = tmp.copy()
+  #---------------------------------
 
   #cut redundant points
 
@@ -479,7 +490,6 @@ def repeat_merge_scale(argv):
       p = np.array(poly[n])
       p2 = np.array(poly[(n+1)%N])
       di = np.linalg.norm(np.cross(p-p1,p-p2))
-
       if di >1e-5:
          tmp.append(p)
       else:
@@ -494,15 +504,28 @@ def repeat_merge_scale(argv):
 
   #scale-----------------------
   if argv.setdefault('relative',True):
+
+   #Scale
+
+   #Scale
    polygons = []
    for poly in new_poly:
     tmp = []
     for p in poly:
      g = list(p)
      g[0] *=lx
-     g[1] *=ly
+     g[1] *=lx
      tmp.append(g)
     polygons.append(tmp) 
+
+   #Translate
+   tmp = []
+   for p,poly in enumerate(polygons):
+     base = extended_base[p]
+     delta = [0,base[1]*(ly-lx)]
+     tmp.append(translate_shape(poly,delta))
+   polygons = tmp   
+
   else:  
     polygons = new_poly.copy()
 
@@ -681,10 +704,8 @@ def create_shared_memory_dict(varss):
            size = np.prod(value.shape)
            nbytes = size * itemsize
            var_meta[var] = [value.shape,data_type,itemsize,nbytes,True]
-
        else: nbytes = 0; var_meta = None
        var_meta = comm.bcast(var_meta,root=0)
-
        #ALLOCATING MEMORY---------------
        for n,(var,meta) in enumerate(var_meta.items()):
         if meta[-1]:
@@ -704,6 +725,7 @@ def create_shared_memory_dict(varss):
        comm.Barrier()
 
        return dict_output
+   
 
 
 def store_shared(func,*argv):

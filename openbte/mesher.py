@@ -121,7 +121,7 @@ class Mesher(object):
    #create polygons-----
    self.add_symmetry(argv) 
    shapes = get_shape(argv)
-  
+ 
    polygons = [translate_shape(shapes[n],i,**argv) for n,i in enumerate(argv['base'])]
    argv.update({'polygons':np.array(polygons,dtype=object)})
 
@@ -307,6 +307,7 @@ class Mesher(object):
 
    shapes = get_shape(argv)
    polygons = [translate_shape(shapes[n],i) for n,i in enumerate(argv['base'])]
+
    argv.update({'polygons':np.array(polygons)})
 
 
@@ -556,14 +557,16 @@ class Mesher(object):
   if argv['Periodic'][0]:
    for n in range(len(hot)):
     periodic = self.FindPeriodic(hot[n],cold,points,lines) 
-    strc = 'Periodic Line{' + str(hot[n]) + '}={' + str(periodic) + '};\n'
-    store.write(strc)
+    if not periodic == -1:
+     strc = 'Periodic Line{' + str(hot[n]) + '}={' + str(periodic) + '};\n'
+     store.write(strc)
 
   if argv['Periodic'][1]:
    for n in range(len(lower)):
     periodic = self.FindPeriodic(lower[n],upper,points,lines)
-    strc = 'Periodic Line{' + str(lower[n]) + '}={' + str(periodic) + '};\n'
-    store.write(strc)
+    if not periodic == -1:
+     strc = 'Periodic Line{' + str(lower[n]) + '}={' + str(periodic) + '};\n'
+     store.write(strc)
 
 #-------------------------------------------------------
   store.close()
@@ -595,8 +598,7 @@ class Mesher(object):
 
   #If no periodic line has been found
   print("NO PERIODIC LINES HAS BEEN FOUND")
-  quit()
-
+  return -1
 
  def create_surface_old(self,ss,bulk_surface,store):
 

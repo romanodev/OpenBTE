@@ -50,6 +50,7 @@ def kappa_mode_2DSym(material,rta,solver)->'kappa_mode':
 
 def kappa_mode_3D(material,rta,solver)->'kappa_mode':
 
+ data = None   
  if comm.rank == 0:
    mfp_bulk    = material['mfp_bulk']
    r_bulk      = material['r_bulk']

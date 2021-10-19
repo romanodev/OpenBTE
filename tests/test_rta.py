@@ -5,7 +5,6 @@ from mpi4py import MPI
 comm = MPI.COMM_WORLD
 
 
-# content of test_class.py
 class TestClass(object):
 
     def test_rta2DSym(self):
@@ -15,7 +14,7 @@ class TestClass(object):
       sol = Solver(geometry = geo,material=mat,save=True)
 
       if comm.rank == 0:
-       assert np.allclose(sol['kappa'],load_data('solver_2DSym')['kappa'])
+       assert np.allclose(sol['kappa'],load_data('solver_2DSym')['kappa'],rtol=1e-3)
 
 
     def test_rta3D(self):
@@ -24,7 +23,7 @@ class TestClass(object):
        geo = Geometry(model='lattice',lx = 10,ly = 10, lz=2,step = 2, base = [[0,0]],porosity=0.2,shape='square',save=False,delete_gmsh_files=True)
        sol = Solver(geometry = geo,material=mat,save=False,max_bte_iter=10)
        if comm.rank == 0:
-        assert np.allclose(sol['kappa'],load_data('solver_3D')['kappa'])
+        assert np.allclose(sol['kappa'],load_data('solver_3D')['kappa'],rtol=1e-3)
 
 
 

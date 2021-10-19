@@ -43,7 +43,10 @@ def Plot(**argv):
 
      if argv.setdefault('show',False):
         plot_line_data(line_data) 
-     
+
+     if comm.rank == 0:
+      save_data('line_data',line_data)   
+      return line_data     
 
    elif model == 'vtu':
 

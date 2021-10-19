@@ -17,13 +17,14 @@ comm = MPI.COMM_WORLD
 
 def database(database_material)->'rta':
    data = None 
+
    if comm.rank == 0:
      filename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + \
                   '/openbte/materials/' +  database_material
    
      data = load_data(filename)
 
-   return create_shared_memory_dict(data)
+   return  create_shared_memory_dict(data)
 
 def Material(**argv):
 

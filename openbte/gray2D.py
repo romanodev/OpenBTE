@@ -47,7 +47,6 @@ def gray2D(options_material)->'material':
     data['mfp_bulk'] = mfp_bulk
     data['mfp_sampled'] = mfp_bulk
     data['sigma_bulk'] = sigma_sampled
-    data['f'] = []
 
  return utils.create_shared_memory_dict(data)
 

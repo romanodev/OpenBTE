@@ -33,10 +33,11 @@ def get_shape(argv):
     argv.setdefault('area_ratio',np.ones(len(argv['base'])))
 
     if argv.setdefault('relative',True):
-     areas =  [argv['porosity']* i /sum(argv['area_ratio'])  for i in argv['area_ratio']]
+     areas =  np.array([argv['porosity']* i /sum(argv['area_ratio'])  for i in argv['area_ratio']])
     else: 
-     areas = argv['area_ratio']
-   
+     areas = np.array(argv['area_ratio'])
+
+    areas *=argv['ly']/argv['lx']
     #-------------------
     shapes = []
     n_custom = 0
