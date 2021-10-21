@@ -36,8 +36,8 @@ DOCKER
       .. code-block:: bash
 
          sudo service docker start
-         sudo usermod -a -G docker username
-         sudo chkconfig docker on
+         sudo usermod -a -G docker $USER
+         sudo newgroup docker 
 
       Execute the following command to make it sure you are added to the Docker group 
 

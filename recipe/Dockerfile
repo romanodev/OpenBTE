@@ -18,15 +18,14 @@ RUN cd openmpi-4.0.3 && ./configure --prefix=/usr/local/openmpi && make all && m
 COPY requirements.txt .
 RUN pip install -r requirements.txt 
 
-COPY openbte-2.45.tar.gz .
-RUN pip install --no-cache openbte-2.45.tar.gz
-RUN rm openbte-2.45.tar.gz
+COPY openbte-2.46.tar.gz .
+RUN pip install --no-cache openbte-2.46.tar.gz
+RUN rm openbte-2.46.tar.gz
 
 
-COPY efunx-8.tar.gz .
-RUN pip install --no-cache efunx-8.tar.gz
-RUN rm efunx-8.tar.gz
-
+COPY elba-0.6.tar.gz .
+RUN pip install --no-cache elba-0.6.tar.gz
+RUN rm elba-0.6.tar.gz
 
 RUN useradd -ms /bin/bash openbte
 
@@ -34,16 +33,17 @@ ENV OMPI_MCA_btl_vader_single_copy_mechanism none
 
 ENV OMPI_MCA_btl_base_warn_component_unused 0
 
+ENV MPLCONFIGDIR /tmp/matplotlib
+
 RUN mkdir /workspace
 
 USER openbte
 
 WORKDIR /home/openbte
 
-#RUN efunx init
-#RUN efunx load openbte
-#RUN efunx list
+RUN elba init
 
+#RUN load openbte
 
 EXPOSE 8050
 

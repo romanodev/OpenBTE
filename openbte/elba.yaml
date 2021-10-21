@@ -24,6 +24,7 @@
      - kappa2DSym         : database,rta2DSym,geometry,first_guess,solve_rta,kappa_mode_2DSym,vtu   
      - kappa2DSym_abte    : almabte2openbte,rta2DSym,geometry,first_guess,solve_rta,kappa_mode_2DSym   
      - kappa3D            : database,rta3D,geometry,first_guess,solve_rta,kappa_mode_3D,vtu  
+     - kappa3D_external   : rta3D,geometry,first_guess,solve_rta,kappa_mode_3D,vtu  
      - kappa2dGray        : gray2D,geometry,first_guess,solve_rta
      - hexagonal2DSym     : hexagonal_lattice,kappa2DSym
      - hexagonal3D        : hexagonal_lattice,kappa3D

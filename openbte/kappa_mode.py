@@ -17,7 +17,7 @@ def plot_kappa_mode(kappa_mode):
 
 
 
-def kappa_mode_2DSym(material,rta,solver)->'kappa_mode':
+def kappa_mode_2DSym(material,solver)->'kappa_mode':
 
  data = None   
  if comm.rank == 0:
@@ -27,6 +27,7 @@ def kappa_mode_2DSym(material,rta,solver)->'kappa_mode':
    phi_bulk    = material['phi_bulk']
    mfp_sampled = material['mfp_sampled']
    phi         = material['phi']
+
 
    mfp_nano_sampled = solver['mfp_nano_sampled'] * 1e9
    kappa_bulk = sigma_bulk[:,0]*mfp_bulk[:,0]
@@ -48,7 +49,7 @@ def kappa_mode_2DSym(material,rta,solver)->'kappa_mode':
  return utils.create_shared_memory_dict(data)
 
 
-def kappa_mode_3D(material,rta,solver)->'kappa_mode':
+def kappa_mode_3D(material,solver)->'kappa_mode':
 
  data = None   
  if comm.rank == 0:

@@ -15,12 +15,14 @@ import shutil
 
 comm = MPI.COMM_WORLD
 
-def database(database_material)->'rta':
+def database(options_database)->'rta':
    data = None 
 
    if comm.rank == 0:
-     filename = os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + \
-                  '/openbte/materials/' +  database_material
+     database_material = options_database['filename']
+     prefix = options_database.setdefault('prefix',os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/openbte/materials')
+
+     filename = prefix + '/'  + database_material
    
      data = load_data(filename)
 
@@ -39,7 +41,7 @@ def Material(**argv):
    if not model == 'gray':
     source = argv.setdefault('source','database')
     if source == 'database':
-         rta = database(argv['filename'])  
+        rta = database({'filename':argv['filename']})  
     else :     
          rta = load_data(argv['filename'])  
 

@@ -26,6 +26,16 @@ def rta2DSym(rta,options_material)->'material':
     Wdiag    = C*f
     r_bulk,phi_bulk = utils.compute_polar(mfp_bulk)
 
+    #Filtering--
+    I = np.where(r_bulk>1e-10)
+    r_bulk = r_bulk[I]
+    mfp_bulk = mfp_bulk[I]
+    phi_bulk = phi_bulk[I]
+    Wdiag = Wdiag[I]
+    sigma = sigma[I]
+    #------------------------
+
+
     #Sampling
     mfp_max = np.max(r_bulk)*1.1
     mfp_min = np.min(r_bulk)*0.9

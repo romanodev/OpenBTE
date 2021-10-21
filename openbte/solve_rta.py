@@ -1,42 +1,36 @@
-from __future__ import absolute_import
-import numpy as np
-from scipy.sparse.linalg import splu
-from termcolor import colored, cprint 
-from .utils import *
-from mpi4py import MPI
-import scipy.sparse as sp
-import time
-import sys
-import scipy
-from cachetools import cached,LRUCache
-from cachetools.keys import hashkey
-
-comm = MPI.COMM_WORLD
-      
-
-
-      
-def get_m(Master,data):
-    
-    Master.data = data
-    return Master
-
-def get_boundary(RHS,eb,n_elems):
-
-    if len(eb)  > 0:
-     RHS_tmp = np.zeros(n_elems) 
-     np.add.at(RHS_tmp,eb,RHS)
-    else: 
-      return np.zeros(n_elems)  
-
-    return RHS_tmp
-
 
 
 
 def solve_rta(geometry,material,temperatures,options_solve_rta)->'solver':
 
+    def get_m(Master,data):
+      Master.data = data
+      return Master
 
+    def get_boundary(RHS,eb,n_elems):
+
+     if len(eb)  > 0:
+      RHS_tmp = np.zeros(n_elems) 
+      np.add.at(RHS_tmp,eb,RHS)
+     else: 
+      return np.zeros(n_elems)  
+
+     return RHS_tmp
+
+
+    import numpy as np
+    from scipy.sparse.linalg import splu
+    from termcolor import colored, cprint 
+    import openbte.utils as utils
+    from mpi4py import MPI
+    import scipy.sparse as sp
+    import time
+    import sys
+    import scipy
+    from cachetools import cached,LRUCache
+    from cachetools.keys import hashkey
+    comm = MPI.COMM_WORLD
+      
     #Options
     verbose       = options_solve_rta.setdefault('verbose',True)
     max_bte_iter  = options_solve_rta.setdefault('max_bte_iter',20)
@@ -80,7 +74,7 @@ def solve_rta(geometry,material,temperatures,options_solve_rta)->'solver':
        del tot, Gbp2
       else: data = None
       if comm.size > 1:
-       GG = create_shared_memory_dict(data)['GG']
+       GG = utils.create_shared_memory_dict(data)['GG']
       else: 
        GG = data['GG']
  
@@ -191,7 +185,7 @@ def solve_rta(geometry,material,temperatures,options_solve_rta)->'solver':
         data.update({'vorticity_BTE'    :compute_vorticity(geometry,J)['vorticity']}) 
         data.update({'vorticity_Fourier':compute_vorticity(geometry,temperatures['flux'])['vorticity']}) 
     #-------------------
-
+    comm.Barrier()
     return data
 
 

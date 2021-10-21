@@ -101,7 +101,7 @@ def Solver(**argv):
 
         #prepare_data(argv)
         if comm.rank == 0 and argv.setdefault('save',True):
-           save_data(argv.setdefault('filename','solver'),output)   
+           utils.save_data(argv.setdefault('filename','solver'),output)   
 
         if argv['verbose'] and comm.rank == 0:
          print(' ',flush=True)   

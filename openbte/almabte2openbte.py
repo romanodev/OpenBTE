@@ -25,11 +25,11 @@ def almabte2openbte(options_almabte)->'rta':
 
   mfp_bulk = np.einsum('qj,q->qj',v,tau)
   r = np.linalg.norm(mfp_bulk[:,:2],axis=1) #absolute values of the projection
-  I = np.where(r > 1e-10)[0]
-  C   = C[I]
-  tau = tau[I]
-  v  = v[I]
-  w = w[I]
+  #I = np.where(r > 1e-10)[0]
+  #C   = C[I]
+  #tau = tau[I]
+  #v  = v[I]
+  #w = w[I]
 
   data = {'C':C,\
          'tau':tau,\

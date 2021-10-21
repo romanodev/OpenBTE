@@ -38,8 +38,16 @@ def rta3D(rta,options_material)->'material':
   mfp_bulk = np.einsum('ki,k->ki',v,tau) 
   f     = np.divide(np.ones_like(tau),tau, out=np.zeros_like(tau), where=tau!=0)
   Wdiag    = C*f
-  r_bulk,phi_bulk,theta_bulk = utils.compute_spherical(mfp_bulk)
 
+  #Filtering--
+  r_bulk = np.linalg.norm(mfp_bulk,axis=1)
+  I = np.where(r_bulk>1e-10)
+  mfp_bulk = mfp_bulk[I]
+  Wdiag = Wdiag[I]
+  sigma = sigma[I]
+  #------------------------
+
+  r_bulk,phi_bulk,theta_bulk = utils.compute_spherical(mfp_bulk)
   #Sampling
   mfp_max = np.max(r_bulk)*1.1
   mfp_min = np.min(r_bulk)*0.9
