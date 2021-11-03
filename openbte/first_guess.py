@@ -1,13 +1,12 @@
 
-import openbte.fourier as fourier
-import numpy as np
-import pickle
-from mpi4py import MPI
-import openbte.utils as utils
-
-comm = MPI.COMM_WORLD
-
 def first_guess(geometry,material,options_first_guess)->'temperatures':
+
+   import openbte.fourier as fourier
+   import numpy as np
+   import pickle
+   from mpi4py import MPI
+   import openbte.utils as utils
+   comm = MPI.COMM_WORLD
 
    data = None  
    if comm.rank == 0:

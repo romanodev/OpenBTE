@@ -1,8 +1,3 @@
-import numpy as np
-import openbte.utils as utils
-from mpi4py import MPI
-
-comm = MPI.COMM_WORLD
 
 def plot_kappa_mode(kappa_mode):
 
@@ -19,6 +14,10 @@ def plot_kappa_mode(kappa_mode):
 
 def kappa_mode_2DSym(material,solver)->'kappa_mode':
 
+ import numpy as np
+ import openbte.utils as utils
+ from mpi4py import MPI
+ comm = MPI.COMM_WORLD
  data = None   
  if comm.rank == 0:
    mfp_bulk    = material['mfp_bulk']
@@ -51,6 +50,10 @@ def kappa_mode_2DSym(material,solver)->'kappa_mode':
 
 def kappa_mode_3D(material,solver)->'kappa_mode':
 
+ import numpy as np
+ import openbte.utils as utils
+ from mpi4py import MPI
+ comm = MPI.COMM_WORLD
  data = None   
  if comm.rank == 0:
    mfp_bulk    = material['mfp_bulk']

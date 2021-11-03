@@ -33,11 +33,12 @@ def get_shape(argv):
     argv.setdefault('area_ratio',np.ones(len(argv['base'])))
 
     if argv.setdefault('relative',True):
-     areas =  np.array([argv['porosity']* i /sum(argv['area_ratio'])  for i in argv['area_ratio']])
+     areas = np.array([argv['porosity']* i /sum(argv['area_ratio'])  for i in argv['area_ratio']])
     else: 
      areas = np.array(argv['area_ratio'])
 
-    areas *=argv['ly']/argv['lx']
+    areas *=argv['ly']/argv['lx'] #Here we assume that the unit cell reflects that of the whole material
+
     #-------------------
     shapes = []
     n_custom = 0
@@ -52,7 +53,7 @@ def get_shape(argv):
        shapes.append(np.array(make_polygon(3,area)))
 
      elif shape == 'circle':
-       shapes.append(np.array(make_polygon(24,area)))
+       shapes.append(np.array(make_polygon(48,area)))
 
      elif shape == 'custom':
 

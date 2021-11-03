@@ -121,7 +121,9 @@ class Mesher(object):
    #create polygons-----
    self.add_symmetry(argv) 
    shapes = get_shape(argv)
- 
+
+   scale = [1,argv['ly']/argv['lx']]
+   argv['base'] = [[tmp[0]*scale[0],tmp[1]*scale[1]]  for tmp in argv['base']]
    polygons = [translate_shape(shapes[n],i,**argv) for n,i in enumerate(argv['base'])]
    argv.update({'polygons':np.array(polygons,dtype=object)})
 

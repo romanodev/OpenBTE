@@ -18,14 +18,10 @@ RUN cd openmpi-4.0.3 && ./configure --prefix=/usr/local/openmpi && make all && m
 COPY requirements.txt .
 RUN pip install -r requirements.txt 
 
-COPY openbte-2.46.tar.gz .
-RUN pip install --no-cache openbte-2.46.tar.gz
-RUN rm openbte-2.46.tar.gz
+COPY openbte-2.47.tar.gz .
+RUN pip install --no-cache openbte-2.47.tar.gz
+RUN rm openbte-2.47.tar.gz
 
-
-COPY elba-0.6.tar.gz .
-RUN pip install --no-cache elba-0.6.tar.gz
-RUN rm elba-0.6.tar.gz
 
 RUN useradd -ms /bin/bash openbte
 
@@ -40,8 +36,6 @@ RUN mkdir /workspace
 USER openbte
 
 WORKDIR /home/openbte
-
-RUN elba init
 
 #RUN load openbte
 

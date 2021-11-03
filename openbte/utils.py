@@ -1,5 +1,6 @@
 from mpi4py import MPI
 import numpy as np
+import matplotlib.pylab as plt
 from termcolor import colored, cprint 
 from shapely.geometry import Polygon,Point
 from shapely.geometry import MultiPolygon,LineString
@@ -66,12 +67,12 @@ os.environ['H5PY_DEFAULT_READONLY']='1'
 comm = MPI.COMM_WORLD
 
 
-def extract_variables(solver):
+def extract_variables(solver,geometry):
 
    #Create variables from data--
    variables = {}
-   variables['Temperature_BTE']      = {'data':solver['Temperature_BTE'],'units':'K','increment':[-1,0,0]}
-   variables['Temperature_Fourier']  = {'data':solver['Temperature_Fourier'],'units':'K','increment':[-1,0,0]}
+   variables['Temperature_BTE']      = {'data':solver['Temperature_BTE'],'units':'K','increment':-geometry['applied_gradient']}
+   variables['Temperature_Fourier']  = {'data':solver['Temperature_Fourier'],'units':'K','increment':-geometry['applied_gradient']}
    variables['Flux_BTE']             = {'data':solver['Flux_BTE'],'units':'W/m/m','increment':[0,0,0]}
    variables['Flux_Fourier']         = {'data':solver['Flux_Fourier'],'units':'W/m/m','increment':[0,0,0]}
    if 'vorticity_BTE' in solver.keys():
@@ -391,12 +392,12 @@ def repeat_merge_scale(argv):
   lx = argv['lx']   
   ly = argv['ly']   
   
+  scale = [1,ly/lx]
   if argv.setdefault('relative',True):
-    dx = 1;dy=1
+      dx = scale[0];dy=scale[1]
   else:  
     dx = lx;dy=ly
   
-
   pbc = []
   pbc.append([0,0])
   if argv.setdefault('repeat',True):
@@ -411,16 +412,17 @@ def repeat_merge_scale(argv):
 
   frame = Polygon([[-dx/2,-dy/2],[-dx/2,dy/2],[dx/2,dy/2],[dx/2,-dy/2]])
 
-   #---------------------
+  #---------------------
   #Store only the intersecting polygons
   extended_base = []
   final = []
+  #stretch base:
+  #base = [[tmp[0]*scale[0],tmp[1]*scale[1]]  for tmp in argv['base']]
   for pp,poly in enumerate(polygons):
 
     for kp in range(len(pbc)):
         
      new_base = [argv['base'][pp][i]+pbc[kp][i] for i in range(2)]
-
 
      if not new_base in extended_base: #periodicity takes back to original shape
 
@@ -439,7 +441,14 @@ def repeat_merge_scale(argv):
          final.append(p1)
 
 
+  #plot_shapes(final,frame)
   #Create bulk surface---get only the exterior to avoid holes
+  #[plt.plot(*p.exterior.xy) for p in final]
+  #plt.plot(*frame.exterior.xy)
+  #plt.gca().set_aspect('equal')
+  #plt.gca().axis('off')
+  #plt.show()
+
   MP = MultiPolygon(final) 
 
   conso = unary_union(MP)
@@ -506,25 +515,15 @@ def repeat_merge_scale(argv):
   if argv.setdefault('relative',True):
 
    #Scale
-
-   #Scale
    polygons = []
    for poly in new_poly:
     tmp = []
     for p in poly:
      g = list(p)
-     g[0] *=lx
-     g[1] *=lx
+     g[0] *= lx
+     g[1] *= lx
      tmp.append(g)
     polygons.append(tmp) 
-
-   #Translate
-   tmp = []
-   for p,poly in enumerate(polygons):
-     base = extended_base[p]
-     delta = [0,base[1]*(ly-lx)]
-     tmp.append(translate_shape(poly,delta))
-   polygons = tmp   
 
   else:  
     polygons = new_poly.copy()

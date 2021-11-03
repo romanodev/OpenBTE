@@ -1,7 +1,6 @@
 from openbte import Material,Geometry,Solver,Plot
 from openbte.utils import *
 from mpi4py import MPI
-
 comm = MPI.COMM_WORLD
 
 
@@ -23,7 +22,7 @@ class TestClass(object):
        geo = Geometry(model='lattice',lx = 10,ly = 10, lz=2,step = 2, base = [[0,0]],porosity=0.2,shape='square',save=False,delete_gmsh_files=True)
        sol = Solver(geometry = geo,material=mat,save=False,max_bte_iter=10)
        if comm.rank == 0:
-        assert np.allclose(sol['kappa'],load_data('solver_3D')['kappa'],rtol=1e-3)
+        assert np.allclose(sol['kappa'],load_data('solver_3D')['kappa'],rtol=1e-2)
 
 
 

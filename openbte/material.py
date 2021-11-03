@@ -1,11 +1,6 @@
 import numpy as np
 import os
 import math
-from .utils import *
-#from .mfp2DSym import *
-#from .mg2DSym import *
-#from .mfp2D import *
-#from .mfp3D import *
 from .gray2D import *
 from .gray2DSym import *
 from .rta2DSym import *
@@ -16,6 +11,7 @@ import shutil
 comm = MPI.COMM_WORLD
 
 def database(options_database)->'rta':
+   import openbte.utils as utils
    data = None 
 
    if comm.rank == 0:
@@ -24,9 +20,9 @@ def database(options_database)->'rta':
 
      filename = prefix + '/'  + database_material
    
-     data = load_data(filename)
+     data = utils.load_data(filename)
 
-   return  create_shared_memory_dict(data)
+   return  utils.create_shared_memory_dict(data)
 
 def Material(**argv):
 
@@ -72,7 +68,7 @@ def Material(**argv):
 
   if argv.setdefault('save',True):
      if comm.rank == 0:
-         save_data(argv.setdefault('output_filename','material'),data)   
+         utils.save_data(argv.setdefault('output_filename','material'),data)   
 
   return data
 

@@ -14,16 +14,19 @@ def rta3D(rta,options_material)->'material':
   #Parse options
   n_phi = options_material.setdefault('n_phi',48)
   n_mfp = options_material.setdefault('n_mfp',50)
-  n_theta = options_material.setdefault('n_theta',24)
+  n_theta = options_material.setdefault('n_theta',25)
   #----------------
 
   n_angles = n_phi * n_theta
   #Angular discretization
   Dphi = 2.0*np.pi/n_phi
-  phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+  #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+  phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
   Dtheta = np.pi/n_theta
-  theta = np.linspace(Dtheta/2,np.pi-Dtheta/2,n_theta,endpoint=True)
-  #theta = np.linspace(0,np.pi,n_theta,endpoint=True)
+  #theta = np.linspace(Dtheta/2,np.pi-Dtheta/2,n_theta,endpoint=True)
+  theta = np.linspace(0,np.pi,n_theta,endpoint=True)
+
+
   polar = np.array([np.sin(phi),np.cos(phi),np.ones(n_phi)]).T
   azimuthal = np.array([np.sin(theta),np.sin(theta),np.cos(theta)]).T
   direction_original = np.einsum('lj,kj->lkj',azimuthal,polar)

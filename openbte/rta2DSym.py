@@ -1,11 +1,10 @@
-import numpy as np 
-import openbte.utils as utils 
-from mpi4py import MPI
-
-comm = MPI.COMM_WORLD
 
 def rta2DSym(rta,options_material)->'material':
 
+   import numpy as np 
+   from mpi4py import MPI
+   import openbte.utils as utils 
+   comm = MPI.COMM_WORLD
    #Parse options
    data = None 
    if comm.rank == 0:
@@ -34,7 +33,6 @@ def rta2DSym(rta,options_material)->'material':
     Wdiag = Wdiag[I]
     sigma = sigma[I]
     #------------------------
-
 
     #Sampling
     mfp_max = np.max(r_bulk)*1.1

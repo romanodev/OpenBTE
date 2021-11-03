@@ -29,6 +29,7 @@ def solve_rta(geometry,material,temperatures,options_solve_rta)->'solver':
     import scipy
     from cachetools import cached,LRUCache
     from cachetools.keys import hashkey
+    import scipy.sparse.linalg as spla
     comm = MPI.COMM_WORLD
       
     #Options
@@ -36,6 +37,8 @@ def solve_rta(geometry,material,temperatures,options_solve_rta)->'solver':
     max_bte_iter  = options_solve_rta.setdefault('max_bte_iter',20)
     max_bte_error = options_solve_rta.setdefault('max_bte_error',1e-3)
     keep_lu       = options_solve_rta.setdefault('keep_lu',True)
+    method        = options_solve_rta.setdefault('method','direct')
+    verbose        = options_solve_rta.setdefault('verbose',False)
 
     #-------------
     Nlu = 1e5 if keep_lu else 0
@@ -45,6 +48,9 @@ def solve_rta(geometry,material,temperatures,options_solve_rta)->'solver':
     X             = temperatures['data']
     kappa_fourier = temperatures['kappa'][0]
     
+
+
+    #T_mat = fdata['Temperature_Fourier'] - jnp.einsum('qi,ci->qc',F,gradT)
 
     n_elems = len(geometry['elems'])
     mfp = material['mfp_sampled']*1e9
@@ -66,18 +72,27 @@ def solve_rta(geometry,material,temperatures,options_solve_rta)->'solver':
 
     if len(geometry['db']) > 0:
       if comm.rank == 0: 
-       Gb   = np.einsum('mqj,jn->mqn',material['sigma'],geometry['db'],optimize=True)
-       Gbp2 = Gb.clip(min=0);
-       with np.errstate(divide='ignore', invalid='ignore'):
-          tot = 1/Gb.clip(max=0).sum(axis=0).sum(axis=0); tot[np.isinf(tot)] = 0
-          data = {'GG': np.einsum('mqs,s->mqs',Gbp2,tot)}
-       del tot, Gbp2
+       Gb   = np.einsum('mqj,js->mqs',material['sigma'],geometry['db'],optimize=True)
+       Gbp2 = Gb.clip(min=0)
+       tmp = Gb.clip(max=0).sum(axis=0).sum(axis=0)
+       tot = np.divide(1, tmp, out=np.zeros_like(tmp), where=tmp!=0)
+       #data = {'GG': np.einsum('mqs,s->mqs',Gbp2,tot),'tot':tot}
+       data = {'tot':tot}
+       #del tot, Gbp2
+       del Gbp2
       else: data = None
       if comm.size > 1:
-       GG = utils.create_shared_memory_dict(data)['GG']
+       data = utils.create_shared_memory_dict(data)
+       #GG   = data['GG']
+       tot  = data['tot']
       else: 
-       GG = data['GG']
- 
+       #GG   = data['GG']
+       tot   = data['tot']
+
+    Gbp_new = np.einsum('mqj,js->mqs',material['sigma'][:,rr,:],geometry['db'],optimize=True).clip(min=0)
+    GG_new  = np.einsum('mqs,s->mqs',Gbp_new,tot)
+
+
     #Bulk properties---
     G = np.einsum('qj,jn->qn',F[rr],geometry['k'],optimize=True)
     Gp = G.clip(min=0); Gm = G.clip(max=0)
@@ -107,8 +122,10 @@ def solve_rta(geometry,material,temperatures,options_solve_rta)->'solver':
 
     kappa,kappap = np.zeros((2,n_serial,n_parallel))
     material['tc'] = material['tc']/np.sum(material['tc'])
-    im = np.concatenate((geometry['i'],list(np.arange(n_elems))))
-    jm = np.concatenate((geometry['j'],list(np.arange(n_elems))))
+    i  = geometry['i']
+    j  = geometry['j']
+    im = np.concatenate((i,list(np.arange(n_elems))))
+    jm = np.concatenate((j,list(np.arange(n_elems))))
     Master = sp.csc_matrix((np.arange(len(im))+1,(im,jm)),shape=(n_elems,n_elems),dtype=np.float64)
     conversion = np.asarray(Master.data-1,int)
     J = np.zeros((n_elems,dim))
@@ -120,6 +137,12 @@ def solve_rta(geometry,material,temperatures,options_solve_rta)->'solver':
        A = get_m(Master,data[conversion])
        return sp.linalg.splu(A)
 
+    def solve_iterative(n,m,B,X0):
+
+        data = np.concatenate((mfp[m]*Gm[n],mfp[m]*D[n]+np.ones(n_elems)))
+        A = get_m(Master,data[conversion])
+
+        return spla.lgmres(A,B,x0=X0)[0]
 
     while kk <max_bte_iter and error > max_bte_error:
 
@@ -127,6 +150,7 @@ def solve_rta(geometry,material,temperatures,options_solve_rta)->'solver':
         DeltaTp = np.zeros_like(DeltaT)
         TBp = np.zeros_like(TB)
         Jp = np.zeros_like(J)
+        gradDeltaT = utils.compute_grad_common(DeltaT,geometry)
         #kappa_bal,kappa_balp = np.zeros((2,n_parallel))
 
                                              
@@ -135,18 +159,20 @@ def solve_rta(geometry,material,temperatures,options_solve_rta)->'solver':
         for n,q in enumerate(rr):
            
            for m in range(n_serial):
-       
                  #----------------------------------------
                  B = DeltaT +  mfp[m]*(P[n] + get_boundary(RHS[n],geometry['eb'],n_elems))
-
-                 X =  compute_lu(n,m).solve(B)
+                 if method =='direct':
+                  X   =  compute_lu(n,m).solve(B)
+                 else:
+                  X =  solve_iterative(n,m,B,X)
 
                  kappap[m,q] = np.dot(geometry['kappa_mask'],X-DeltaT)
 
                  DeltaTp += X*material['tc'][m,q]
 
                  if len(geometry['eb']) > 0:
-                  np.add.at(TBp,np.arange(geometry['eb'].shape[0]),-X[geometry['eb']]*GG[m,q])
+                  #np.add.at(TBp,np.arange(geometry['eb'].shape[0]),-X[geometry['eb']]*GG[m,q])
+                  np.add.at(TBp,np.arange(geometry['eb'].shape[0]),-X[geometry['eb']]*GG_new[m,n])
 
                  Jp += np.einsum('c,j->cj',X,sigma[m,q,0:dim])*1e-9
 
