@@ -4,7 +4,6 @@ OpenBTE documentation
     
 OpenBTE is an open-source solver for the first-principles Boltzmann transport equation, with a focus on phonon transport. Here is an example to calculate the effective thermal conductivity of nanoporous silicon:
 
-NOTE: a multiscale model is coming soon (check back in a few days)
 
 .. raw:: html
 
