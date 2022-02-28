@@ -163,7 +163,7 @@ class Mesher(object):
 
   if model == 'lattice':   
    argv.setdefault('ly',argv['lx'])
-   #create polygons-----
+
    self.add_symmetry(argv) 
    shapes = get_shape(argv)
 

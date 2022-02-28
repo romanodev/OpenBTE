@@ -45,5 +45,5 @@ def main():
    else  :
      output = 'rta'
 
-   utils.save_data(output,data)   
+   utils.save(output,data)   
 

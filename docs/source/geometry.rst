@@ -13,7 +13,7 @@ Geometry
    +----------------------+---------------------------------------------+-----------------------+
    |     ``step``         |      mesh size [nm]                         |      required         |     
    +----------------------+---------------------------------------------+-----------------------+
-   | ``delete_gmsh_files``|     wheather to delete ``gmsh`` files       |      ``True``         |     
+   | ``delete_gmsh_files``|     whether to delete ``gmsh`` files        |      ``True``         |     
    +----------------------+---------------------------------------------+-----------------------+
 
 
@@ -35,13 +35,13 @@ Porous materials can be defined with ``model=lattice`` model. Options include `p
    +-------------------+---------------------------------------------+--------------------------+
    | ``porosity``      | volume fraction                             |      required            |     
    +-------------------+---------------------------------------------+--------------------------+
+   |     ``base``      | local coordinate of the pores               |      required            |
+   +-------------------+---------------------------------------------+--------------------------+
    |     ``shape``     | ``circle``, ``square`` or ``triangle``      |      ``circle``          |
    +-------------------+---------------------------------------------+--------------------------+
    |     ``ly``        | lenght along y [nm]                         |      ``lx``              |
    +-------------------+---------------------------------------------+--------------------------+
    |   ``repeate``     | Add periodic pores                          |      ``True``            |
-   +-------------------+---------------------------------------------+--------------------------+
-   |     ``base``      | local coordinate of the pores               |       ``[[0,0]]``        |
    +-------------------+---------------------------------------------+--------------------------+
    | ``shape_function``| function for a custom shape                 |       ``None``           |
    +-------------------+---------------------------------------------+--------------------------+
@@ -169,6 +169,19 @@ Here is an illustration for the disk simulation domain
    :width: 200
    :align: center
    :alt: disk
+
+
+Bulk
+----------------------------------------
+
+An unbounded system can be simulated with ``model=bulk``. In this case, a rectangular simulation domain is created with periodic boundary condition on both axes. The effective thermal conductivity should be the same as in bulk, within the error of the iterative scheme and spatial discretization. Example:
+
+.. code:: python
+
+   from openbte import Geometry
+
+   Geometry(model='bulk',lx=100,ly=100,step=10)
+
 
 
 .. _gmsh: https://gmsh.info/

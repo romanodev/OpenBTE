@@ -303,6 +303,21 @@ def create_line_list(pp,points,lines,store,lx,ly,step_label = 'h'):
    return line_list
 
 
+def check_rta_data(data):
+    """Check bulk data"""
+
+    tau   = data['scattering_time']
+    kappa = data['thermal_conductivity'] 
+    v     = data['group_velocity'] 
+    C     = data['heat_capacity'] 
+
+    kappa_computed = np.einsum('u,ui,uj,u->ij',tau,v,v,C,optimize=True)
+
+    if np.allclose(kappa,kappa_computed):
+       print('Check passed.')
+
+
+
 def save(fh, namedict):
 
      if comm.rank == 0:

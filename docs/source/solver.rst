@@ -7,11 +7,24 @@ Solver reads the files `geometry.npz` and `material.npz` and, after solving the 
 
    Solver(**options)
 
+
 Options
 -------------------------
- - ``max_bte_iter`` : maximum number of BTE iteration 
- - ``max_bte_error`` : maximum error for the BTE solver (computed for the thermal conductivity)
- - ``max_fourier_iter`` : maximum number of Fourier iteration 
- - ``max_fourier_error`` : maximum error for the Fourier solver (computed for the thermal conductivity)
- - ``only_fourier`` : whether to compute only Fourier
+.. table:: 
+   :widths: auto
+   :align: center
+
+   +----------------------+-----------------------------------------------------+-----------------------+
+   | **Option**           |     **Note**                                        |     **Default**       |  
+   +----------------------+-----------------------------------------------------+-----------------------+
+   |  ``max_bte_iter``    |      maximum BTE iteration                          |      ``20``           |     
+   +----------------------+-----------------------------------------------------+-----------------------+
+   | ``max_bte_error``    |     max error on the BTE (relative residual)        |      ``1e-3``         |     
+   +----------------------+-----------------------------------------------------+-----------------------+
+   |  ``max_forier_iter`` |      maximum Fourier iteration                      |      ``30``           |     
+   +----------------------+-----------------------------------------------------+-----------------------+
+   | ``max_fourier_error``| max error on Fourier (non-orthogonal contribution)  |      ``1e-10``        |     
+   +----------------------+-----------------------------------------------------+-----------------------+
+   | ``only_fourier``     |   whether only the Fourier solver is needed         |      ``False``        |     
+   +----------------------+-----------------------------------------------------+-----------------------+
 
