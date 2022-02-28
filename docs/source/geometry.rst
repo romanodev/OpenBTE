@@ -148,7 +148,7 @@ In addition to applying a difference of temperature, it is possible to add heat 
    G = 1e3
    Geometry(model='lattice',lx = 10,ly = 10, step = 0.5, base = [[0.2,0],[0,0],[-0.2,0]],porosity=0.1,shape='circle',apply_gradient=False,heat_source=[G,None,-G])
 
-Note that ``G`` here is in ``K/s``. It assumes that your mode-resolved heat generation :math:`W_\mu` has the form  :math:`W_\mu = C_\mu G`, where :math:`C_\mu` is the mode-resolved specific heat capacity. In the example above, we have an heat source, a heat sink and one pore.
+In the example above, we have an heat source, a heat sink and one pore.
 
 
 
