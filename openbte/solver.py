@@ -36,7 +36,7 @@ def print_bulk_info(mat,mesh):
                   print(colored('  Bulk Thermal Conductivity (zz)[W/m/K]:   ','green')+ str(round(kappa[2,2],2)),flush=True)
 
            dirr = ['x','y','z']
-           print(colored('  Applied Thermal Gradient along :         ','green')+ dirr[int(mesh['meta'][-2])],flush=True)
+           print(colored('  Applied Thermal Gradient along :         ','green')+ dirr[int(mesh['meta'][5])],flush=True)
 
 
 def print_options(**argv):
@@ -50,7 +50,7 @@ def print_options(**argv):
 
 def print_logo():
 
-    v = pkg_resources.require("OpenBTE")[0].version   
+    #v = pkg_resources.require("OpenBTE")[0].version   
     print(' ',flush=True)
     print(colored(r'''        ___                   ____ _____ _____ ''','green'),flush=True)
     print(colored(r'''       / _ \ _ __   ___ _ __ | __ )_   _| ____|''','green'),flush=True)
@@ -58,7 +58,7 @@ def print_logo():
     print(colored(r'''      | |_| | |_) |  __/ | | | |_) || | | |___ ''','green'),flush=True)
     print(colored(r'''       \___/| .__/ \___|_| |_|____/ |_| |_____|''','green'),flush=True)
     print(colored(r'''            |_|                                ''','green'),flush=True)
-    print(colored(r'''                                               v. ''' + str(v) ,'blue'),flush=True)
+    #print(colored(r'''                                               v. ''' + str(v) ,'blue'),flush=True)
     print(flush=True)
     print('                       GENERAL INFO',flush=True)
     print(colored(' -----------------------------------------------------------','green'),flush=True)
@@ -70,7 +70,6 @@ def print_logo():
     print(flush=True)   
 
 
-
 def Solver(**argv):
 
         #COMMON OPTIONS--------------------------------------
@@ -78,8 +77,8 @@ def Solver(**argv):
         only_fourier = argv.setdefault('only_fourier',False)
         #---------------------------------------------------
 
-        geometry = argv['geometry'] if 'geometry' in argv.keys() else utils.load_shared('geometry')
-        material = argv['material'] if 'material' in argv.keys() else utils.load_shared('material')
+        geometry = argv['geometry'] if 'geometry' in argv.keys() else utils.load('geometry')
+        material = argv['material'] if 'material' in argv.keys() else utils.load('material')
 
         #Print relevant options-----------------------------
         if comm.rank == 0 :
@@ -93,15 +92,16 @@ def Solver(**argv):
         #---------------------------------------------------
 
         #Solve fourier--
-        X = first_guess(geometry,material,{})
+        output = first_guess(geometry,material,{'verbose':verbose})
         
         #Solve bte--
         if not only_fourier:
-           output = solve_rta(geometry,material,X,argv)
-
+           output_rta = solve_rta(geometry,material,output,argv)
+           output.update(output_rta)
+ 
         #prepare_data(argv)
         if comm.rank == 0 and argv.setdefault('save',True):
-           utils.save_data(argv.setdefault('filename','solver'),output)   
+           utils.save(argv.setdefault('filename','solver'),output)   
 
         if argv['verbose'] and comm.rank == 0:
          print(' ',flush=True)   

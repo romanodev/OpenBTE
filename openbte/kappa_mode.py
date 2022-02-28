@@ -1,6 +1,8 @@
 
 def plot_kappa_mode(kappa_mode):
 
+ from mpi4py import MPI
+ comm = MPI.COMM_WORLD
  if comm.rank == 0:
    from pubeasy import MakeFigure
 
@@ -18,7 +20,8 @@ def kappa_mode_2DSym(material,solver)->'kappa_mode':
  import openbte.utils as utils
  from mpi4py import MPI
  comm = MPI.COMM_WORLD
- data = None   
+ data = None  
+  
  if comm.rank == 0:
    mfp_bulk    = material['mfp_bulk']
    r_bulk      = material['r_bulk']
@@ -41,10 +44,11 @@ def kappa_mode_2DSym(material,solver)->'kappa_mode':
    np.add.at(mfp_nano,np.arange(n_bulk),a2*b1*mfp_nano_sampled[m2,p1])
    np.add.at(mfp_nano,np.arange(n_bulk),a2*b2*mfp_nano_sampled[m2,p2])
 
+
    kappa_nano = sigma_bulk[:,0]*mfp_nano
 
    data = {'kappa_nano':kappa_nano,'mfp_nano':mfp_nano,'kappa_bulk':kappa_bulk,'mfp_bulk':mfp_bulk,'f':material['f']}
-   
+ 
  return utils.create_shared_memory_dict(data)
 
 

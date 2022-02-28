@@ -31,6 +31,19 @@ def plot_line_data(line_data):
    fig.finalize(grid=True,show=True,xlim=[minl,maxl])
 
 
+def interpolate_data(solver,geometry,variable,points)->'interpolated_data':
+
+  from matplotlib.tri import LinearTriInterpolator as TriInterpolator
+  from matplotlib.tri import Triangulation as triangulation
+    
+  data_master =  utils.extract_variables(solver,geometry)
+  data_master =  utils.expand_variables(data_master,geometry)
+  utils.get_node_data(data_master,geometry)
+  data = data_master[variable]['data']
+
+  tri = triangulation(geometry['nodes'][:,0],geometry['nodes'][:,1],geometry['elems'])
+
+  return np.array(TriInterpolator(tri,data)(points[:,0],points[:,1]) )
 
 
 def compute_line_data(solver,geometry,compute_line_data_options)->'line_data':
@@ -54,7 +67,7 @@ def compute_line_data(solver,geometry,compute_line_data_options)->'line_data':
      p2 = np.array([geometry['size'][0]/2-delta,y])
   #--------------------
 
-  data_master =  utils.extract_variables(solver)
+  data_master =  utils.extract_variables(solver,geometry)
   data_master =  utils.expand_variables(data_master,geometry)
 
   if dof=='nodes':  

@@ -2,7 +2,7 @@ from setuptools import setup,find_packages
 import os
 
 setup(name='openbte',
-      version='2.49',
+      version='2.71.0',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',
@@ -11,6 +11,7 @@ setup(name='openbte',
       install_requires=['shapely',
                         'pandas',
                         'docutils==0.16',
+                        'numpy',
                         'dash',
                         'unittest2',
                         'nbsphinx',
@@ -20,7 +21,6 @@ setup(name='openbte',
                         'alabaster',
                         'cachetools',
                         'mpi4py',
-                        'numpy',
                         'scipy',
                         'dash_core_components',
                         'dash_html_components',
@@ -33,15 +33,10 @@ setup(name='openbte',
                          ],
       license='GPLv3',\
       packages = ['openbte'],
-      package_data = {'openbte':['materials/*.npz','efunx.yaml']},
+      package_data = {'openbte':['materials/*.npz']},
+      include_package_data=True,
       entry_points = {
      'console_scripts': ['AlmaBTE2OpenBTE=openbte.almabte2openbte:main',\
-                         'AlmaBTE2OpenBTE2=openbte.almabte2openbte_new:main',\
-                         'Phono3py2OpenBTE=openbte.phono3py2openbte:main',\
-                         'rta2mfp=openbte.rta2mfp:main',\
-                         'bundle_data=openbte.bundle_data:main',\
-                         'gui=openbte.gui:main',\
-                         'app=openbte.app:App',\
-                         'OpenBTE=openbte.openbte:main'],
+                         'Phono3py2OpenBTE=openbte.phono3py2openbte:main']\
       },
-      zip_safe=False)
+      zip_safe=True)

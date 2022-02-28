@@ -15,9 +15,9 @@ import gzip
 import time
 import functools
 
-def compute_grad_common(data,geometry):
+def compute_grad_common(data,geometry,**argv):
      """ Compute grad via least-square method """
-     jump = True
+     jump = argv.setdefault('jump',True)
      #Compute deltas-------------------   
      rr = []
      for i in geometry['side_per_elem']:
@@ -39,24 +39,33 @@ def compute_grad_common(data,geometry):
       rr[kc1][ind1] = [kc2,kc1, delta] 
       rr[kc2][ind2] = [kc1,kc2,-delta]
 
+      #if ll in geometry['hot_sides']:
+      #  rr[kc1][ind1] = [-0.5,kc1, 0] 
+
+      #if ll in geometry['cold_sides']:
+      #  rr[kc1][ind1] = [-1.5,kc1, 0] 
+
      diff_data = [[data[j[0]]-data[j[1]]+j[2] for j in f] for f in rr]
+     #diff_data = [[(data[j[0]] if j[0] >= 0 else (j[0]+1))-data[j[1]]+j[2] for j in f] for f in rr]
 
      return np.array([np.einsum('js,s->j',geometry['weigths'][k,:,:geometry['n_non_boundary_side_per_elem'][k]],np.array(dt)) for k,dt in enumerate(diff_data)])
 
 
 
-def fix_instability(F,B,scale=True):
+def fix_instability(F,B,scale=True,floating=True):
 
    n_elems = F.shape[0]
    if scale:
     scale = 1/F.max(axis=0).toarray()[0]
    else: 
     scale = np.ones(n_elems)   
-   n = np.random.randint(n_elems)
-   scale[n] = 0
+   #n = np.random.randint(n_elems)
+   #if floating: scale[n] = 0
    F.data = F.data * scale[F.indices]
-   F[n,n] = 1
-   B[n] = 0   
+
+   #if floating:
+   # F[n,n] = 1
+   # B[n] = 0   
 
    return scale
 
@@ -70,36 +79,52 @@ comm = MPI.COMM_WORLD
 def extract_variables(solver,geometry):
 
    #Create variables from data--
+   tags = solver.keys()
    variables = {}
-   variables['Temperature_BTE']      = {'data':solver['Temperature_BTE'],'units':'K','increment':-geometry['applied_gradient']}
-   variables['Temperature_Fourier']  = {'data':solver['Temperature_Fourier'],'units':'K','increment':-geometry['applied_gradient']}
-   variables['Flux_BTE']             = {'data':solver['Flux_BTE'],'units':'W/m/m','increment':[0,0,0]}
-   variables['Flux_Fourier']         = {'data':solver['Flux_Fourier'],'units':'W/m/m','increment':[0,0,0]}
-   if 'vorticity_BTE' in solver.keys():
+   if 'Temperature_BTE' in tags:
+    variables['Temperature_BTE']      = {'data':solver['Temperature_BTE'],'units':'K','increment':-geometry['applied_gradient']}
+    variables['Flux_BTE']             = {'data':solver['Flux_BTE'],'units':'W/m/m','increment':[0,0,0]}
+   if 'Temperature_Fourier' in tags:
+    variables['Temperature_Fourier']  = {'data':solver['Temperature_Fourier'],'units':'K','increment':-geometry['applied_gradient']}
+    variables['Flux_Fourier']         = {'data':solver['Flux_Fourier'],'units':'W/m/m','increment':[0,0,0]}
+    variables['Heat_Generation']      = {'data':solver['Heat_Generation'],'units':'W/m/m','increment':[0,0,0]}
+   if 'vorticity_BTE' in tags:
     variables['vorticity_BTE']       = {'data':solver['vorticity_BTE']    ,'units':'W/m/m/m','increment':[0,0,0]}
-   if 'vorticity_Fourier' in solver.keys():
+   if 'vorticity_Fourier' in tags:
     variables['vorticity_Fourier']   = {'data':solver['vorticity_Fourier'],'units':'W/m/m/m','increment':[0,0,0]}
 
-
    return variables
+
+
+def compute_laplacian(data,geometry):
+
+    n = len(data) 
+    laplacian = np.zeros((n,2,2))
+
+    grad =  compute_grad_common(data,geometry)
+
+    laplacian[:,0,:] = compute_grad_common(grad[:,0],geometry,jump=False)
+    laplacian[:,1,:] = compute_grad_common(grad[:,1],geometry,jump=False)
+ 
+    return laplacian
 
 
 def compute_vorticity(geometry,J):
    """Compute vorticity (only for 2D cases)"""
 
-   data = None  
-   if comm.rank == 0:
-    vorticity = np.zeros((len(geometry['elems']),3))
-    grad_x = compute_grad_common(J[:,0],geometry)
-    grad_y = compute_grad_common(J[:,1],geometry)
-    #Defines only for 2D
-    vorticity[:,2] = grad_y[:,0]-grad_x[:,1]
-    data = {'vorticity':vorticity*1e9} #W/m/m/m
-    
-   return create_shared_memory_dict(data)
-    
-  
+   #data = None  
+   #if comm.rank == 0:
+   vorticity = np.zeros((len(geometry['elems']),3))
+   grad_x = compute_grad_common(J[:,0],geometry)
+   grad_y = compute_grad_common(J[:,1],geometry)
+   #Defines only for 2D
+   vorticity[:,2] = grad_y[:,0]-grad_x[:,1]
+   data = {'vorticity':vorticity*1e9} #W/m/m/m
 
+   return data
+    
+   #return create_shared_memory_dict(data)
+    
 
 
 def expand_variables(data,geometry):
@@ -183,23 +208,13 @@ def fast_interpolation(fine,coarse,bound=False,scale='linear') :
 
 
 
+def make_rectangle(area,aspect_ratio):
 
+   Lx = np.sqrt(area/aspect_ratio)
+   Ly = aspect_ratio*Lx
 
-def periodic_kernel(x1, x2, p,l,variance):
-    return variance*np.exp(-2/l/l * np.sin(np.pi*abs(x1-x2)/p) ** 2)
+   return [[-Lx/2,-Ly/2],[-Lx/2,Ly/2],[Lx/2,Ly/2],[Lx/2,-Ly/2]]
 
-def gram_matrix(xs,p,l,variance):
-    return [[periodic_kernel(x1,x2,p,l,variance) for x2 in xs] for x1 in xs]
-
-def generate_random_interface(p,l,variance,scale):
-
- xs = np.arange(-p/2, p/2,p/200)
- mean = [0 for x in xs]
- gram = gram_matrix(xs,p,l,variance)
- ys = np.random.multivariate_normal(mean, gram)*scale
- f = interpolate.interp1d(xs, ys,fill_value='extrapolate')
-
- return f
 
 
 def make_polygon(Na,A):
@@ -288,30 +303,24 @@ def create_line_list(pp,points,lines,store,lx,ly,step_label = 'h'):
    return line_list
 
 
- 
-
-
-def save_data(fh, namedict):
+def save(fh, namedict):
 
      if comm.rank == 0:
       with gzip.GzipFile(fh + '.npz', 'w') as f:
             pickle.dump(namedict, f,protocol=pickle.HIGHEST_PROTOCOL)
 
-def load(fh):
 
-    return  {f:load_data(f) for f in fh}
-
-
-def load_data(fh):
+def load(filename):
 
     if comm.rank == 0:
-     if os.path.isfile(fh + '.npz'):
-      with gzip.open(fh + '.npz', 'rb') as f:
-          return pickle.load(f)
-     print("Can't load " + fh)
-     quit()
-     return -1 
-    comm.Barrier()
+        try:
+           with gzip.open(filename + '.npz', 'rb') as f:
+             data = pickle.load(f)
+        except ValueError:
+            print("We could not find the file: ",filename)
+    else: data = None
+
+    return create_shared_memory_dict(data)
 
 
 
@@ -356,7 +365,6 @@ def find_elem(mesh,p,guess):
 
 def generate_frame(**argv):
 
-
     argv.setdefault('bounding_box',[0,0,0])
     Lx = float(argv.setdefault('lx',argv['bounding_box'][0]))
     Ly = float(argv.setdefault('ly',argv['bounding_box'][1]))
@@ -385,9 +393,11 @@ def translate_shape(s,b,**argv):
 
   return out
 
+
 def repeat_merge_scale(argv):
 
   polygons = argv['polygons']
+  argv.setdefault('heat_source',[None]*len(polygons))
 
   lx = argv['lx']   
   ly = argv['ly']   
@@ -413,67 +423,80 @@ def repeat_merge_scale(argv):
   frame = Polygon([[-dx/2,-dy/2],[-dx/2,dy/2],[dx/2,dy/2],[dx/2,-dy/2]])
 
   #---------------------
-  #Store only the intersecting polygons
+ 
+  #Create artificial base in case of 'custom' polygon
+  if not 'base' in argv.keys():
+   base = []
+   for p in polygons:
+       base.append(np.mean(p,axis=0))
+   argv['base'] = base
+  #-----------------------------
+
   extended_base = []
-  final = []
-  #stretch base:
-  #base = [[tmp[0]*scale[0],tmp[1]*scale[1]]  for tmp in argv['base']]
+  #final = []
+  new_poly = []
+  corr1 = {}
+  heat_source = []
   for pp,poly in enumerate(polygons):
 
     for kp in range(len(pbc)):
         
-     new_base = [argv['base'][pp][i]+pbc[kp][i] for i in range(2)]
+      new_base = [argv['base'][pp][i]+pbc[kp][i] for i in range(2)]
 
-     if not new_base in extended_base: #periodicity takes back to original shape
-
+      #if not new_base in extended_base: #periodicity takes back to original shape
       tmp = [[ p[0] + pbc[kp][0],p[1] + pbc[kp][1] ] for p in poly] 
 
       p1 = Polygon(tmp)
       if p1.intersects(frame):
        extended_base.append(new_base)
+       #corr1[len(extended_base)-1] = pp
 
-       thin = Polygon(p1).intersection(frame)
-       if isinstance(thin, shapely.geometry.multipolygon.MultiPolygon):
-        tmp = list(thin)
-        for t in tmp:
-         final.append(t)
-       else:
-         final.append(p1)
+       #thin = Polygon(p1).intersection(frame)
+       #if isinstance(thin, shapely.geometry.multipolygon.MultiPolygon):
+       # tmp = list(thin)
+       # for t in tmp:
+       #  final.append(t)
+       #else:
+       #final.append(p1)
+       new_poly.append(list(p1.exterior.coords))
+       heat_source += [argv['heat_source'][pp]]
+       #argv['heat_source'] = [argv['heat_source'][c]  for c in corr]
 
+  argv['heat_source'] = heat_source
+  #MP = MultiPolygon(final) 
 
-  #plot_shapes(final,frame)
-  #Create bulk surface---get only the exterior to avoid holes
-  #[plt.plot(*p.exterior.xy) for p in final]
-  #plt.plot(*frame.exterior.xy)
-  #plt.gca().set_aspect('equal')
-  #plt.gca().axis('off')
-  #plt.show()
+  #conso = unary_union(MP)
 
-  MP = MultiPolygon(final) 
-
-  conso = unary_union(MP)
-
-  new_poly = []
-  if isinstance(conso, shapely.geometry.multipolygon.MultiPolygon):
-      for i in conso: 
-       new_poly.append(list(i.exterior.coords))
-  else: 
-       new_poly.append(list(conso.exterior.coords))
+  #new_poly = []
+  #if isinstance(conso, shapely.geometry.multipolygon.MultiPolygon):
+  #    for i in conso: 
+  #     new_poly.append(list(i.exterior.coords))
+  #else: 
+  #     new_poly.append(list(conso.exterior.coords))
 
   #Find the closest centroids--
-  extended_base = np.array(extended_base)
-  tmp = np.zeros_like(extended_base)
-  for n,p in enumerate(new_poly):
-     index = np.argmin(np.linalg.norm(extended_base - np.mean(p,axis=0)[np.newaxis,...],axis=1))
-     tmp[n] = extended_base[index]
-  extended_base = tmp.copy()
-  #---------------------------------
+  #extended_base = np.array(extended_base) #this is the original one but repeated
+  #tmp = np.zeros_like(extended_base)
+  #corr = []
+  #for n,p in enumerate(new_poly):
+  #     index = np.argmin(np.linalg.norm(extended_base - np.mean(p,axis=0)[np.newaxis,...],axis=1))
+  #     corr.append(corr1[index]) 
+  #     tmp[n] = extended_base[index]
+  #extended_base = tmp.copy()
+  #argv['heat_source'] = [argv['heat_source'][c]  for c in corr]
+  #-----
+
+  #original_number = len(final)
+  #final_number = len(new_poly)
+  #overlap = final_number < original_number
+  overlap = False
 
   #cut redundant points
-
   if argv.setdefault('cut_redundant_point',False):
 
-   new_poly_2 = []
+   #This cut points that are very close to each other   
+   n_cut = 0
+   new_poly2 = []
    for poly in new_poly:
     N = len(poly)
     tmp = []
@@ -482,16 +505,14 @@ def repeat_merge_scale(argv):
      p2 = poly[(n+1)%N]
      if np.linalg.norm(np.array(p1)-np.array(p2)) >1e-4:
       tmp.append(p1)
+     else: 
+      n_cut +=1   
     new_poly2.append(tmp)
    new_poly = new_poly2.copy()
 
-   #cut redundant points
-   discard = 0
-   while discard > 0:
-      
-    discard = 0  
-    new_poly_2 = []
-    for gg,poly in enumerate(new_poly):
+   discard = 0  
+   new_poly_2 = []
+   for gg,poly in enumerate(new_poly):
      N = len(poly)
      tmp = []
      for n in range(N):
@@ -504,12 +525,13 @@ def repeat_merge_scale(argv):
       else:
          discard += 1 
      new_poly_2.append(tmp)
-    new_poly = new_poly_2.copy()
-
+   new_poly = new_poly_2.copy()
+  
 
   #----------------------------
-  dmin = check_distances(final)
-  #dmin = check_distances(new_poly)
+  #dmin = check_distances(final)
+  dmin = 0
+
 
   #scale-----------------------
   if argv.setdefault('relative',True):
@@ -530,15 +552,10 @@ def repeat_merge_scale(argv):
 
   argv['polygons'] = polygons
   argv['dmin'] = dmin
-
-
-
-
-
+  argv['overlap'] = int(overlap)
 
 
 def check_distances(new_poly):
-
 
   #Merge pores is they are too close
   Pores = [ Polygon(p)  for p in new_poly]
@@ -577,7 +594,6 @@ def check_distances(new_poly):
      #print('left',p1)  
      dmin = d
 
-   #print(dmin)
 
   return dmin
 
@@ -624,15 +640,6 @@ def get_linear_indexes(mfp,value,scale,extent):
    return i,ai,j,aj  
 
 
-def load_shared(filename):
-
-    data = None
-    if comm.rank == 0:
-      data = load_data(filename)
-    data =   create_shared_memory_dict(data)  
-
-    return data
-
 
 def shared_array(value):
 
@@ -668,6 +675,8 @@ def compute_spherical(mfp_bulk):
  return r,phi_bulk,theta_bulk
 
 
+
+
 def create_shared_memory_dict(varss):
 
        dtype = [np.int32,np.int64,np.float32,np.float64]
@@ -676,13 +685,9 @@ def create_shared_memory_dict(varss):
        if comm.Get_rank() == 0:
           var_meta = {} 
           for var,value in varss.items():
-           if callable(value) or type(value) == str or type(value) == int or type(value) == float:
-              var_meta[var] = [None,None,None,None,False] 
-              continue 
-           if type(value) == list: 
-              value = np.array(value)   
-
-           #Check types
+           if callable(value) or type(value) == str or type(value) == int or type(value) == float or type(value) == list or type(value) == dict or type(value) == bool:
+                var_meta[var] = [None,None,None,None,False] 
+                continue 
            if   value.dtype == np.int32:
                 data_type = 0
                 itemsize = MPI.INT32_T.Get_size()
@@ -718,7 +723,7 @@ def create_shared_memory_dict(varss):
          dict_output[var] = output
         else:
             if comm.rank == 0:  
-               dict_output[var] = varss[var]   
+             dict_output[var] = varss[var]   
 
        del varss
        comm.Barrier()

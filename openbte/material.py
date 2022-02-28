@@ -2,25 +2,23 @@ import numpy as np
 import os
 import math
 from .gray2D import *
-from .gray2DSym import *
 from .rta2DSym import *
 from .rta3D import *
 from mpi4py import MPI
 import shutil
+import openbte.utils as utils
 
 comm = MPI.COMM_WORLD
 
 def database(options_database)->'rta':
-   import openbte.utils as utils
    data = None 
+ 
+   database_material = options_database['filename']
+   prefix = options_database.setdefault('prefix',os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/openbte/materials')
 
-   if comm.rank == 0:
-     database_material = options_database['filename']
-     prefix = options_database.setdefault('prefix',os.path.dirname(os.path.dirname(os.path.realpath(__file__))) + '/openbte/materials')
-
-     filename = prefix + '/'  + database_material
+   filename = prefix + '/'  + database_material
    
-     data = utils.load_data(filename)
+   data = utils.load(filename)
 
    return  utils.create_shared_memory_dict(data)
 
@@ -36,10 +34,11 @@ def Material(**argv):
    #set up database
    if not model == 'gray':
     source = argv.setdefault('source','database')
+
     if source == 'database':
         rta = database({'filename':argv['filename']})  
     else :     
-         rta = load_data(argv['filename'])  
+        rta = load(argv['filename'])  
 
    if model == 'rta2DSym':
       data  = rta2DSym(rta,argv)
@@ -68,7 +67,7 @@ def Material(**argv):
 
   if argv.setdefault('save',True):
      if comm.rank == 0:
-         utils.save_data(argv.setdefault('output_filename','material'),data)   
+         utils.save(argv.setdefault('output_filename','material'),data)   
 
   return data
 

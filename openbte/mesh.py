@@ -20,22 +20,32 @@ import matplotlib.pylab as plt
 comm = MPI.COMM_WORLD
 
 def compute_boundary_condition_data(data,**argv):
-
     
     side_elem_map = data['side_elem_map_vec']
     face_normals = data['face_normals']
     volumes = data['volumes']
     dim = data['dim']
 
+    #Apply gradient
+    if argv.setdefault('apply_gradient',True):
+       DeltaT = 1
+    else:   
+       DeltaT = 1e-18
+    #--------------------
+
+
     direction = data['direction']
+
+    gradir = 0
+    applied_grad = [0,0,0]
     if direction == 0:
      gradir = 0
-     applied_grad = [1,0,0]
+     applied_grad = [DeltaT,0,0]
     if direction == 1:
      gradir = 1
-     applied_grad = [0,1,0]
+     applied_grad = [0,DeltaT,0]
     if direction == 2:
-     applied_grad = [0,0,1]
+     applied_grad = [0,0,DeltaT]
      gradir = 2
 
     if gradir == 0:
@@ -49,6 +59,7 @@ def compute_boundary_condition_data(data,**argv):
     if gradir == 2:
      flux_dir = [0,0,1]
      length = data['size'][2]
+    #----------------
 
     delta = 1e-2
     nsides = len(data['sides'])
@@ -56,12 +67,11 @@ def compute_boundary_condition_data(data,**argv):
 
     tmp = list(data['periodic_sides']) + list(data['inactive_sides'])
 
-    DeltaT = 1
+
     for kl,ll in enumerate(tmp) :
      Ee1,e2 = side_elem_map[ll]
      normal = face_normals[ll]  
      tmp = np.dot(normal,flux_dir)
-
 
      if tmp < - delta :
         side_value[ll] = -DeltaT
@@ -104,7 +114,6 @@ def compute_boundary_condition_data(data,**argv):
  
       B[i,j] = side_value[side[0]]
       B[j,i] = side_value[side[1]]
-  
 
       if abs(side_value[side[0]]) > 0:
        pp += ((data['ij'].index([i,j]),side_value[side[0]]),)
@@ -123,42 +132,71 @@ def compute_boundary_condition_data(data,**argv):
     #Get flux sides for thermal conductivity calculations--
     flux_sides = [] #where flux goes
     total_area = 0
-    area_flux  = -1
+    #area_flux  = -1
+
+    #Compute area flux--
+    if dim == 2 and direction == 0:
+       area_flux = data['size'][1]
+    elif dim == 3 and direction == 0:
+       area_flux = data['size'][1]*data['size'][2]
+    elif dim == 2 and direction == 1:
+       area_flux = data['size'][0]
+    elif dim == 3 and direction == 1:
+       area_flux = data['size'][0]*data['size'][2]
+    elif direction == 2:
+       area_flux = data['size'][0]*data['size'][1]
+    elif direction == -1:
+       area_flux = 0 
+    else:
+        raise Exception("Can't recongnize combination of dimension and direction of the applied gradient",dim,direction)
+    #==========================
+
 
     #From Periodic sides
-    for ll in data['periodic_sides']:
+    kappa_mask_thermalizing = np.zeros(len(data['elems']))
+    for ll in list(data['periodic_sides']) + list(data['fixed_temperature_sides']):
      e1,e2 = side_elem_map[ll]
      normal = data['face_normals'][ll]   
-     tmp = np.abs(np.dot(normal,flux_dir))
-     if tmp > delta : #either negative or positive
-       if abs(normal[0]) == 1:
-           if dim == 2:  
-            area_flux = data['size'][1]
-           else: 
-            area_flux = data['size'][1]*data['size'][2]
-           total_area += data['areas'][ll]
-
-       elif abs(normal[1]) == 1:
-           if data['dim'] == 2:  
-            area_flux = data['size'][0]
-           else:
-            area_flux = data['size'][0]*data['size'][2]
-           total_area += data['areas'][ll]
-
-       else : #along z
-           area_flux = data['size'][0]*data['size'][1]
-           total_area += data['areas'][ll]
-
+     tmp = np.dot(normal,flux_dir)
+     if tmp == 1:
        flux_sides.append(ll)
+       total_area += data['areas'][ll]
+       #if mode == 'isothermal':
+       #   kappa_mask_thermalizing[e1] = data['areas'][ll] 
 
+     #if abs(tmp) > delta : #either negative or positive
+     # if (mode =='isothermal' and (ll in data['hot_sides'])) or mode =='periodic':  #If isothermal we only consider cold contact
+     #  if abs(normal[0]) == 1:
+     #      if dim == 2:  
+     #       area_flux = data['size'][1]
+     #      else: 
+     #       area_flux = data['size'][1]*data['size'][2]
+     #      total_area += data['areas'][ll]
 
-    #-------THIS
+     #  elif abs(normal[1]) == 1:
+     #      if data['dim'] == 2:  
+     #       area_flux = data['size'][0]
+     #      else:
+     #       area_flux = data['size'][0]*data['size'][2]
+     #      total_area += data['areas'][ll]
+
+     #  else : #along z
+     #      area_flux = data['size'][0]*data['size'][1]
+     #      total_area += data['areas'][ll]
+
+     #  flux_sides.append(ll)
+     #  if mode == 'isothermal':
+     #      kappa_mask_thermalizing[e1] = data['areas'][ll] 
+
+    #-------
+
+    
     if argv.setdefault('contact_area','box') == 'box':
-      kappa_factor = data['size'][gradir]/area_flux
+      kappa_factor = data['size'][gradir]/area_flux if area_flux > 0 else 0
     else:  
-      kappa_factor = data['size'][gradir]/total_area
+      kappa_factor = data['size'][gradir]/total_area if total_area > 0 else 0
 
-    data['kappa_mask']= -np.array(np.sum(B_with_area_old.todense(),axis=0))[0]*kappa_factor*1e-18
+    data['kappa_mask']= (-np.array(np.sum(B_with_area_old,axis=0))[0]-kappa_mask_thermalizing)*kappa_factor*1e-18
     data['periodic_side_values'] = np.array([periodic_side_values[ll]  for ll in data['periodic_sides']])
     data['pp'] = np.array(pp)
     data['applied_gradient'] = np.array(applied_grad)
@@ -168,20 +206,26 @@ def compute_boundary_condition_data(data,**argv):
 
 
 def compute_dists(data):
-  
 
   dists_side = np.zeros((len(data['sides']),3))
   side_elem_map = data['side_elem_map_vec']
   centroids = data['centroids']
 
   for ll in data['active_sides']:
-   if not (ll in (list(data['boundary_sides']) + list(data['fixed_sides']))):
-    elem_1 = side_elem_map[ll][0]
-    elem_2 = side_elem_map[ll][1]
-    c1 = centroids[elem_1]
+   elem_1 = side_elem_map[ll][0]
+   elem_2 = side_elem_map[ll][1]
+   c1 = centroids[elem_1]
+   #if not (ll in (list(data['boundary_sides']) + list(data['fixed_sides']) + list(data['cold_sides']) + list(data['hot_sides']))):
+   if not (ll in (list(data['boundary_sides']) + list(data['fixed_temperature_sides']))):
     c2 = get_next_elem_centroid(elem_1,ll,data)
     dist = c2 - c1
-    dists_side[ll] = dist 
+   else: 
+    c2 = data['side_centroids'][ll]
+    #dist = data['face_normals'][ll]*(np.dot(data['face_normals'][ll],c2-c1))
+    dist = (c2-c1)
+  
+   dists_side[ll] = dist 
+
 
   data['dists'] = np.array(dists_side) 
 
@@ -192,7 +236,8 @@ def compute_interpolation_weigths(data):
 
   #from here: http://geomalgorithms.com/a05-_intersect-1.html
 
-  net_sides=data['active_sides'][~np.isin(data['active_sides'],list(data['boundary_sides'])+list(data['fixed_sides']))] #Get only the nonboundary sides
+  #net_sides=data['active_sides'][~np.isin(data['active_sides'],list(data['boundary_sides'])+list(data['fixed_sides']) + list(data['hot_sides']) + list(data['cold_sides'])  )] #Get only the nonboundary sides
+  net_sides=data['active_sides'][~np.isin(data['active_sides'],list(data['boundary_sides'])+list(data['fixed_temperature_sides']))] #Get only the nonboundary sides
 
   e1 =  data['side_elem_map_vec'][net_sides,0]
 
@@ -205,8 +250,6 @@ def compute_interpolation_weigths(data):
 
   interp_weigths = np.zeros(len(data['sides']))
   interp_weigths[net_sides]   = 1+tmp2[net_sides]/tmp[net_sides] #this is the relative distance with the centroid of the second element
-
-
 
   if len(data['boundary_sides']) > 0:
    interp_weigths[data['boundary_sides']] = 1
@@ -223,13 +266,12 @@ def compute_connecting_matrix(data):
    side_areas    = data['areas']
    dim           = data['dim']
    face_normals  = data['face_normals']
-   a_sides =       data['active_sides']
-   b_sides =       data['boundary_sides']
-   c_sides =       data['interface_sides']
+   a_sides       = data['active_sides']
+   b_sides       = data['boundary_sides']
+   c_sides       = data['fixed_temperature_sides']
 
    #Active sides-----
-   #net_sides=a_sides[~np.isin(a_sides,list(b_sides)+list(c_sides))]
-   net_sides=a_sides[~np.isin(a_sides,list(b_sides))]
+   net_sides=a_sides[~np.isin(a_sides,list(b_sides)+list(c_sides))]
    i2 = side_elem_map[net_sides].flatten()
    j2 = np.flip(side_elem_map[net_sides],1).flatten()
    common = np.einsum('u,ui->ui',side_areas[net_sides],face_normals[net_sides,:dim])
@@ -238,42 +280,31 @@ def compute_connecting_matrix(data):
    k2 = np.zeros((2*t1.shape[0],dim))
    k2[np.arange(t1.shape[0])*2]   =  t1
    k2[np.arange(t1.shape[0])*2+1] = -t2
-   k2 = k2.T     
-   #----------------
+   k2 = k2.T    
+   #Compute simple connectivity matrix--
+   normals = np.zeros((2*t1.shape[0],dim))
+   normals[np.arange(t1.shape[0])*2]   =  face_normals[net_sides,:dim]
+   normals[np.arange(t1.shape[0])*2+1] = -face_normals[net_sides,:dim] 
+   data['normals'] = normals
+   #------------------------------------
 
    #ij - it will need to be removed
    ij2 = np.zeros((2*t1.shape[0],2))
    ij2[np.arange(t1.shape[0])*2  ] = side_elem_map[net_sides]
    ij2[np.arange(t1.shape[0])*2+1] = np.flip(side_elem_map[net_sides],1)
 
-   #-------------------------------------
-
-   #Interface sides----
-   #if len(c_sides) >0 :
-   # inti2 = side_elem_map[c_sides].flatten()
-   # intj2 = np.flip(side_elem_map[c_sides],1).flatten()
-   # tmp = np.flip(side_elem_map[c_sides],1).flatten()
-   # common = np.einsum('u,ui->ui',side_areas[c_sides],face_normals[c_sides,:dim])
-   # t1 =  common/elem_volumes[side_elem_map[c_sides][:,0],None]
-   # t2 =  common/elem_volumes[side_elem_map[c_sides][:,1],None]
-   # intk2 = np.zeros((2*t1.shape[0],dim))
-   # intk2[np.arange(t1.shape[0])*2]   =  t1
-   # intk2[np.arange(t1.shape[0])*2+1] = -t2
-   # intk2 = intk2.T     
-   #else:
-   inti2 = []   
-   intj2 = []   
-   intk2 = []   
-    
-   #boundary sides----
+   #Boundary sides----
    sb2 = a_sides[np.isin(a_sides,b_sides)]
    eb2 = side_elem_map[sb2][:,0]
    db2 = face_normals[sb2,:dim].T*side_areas[sb2]/elem_volumes[eb2]
    #-------------
-   
-   data['intk'] = np.asarray(intk2,dtype=np.int64); 
-   data['inti'] = np.asarray(inti2,dtype=np.int64);
-   data['intj'] = np.asarray(intj2,dtype=np.int64);
+
+   #Isothermal sides----
+   sfixed  = a_sides[np.isin(a_sides,c_sides)]
+   efixed  = side_elem_map[sfixed][:,0]
+   dfixed  = face_normals[sfixed,:dim].T*side_areas[sfixed]/elem_volumes[efixed]
+   #------------------
+
    data['i']    = np.array(i2); 
    data['j']    = np.array(j2); 
    data['k']    = np.array(k2);
@@ -281,6 +312,9 @@ def compute_connecting_matrix(data):
    data['sb']   = sb2; 
    data['db']   = db2; 
    data['ij']   = ij2.tolist(); 
+   data['efixed']   = efixed; 
+   data['sfixed']   = sfixed; 
+   data['dfixed']   = dfixed; 
 
 def get_next_elem_centroid(elem,side,data):
 
@@ -323,19 +357,18 @@ def compute_least_square_weigths(data):
     dist = dists[ll]
     kc1 = elems[0]
     ind1 = list(elem_side_map[kc1]).index(ll)
-    if not ll in data['boundary_sides'] :
+    #if not ll in (list(data['boundary_sides'])+list(data['cold_sides']) + list(data['hot_sides'])):
+    if not ll in (list(data['boundary_sides']) + list(data['fixed_temperature_sides'])):
      kc2 = elems[1]
      ind2 = list(elem_side_map[kc2]).index(ll)
      diff_dist[kc1,ind1] =  dist[:dim]
      diff_dist[kc2,ind2] = -dist[:dim]
-    else :
-     dist = side_centroids[ll] - elem_centroids[kc1]
-     diff_dist[kc1,ind1] = dist[:dim]
+    #else :
+    # diff_dist[kc1,ind1] = dist[:dim]
 
    #We solve the pinv for a stack of matrices. We do so for each element group
    index3 = np.where(data['side_per_elem'] == 3)[0]
    G3 = np.linalg.pinv(diff_dist[index3,:3])
-   
 
    index4 = np.where(data['side_per_elem'] == 4)[0]
    G4 = np.linalg.pinv(diff_dist[index4,:4])
@@ -356,7 +389,6 @@ def compute_boundary_connection(data):
      side_elem_map = data['side_elem_map_vec']
      face_normals = data['face_normals']
      
-
      bconn = []
      for s in data['boundary_sides']:
         ce = elem_centroids[side_elem_map[s][0]]
@@ -370,7 +402,6 @@ def compute_boundary_connection(data):
 
 
 def compute_face_normals(data):
-
 
    sides = data['sides']
    nodes = data['nodes']
@@ -389,7 +420,7 @@ def compute_face_normals(data):
    v = np.cross(v1,v2)
 
    normal = v.T/np.linalg.norm(v,axis=1)
-   
+
    c = side_centroids - elem_centroids[side_elem_map[:,0]]   
    index = np.where(np.einsum('iu,ui->u',normal,c) < 0)[0]
    normal[:,index] = -normal[:,index]
@@ -401,8 +432,10 @@ def compute_face_normals(data):
 
 def import_mesh(**argv):
 
+ 
+   heat_source = argv.setdefault('heat_source',[]) 
    data = {}
-
+   
    elem_region_map = {}
    region_elem_map = {}
 
@@ -437,6 +470,14 @@ def import_mesh(**argv):
    elems = [list(np.array(lines[current_line + n][5:],dtype=int)-1) for n in bulk_tags]
    side_per_elem = np.array([len(e) for e in elems])
    n_elems = len(elems)
+  
+   #Bulk physical regions--
+   physical_regions = {}
+   for n in bulk_tags:
+       tag = int(lines[current_line + n][3])
+       physical_regions.setdefault(blabels[tag],[]).append(n-len(face_tags))
+   #-----------------------
+
 
    boundary_sides = np.array([ sorted(np.array(lines[current_line + n][5:],dtype=int)) for n in face_tags] ) -1
    #generate sides and maps---
@@ -460,9 +501,20 @@ def import_mesh(**argv):
 
    side_elem_map = { i:[] for i in range(len(sides))}
    for key, value in elem_side_map.items():
-     for v in value:   
-      side_elem_map[v].append(key)    
+     for v in value:  
+      side_elem_map[v].append(key)   
+
    #----------------------------------------------------      
+
+   #(TO BE IMPROVED).
+   face_physical_regions = {}
+   sides_list = sides.tolist()
+   boundary_sides_list = boundary_sides.tolist()
+   for n in face_tags:
+        tag = int(lines[current_line + n][3])
+        face_physical_regions.setdefault(blabels[tag],[]).append(sides_list.index(boundary_sides_list[n]))
+   #---------------------
+
 
    #Build relevant data
    side_areas = compute_side_areas(nodes,sides,dim) 
@@ -480,6 +532,22 @@ def import_mesh(**argv):
    
    data.update({'side_per_elem':np.array(side_per_elem)})
 
+
+   #Compute generation rate-------------
+   generation = np.zeros(n_elems)
+   for key,value in physical_regions.items():
+       if len(key) > 10:
+        if key[:10] == 'GENERATION':
+            v = float(key[11:])
+            generation[value]=float(key[11:])
+   #generation = np.zeros(n_elems)
+   #kk = 0
+   #for g in heat_source:
+   #       if not g == None:
+   #        generation[physical_regions['GENERATION_' + str(kk)]]=g
+   #        kk +=1
+   data['generation'] = generation
+   #------------------------------------
 
    #match the boundary sides with the global side.
    physical_boundary = {}
@@ -500,6 +568,8 @@ def import_mesh(**argv):
    #self.pairs = [] #global (all periodic pairs)
 
    side_list.setdefault('Boundary',[])
+   side_list.setdefault('Cold',[])
+   side_list.setdefault('Hot',[])
    side_list.setdefault('Fixed',[])
    side_list.setdefault('Interface',[])
    side_list.setdefault('Periodic',[])
@@ -565,16 +635,29 @@ def import_mesh(**argv):
       [side_list['Periodic'].append(i) for i in physical_boundary[contact_1]]
       [side_list['Inactive'].append(i) for i in physical_boundary[contact_2]]
 
-
+   
+   #Consolidate fixed-temperature boundaries
+   fixed_temperature_sides = []
+   fixed_temperature = []
+   for key,value in physical_boundary.items():
+       if key[:3] == 'ISO':
+           fixed_temperature_sides += value
+           fixed_temperature += [float(key[4:])]*len(value)
+   #--------------------------------        
+ 
    if 'Boundary' in physical_boundary.keys(): side_list.update({'Boundary':physical_boundary['Boundary']})
-   if 'Fixed' in physical_boundary.keys(): side_list.update({'Fixed':physical_boundary['Fixed']})
-   if 'Interface' in physical_boundary.keys(): side_list.update({'Interface':physical_boundary['Interface']})
+   side_list['Fixed_temperature'] = fixed_temperature_sides
 
 
-   for side in side_list['Boundary']  :# + self.side_list['Hot'] + self.side_list['Cold']:
-    side_elem_map[side].append(side_elem_map[side][0])
+   #if 'Fixed' in physical_boundary.keys(): side_list.update({'Fixed':physical_boundary['Fixed']})
+   #if 'Interface' in physical_boundary.keys(): side_list.update({'Interface':physical_boundary['Interface']})
+   #if 'Cold' in physical_boundary.keys(): side_list.update({'Cold':physical_boundary['Cold']})
+   #if 'Hot' in physical_boundary.keys():  side_list.update({'Hot':physical_boundary['Hot']})
 
-   for side in side_list['Fixed']  :# + self.side_list['Hot'] + self.side_list['Cold']:
+   #for side in side_list['Boundary'] + side_list['Fixed'] + side_list['Cold'] + side_list['Hot'] :
+   # side_elem_map[side].append(side_elem_map[side][0])
+
+   for side in side_list['Boundary'] + side_list['Fixed_temperature'] :   
     side_elem_map[side].append(side_elem_map[side][0])
 
 
@@ -600,19 +683,28 @@ def import_mesh(**argv):
             elem_side_map[n].append(-1)
    #----------------------------------------
 
-
    data.update({'active_sides':np.array(side_list['active'])})
    data.update({'n_non_boundary_side_per_elem':np.array(n_non_boundary_side_per_elem)})
    data.update({'boundary_sides':np.array(side_list['Boundary'])})
+   data.update({'cold_sides':np.array(side_list['Cold'])})
+   data.update({'hot_sides':np.array(side_list['Hot'])})
    data.update({'fixed_sides':np.array(side_list['Fixed'])})
    data.update({'periodic_sides':np.array(side_list['Periodic'])})
    data.update({'side_periodicity':side_periodicity})
    data.update({'areas':np.array(side_areas)})
+   data.update({'fixed_temperature':np.array(fixed_temperature)})
+   data.update({'fixed_temperature_sides':np.array(fixed_temperature_sides)})
+
+   #-------
+   #data.update({'physical_regions':physical_regions})
+   #data.update({'face_physical_regions':face_physical_regions})
    data.update({'elem_mat_map':np.zeros(len(elems))})
 
    data.update({'dim':dim})
    if 'dmin' in argv.keys():
     data.update({'dmin':argv['dmin']})
+   #if 'overlap' in argv.keys():
+   # data.update({'overlap':argv['overlap']})
    data.update({'pairs':np.array(pairs)})
    data.update({'elem_side_map_vec': np.array([elem_side_map[ll]  for ll in range(len(elems))]) })
    data.update({'side_elem_map_vec': np.array([side_elem_map[ll]  for ll in range(len(sides))]) })
@@ -623,7 +715,7 @@ def import_mesh(**argv):
    elif  direction == 'y': 
     data['direction'] = 1
    else: 
-    data['direction'] = 2
+    data['direction'] = -1
    
    data['size'] = np.array(size)
    data['inactive_sides'] = np.array(side_list['Inactive'])
@@ -649,6 +741,8 @@ def compute_data(data,**argv):
    compute_boundary_condition_data(data,**argv)
 
    #Some adjustement--
+   data.setdefault('dmin',0)
+   #data.setdefault('overlap',False)
    data['meta'] = np.asarray([len(data['elems']),data['kappa_factor'],data['dim'],len(data['nodes']),len(data['active_sides']),data['direction'],data['dmin']],np.float64)
    
    del data['direction']

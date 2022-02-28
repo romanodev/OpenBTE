@@ -45,18 +45,16 @@ def main():
  tail = str(nx) + str(ny) + str(nz) + '.hdf5'
  
  #KAPPA-------------------------
- #f = dd.io.load('kappa-m' + tail)
  
  f = hdfdict.load('kappa-m' + tail)
  
  mode_kappa = f['mode_kappa']
- #weight = f['weight'][:]
  g = f['gamma'][:]
  gg = np.pi * g[0]*1e12 #NOTE: there should be a factor 4 here according to doc.
  (nq,nb) = np.shape(g[0])
  nm = nq*nb
  alpha = V*nq
- v = np.array(f['group_velocity'])*1e2 #m/2
+ v = np.array(f['group_velocity'])*1e2 #m/s
  w = np.array(f['frequency'])*1e12 #1/s
  q = 1.60218e-19 #C
  kb = 1.380641e-23 #j/K
@@ -87,7 +85,7 @@ def main():
  print(kappa)
 
 
- data = {'C':C/alpha,'tau':tau,'v':v,'kappa':kappa}
+ data = {'heat_capacity':C/alpha,'scattering_time':tau,'group_velocity':v,'thermal_conductivity':kappa,'frequency':w}
  save_data('rta',data)   
 
  #---------------------------------------------

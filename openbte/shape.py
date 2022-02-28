@@ -49,6 +49,10 @@ def get_shape(argv):
      if shape == 'square':
        shapes.append(np.array(make_polygon(4,area)))
 
+     if shape == 'rectangle':
+       shape_factor = argv.setdefault('shape_factor',1)
+       shapes.append(np.array(make_rectangle(area,shape_factor)))
+
      if shape == 'triangle':
        shapes.append(np.array(make_polygon(3,area)))
 

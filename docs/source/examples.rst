@@ -9,7 +9,7 @@ Interactive examples can be run in Google Colab
 
 
 
-1) Different shapes and non-uniform areas
+Different shapes and non-uniform areas
 #########################################
 
 
@@ -35,7 +35,7 @@ Interactive examples can be run in Google Colab
     <iframe src="_static/plotly_1.html" height="475px" width="65%"  display= inline-block  ></iframe>
 
 
-2) Custom shapes
+Custom shapes
 #########################################
 
 
@@ -94,7 +94,7 @@ Interactive examples can be run in Google Colab
     <iframe src="_static/plotly_2.html" height="475px" width="65%"  display= inline-block  ></iframe>
    
 
-3) Simple gray model
+Gray model
 #########################################
 
 Sometimes you might just want to do some quick calculations using the gray model. In this case no file is needed to create the `Material` object; only the bulk MFP and bulk thermal conductivity need to be specified.
@@ -104,9 +104,9 @@ Sometimes you might just want to do some quick calculations using the gray model
 
   from openbte import Material,Geometry,Solver,Plot
 
-  Material(model='gray2D',mfp=1e-7,kappa=130) #mfp in nm
+  Material(model='gray2D',mfp=1e-7,kappa=130) #mfp in m
 
-  Geometry(model='lattice',lx = 10,ly = 10, lz=0,step = 0.5, base = [[0,0]],porosity=0.2,shape='square',delete_gmsh_files=True,direction='x')
+  Geometry(model='lattice',lx = 10,ly = 10, lz=0,step = 0.5, base = [[0,0]],porosity=0.2,shape='square',direction='x')
 
   Solver(multiscale=False,max_bte_iter=30)
 
@@ -117,8 +117,27 @@ Sometimes you might just want to do some quick calculations using the gray model
     <iframe src="_static/plotly_3.html" height="475px" width="65%"  display= inline-block  ></iframe>
    
 
+Disk
+#########################################
 
+Heat source at the center of a disk
 
+.. code-block:: python
+
+   from openbte import Geometry, Solver, Material, Plot
+
+   Material(source='database',model='rta2DSym',filename='rta_Si_300')
+
+   Geometry(model='disk',Rh=1,R=10,step=1,heat_source=0.5)
+
+   Solver(verbose=True,max_bte_iter=30)
+
+   Plot(model='maps',write_html=True)
+
+.. raw:: html
+
+    <iframe src="_static/plotly_4.html" height="475px" width="65%"  display= inline-block  ></iframe>
+   
   
 
 

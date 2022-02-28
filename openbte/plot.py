@@ -17,14 +17,10 @@ comm = MPI.COMM_WORLD
 
 def Plot(**argv):
 
-
    #import data-------------------------------
-   geometry     = argv['geometry'] if 'geometry' in argv.keys() else utils.load_shared('geometry')
-   solver       = argv['solver']   if 'geometry' in argv.keys() else utils.load_shared('solver')
-   material     = argv['material'] if 'material' in argv.keys() else utils.load_shared('material')
-   #argv['solver'] = solver
-   #argv['geometry'] = geometry
-   #argv['material'] = material
+   geometry     = argv['geometry'] if 'geometry' in argv.keys() else utils.load('geometry')
+   solver       = argv['solver']   if 'geometry' in argv.keys() else utils.load('solver')
+   material     = argv['material'] if 'material' in argv.keys() else utils.load('material')
 
    dim = int(geometry['meta'][2])
    model = argv['model']
@@ -32,8 +28,8 @@ def Plot(**argv):
    if model == 'maps':
 
      output = plot_results(solver,geometry,material,argv)
-     if comm.rank == 0:
-      save_data('sample',output)
+     if comm.rank == 0 and argv.setdefault('save',True):
+      save('sample',output)
 
      return output
 
@@ -61,15 +57,20 @@ def Plot(**argv):
    elif model == 'kappa_mode':
 
       dim = int(geometry['meta'][2])
-      rta = load_data(argv.setdefault('rta_material_file','rta'))
+      #rta = load_data(argv.setdefault('rta_material_file','rta'))
 
       if dim == 2:
-        output = kappa_mode_2DSym(material,rta,solver)
+        output = kappa_mode_2DSym(material,solver)
       else:
-        output = kappa_mode_3D(material,rta,solver)
+        output = kappa_mode_3D(material,solver)
 
       if argv.setdefault('save',True) and comm.rank == 0:
         save_data(argv.setdefault('kappa_mode_file','kappa_mode'),output)
+      
+      if argv.setdefault('show',False) :
+         plot_kappa_mode(output)
+
+      return output  
 
 
 

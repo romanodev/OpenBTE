@@ -10,14 +10,57 @@ import subprocess
 import os
 import time
 
+def generate_disk(argv):
+  
+  strc ='''
+
+SetFactory("OpenCASCADE");
+
+Mesh.CharacteristicLengthMin = STEP;
+Mesh.CharacteristicLengthMax = STEP;
+
+Circle(1) = {0,0,0, R1};
+Circle(2) = {0,0,0, R2};
+
+Line Loop(1) = {1};
+Line Loop(2) = {2};
+
+Plane Surface(1) = {1};
+Plane Surface(2) = {1,2};
+
+
+Physical Surface('GENERATION_Q') = {1};
+Physical Surface('Bulk') = {2};
+Physical Line('ISO_0.0') = {2};
+
+'''
+
+
+  strc = strc.replace('STEP',str(argv['step']))
+  strc = strc.replace('R1',str(argv['Rh']))
+  strc = strc.replace('R2',str(argv['R']))
+  strc = strc.replace('Q',str(argv['heat_source']))
+
+  store = open('mesh.geo', 'w+')
+
+  store.write(strc)  
+
+  store.close()
+  with open(os.devnull, 'w') as devnull:
+    output = subprocess.check_output("gmsh -optimize_netgen -format msh2 -2 mesh.geo -o mesh.msh".split(), stderr=devnull)
+
+
+
 
 def generate_bulk_2D(argv):
 
   direction = argv.setdefault('direction','x')
+  argv.setdefault('boundary',['Periodic','Periodic','Periodic'])
+  argv['heat_source']=[]
 
   frame = generate_frame(**argv)
   Lx = float(argv['lx'])
-  Ly = float(argv['ly'])
+  Ly = float(argv.setdefault('ly',Lx))
 
   mesh_ext = argv['step']
   points = []
@@ -51,26 +94,32 @@ def generate_bulk_2D(argv):
   strc = r'''Physical Surface('Matrix') = {10};'''+'\n'
   store.write(strc)
 
+  
   bs = []
-  if argv.setdefault('Periodic',[True,True,True])[1] :
+  if argv['boundary'][1] == 'Periodic':
     strc = r'''Physical Line('Periodic_1') = {1};''' + '\n'
     store.write(strc)
     strc = r'''Physical Line('Periodic_2') = {3};''' + '\n'
     store.write(strc)
+    strc = 'Periodic Line{1}={-3};\n'
+    store.write(strc)
   else:
    if direction=='y':
-    strc = r'''Physical Line('Cold') = {2};''' + '\n'
+    strc = r'''Physical Line('Cold') = {3};''' + '\n'
     store.write(strc)
-    strc = r'''Physical Line('Hot') = {4};''' +'\n'
+    strc = r'''Physical Line('Hot') = {1};''' +'\n'
     store.write(strc)
    else:
     bs.append(1)
     bs.append(3)
+  
 
-  if argv.setdefault('Periodic',[True,True,True])[0] :
+  if argv['boundary'][0] =='Periodic':
     strc = r'''Physical Line('Periodic_3') = {2};''' + '\n'
     store.write(strc)
     strc = r'''Physical Line('Periodic_4') = {4};''' +'\n'
+    store.write(strc)
+    strc = 'Periodic Line{2}={-4};\n'
     store.write(strc)
   else:
    if direction=='x':
@@ -94,11 +143,6 @@ def generate_bulk_2D(argv):
    store.write(strc)
 
 
-  strc = 'Periodic Line{1}={-3};\n'
-  store.write(strc)
-  strc = 'Periodic Line{2}={-4};\n'
-  store.write(strc)
-
   if argv.setdefault('structured',False):
       store.write('Transfinite Surface {10};\n')
       store.write('Recombine Surface {10};\n')
@@ -114,10 +158,11 @@ class Mesher(object):
 
  def __init__(self,argv):
 
-  argv['dmin'] = 0
+  #argv['dmin'] = 0.0
   model = argv.setdefault('model','lattice')
 
   if model == 'lattice':   
+   argv.setdefault('ly',argv['lx'])
    #create polygons-----
    self.add_symmetry(argv) 
    shapes = get_shape(argv)
@@ -127,7 +172,9 @@ class Mesher(object):
    polygons = [translate_shape(shapes[n],i,**argv) for n,i in enumerate(argv['base'])]
    argv.update({'polygons':np.array(polygons,dtype=object)})
 
+
    repeat_merge_scale(argv)
+
 
   elif model == 'custom':
     repeat_merge_scale(argv)
@@ -146,13 +193,15 @@ class Mesher(object):
        self.add_symmetry(argv) 
        self.add_polygons(argv)
        repeat_merge_scale(argv)
+
+  elif model =='disk':
+    return generate_disk(argv)
   #---------------------
   #if not argv.setdefault('only_geo',False):
   if argv.setdefault('lz',0) == 0:
-    self.generate_mesh_2D(argv)
+    self.generate_mesh_2D_new(argv)
   else:   
     self.generate_mesh_3D(argv)
-
 
 
  def generate_bulk_3D(self,argv):
@@ -336,8 +385,6 @@ class Mesher(object):
 
 
 
-
-
  def create_loop(self,loops,line_list,store):
 
    #create external loop
@@ -352,11 +399,256 @@ class Mesher(object):
 
    return strc
 
+
+ def generate_mesh_2D_new(self,argv): 
+
+  #Create polygons 
+  #polygons = unary_union([Polygon(poly)  for poly in argv['polygons']])
+  polygons = [Polygon(poly)  for poly in argv['polygons']]
+  polygons_union = unary_union(polygons)
+
+  #Create frame
+  frame = Polygon(generate_frame(**argv))
+
+  #Creat heat source--
+  heat_source = argv.setdefault('heat_source',len(argv['polygons'])*[None])
+
+
+  step = argv['step']
+  lx = argv['lx']
+  ly = argv['ly']
+  self.lx = lx
+  self.ly = ly
+
+  #Init data
+  points = []
+  lines = []
+  loops = 1000
+  ss = 1
+  pore_wall = []
+  bulk_surface = []
+  #inclusions = []
+  #---------
+
+  #Start File--
+  store = open('mesh.geo', 'w+')
+  store.write('h='+str(step) + ';\n')
+  store.write('lx='+str(lx) + ';\n')
+  store.write('ly='+str(ly) + ';\n')
+
+  #polygons = frame.intersection(polygons)
+  heat_source_surface = []
+  heat_source_lines = []
+  internal_loops = []
+  kg = 0
+  for n,polygon in enumerate(polygons):
+
+      polygon_intersected = frame.intersection(polygon) 
+      pp = list(polygon_intersected.exterior.coords)[:-1]
+      cross =  abs(polygon.area - polygon_intersected.area)/polygon.area >1e-4
+
+      if not heat_source[n] == None: #Heat source
+         line_list = self.create_line_list(pp,points,lines,store)
+         heat_source_lines += line_list
+         loops +=1
+         self.create_loop(loops,line_list,store)
+         self.create_surface_old([loops],ss,store)
+         heat_source_surface.append(str(ss))
+         strc = r'''Physical Surface('GENERATION_''' + str(heat_source[n])+ "') = {" + str(heat_source_surface[kg]) + '''};\n''';store.write(strc)
+         ss += 1
+         kg += 1
+         if not cross:
+          internal_loops.append(loops)
+
+      
+      if heat_source[n] == None and not cross: #Internal pore
+         line_list = self.create_line_list(pp,points,lines,store)
+         loops +=1
+         self.create_loop(loops,line_list,store)
+         internal_loops.append(loops)
+
+
+  #----------------------------------------------------
+  #Create bulk region--
+  diff = frame.difference(polygons_union)
+  pp = list(diff.exterior.coords)[:-1]
+  line_list = self.create_line_list(pp,points,lines,store)
+  loops +=1
+  self.create_loop(loops,line_list,store)
+  self.create_surface_old([loops] + internal_loops,ss,store)
+  #bulk_surface = heat_source_surface + [ss]
+  bulk_surface = [ss]
+  ss += 1
+  #------------------------------------------------------
+ 
+  strc = r'''Physical Surface('Matrix') = {'''
+  for n,s in enumerate(bulk_surface):
+   strc += str(s)
+   if n == len(bulk_surface)-1:
+     strc += '};\n'
+   else:
+     strc += ','
+  store.write(strc)
+
+  left = []
+  right = []
+  upper = []
+  lower = []
+
+  pul = np.array([-self.lx/2.0,self.ly/2.0])
+  pur = np.array([self.lx/2.0,self.ly/2.0])
+  pll = np.array([-self.lx/2.0,-self.ly/2.0])
+  plr = np.array([self.lx/2.0,-self.ly/2.0])
+
+
+  delta = 1e-12
+  pore_wall = []
+  for l,line in enumerate(lines):
+ 
+   pl = (np.array(points[line[0]])+np.array(points[line[1]]))/2.0
+   
+   is_on_boundary = True
+   if self.compute_line_point_distance(pul,pur,pl) < delta:     
+     upper.append(l+1)
+     is_on_boundary = False
+     
+   if self.compute_line_point_distance(pll,plr,pl) < delta:
+     lower.append(l+1)
+     is_on_boundary = False 
+     
+   if self.compute_line_point_distance(plr,pur,pl) < delta:
+     left.append(l+1)
+     is_on_boundary = False 
+     
+   if self.compute_line_point_distance(pll,pul,pl) < delta:
+     right.append(l+1)
+     is_on_boundary = False   
+     
+   if is_on_boundary and (not l+1 in heat_source_lines):
+    pore_wall.append(l+1)
+
+
+
+  #Setting the temperature---
+  boundary_bc = argv.setdefault('boundary',['Periodic','Periodic','Periodic'])
+  direction        = argv.setdefault('direction','x')
+  additional_boundary = []
+  boundary_conditions = {}
+  if direction == 'x':     
+
+     #bc along x
+     if boundary_bc[0] == 'Isothermal':
+       boundary_conditions['ISO_-0.5'] = left
+       boundary_conditions['ISO_0.5']  = right
+     elif boundary_bc[0] == 'Periodic':
+       boundary_conditions['Periodic_1'] = left
+       boundary_conditions['Periodic_2'] = right
+     elif boundary_bc[0] == 'Diffuse':
+       additional_boundary += left + right
+     else:
+       raise Exception('No applied gradient direction recognized')  
+
+     
+     #bc along y
+     if boundary_bc[1] == 'Isothermal':
+       boundary_conditions['ISO_0.0']   = lower
+       boundary_conditions['ISO_0.0']  += upper
+     elif boundary_bc[1] == 'Periodic':
+       boundary_conditions['Periodic_3'] = upper
+       boundary_conditions['Periodic_4'] = lower
+     elif boundary_bc[1] == 'Diffuse':
+       additional_boundary += upper + lower
+     else:
+       raise Exception('No applied gradient direction recognized')  
+
+
+  elif direction == 'y':    
+
+     #bc along x
+     if boundary_bc[0] == 'Isothermal':
+       boundary_conditions['ISO_0.0']  = left
+       boundary_conditions['ISO_0.0']  = right
+     elif boundary_bc[0] == 'Periodic':
+       boundary_conditions['Periodic_1'] = left
+       boundary_conditions['Periodic_2'] = right
+     elif boundary_bc[0] == 'Diffuse':
+       additional_boundary += left + right
+     else:
+       raise Exception('No applied gradient direction recognized')  
+
+
+     #bc along y
+     if boundary_bc[1] == 'Isothermal':
+       boundary_conditions['ISO_-0.5'] = lower
+       boundary_conditions['ISO_0.5']  = upper
+     elif boundary_bc[1] == 'Periodic':
+       boundary_conditions['Periodic_3'] = upper
+       boundary_conditions['Periodic_4'] = lower
+     elif boundary_bc[1] == 'Diffuse':
+       additional_boundary += lower + upper
+     else:
+       raise Exception('No applied gradient direction recognized')  
+
+  elif direction == '-1':     
+     if boundary_bc[0] == 'Isothermal':
+       boundary_conditions['ISO_0.0']  = left
+       boundary_conditions['ISO_0.0'] += right
+     if boundary_bc[1] == 'Isothermal':
+       boundary_conditions['ISO_0.0'] += lower
+       boundary_conditions['ISO_0.0'] += upper
+
+  else:
+    raise Exception('No applied gradient direction recognized')  
+  #-------------------------
+
+  #Write to file
+  for key, value in boundary_conditions.items():
+   store.write('Physical Line("' + key + '") = {' + ','.join([str(s)  for s in value]) + '};')
+
+
+
+  #Thermalizing Boundaries---
+  interface_surfaces = []
+  boundary_surfaces  =  pore_wall + additional_boundary
+
+  #Interface surface
+  if len(boundary_surfaces)> 0:
+   strc = r'''Physical Line('Boundary') = {'''
+   for r,region in enumerate(boundary_surfaces) :
+    strc += str(region)
+    if r == len(boundary_surfaces)-1:
+     strc += '};\n'
+     store.write(strc)
+    else :
+     strc += ','
+
+
+  if len(interface_surfaces)> 0:
+   strc = r'''Physical Line('Interface') = {'''
+   for r,region in enumerate(interface_surfaces) :
+    strc += str(region)
+    if r == len(interface_surfaces)-1:
+     strc += '};\n'
+     store.write(strc)
+    else :
+     strc += ','
+  
+
+#-------------------------------------------------------
+  store.close()
+
+  with open(os.devnull, 'w') as devnull:
+    output = subprocess.check_output("gmsh -format msh2 -2 mesh.geo -o mesh.msh".split(), stderr=devnull)
+
+
  def generate_mesh_2D(self,argv): 
 
   polygons = argv['polygons']
+
   mesh_ext = argv['step']
- 
+  
+  heat_source = argv.setdefault('heat_source',len(polygons)*[None])
+
   #Create the frame
   frame = generate_frame(**argv)
   Frame = Polygon(frame)
@@ -382,15 +674,13 @@ class Mesher(object):
   delta = 1e-2
   #-------------------------
 
-
-  
   bulk = Frame.difference(unary_union(polypores))
   if not (isinstance(bulk, shapely.geometry.multipolygon.MultiPolygon)):
    bulk = [bulk]
 
   bulk_surface = []
   inclusions = []
- 
+
   for r,region in enumerate(bulk):
    
     pp = list(region.exterior.coords)[:-1]
@@ -401,44 +691,36 @@ class Mesher(object):
     self.create_loop(loops,line_list,store)
 
     #Create internal loops-------------
-    a = 0
+    iloop = []
+    pore_lines = []
     for interior in region.interiors:
-     a +=1
      pp = list(interior.coords)[:-1]
      line_list = self.create_line_list(pp,points,lines,store)
+     pore_lines.append(line_list)
      loops +=1
+     iloop.append(loops)
      local_loops.append(loops)
      self.create_loop(loops,line_list,store)
     #---------------------------------
     ss +=1
     bulk_surface.append(ss)
     self.create_surface_old(local_loops,ss,store)
+    ss +=1
 
   #Create Inclusion surfaces--------
-  if argv.setdefault('inclusion',False):
-
-    for poly in polygons:
-     thin = Polygon(poly).intersection(Frame)
-
-     #Points-------
-     pp = list(thin.exterior.coords)[:-1]
-     line_list = create_line_list(pp,points,lines,store)
-     loops +=1
-     self.create_loop(loops,line_list,store)
-     ss +=1
-     create_surface([loops],ss,store)
-     inclusions.append(ss)
-
-    strc = r'''Physical Surface('Inclusion') = {'''
-    for n,s in enumerate(inclusions):
-     strc += str(s)
-     if n == len(inclusions)-1:
-      strc += '};\n'
-     else:
-       strc += ','
-    store.write(strc)
+  #if argv.setdefault('inclusion',False):
+  kg = 0
+  pore_wall2 = []
+  for ng,g in enumerate(heat_source):
+      if not g == None:  
+         self.create_surface_old([iloop[argv['corr'][ng]]],ss,store)
+         strc = r'''Physical Surface('GENERATION_''' + str(kg)+ "') = {" + str(ss) + '''};\n'''
+         kg += 1
+         store.write(strc)
+         ss +=1
+      else:   
+        pore_wall2 += pore_lines[argv['corr'][ng]]  
   #-------------------------------
-
 
   strc = r'''Physical Surface('Matrix') = {'''
   for n,s in enumerate(bulk_surface):
@@ -484,9 +766,16 @@ class Mesher(object):
      hot.append(l+1)
      is_on_boundary = False   
      
-
    if is_on_boundary:
     pore_wall.append(l+1)
+
+
+  #Rationale: pore_wall trackes all the surfaces/lines that are NOT on the boundary.
+  #pore_wall2, on the other side, tracks all the surfaces/lines that are actually pores (as opposed to heat source)
+  #In some cases, however, 
+  #print(pore_wall)
+  #print(pore_wall2)
+  #quit()
 
   additional_boundary = []
   argv.setdefault('Periodic',[True,True,True])
@@ -527,12 +816,13 @@ class Mesher(object):
     additional_boundary.append(k)
 
   #Collect Wall
-  if argv.setdefault('inclusion',False):
-   interface_surfaces = pore_wall
-   boundary_surfaces = additional_boundary
-  else:
-   boundary_surfaces = pore_wall + additional_boundary
-   interface_surfaces = []
+  #if argv.setdefault('inclusion',False):
+  # interface_surfaces = pore_wall
+  # boundary_surfaces = additional_boundary
+  #else:
+
+  interface_surfaces = []
+  boundary_surfaces  =  pore_wall2 + additional_boundary
 
   #Interface surface
   if len(boundary_surfaces)> 0:
@@ -703,13 +993,12 @@ class Mesher(object):
      
  def apply_periodic_mesh(self):
 
-     self.argv.setdefault('Periodic',[True,True,False])
      #Find periodic surfaces----
      self.periodic = {}
      for s1 in range(len(self.surfaces)):
       for s2 in range(s1+1,len(self.surfaces)):
          (a,per) = self.isperiodic(s1,s2)
-         if not a == None and self.argv['Periodic'][a]:
+         if not a == None and self.argv['Boundary'][a]=='Periodic':
            
            corr = {}
            pts1,ind1 = self.get_points_from_surface(s1)
@@ -962,35 +1251,29 @@ class Mesher(object):
 
  def create_line_list(self,pp,points,lines,store):
 
-   #Eliminate unncessesary points--
-
-
-   #------------------------------
-
    p_list = []
-   for p in pp:
+   for k,p in enumerate(pp):
     tmp = self.already_included_old(points,p,p_list)
     if tmp == -1:    
       points.append(p)
       p_list.append(len(points)-1)
+      point  = p
+      store.write( 'Point('+str(len(points)-len(p_list)+k) +') = {' + str(point[0]/self.lx) +'*lx,'+ str(point[1]/self.ly)+'*ly,0,h};\n')
     else:
       p_list.append(tmp)
 
-   for k,p in enumerate(p_list):
-     point = points[-len(p_list)+k] 
-     store.write( 'Point('+str(len(points)-len(p_list)+k) +') = {' + str(point[0]/self.lx) +'*lx,'+ str(point[1]/self.ly)+'*ly,0,h};\n')
-
-   
+   #for k,p in enumerate(p_list):
+   #  point = points[-len(p_list)+k] 
+   #  store.write( 'Point('+str(len(points)-len(p_list)+k) +') = {' + str(point[0]/self.lx) +'*lx,'+ str(point[1]/self.ly)+'*ly,0,h};\n')
 
    line_list = []
    for l in range(len(p_list)):
     p1 = p_list[l]
     p2 = p_list[(l+1)%len(p_list)]
     if not p1 == p2:
-    #f 1 == 1:    
      tmp = self.line_exists_ordered_old([p1,p2],lines)
 
-     if tmp == 0 : #craete line
+     if tmp == 0 : #create line
       lines.append([p1,p2])
       store.write( 'Line('+str(len(lines)) +') = {' + str(p1) +','+ str(p2)+'};\n')
       line_list.append(len(lines))

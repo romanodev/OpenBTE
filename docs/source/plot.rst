@@ -1,7 +1,7 @@
 Plot
 ===================================
 
-The ``Plot`` module helps visualize results, based on the file ``material.h5``, ``geometry.h5`` and ``solver.h5``, which must be in the current directory.
+The ``Plot`` module visualizes and analyzes results, reading ``material.npz``, ``geometry.npz`` and ``solver.nzp``.
 
 Internal Viewer
 ###################################
@@ -13,23 +13,7 @@ OpenBTE features its own viewer, based on plotly_. This experimental feature can
 
    Plot(model='maps',repeat=[2,2,1])
 
-where ``repeat`` is used to plot the supercell. Nodes, that OpenBTE includes the periodic boundary conditions in translating cell data to node data. 
-
-Here is an example:
-
-.. raw:: html
-
-    <iframe src="_static/plotly.html" height="475px" width="65%"  display= inline-block  ></iframe>
-
-
-
-Note that the external viewer can also be run with
-
-.. code:: bash
-
-   gui
-
-where ``repeat=[2,2,1]`` is assumed.   
+where ``repeat`` is used to plot the supercell. 
 
 
 External Viewer
@@ -41,8 +25,7 @@ Alternatively, it is possible to write results in the ``vtu`` format
 
    Plot(model='vtu',repeat=[2,2,1])
 
-The created file ``output.vtk`` can be read by Paraview_
-
+The created file ``output.vtk`` is compatible with Paraview_
 
 Mode-resolved effective thermal conductivity
 ############################################
@@ -52,7 +35,6 @@ Once you have calculated the effective thermal conductivity, you may want to int
 
    Plot(model='kappa_mode')
 
-
 Notes/limitations:
 
 - kappa_mode works only with the material model ``rta2DSym``.
@@ -61,37 +43,6 @@ Notes/limitations:
 
 .. image:: _static/kappa_mode.png
    :width: 600
-
-Formulation
-############################################
-
-
-The effective thermal conductivity, after interpolation, can be computed as 
-
-.. math::
-
-   \kappa^{\mathrm{eff}}_\mu = C_\mu v_\mu^x \Lambda_\mu^{x,\mathrm{eff}}
- 
-where
-
-.. math::
-
-  \Lambda_\mu^{x,\mathrm{eff}}= \frac{L}{\Delta T A_{\mathrm{hot}}}\int_{A_\mathrm{hot}} dS \Delta T_\mu(\mathbf{r}).
-
-
-  
-
-
-
-
-   
-
-
-
-
-
-
-
 
 
 

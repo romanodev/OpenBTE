@@ -37,7 +37,7 @@ def plot_results(solver,geometry,material,options_maps):
 
    dim = int(geometry['meta'][2])
 
-   data = utils.extract_variables(solver)
+   data = utils.extract_variables(solver,geometry)
 
    data = utils.expand_variables(data,geometry) #this is needed to get the component-wise data for plotly
    
@@ -166,8 +166,8 @@ def plot_results(solver,geometry,material,options_maps):
    fig.update_layout(scene_camera=camera)
    fig.update_layout(updatemenus=updatemenus)
 
-   #if argv.setdefault('write_html',False):
-   # fig.write_html("plotly.html")
+   if options_maps.setdefault('write_html',False):
+    fig.write_html("plotly.html")
    #plotly.io.write_json(fig,'ff.json')
 
    # plotly.io.to_image(fig,format='png')

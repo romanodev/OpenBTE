@@ -1,5 +1,5 @@
 
-def first_guess(geometry,material,options_first_guess)->'temperatures':
+def first_guess(geometry,material,options_first_guess)->'first_guess':
 
    import openbte.fourier as fourier
    import numpy as np
@@ -11,12 +11,12 @@ def first_guess(geometry,material,options_first_guess)->'temperatures':
    data = None  
    if comm.rank == 0:
 
-    argv = {'geometry':geometry,'material':material} #this needs to change
+    argv = {'geometry':geometry,'material':material,'additional_heat_source':options_first_guess.setdefault('additional_heat_source',np.zeros_like(geometry['generation'])),'verbose':options_first_guess.setdefault('verbose',True)} #this needs to change
 
-    f = fourier.solve_fourier_single(argv)
+    f = fourier.solve_fourier_single(**argv)
 
-    data =  {'data':f['temperature'],'kappa':[f['meta'][0]],'flux':f['flux'],'gradT':f['grad']}
-    
+    data =  {'Temperature_Fourier':f['temperature'],'kappa_fourier':np.array([f['meta'][0]]),'Flux_Fourier':f['flux'],'gradT':f['grad'],'Heat_Generation':geometry['generation']}
+
    return utils.create_shared_memory_dict(data)
 
 
