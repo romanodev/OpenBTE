@@ -26,7 +26,7 @@ The latest release can be downloaded from the PyPi repository
         apt-get install build-essential libopenmpi-dev libgmsh-dev 
         pip install --upgrade --no-cache openbte
 
-Note that the ``mpi`` and ``gmsh`` are needed.
+Note that ``mpi`` and ``gmsh`` are needed.
 
 Development version
 #######################################

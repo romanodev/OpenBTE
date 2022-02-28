@@ -130,9 +130,9 @@ Heat source at the center of a disk
 
    Geometry(model='disk',Rh=1,R=10,step=1,heat_source=0.5)
 
-   Solver(verbose=True,max_bte_iter=30)
+   Solver(max_bte_iter=30)
 
-   Plot(model='maps',write_html=True)
+   Plot(model='maps')
 
 .. raw:: html
 
