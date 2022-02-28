@@ -161,7 +161,7 @@ With ``model=disk`` it is possible to have a disk a simulation domain. This scen
 
    from openbte import Geometry
 
-   Geometry(model='disk',R1=1,R2=3,R3=10,step=0.5,delete_gmsh_files=False,heat_source=0.5)
+   Geometry(model='disk',R=10,Rh=1,step=0.5,heat_source=0.5)
 
 Here is an illustration for the disk simulation domain
 

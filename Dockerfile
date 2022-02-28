@@ -10,7 +10,7 @@ ADD dist app
 
 WORKDIR app
 
-RUN pip install --no-cache openbte-2.70.tar.gz
+RUN pip install --no-cache openbte-2.71.0.tar.gz
 
 RUN useradd -ms /bin/bash openbte
 
