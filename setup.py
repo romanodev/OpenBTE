@@ -1,42 +1,31 @@
 from setuptools import setup,find_packages
-import os
 
 setup(name='openbte',
-      version='2.72.0',
+      version='3.0.0',
       description='Boltzmann Transport Equation for Phonons',
       author='Giuseppe Romano',
       author_email='romanog@mit.edu',
-      classifiers=['Programming Language :: Python :: 3.6'],
-      #long_description=open('README.rst').read(),
+      classifiers=['Programming Language :: Python :: 3.8'],
       install_requires=['shapely',
-                        'pandas',
-                        'docutils==0.16',
                         'numpy',
-                        'dash',
-                        'unittest2',
-                        'nbsphinx',
-                        'pytest',
-                        'termcolor',
-                        'matplotlib',
-                        'alabaster',
+                        'sqlitedict',
                         'cachetools',
-                        'mpi4py',
+                        'sqlitedict',
+                        'icosphere',
+                        'nptyping',
+                        'pickle5',
+                        'plotly',
+                        'jax',
+                        'jaxlib',
+                        'nlopt',
+                        'scikit-image',
+                        'matplotlib',
                         'scipy',
-                        'dash_core_components',
-                        'dash_html_components',
-                        'dash_bootstrap_components',
-                        'plotly >=4.14.0',
-                        'nbsphinx',
-                        'recommonmark',
-                        'sphinx',
-                        'sphinx_rtd_theme'
-                         ],
+                        'gmsh'],
       license='GPLv3',\
-      packages = ['openbte'],
-      package_data = {'openbte':['materials/*.npz']},
-      include_package_data=True,
+      packages = find_packages(),
       entry_points = {
-     'console_scripts': ['AlmaBTE2OpenBTE=openbte.almabte2openbte:main',\
-                         'Phono3py2OpenBTE=openbte.phono3py2openbte:main']\
-      },
-      zip_safe=True)
+     'console_scripts': ['AlmaBTE2OpenBTE=openbte.almabte2openbte:almabte2openbte']},
+      package_data = {'openbte':['materials/*.db']},
+      include_package_data=True
+      )

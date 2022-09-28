@@ -3,6 +3,9 @@ sphinx_rtd_theme
 jaxlib
 ipykernel
 ipywidgets
+sphinx_copybutton
+sphinx_toolbox
+sphinx_book_theme
 nbsphinx
 sphinx-autorun
 sphinx-autodoc-typehints

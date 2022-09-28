@@ -1,0 +1,14 @@
+Metadata-Version: 2.1
+Name: openbte
+Version: 2.73.17
+Summary: Boltzmann Transport Equation for Phonons
+Home-page: UNKNOWN
+Author: Giuseppe Romano
+Author-email: romanog@mit.edu
+License: GPLv3
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3.6
+License-File: LICENSE
+
+UNKNOWN
+

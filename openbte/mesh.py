@@ -1,799 +1,479 @@
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
+import os
+import subprocess
+from openbte.objects import BoundaryConditions,List,Mesh
+from openbte import Geometry
 import numpy as np
-from .mesher import *
-import openbte.utils as utils 
-import time
-import scipy.sparse as sp
-import itertools
-from mpi4py import MPI
-import time
-import numpy.testing as npt
-from statistics import mean
-from scipy.ndimage.interpolation import shift
-from collections import Counter
-from matplotlib.patches import Polygon
-from matplotlib.collections import PatchCollection
-import matplotlib
-import matplotlib.pylab as plt
 
-comm = MPI.COMM_WORLD
+def get_normal(nodes,lines,dim) :
+          """Get the normal to a surface or line"""
 
-def compute_boundary_condition_data(data,**argv):
-    
-    side_elem_map = data['side_elem_map_vec']
-    face_normals = data['face_normals']
-    volumes = data['volumes']
-    dim = data['dim']
+          if dim == 2:
+               n1 = nodes[np.array(lines[0],dtype=int)[0] - 1]
+               n2 = nodes[np.array(lines[1],dtype=int)[0] - 1]
+               v1 = list(n1-n2); v1.append(0)
+               v = np.cross(v1,[0,0,1])[:2]
+               v /= np.linalg.norm(v)
+               return np.absolute(v)
 
-    #Apply gradient
-    if argv.setdefault('apply_gradient',True):
-       DeltaT = 1
+
+          if dim == 3:
+           for n,l in enumerate(lines):
+               #The reason for this for is that sometimes nodes can be collinear
+               n1 = nodes[np.array(lines[n],dtype=int)[0] - 1]
+               n2 = nodes[np.array(lines[(n+1)%len(lines)],dtype=int)[0] - 1]
+               n3 = nodes[np.array(lines[(n+2)%len(lines)],dtype=int)[0] - 1]
+               v = np.cross(n1-n2,n1-n3)
+               if np.linalg.norm(v) > 1e-3:
+                   v /= np.linalg.norm(v)
+                   return np.absolute(v)
+
+def get_periodicity(nodes,lines,dim) :
+          """Get the normal to a surface or line"""
+
+          if dim == 2:
+               n1 = nodes[np.array(lines[0],dtype=int)[0] - 1]
+               n2 = nodes[np.array(lines[1],dtype=int)[0] - 1]
+               v1 = list(n1-n2); v1.append(0)
+               v = np.cross(v1,[0,0,1])[:2]
+               v /= np.linalg.norm(v)
+               return np.absolute(v)
+
+
+          if dim == 3:
+           for n,l in enumerate(lines):
+               #The reason for this for is that sometimes nodes can be collinear
+               n1 = nodes[np.array(lines[n],dtype=int)[0] - 1]
+               n2 = nodes[np.array(lines[(n+1)%len(lines)],dtype=int)[0] - 1]
+               n3 = nodes[np.array(lines[(n+2)%len(lines)],dtype=int)[0] - 1]
+               v = np.cross(n1-n2,n1-n3)
+               if np.linalg.norm(v) > 1e-3:
+                   v /= np.linalg.norm(v)
+                   return np.absolute(v)
+
+
+def get_mesh()->Mesh:
+    """Build mesh with gmsh"""
+
+    #Dimension
+    #Import mesh
+    with open('mesh.msh', 'r') as f: lines = f.readlines()
+    #Physical surfaces--
+    lines = [l.split()  for l in lines]
+    nb = int(lines[4][0])
+    current_line = 5
+    blabels = {int(lines[current_line+i][1]) : lines[current_line+i][2].replace('"',r'') for i in range(nb)}
+    #-------------------
+
+    #Nodes--
+    current_line += nb+2
+    n_nodes = int(lines[current_line][0])
+    current_line += 1
+    nodes = np.array([lines[current_line + n][1:4] for n in range(n_nodes)],float)
+
+    #Guess the dimension (it assumes that 2D shapes lie on the xy plane
+    if np.allclose(nodes[:,2],np.zeros(nodes.shape[0])):
+       dim = 2
+       nodes = nodes[:,:dim]
     else:   
-       DeltaT = 1e-18
-    #--------------------
-
-
-    direction = data['direction']
-
-    gradir = 0
-    applied_grad = [0,0,0]
-    if direction == 0:
-     gradir = 0
-     applied_grad = [DeltaT,0,0]
-    if direction == 1:
-     gradir = 1
-     applied_grad = [0,DeltaT,0]
-    if direction == 2:
-     applied_grad = [0,0,DeltaT]
-     gradir = 2
-
-    if gradir == 0:
-     flux_dir = [1,0,0]
-     length = data['size'][0]
-
-    if gradir == 1:
-     flux_dir = [0,1,0]
-     length = data['size'][1]
-
-    if gradir == 2:
-     flux_dir = [0,0,1]
-     length = data['size'][2]
-    #----------------
-
-    delta = 1e-2
-    nsides = len(data['sides'])
-    side_value = np.zeros(nsides)
-
-    tmp = list(data['periodic_sides']) + list(data['inactive_sides'])
-
-
-    for kl,ll in enumerate(tmp) :
-     Ee1,e2 = side_elem_map[ll]
-     normal = face_normals[ll]  
-     tmp = np.dot(normal,flux_dir)
-
-     if tmp < - delta :
-        side_value[ll] = -DeltaT
-     if tmp > delta :
-        side_value[ll] = +DeltaT
-     
-
-    side_periodic_value = np.zeros((nsides,2))
-    periodic_values = {}
-    periodic_side_values = {}
-
-    n_el = len(data['elems'])
-    B = sp.dok_matrix((n_el,n_el),dtype=np.float64)
-
-    B_with_area_old = sp.dok_matrix((n_el,n_el),dtype=np.float64)
-    B_area = np.zeros(n_el,dtype=np.float64)
-   
-    counter = 0
-    pp = ()
-    ip = []; jp = []; dp = []; pv = [] 
-    if len(data['periodic_sides']) > 0:
-     for side in data['pairs']:
-
-      area = data['areas'][side[0]]
-      
-      side_periodic_value[side[0]][0] = side_value[side[0]]
-      side_periodic_value[side[0]][1] = side_value[side[1]]
-
-      i,j = side_elem_map[side[0]]
-
-      periodic_values.update({i:{j:[side_value[side[0]]]}})
-      periodic_values.update({j:{i:[side_value[side[1]]]}})
-    
-      periodic_side_values.update({side[0]:side_value[side[0]]})
-
-      normal = data['face_normals'][side[0]]
-      
-      voli = volumes[i]
-      volj = volumes[j]
- 
-      B[i,j] = side_value[side[0]]
-      B[j,i] = side_value[side[1]]
-
-      if abs(side_value[side[0]]) > 0:
-       pp += ((data['ij'].index([i,j]),side_value[side[0]]),)
-       ip.append(i); jp.append(j); dp.append(side_value[side[0]]); pv.append(normal*area/voli)
-       counter +=1
-
-      if abs(side_value[side[1]]) > 0:
-       pp += ((data['ij'].index([j,i]),side_value[side[1]]),)
-       ip.append(j); jp.append(i); dp.append(side_value[side[1]]); pv.append(-normal*area/volj)
-       counter +=1
-
-      if np.linalg.norm(np.cross(data['face_normals'][side[0]],applied_grad)) < 1e-12:
-       B_with_area_old[i,j] = abs(side_value[side[0]]*area)
-    
-
-    #Get flux sides for thermal conductivity calculations--
-    flux_sides = [] #where flux goes
-    total_area = 0
-    #area_flux  = -1
-
-    #Compute area flux--
-    if dim == 2 and direction == 0:
-       area_flux = data['size'][1]
-    elif dim == 3 and direction == 0:
-       area_flux = data['size'][1]*data['size'][2]
-    elif dim == 2 and direction == 1:
-       area_flux = data['size'][0]
-    elif dim == 3 and direction == 1:
-       area_flux = data['size'][0]*data['size'][2]
-    elif direction == 2:
-       area_flux = data['size'][0]*data['size'][1]
-    elif direction == -1:
-       area_flux = 0 
-    else:
-        raise Exception("Can't recongnize combination of dimension and direction of the applied gradient",dim,direction)
-    #==========================
-
-
-    #From Periodic sides
-    kappa_mask_thermalizing = np.zeros(len(data['elems']))
-    for ll in list(data['periodic_sides']) + list(data['fixed_temperature_sides']):
-     e1,e2 = side_elem_map[ll]
-     normal = data['face_normals'][ll]   
-     tmp = np.dot(normal,flux_dir)
-     if tmp == 1:
-       flux_sides.append(ll)
-       total_area += data['areas'][ll]
-       #if mode == 'isothermal':
-       #   kappa_mask_thermalizing[e1] = data['areas'][ll] 
-
-     #if abs(tmp) > delta : #either negative or positive
-     # if (mode =='isothermal' and (ll in data['hot_sides'])) or mode =='periodic':  #If isothermal we only consider cold contact
-     #  if abs(normal[0]) == 1:
-     #      if dim == 2:  
-     #       area_flux = data['size'][1]
-     #      else: 
-     #       area_flux = data['size'][1]*data['size'][2]
-     #      total_area += data['areas'][ll]
-
-     #  elif abs(normal[1]) == 1:
-     #      if data['dim'] == 2:  
-     #       area_flux = data['size'][0]
-     #      else:
-     #       area_flux = data['size'][0]*data['size'][2]
-     #      total_area += data['areas'][ll]
-
-     #  else : #along z
-     #      area_flux = data['size'][0]*data['size'][1]
-     #      total_area += data['areas'][ll]
-
-     #  flux_sides.append(ll)
-     #  if mode == 'isothermal':
-     #      kappa_mask_thermalizing[e1] = data['areas'][ll] 
-
-    #-------
-
-    
-    if argv.setdefault('contact_area','box') == 'box':
-      kappa_factor = data['size'][gradir]/area_flux if area_flux > 0 else 0
-    else:  
-      kappa_factor = data['size'][gradir]/total_area if total_area > 0 else 0
-
-    data['kappa_mask']= (-np.array(np.sum(B_with_area_old,axis=0))[0]-kappa_mask_thermalizing)*kappa_factor*1e-18
-    data['periodic_side_values'] = np.array([periodic_side_values[ll]  for ll in data['periodic_sides']])
-    data['pp'] = np.array(pp)
-    data['applied_gradient'] = np.array(applied_grad)
-    data['flux_sides'] = np.array(flux_sides)
-    data['kappa_factor'] = kappa_factor
-    del data['ij']
-
-
-def compute_dists(data):
-
-  dists_side = np.zeros((len(data['sides']),3))
-  side_elem_map = data['side_elem_map_vec']
-  centroids = data['centroids']
-
-  for ll in data['active_sides']:
-   elem_1 = side_elem_map[ll][0]
-   elem_2 = side_elem_map[ll][1]
-   c1 = centroids[elem_1]
-   #if not (ll in (list(data['boundary_sides']) + list(data['fixed_sides']) + list(data['cold_sides']) + list(data['hot_sides']))):
-   if not (ll in (list(data['boundary_sides']) + list(data['fixed_temperature_sides']))):
-    c2 = get_next_elem_centroid(elem_1,ll,data)
-    dist = c2 - c1
-   else: 
-    c2 = data['side_centroids'][ll]
-    #dist = data['face_normals'][ll]*(np.dot(data['face_normals'][ll],c2-c1))
-    dist = (c2-c1)
-  
-   dists_side[ll] = dist 
-
-
-  data['dists'] = np.array(dists_side) 
-
-
-
-
-def compute_interpolation_weigths(data):
-
-  #from here: http://geomalgorithms.com/a05-_intersect-1.html
-
-  #net_sides=data['active_sides'][~np.isin(data['active_sides'],list(data['boundary_sides'])+list(data['fixed_sides']) + list(data['hot_sides']) + list(data['cold_sides'])  )] #Get only the nonboundary sides
-  net_sides=data['active_sides'][~np.isin(data['active_sides'],list(data['boundary_sides'])+list(data['fixed_temperature_sides']))] #Get only the nonboundary sides
-
-  e1 =  data['side_elem_map_vec'][net_sides,0]
-
-  w =  np.zeros((len(data['sides']),3))
-
-  w[net_sides] = data['centroids'][e1] - data['nodes'][data['sides'][net_sides,0]]
-
-  tmp  = np.einsum('ui,ui->u',data['face_normals'],data['dists'])
-  tmp2 = np.einsum('ui,ui->u',data['face_normals'],w)
-
-  interp_weigths = np.zeros(len(data['sides']))
-  interp_weigths[net_sides]   = 1+tmp2[net_sides]/tmp[net_sides] #this is the relative distance with the centroid of the second element
-
-  if len(data['boundary_sides']) > 0:
-   interp_weigths[data['boundary_sides']] = 1
-
-  data['interp_weigths'] = interp_weigths
-
-
-def compute_connecting_matrix(data):
-
-   elems         = data['elems']
-   elem_side_map = data['elem_side_map_vec']
-   side_elem_map = data['side_elem_map_vec']
-   elem_volumes  = data['volumes']
-   side_areas    = data['areas']
-   dim           = data['dim']
-   face_normals  = data['face_normals']
-   a_sides       = data['active_sides']
-   b_sides       = data['boundary_sides']
-   c_sides       = data['fixed_temperature_sides']
-
-   #Active sides-----
-   net_sides=a_sides[~np.isin(a_sides,list(b_sides)+list(c_sides))]
-   i2 = side_elem_map[net_sides].flatten()
-   j2 = np.flip(side_elem_map[net_sides],1).flatten()
-   common = np.einsum('u,ui->ui',side_areas[net_sides],face_normals[net_sides,:dim])
-   t1 =  common/elem_volumes[side_elem_map[net_sides][:,0],None]
-   t2 =  common/elem_volumes[side_elem_map[net_sides][:,1],None]
-   k2 = np.zeros((2*t1.shape[0],dim))
-   k2[np.arange(t1.shape[0])*2]   =  t1
-   k2[np.arange(t1.shape[0])*2+1] = -t2
-   k2 = k2.T    
-   #Compute simple connectivity matrix--
-   normals = np.zeros((2*t1.shape[0],dim))
-   normals[np.arange(t1.shape[0])*2]   =  face_normals[net_sides,:dim]
-   normals[np.arange(t1.shape[0])*2+1] = -face_normals[net_sides,:dim] 
-   data['normals'] = normals
-   #------------------------------------
-
-   #ij - it will need to be removed
-   ij2 = np.zeros((2*t1.shape[0],2))
-   ij2[np.arange(t1.shape[0])*2  ] = side_elem_map[net_sides]
-   ij2[np.arange(t1.shape[0])*2+1] = np.flip(side_elem_map[net_sides],1)
-
-   #Boundary sides----
-   sb2 = a_sides[np.isin(a_sides,b_sides)]
-   eb2 = side_elem_map[sb2][:,0]
-   db2 = face_normals[sb2,:dim].T*side_areas[sb2]/elem_volumes[eb2]
-   #-------------
-
-   #Isothermal sides----
-   sfixed  = a_sides[np.isin(a_sides,c_sides)]
-   efixed  = side_elem_map[sfixed][:,0]
-   dfixed  = face_normals[sfixed,:dim].T*side_areas[sfixed]/elem_volumes[efixed]
-   #------------------
-
-   data['i']    = np.array(i2); 
-   data['j']    = np.array(j2); 
-   data['k']    = np.array(k2);
-   data['eb']   = eb2; 
-   data['sb']   = sb2; 
-   data['db']   = db2; 
-   data['ij']   = ij2.tolist(); 
-   data['efixed']   = efixed; 
-   data['sfixed']   = sfixed; 
-   data['dfixed']   = dfixed; 
-
-def get_next_elem_centroid(elem,side,data):
-
-  elem_centroids    = data['centroids']
-  side_elem_map     = data['side_elem_map_vec']
-  side_periodicity  = data['side_periodicity']
-
-  centroid = elem_centroids[elem]
-
-  if not (elem in side_elem_map[side]) : print('error, no neighbor',side,elem)
-  for tmp in side_elem_map[side] :
-       if not (tmp == elem) :
-         elem2 = tmp  
-         break
-
-  centroid2 = elem_centroids[elem2]
-  ind1 = list(side_elem_map[side]).index(elem)
-  ind2 = list(side_elem_map[side]).index(elem2)
-  centroid = centroid2 - side_periodicity[side][ind1] + side_periodicity[side][ind2]
-
-  return centroid
-
-
-def compute_least_square_weigths(data):
-
-   #elems     = data['elems']
-   side_elem_map = data['side_elem_map_vec']
-   elem_side_map = data['elem_side_map_vec']
-   elem_centroids = data['centroids']
-   side_centroids = data['side_centroids']
-   dists = data['dists']
-   dim = data['dim']
-   n_elems = len(data['elems'])
-
-
-   diff_dist = np.zeros((n_elems,max(data['side_per_elem']),dim))
-
-   for ll in data['active_sides'] :
-    elems = side_elem_map[ll]
-    dist = dists[ll]
-    kc1 = elems[0]
-    ind1 = list(elem_side_map[kc1]).index(ll)
-    #if not ll in (list(data['boundary_sides'])+list(data['cold_sides']) + list(data['hot_sides'])):
-    if not ll in (list(data['boundary_sides']) + list(data['fixed_temperature_sides'])):
-     kc2 = elems[1]
-     ind2 = list(elem_side_map[kc2]).index(ll)
-     diff_dist[kc1,ind1] =  dist[:dim]
-     diff_dist[kc2,ind2] = -dist[:dim]
-    #else :
-    # diff_dist[kc1,ind1] = dist[:dim]
-
-   #We solve the pinv for a stack of matrices. We do so for each element group
-   index3 = np.where(data['side_per_elem'] == 3)[0]
-   G3 = np.linalg.pinv(diff_dist[index3,:3])
-
-   index4 = np.where(data['side_per_elem'] == 4)[0]
-   G4 = np.linalg.pinv(diff_dist[index4,:4])
-
-   G = np.zeros((n_elems,dim,max(data['side_per_elem'])))  
-
-   G[index3,:,:3] = G3
-   G[index4,:,:4] = G4
-
-   data.update({'weigths':G})
-
-
-def compute_boundary_connection(data):
-
-
-     elem_centroids = data['centroids']
-     side_centroids = data['side_centroids']
-     side_elem_map = data['side_elem_map_vec']
-     face_normals = data['face_normals']
-     
-     bconn = []
-     for s in data['boundary_sides']:
-        ce = elem_centroids[side_elem_map[s][0]]
-        cs = side_centroids[s]
-        d = cs-ce
-        normal = face_normals[s]
-        d1 = normal * np.dot(normal,d)
-        bconn.append(d1)
-
-     data.update({'bconn':np.array(bconn)})
-
-
-def compute_face_normals(data):
-
-   sides = data['sides']
-   nodes = data['nodes']
-   dim = data['dim']
-   side_elem_map = np.array(data['side_elem_map_vec'])
-   elem_centroids = np.array(data['centroids'])
-   side_centroids = np.array(data['side_centroids'])
-
-   a= time.time()
-   v1 =  nodes[sides[:,1]]-nodes[sides[:,0]]
-
-   if dim == 3:
-    v2 =  nodes[sides[:,2]]-nodes[sides[:,1]]
-   else :
-    v2 = np.array([0,0,1]).T
-   v = np.cross(v1,v2)
-
-   normal = v.T/np.linalg.norm(v,axis=1)
-
-   c = side_centroids - elem_centroids[side_elem_map[:,0]]   
-   index = np.where(np.einsum('iu,ui->u',normal,c) < 0)[0]
-   normal[:,index] = -normal[:,index]
-   normal = normal.T
- 
-   #---------------------------------------------------------
-   data.update({'face_normals':normal})
-
-
-def import_mesh(**argv):
-
- 
-   heat_source = argv.setdefault('heat_source',[]) 
-   data = {}
-   
-   elem_region_map = {}
-   region_elem_map = {}
-
-   with open('mesh.msh', 'r') as f: lines = f.readlines()
-
-   #Read physical surfaces--
-   lines = [l.split()  for l in lines]
-   nb = int(lines[4][0])
-   current_line = 5
-   blabels = {int(lines[current_line+i][1]) : lines[current_line+i][2].replace('"',r'') for i in range(nb)}
-
-   current_line += nb+2
-   n_nodes = int(lines[current_line][0])
-   current_line += 1
-   nodes = np.array([lines[current_line + n][1:4] for n in range(n_nodes)],float)
-   current_line += n_nodes+1
-
-   size = [ np.max(nodes[:,i]) - np.min(nodes[:,i])   for i in range(3)]
-   
-   dim = 2 if size[2] == 0 else 3
-   current_line += 1
-   n_elem_tot = int(lines[current_line][0])
-   current_line += 1
-
-   #type of elements
-   bulk_type = {2:[2,3],3:[4]}
-   face_type = {2:[1],3:[2]}
-   #---------------------------
-
-   bulk_tags = [n for n in range(n_elem_tot) if int(lines[current_line + n][1]) in bulk_type[dim]] 
-   face_tags = [n for n in range(n_elem_tot) if int(lines[current_line + n][1]) in face_type[dim]]
-   elems = [list(np.array(lines[current_line + n][5:],dtype=int)-1) for n in bulk_tags]
-   side_per_elem = np.array([len(e) for e in elems])
-   n_elems = len(elems)
-  
-   #Bulk physical regions--
-   physical_regions = {}
-   for n in bulk_tags:
-       tag = int(lines[current_line + n][3])
-       physical_regions.setdefault(blabels[tag],[]).append(n-len(face_tags))
-   #-----------------------
-
-
-   boundary_sides = np.array([ sorted(np.array(lines[current_line + n][5:],dtype=int)) for n in face_tags] ) -1
-   #generate sides and maps---
-   elem_side_map = { i:[] for i in range(len(elems))}
-   sides = []
-   tmp_indices = []
-   for k,elem in enumerate(elems):
+       dim = 3  
+
+    current_line += n_nodes+1
+
+    #Size
+    size = np.zeros(3)
+    for i in range(dim):
+      size[i] = np.max(nodes[:,i]) - np.min(nodes[:,i])
+
+    #Elements
+    current_line += 1
+    n_elem_tot = int(lines[current_line][0])
+    current_line += 1
+    bulk_type = {2:[2,3],3:[4]}
+    face_type = {2:[1],3:[2]}
+    bulk_tags = [n for n in range(n_elem_tot) if int(lines[current_line + n][1]) in bulk_type[dim]] 
+    face_tags = [n for n in range(n_elem_tot) if int(lines[current_line + n][1]) in face_type[dim]]
+    elems = [list(np.array(lines[current_line + n][5:],dtype=int)-1) for n in bulk_tags]
+    n_elems = len(elems)
+
+    #Create maps between sides and elements    
+    elem_side_map = { i:[] for i in range(len(elems))}
+    sides = []
+    tmp_indices = []
+    for k,elem in enumerate(elems):
        tmp = list(elem)
        for i in range(len(elem)):
          tmp.append(tmp.pop(0))
          trial = sorted(tmp[:dim])
          sides.append(trial)
          tmp_indices.append(k)
-   sides,inverse = np.unique(sides,axis=0,return_inverse = True)
-   for k,s in enumerate(inverse): elem_side_map[tmp_indices[k]].append(s)
+    sides,inverse = np.unique(sides,axis=0,return_inverse = True)
+    n_sides = len(sides)
+    for k,s in enumerate(inverse): 
+        elem_side_map[tmp_indices[k]].append(s)
 
-   node_side_map = { i:[] for i in range(len(nodes))}
-   for s,side in enumerate(sides): 
+    #Node->Sides
+    node_side_map = { i:[] for i in range(len(nodes))}
+    for s,side in enumerate(sides): 
         for t in side:
             node_side_map[t].append(s)
 
-   side_elem_map = { i:[] for i in range(len(sides))}
-   for key, value in elem_side_map.items():
-     for v in value:  
-      side_elem_map[v].append(key)   
-
-   #----------------------------------------------------      
-
-   #(TO BE IMPROVED).
-   face_physical_regions = {}
-   sides_list = sides.tolist()
-   boundary_sides_list = boundary_sides.tolist()
-   for n in face_tags:
-        tag = int(lines[current_line + n][3])
-        face_physical_regions.setdefault(blabels[tag],[]).append(sides_list.index(boundary_sides_list[n]))
-   #---------------------
+    #Side elem map
+    tmp = { i:[] for i in range(len(sides))}
+    for key, value in elem_side_map.items():
+      for v in value:
+          tmp[v].append(key)
+    side_elem_map = np.ones((n_sides,2),dtype=int) 
+    for key,values in tmp.items():
+        side_elem_map[key] = np.array(values) #it broadcasts in case of boundary sides
 
 
-   #Build relevant data
-   side_areas = compute_side_areas(nodes,sides,dim) 
- 
-   #Compute volumes
-   elem_volumes = compute_elem_volumes(nodes,elems,dim)
-
-   data.update({'elems':np.array(elems),'sides':sides,'nodes':nodes,'volumes':elem_volumes})
-
-   side_centroids = np.array([np.mean(nodes[i],axis=0) for i in data['sides']] )
-   elem_centroids = np.array([np.mean(nodes[i],axis=0) for i in data['elems']])
-
-   data.update({'side_centroids':side_centroids})
-   data.update({'centroids':elem_centroids})
-   
-   data.update({'side_per_elem':np.array(side_per_elem)})
+    #Bulk Physical regions
+    elem_physical_regions = {}
+    for n in bulk_tags:
+       tag = int(lines[current_line + n][3])
+       elem_physical_regions.setdefault(blabels[tag],[]).append(n-len(face_tags))
 
 
-   #Compute generation rate-------------
-   generation = np.zeros(n_elems)
-   for key,value in physical_regions.items():
-       if len(key) > 10:
-        if key[:10] == 'GENERATION':
-            v = float(key[11:])
-            generation[value]=float(key[11:])
-   #generation = np.zeros(n_elems)
-   #kk = 0
-   #for g in heat_source:
-   #       if not g == None:
-   #        generation[physical_regions['GENERATION_' + str(kk)]]=g
-   #        kk +=1
-   data['generation'] = generation
-   #------------------------------------
+    #Side Physical regions
+    boundary_sides = [ sorted(np.array(lines[current_line + n][5:],dtype=int)-1) for n in face_tags] 
+    side_physical_regions = {}
+    periodic_physical_regions = {}
+    sides_list = sides.tolist()
+    for t in face_tags:
+        tag = int(lines[current_line + t][3])
+        side_physical_regions.setdefault(blabels[tag],[]).append(sides_list.index(boundary_sides[t]))
 
-   #match the boundary sides with the global side.
-   physical_boundary = {}
-   for n,bs in enumerate(boundary_sides): #match with the boundary side
-      side = node_side_map[bs[0]]
-      for s in side: 
-        if np.allclose(np.array(sides[s]),np.array(bs),rtol=1e-4,atol=1e-4):
-            physical_boundary.setdefault(blabels[int(lines[current_line + n][3])],[]).append(s) 
-            break
-
-
-   side_list = {}
-   #Apply Periodic Boundary Conditions
-   side_list.update({'active':list(range(len(sides)))})
-   side_periodicity = np.zeros((len(sides),2,3))
-   group_1 = []
-   group_2 = []
-   #self.pairs = [] #global (all periodic pairs)
-
-   side_list.setdefault('Boundary',[])
-   side_list.setdefault('Cold',[])
-   side_list.setdefault('Hot',[])
-   side_list.setdefault('Fixed',[])
-   side_list.setdefault('Interface',[])
-   side_list.setdefault('Periodic',[])
-   side_list.setdefault('Inactive',[])
-   periodic_nodes = {}
-
-   if argv.setdefault('delete_gmsh_files',True):
-    os.remove(os.getcwd() + '/mesh.msh')
-    os.remove(os.getcwd() + '/mesh.geo')
-
-   pairs = []
-   for label in list(physical_boundary.keys()):
-
-    if str(label.split('_')[0]) == 'Periodic':
-     if not int(label.split('_')[1])%2==0:
-      contact_1 = label
-      contact_2 = 'Periodic_' + str(int(label.split('_')[1])+1)
-      group_1 = physical_boundary[contact_1]
-    
-      group_2 = physical_boundary[contact_2]
-      for s in group_1:
-        c = side_centroids[s]
-      for s in group_2:
-        c = side_centroids[s]
-
-      #----create pairs
-      new_pairs = []
-      #compute tangential unity vector
-      tmp = nodes[sides[group_2[0]][0]] - nodes[sides[group_2[0]][1]]
-      t = tmp/np.linalg.norm(tmp)
-      n = len(group_1)
-      for s1 in group_1:
-       d_min = 1e6
-       for s in group_2:
-        c1 = side_centroids[s1]
-        c2 = side_centroids[s]
-        d = np.linalg.norm(c2-c1)
-        if d < d_min:
-         d_min = d
-         pp = c1-c2
-         s2 = s
-       new_pairs.append([s1,s2])
-       side_periodicity[s1][1] = pp
-       side_periodicity[s2][1] = -pp
-      pairs +=new_pairs
-      #----------------------------------
-      #Amend map
-      for s in new_pairs:
-       s1 = s[0]
-       s2 = s[1]
-
-       #Change side in elem 2--------------------
-       elem2 = side_elem_map[s2][0]
-       index = elem_side_map[elem2].index(s2)
-       elem_side_map[elem2][index] = s1
-    
-       side_elem_map[s1].append(elem2)
-       side_elem_map[s2].append(side_elem_map[s1][0])
-       side_list['active'].remove(s2)
-       #-----------------------------------------
-        
-      #Polish sides
-      [side_list['Periodic'].append(i) for i in physical_boundary[contact_1]]
-      [side_list['Inactive'].append(i) for i in physical_boundary[contact_2]]
-
-   
-   #Consolidate fixed-temperature boundaries
-   fixed_temperature_sides = []
-   fixed_temperature = []
-   for key,value in physical_boundary.items():
-       if key[:3] == 'ISO':
-           fixed_temperature_sides += value
-           fixed_temperature += [float(key[4:])]*len(value)
-   #--------------------------------        
- 
-   if 'Boundary' in physical_boundary.keys(): side_list.update({'Boundary':physical_boundary['Boundary']})
-   side_list['Fixed_temperature'] = fixed_temperature_sides
-
-
-   #if 'Fixed' in physical_boundary.keys(): side_list.update({'Fixed':physical_boundary['Fixed']})
-   #if 'Interface' in physical_boundary.keys(): side_list.update({'Interface':physical_boundary['Interface']})
-   #if 'Cold' in physical_boundary.keys(): side_list.update({'Cold':physical_boundary['Cold']})
-   #if 'Hot' in physical_boundary.keys():  side_list.update({'Hot':physical_boundary['Hot']})
-
-   #for side in side_list['Boundary'] + side_list['Fixed'] + side_list['Cold'] + side_list['Hot'] :
-   # side_elem_map[side].append(side_elem_map[side][0])
-
-   for side in side_list['Boundary'] + side_list['Fixed_temperature'] :   
-    side_elem_map[side].append(side_elem_map[side][0])
-
-
-   #Put boundaries at the end
-   n_non_boundary_side_per_elem = []
-   for key,value in elem_side_map.items():
-       tmp_1 = []
-       tmp_2 = []
-       for s in value:
-         if s in side_list['Boundary']:
-           tmp_1.append(s)
-         else:  
-           tmp_2.append(s)
-       n_non_boundary_side_per_elem.append(len(tmp_2)+len(tmp_1))
-       elem_side_map[key] = tmp_2 + tmp_1
-
-
-   #Fill with -1 the missing connectivity
-   ms = max(side_per_elem)
-   for n,e in enumerate(elems):
-        if len(e) < ms:
-            e.append(-1)
-            elem_side_map[n].append(-1)
-   #----------------------------------------
-
-   data.update({'active_sides':np.array(side_list['active'])})
-   data.update({'n_non_boundary_side_per_elem':np.array(n_non_boundary_side_per_elem)})
-   data.update({'boundary_sides':np.array(side_list['Boundary'])})
-   data.update({'cold_sides':np.array(side_list['Cold'])})
-   data.update({'hot_sides':np.array(side_list['Hot'])})
-   data.update({'fixed_sides':np.array(side_list['Fixed'])})
-   data.update({'periodic_sides':np.array(side_list['Periodic'])})
-   data.update({'side_periodicity':side_periodicity})
-   data.update({'areas':np.array(side_areas)})
-   data.update({'fixed_temperature':np.array(fixed_temperature)})
-   data.update({'fixed_temperature_sides':np.array(fixed_temperature_sides)})
-
-   #-------
-   #data.update({'physical_regions':physical_regions})
-   #data.update({'face_physical_regions':face_physical_regions})
-   data.update({'elem_mat_map':np.zeros(len(elems))})
-
-   data.update({'dim':dim})
-   if 'dmin' in argv.keys():
-    data.update({'dmin':argv['dmin']})
-   #if 'overlap' in argv.keys():
-   # data.update({'overlap':argv['overlap']})
-   data.update({'pairs':np.array(pairs)})
-   data.update({'elem_side_map_vec': np.array([elem_side_map[ll]  for ll in range(len(elems))]) })
-   data.update({'side_elem_map_vec': np.array([side_elem_map[ll]  for ll in range(len(sides))]) })
-   data['interface_sides']= np.array(side_list['Interface'])
-   direction = argv.setdefault('direction','x')
-   if direction == 'x':
-    data['direction'] = 0
-   elif  direction == 'y': 
-    data['direction'] = 1
-   else: 
-    data['direction'] = -1
-   
-   data['size'] = np.array(size)
-   data['inactive_sides'] = np.array(side_list['Inactive'])
-
-   return data
-   #------------------
-
-
-def compute_data(data,**argv):
-
-   compute_face_normals(data)
-
-   compute_boundary_connection(data)
+    #Side areas
+    if dim == 2:
+     side_areas = np.array([np.linalg.norm(nodes[s[1]] - nodes[s[0]]) for s in sides])
+    else:   
+     p =nodes[sides]
+     side_areas = np.linalg.norm(np.cross(p[:,0]-p[:,1],p[:,0]-p[:,2]),keepdims=True,axis=1).T[0]/2
   
-   compute_dists(data)
-   
-   compute_least_square_weigths(data)
-   
-   compute_connecting_matrix(data)
+    
+    #Elem volumes
+    elem_volumes = np.zeros(n_elems)
+    if dim == 3: #Assuming Tetraedron
+     M = np.ones((4,4))
+     for i,e in enumerate(elems):
+      M[:,:3] = nodes[e,:]
+      elem_volumes[i] = 1.0/6.0 * abs(np.linalg.det(M))
 
-   compute_interpolation_weigths(data)
-   
-   compute_boundary_condition_data(data,**argv)
+    if dim == 2: 
+     M = np.ones((3,3))
+     for i,e in enumerate(elems):
+      if len(e) == 3:     
+       M[:,:2] = nodes[e,0:2]
+       elem_volumes[i] = abs(0.5*np.linalg.det(M))
+      else:
+       points = nodes[e]
+       x = points[:,0]
+       y = points[:,1]
+       elem_volumes[i] = 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
 
-   #Some adjustement--
-   data.setdefault('dmin',0)
-   #data.setdefault('overlap',False)
-   data['meta'] = np.asarray([len(data['elems']),data['kappa_factor'],data['dim'],len(data['nodes']),len(data['active_sides']),data['direction'],data['dmin']],np.float64)
-   
-   del data['direction']
-   del data['dim']
-   del data['dmin']
-   del data['kappa_factor']
+    #Side centroids
+    side_centroids = np.array([np.mean(nodes[i],axis=0) for i in sides])
 
+    #Elem centroids
+    elem_centroids = np.array([np.mean(nodes[i],axis=0) for i in elems])
 
-def compute_elem_volumes(nodes,elems,dim):
-
-
-  n_elems = len(elems)
-  elem_volumes = np.zeros(len(elems))
-  if dim == 3: #Assuming Tetraedron
-   M = np.ones((4,4))
-   for i,e in enumerate(elems):
-    M[:,:3] = nodes[e,:]
-    elem_volumes[i] = 1.0/6.0 * abs(np.linalg.det(M))
-
-  if dim == 2: 
-   M = np.ones((3,3))
-   for i,e in enumerate(elems):
-    if len(e) == 3:     
-     M[:,:2] = nodes[e,0:2]
-     elem_volumes[i] = abs(0.5*np.linalg.det(M))
-    else:
-
-     points = nodes[e]
-     x = points[:,0]
-     y = points[:,1]
-     elem_volumes[i] = 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
-
-  return elem_volumes   
-
-comm = MPI.COMM_WORLD
+    #Face normals
+    v1 =  nodes[sides[:,1]]-nodes[sides[:,0]]
+    if dim == 3:
+     v2 =  nodes[sides[:,2]]-nodes[sides[:,0]]
+    else :
+     v2 = np.array([0,0,1]).T
+    v = np.cross(v1,v2)
+    normal = (v.T/np.linalg.norm(v,axis=1))[:dim]
+    
+    c = side_centroids - elem_centroids[side_elem_map[:,0]] #with respect the first elements
+    index = np.where(np.einsum('iu,ui->u',normal,c) < 0)[0]
+    normal[:,index] = -normal[:,index]
+    normal= normal.T
 
 
-def compute_side_areas(nodes,sides,dim):
+    normal_areas = np.einsum('si,s->si',normal,side_areas)
 
-  if dim == 2:
-   side_areas = [  np.linalg.norm(nodes[s[1]] - nodes[s[0]]) for s in sides ]
-  else:     
-   p =nodes[sides]
-   side_areas = np.linalg.norm(np.cross(p[:,0]-p[:,1],p[:,0]-p[:,2]),keepdims=True,axis=1).T[0]/2
+    #Compute dists
+    dists = np.zeros((n_sides,dim)) 
+    for s in range(n_sides):
+        e1,e2 = side_elem_map[s]
+        if e1 == e2:
+         dists[s] =   normal[s]*np.dot(normal[s],side_centroids[s]  - elem_centroids[e1])
+        else:
+         dists[s] = elem_centroids[e2] - elem_centroids[e1]
 
-  return side_areas 
+    #Periodic sides-----------------------------------------------------------------------------------
+    to_discard  = []; 
+    periodic_sides_dict = {}
+
+    if len(lines) > current_line+n+2:
+
+     periodic_sides  = []; 
+
+     n_periodic_sides = int(lines[current_line+n+3][0])
 
 
+     a1 = []
+     a2 = []
+     #print(n_periodic_sides)
+     #checkpoint = current_line+n+6
+     checkpoint = current_line+n+3 + dim
+     for ss  in range(n_periodic_sides):
 
-
-
-
+         n_periodic_nodes = int(lines[checkpoint][0])
         
+         #Get normal to the surface
+         periodic_normal = get_normal(nodes,lines[checkpoint+1:checkpoint+1+n_periodic_nodes],dim)
+         
+
+         #Rationale: we take the nodes from gmsh and find the associated sides that are periodic
+         #As a point may belong to different boundary sides (e.g. corner points), we also have to check collinearity
+         for i in range(n_periodic_nodes):
+         
+           tags   = np.array(lines[checkpoint + 1 + i],dtype=int) - 1
+           L      = nodes[tags[0]] - nodes[tags[1]]
+
+           sides_1 = set(node_side_map[tags[0]])#-1 takes into account the fact that nodes' tags in gmsh start with 1
+           sides_2 = set(node_side_map[tags[1]])
+
+           #Sort collinearity out
+           corr = []
+           for s1 in sides_1:
+            for s2 in sides_2:
+                if np.allclose(side_centroids[s1],side_centroids[s2] + L):
+                    corr.append([s1,s2])
+
+           for s1,s2 in corr:
+
+               for key,value in side_physical_regions.items():
+
+                  if key[-2:] == '_b': #To keep
+
+                     if (s1 in value) and not (s1 in periodic_sides) :
+                         
+                        periodic_sides_dict.setdefault(key[:-2],[]).append(s1)
+                        periodic_sides.append(s1)
+                        to_discard.append(s2)
+
+                     if (s2 in value) and not (s2 in periodic_sides) :
+                         
+                        periodic_sides_dict.setdefault(key[:-2],[]).append(s2)
+                        periodic_sides.append(s2)
+                        to_discard.append(s1)
+
+
+         checkpoint += n_periodic_nodes + dim #Just a coincidence that dim works here
+
+     #Update physical side dictionaries
+     for key,value in periodic_sides_dict.items():
+        side_physical_regions.pop(key+'_a',None)
+        side_physical_regions.pop(key+'_b',None)
+
+     #Update other quantities
+     for n,(s1,s2) in enumerate(zip(*(to_discard,periodic_sides))):
+        #update map
+        e2 = side_elem_map[s2][0]
+        e1 = side_elem_map[s1][0]
+        side_elem_map[s2][1] = e1
+        elem_side_map[e1][elem_side_map[e1].index(s1)]=s2
+
+        dists[s2] = elem_centroids[e1] + side_centroids[s2]-side_centroids[s1] - elem_centroids[e2]
+   
+    #Get boundary side indices
+    boundary_sides_indices = []
+    for key,value in side_physical_regions.items():
+        boundary_sides_indices += value
+
+    #Compute second-order correction for gradients---
+    second_order_correction = np.zeros((len(boundary_sides_indices),dim))
+    for k,s in enumerate(boundary_sides_indices):
+        e1,_ = side_elem_map[s]
+        second_order_correction[k] = dists[s] - (side_centroids[s]  - elem_centroids[e1])
+    #------------------------------------------------
+
+
+    #Identify all internal sides (e.g. no associated to boundary conditions)
+    internal = np.arange(n_sides)[~np.isin(np.arange(n_sides),boundary_sides_indices + to_discard)]
+
+    #Compute interpolation weights
+    w              = elem_centroids[side_elem_map[:,0]] - nodes[sides[:,0]]
+    tmp2           = np.einsum('ui,ui->u',normal_areas,w)
+    tmp            = np.einsum('ui,ui->u',normal_areas,dists)
+    interp_weights = 1+tmp2/tmp
+
+    # compute_least_square_weigths
+    diff_dist = np.zeros((n_elems,len(elems[0]),dim))
+    for s in range(n_sides):
+     if not s in to_discard:   
+            e1,e2 = side_elem_map[s]
+            ind1 = list(elem_side_map[e1]).index(s)
+
+            if not e1 == e2:
+             diff_dist[e1,ind1] =   dists[s]
+             ind2 = list(elem_side_map[e2]).index(s)
+             diff_dist[e2,ind2] =  -dists[s]
+            else:
+             diff_dist[e1,ind1] = dists[s]
+
+    gradient_weights = np.linalg.pinv(diff_dist)
+
+    #ind = np.unravel_index(np.argmax(gradient_weights, axis=None),gradient_weights.shape)
+
+    elems = np.array(elems)
+
+    return Mesh(n_elems,
+                    n_nodes,
+                    dim,
+                    size,
+                    nodes,
+                    sides,
+                    elems,
+                    elem_side_map,
+                    side_elem_map,
+                    normal_areas,
+                    gradient_weights,\
+                    interp_weights,\
+                    elem_centroids,\
+                    side_centroids,\
+                    elem_volumes,\
+                    side_areas,\
+                    dists,\
+                    second_order_correction,\
+                    internal,\
+                    boundary_sides_indices,\
+                    periodic_sides_dict,\
+                    elem_physical_regions,\
+                    side_physical_regions)
+
+
+ 
+
+
+def get_geo(geometry: Geometry, boundary: dict = {}, periodicity: dict = {})->int:
+   """Write mesh given polygons and boundary conditions"""
+
+   step = 0.05
+   strc = ''
+   strc +='h='+str(step) + ';\n'
+
+   polygons = geometry.polygons
+
+   #Write points--
+   n_point = 1
+   points_map  = [] #to map points and lines
+   surface_map = [0]*len(polygons)
+   internal_region_map = {}
+   for i,poly in enumerate(polygons):
+    #External--------------- 
+    points = list(poly.exterior.coords)[:-1]
+    local_map = []
+    for k,p in enumerate(points) :  
+      local_map.append(n_point) 
+      strc +='Point('+str(n_point) +') = {' + str(p[0]) +','+ str(p[1])+',0,h};\n'
+      n_point +=1
+    points_map.append(local_map)  
+    #---------------------
+   
+    #Internals--------------- 
+    for hole in list(poly.interiors):
+         surface_map[i] +=1
+         local_map = []
+         points = list(hole.coords)[:-1]
+         for k,p in enumerate(points) :  
+           local_map.append(n_point) 
+           strc +='Point('+str(n_point) +') = {' + str(p[0]) +','+ str(p[1])+',0,h};\n'
+           n_point +=1
+         points_map.append(local_map)  
+         
+   #Write lines
+   n_line = 1
+   for local_map in points_map:
+       for n in range(len(local_map)): 
+        strc +='Line('+str(n_line) +') = {' + str(local_map[n]) +','+ str(local_map[(n+1)%len(local_map)])+'};\n'
+        n_line +=1
+
+   #Write loops&surfaces
+   n_loop = 1
+   for local_map in points_map:
+     strc += 'Line Loop(' + str(n_loop) + ') = {'
+     for n in range(len(local_map)): 
+         strc += str(local_map[n])
+         strc += '};\n' if n == len(local_map) -1 else  ','
+     n_loop +=1    
+
+   #Build surfaces
+   n_hole = 1
+   n_surface = 1
+   for holes in surface_map:
+     strc += 'Plane Surface(' + str(n_surface) + ') = {' + str(n_hole)   #this is the external one
+     n_hole +=1
+     if holes == 0:
+        strc += '};\n'
+     else:   
+        strc += ','
+        for n in range(holes): 
+         strc += str(n_hole)
+         strc += '};\n' if n == holes -1 else  ','
+         n_hole    +=1    
+     n_surface +=1    
+
+   #Interior regions
+   for h,holes in enumerate(surface_map):
+       for hole in range(holes):
+        if not geometry.interior_regions[h] == '__empty__':
+            strc += 'Plane Surface(' + str(n_surface) + ') = {' + str(n_hole-1) + '};\n'  #this is the external one
+            strc += r'''Physical Surface("''' + geometry.interior_regions[h] + r'''") = {''' + str(n_surface) + '};\n'
+            n_surface +=1    
+         
+   #Volume regions surface
+   strc += r'''Physical Surface("Bulk") = {'''
+   for l in range(len(polygons)):
+     strc += str(l+1)
+     strc += '};\n' if l == len(polygons)-1 else  ','
+   
+   #Boundary regions
+   for name,sides in boundary.items():
+       if len(sides) > 0:
+        strc += r'''Physical Line("''' + name + r'''") = {'''
+        for s,side in enumerate(sides):
+            strc += str(side)
+            strc += '};\n' if s == len(sides) -1 else  ','
+
+   for name,sides in periodicity.items():
+
+            #Periodic Line
+            strc += r'''Periodic Line{'''
+            for l,side in enumerate(sides[0]):
+              strc += str(side)
+              strc += '} = {' if l == len(sides[0]) -1 else  ','
+
+            for l,side in enumerate(sides[1]):
+              strc += str(side)
+              strc += '};\n' if l == len(sides[1]) -1 else  ','
+            #-----------------
+
+            #Physical Periodic Line
+            strc += r'''Physical Line("''' + name +  r'''_a") = {'''
+            for l,side in enumerate(sides[0]):
+              strc += str(abs(side))
+              strc += '};\n' if l == len(sides[0]) -1 else  ','
+
+            strc += r'''Physical Line("''' + name + r'''_b") = {'''
+            for l,side in enumerate(sides[1]):
+              strc += str(abs(side))
+              strc += '};\n' if l == len(sides[1]) -1 else  ','
+
+
+   #Create mesh
+   with open("mesh.geo", 'w+') as f:
+        f.write(strc)
+    
+   with open(os.devnull, 'w') as devnull:
+       output = subprocess.check_output("gmsh -format msh2 -2 mesh.geo -o mesh.msh".split(), stderr=devnull)
+     
+
+
+   return 1
+  
 

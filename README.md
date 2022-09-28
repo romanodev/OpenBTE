@@ -1,41 +1,24 @@
 
-<img src="docs/source/_static/openbte_logo.png" width="300">
+<img src="docs/_static/openbte_logo.png" width="300">
 
 [![license](https://img.shields.io/github/license/romanodev/openbte)](https://github.com/romanodev/OpenBTE/blob/master/LICENSE)
 [![documentation](https://readthedocs.org/projects/pip/badge/?version=latest)](https://openbte.readthedocs.io/en/latest/)
 [![downloads](https://img.shields.io/pypi/dm/openbte)](https://pypi.org/project/openbte/)
-[![docker](https://img.shields.io/docker/pulls/romanodev/openbte)](https://hub.docker.com/r/romanodev/openbte)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/18u1ieij2Wn6WEZFN2TmMteYHAJADMdSk?usp=sharing)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1G7eX5jFMtYiyIcNGYodLsvkVtQpqu0Qo?usp=sharing)
 [![Python](https://img.shields.io/pypi/pyversions/openbte)](https://www.python.org/)
 
-OpenBTE solves the Linearized Boltzmann Transport equation, with current focus on steady-state phonon transport. Bulk-related data is from first-principles calculations.
-
-```python
-
-from openbte import Material,Geometry,Solver,Plot
-
-Material(filename='rta_Si_300') #Retrieves data from the database
-
-Geometry(lx = 50,ly = 50, lz=10,step=4,porosity=0.2,shape='circle',Periodic=[True,True,False]) #Creates the structure
-
-Solver() #Solves the BTE
-
-Plot(model='vtu',repeat=[5,1,1]) #Creates a file which can be opened with Paraview
-
-```
-
-Method: https://arxiv.org/abs/2105.08181
-
-Code:  https://arxiv.org/abs/2106.02764
-
-Community: https://groups.google.com/g/openbte
-
-![Thermal Flux](bte.png "Thermal Flux")
+OpenBTE solves transport at the nondiffusive level. Current focus is phonon transport. References:
 
 
+**References**:
 
+G. Romano, OpenBTE: a Solver for ab-initio Phonon Transport in Multidimensional Structures, arXiv:2106.02764, (2021) [Link](https://arxiv.org/abs/2106.02764)
 
+G. Romano and S. G. Johnson, Inverse design in nanoscale heat transport via interpolating interfacial phonon transmission, Structural and Multidisciplinary Optimization, (2022)  [Link](https://arxiv.org/abs/2202.05251) 
 
+G. Romano, Efficient calculations of the mode-resolved ab-initio thermal conductivity in nanostructures, arXiv:2105.08181 (2021) [Link](https://arxiv.org/abs/2105.08181)  
+
+G. Romano, A Di Carlo, and J.C. Grossman, Mesoscale modeling of phononic thermal conductivity of porous Si: interplay between porosity, morphology and surface roughness. Journal of Computational Electronics 11 (1), 8-13 52 (2012) [Link](https://link.springer.com/article/10.1007/s10825-012-0390-2)
 
 
 
