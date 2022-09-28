@@ -4,11 +4,10 @@
 [![license](https://img.shields.io/github/license/romanodev/openbte)](https://github.com/romanodev/OpenBTE/blob/master/LICENSE)
 [![documentation](https://readthedocs.org/projects/pip/badge/?version=latest)](https://openbte.readthedocs.io/en/latest/)
 [![downloads](https://img.shields.io/pypi/dm/openbte)](https://pypi.org/project/openbte/)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1G7eX5jFMtYiyIcNGYodLsvkVtQpqu0Qo?usp=sharing)
+[![Open in Colab (Inverse Design)](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1DluLzUBbXKNz6K14R1gErOi17u9W_CLu?usp=sharing)
 [![Python](https://img.shields.io/pypi/pyversions/openbte)](https://www.python.org/)
 
 OpenBTE solves transport at the nondiffusive level. Current focus is phonon transport. References:
-
 
 **References**:
 
