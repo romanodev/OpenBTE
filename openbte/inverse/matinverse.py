@@ -305,54 +305,6 @@ def get_guess(**options):
 
       return final
 
-      #a = radii_ratio*b
-    
-       #a = L*np.sqrt(phi/np.pi/8)
-       #b = a
-       #C = []
-       #for n in [-1,0,1]:
-       # for m in [-1,0,1]:
-       #  C.append([n*L/2,m*L/2])
-
-       #for n in [-1/2,1/2]:
-       # for m in [-1/2,1/2]:
-       #  C.append([n*L/2,m*L/2])
-
-       #a = L*np.sqrt(phi/np.pi/18)
-       #b = a
-       #C = []
-       #for n in [-1,-1/3,1/3,1]:
-       # for m in [-1,-1/3,1/3,1]:
-       #   C.append([n*L/2,m*L/2])
-
-       #for n in [-2/3,0,2/3]:
-       # for m in [-2/3,0,2/3]:
-       #  C.append([n*L/2,m*L/2])
-
-       #a = L*np.sqrt(phi/np.pi/32)
-       #b = a
-       #C = []
-       #for n in [-1,-1/2,0,1/2,1]:
-       # for m in [-1,-1/2,0,1/2,1]:
-       #   C.append([n*L/2,m*L/2])
-
-       #for n in [-3/4,-1/4,1/4,3/4]:
-       # for m in [-3/4,-1/4,1/4,3/4]:
-       #  C.append([n*L/2,m*L/2])
-
-
-      #else:
-
-      # C = [[0,0]]
-      # b = L*np.sqrt(phi/np.pi/radii_ratio)
-      # a = radii_ratio*b
-     
-      #for c in C:
-      # tmp = jnp.power((centroids[:,0]-c[0])/a,2) + jnp.power((centroids[:,1]-c[1])/b,2)
-      # vec +=  jnp.where(tmp<1,1,0)
-      #final =  jnp.where(1-vec>0,1-vec,0)
-      #print(1-np.sum(final)/np.sum(np.ones_like(final)))
-
  if options.setdefault('show',False):
      plot_structure(final,**{'replicate':True,'invert':True,'unitcell':True,'color_unitcell':'r','write':True})
 
@@ -361,6 +313,70 @@ def get_guess(**options):
 
  return final
 
+
+def plot_2D(x,**options_plot_structure):
+ 
+ N  = len(x)   
+ Ns = int(jnp.sqrt(len(x)))
+ N2 = int(N/2)
+ x  = np.array(x)
+ x  = x.reshape((Ns,Ns)).T
+ 
+ if not options_plot_structure.setdefault('headless',False):
+    fig  = plt.figure(figsize=(6,6),num='Evolution',frameon=False)
+    ax = plt.Axes(fig, [0., 0., 1., 1.])
+    #ax   = fig.add_subplot(111)
+
+
+ if options_plot_structure.setdefault('transpose',False):
+     x = x.T
+
+ if options_plot_structure.setdefault('replicate',True):
+  x = jnp.pad(x,Ns,mode='wrap')
+ if options_plot_structure.setdefault('invert',True):
+  x = 1-x   
+
+ cmap =  options_plot_structure.setdefault('colormap','gray')
+
+ vmax = options_plot_structure.setdefault('max',np.max(x))
+
+ if options_plot_structure.setdefault('normalize','binary') == 'binary':
+    im = plt.imshow(x,vmin=0,vmax=1,cmap=cmap,animated=True)
+ else:   
+    im = plt.imshow(x,vmin=np.min(x),vmax=np.max(x),cmap=cmap,animated=True)
+
+ #Apply mask
+ if 'mask' in options_plot_structure.keys():
+    x = options_plot_structure['mask']
+    x = x.reshape((Ns,Ns)).T
+    x = jnp.pad(x,Ns,mode='wrap')
+    masked = np.ma.masked_where(x > 0.5, 1-x)
+    if options_plot_structure.setdefault('invert_mask',False): masked = 1-masked
+    plt.imshow(masked,cmap='gray',vmin=0,vmax=1);
+
+ if  options_plot_structure.setdefault('unitcell',True):
+     dx = 0.5
+
+     plt.plot([Ns-0.5,Ns-0.5,2*Ns-0.5,2*Ns-0.5,Ns-0.5],[Ns-0.5,2*Ns-0.5,2*Ns-0.5,Ns-0.5,Ns-0.5],color=options_plot_structure.setdefault('color_unitcell','c'),ls='--')
+
+ plt.axis('off')
+
+ if options_plot_structure.setdefault('save',False):
+  ax.set_xlim([0,3*Ns])
+  ax.set_ylim([0,3*Ns])
+  plt.savefig('figure.png',dpi=600,bbox_inches='tight')   
+
+ plt.tight_layout(pad=0,h_pad=0,w_pad=0)
+ if options_plot_structure.setdefault('blocking',True):
+  plt.ioff()
+  plt.show()
+  
+ else: 
+  plt.ion()
+  plt.show()
+  plt.pause(0.1)
+
+ return im
 
 
 
@@ -376,14 +392,6 @@ def init_state(name,N,monitor,dim):
    with SqliteDict(name,autocommit=True) as db:
         db['dim'] = dim
         db['x']   = []
-   #db =  SqliteDict(name,autocommit=True)
-   #----------------------
-
-   #if os.path.exists(name):
-   #  shutil.rmtree(name)
-   #os.makedirs(name)
-    #Initialize--
-
 
    if monitor:
     fig  = plt.figure(figsize=(6,6),num='Evolution')

@@ -1,5 +1,3 @@
-
-
 .. raw:: html
 
      <a href="(https://colab.research.google.com/drive/1G7eX5jFMtYiyIcNGYodLsvkVtQpqu0Qo?usp=sharing"><img  src="https://colab.research.google.com/assets/colab-badge.svg" style="vertical-align:text-bottom"></a>

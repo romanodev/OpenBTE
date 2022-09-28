@@ -1,3 +1,8 @@
+.. raw:: html
+
+     <a href="(https://colab.research.google.com/drive/1DluLzUBbXKNz6K14R1gErOi17u9W_CLu?usp=sharing"><img  src="https://colab.research.google.com/assets/colab-badge.svg" style="vertical-align:text-bottom"></a>
+
+
 Example 2: Inverse Design (NEW!)
 =================================
 
@@ -44,9 +49,9 @@ where ``R`` is the radius of the conic filter. Lastly, you can visualize the str
 
 .. code-block:: python
 
-   from openbte.inverse import visualize
+   from openbte.inverse import matinverse as mi
 
-   visualize.plot_2D(x)
+   mi.plot_2D(x)
 
 .. image:: _static/inverse.png
   :width: 400
