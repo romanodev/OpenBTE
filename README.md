@@ -11,8 +11,6 @@ OpenBTE solves transport at the nondiffusive level. Current focus is phonon tran
 
 Developed by Giuseppe Romano (romanog@mit.edu).
 
-References:
-
 **References**:
 
 G. Romano, OpenBTE: a Solver for ab-initio Phonon Transport in Multidimensional Structures, arXiv:2106.02764, (2021) [Link](https://arxiv.org/abs/2106.02764)
