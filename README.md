@@ -7,7 +7,11 @@
 [![Open in Colab (Inverse Design)](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1DluLzUBbXKNz6K14R1gErOi17u9W_CLu?usp=sharing)
 [![Python](https://img.shields.io/pypi/pyversions/openbte)](https://www.python.org/)
 
-OpenBTE solves transport at the nondiffusive level. Current focus is phonon transport. References:
+OpenBTE solves transport at the nondiffusive level. Current focus is phonon transport. 
+
+Developed by Giuseppe Romano (romanog@mit.edu).
+
+References:
 
 **References**:
 
