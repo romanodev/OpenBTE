@@ -17,7 +17,7 @@ from openbte.material        import Gray2D,Gray3D,Gray3DEqui,RTA2DSym,RTA2DMode,
 
 #Write the version#
 import pkg_resources  
-v = pkg_resources.require("OpenBTEplus")[0].version   
+v = pkg_resources.require("OpenBTE")[0].version   
 
 print('OpenBTE')
 print('Version: ',v)

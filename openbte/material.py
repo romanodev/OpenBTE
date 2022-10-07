@@ -1,5 +1,5 @@
 import numpy as np
-from openbte.objects import Material,RTA
+from openbte.objects import Material,MaterialRTA
 from icosphere import icosphere
 
 
@@ -63,7 +63,7 @@ def fast_interpolation(fine,coarse,bound=False,scale='linear') :
 
  return a1,a2,m1,m2
 
-def RTA3D(data : RTA,**kwargs)->Material:
+def RTA3D(data : MaterialRTA,**kwargs)->Material:
 
     #Parse options
     n_phi   = kwargs.setdefault('n_phi',24)
@@ -152,7 +152,7 @@ def RTA3D(data : RTA,**kwargs)->Material:
 
 
 
-def RTA2DSym(data : RTA,**kwargs)->Material:
+def RTA2DSym(data : MaterialRTA,**kwargs)->Material:
     """Interpolation from q-space to vectorial MFP-space"""
 
     n_phi = kwargs.setdefault('n_phi',48)
@@ -340,9 +340,8 @@ def Gray3D(**kwargs):
                          n_angles,1,1e20)
 
 
-def RTA2DMode(data : RTA,**kwargs)->Material:
+def RTA2DMode(data : MaterialRTA,**kwargs)->Material:
     """Provide q-resolved material data"""
-
 
     #Build mode-resolved quantities
     tau      = data.scattering_time
@@ -365,6 +364,14 @@ def RTA2DMode(data : RTA,**kwargs)->Material:
     kappa     = np.einsum('qi,q,qj->ij',sigma,Wdiag_inv,sigma)
     t_coeff   = Wdiag/np.sum(Wdiag)
 
-    return Material(kappa,np.array([sigma*1e-9]),mfp_bulk*1e9,np.array([t_coeff]),np.array([1]),nq,1,1e20)
+    #Boundary resistance--
+    h = 2/3*np.sum(Wdiag*mfp_bulk[:,0].clip(min=0))*1e-9 #from W/m^2/K to W/m/nm/K
+
+    #Heat source ratio
+    coeff = 1/np.sum(Wdiag)
+
+
+    return Material(kappa,np.array([sigma*1e-9]),mfp_bulk*1e9,np.array([t_coeff]),np.array([1]),nq,1,h,coeff*1e18)
+
 
 

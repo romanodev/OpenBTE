@@ -1,8 +1,3 @@
-.. raw:: html
-
-     <a href="(https://colab.research.google.com/drive/1G7eX5jFMtYiyIcNGYodLsvkVtQpqu0Qo?usp=sharing"><img  src="https://colab.research.google.com/assets/colab-badge.svg" style="vertical-align:text-bottom"></a>
-
-
 Example 1: Porous Material
 ==========================
 
@@ -104,7 +99,7 @@ To run BTE calculations, we first solve standard heat conduction
 
  from openbte import Fourier
 
- fourier     = Fourier(mesh,mat.kappa,boundary_conditions,\
+ fourier     = Fourier(mesh,mat.thermal_conductivity,boundary_conditions,\
                         effective_thermal_conductivity=effective_kappa)
 
 Finally, using ``fourier`` as first guess, we solve the BTE

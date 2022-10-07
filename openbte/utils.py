@@ -12,7 +12,7 @@ import scipy
 from scipy.ndimage import rotate
 
 
-def solver(LL,P,x0,callback = lambda x:x,verbose=False,maxiter=200,early_termination=False,tol=1e-4,inplace=True):
+def solver(LL,P,x0,callback = lambda x:x,verbose=False,maxiter=200,early_termination=False,tol=1e-4,inplace=True,filename = None):
   """A wrapper to GMRES solver. It allows to set an early termination criteria based on user-provided functions"""
 
   size = len(P)
@@ -31,6 +31,14 @@ def solver(LL,P,x0,callback = lambda x:x,verbose=False,maxiter=200,early_termina
       call_count[0] +=1
       value = callback(x)
 
+      #write to file--     
+      if not filename == None:
+            with  open(filename, "a")  as f:
+                for v in value:
+                 f.write(str(v))
+                f.write("\n") 
+
+
       value_norm = [np.linalg.norm(v) for v in value]
 
       error = np.array([1 if values[i] == 0 else abs((value_norm[i]-values[i])/value_norm[i])  for i in range(len(values))])
@@ -42,7 +50,6 @@ def solver(LL,P,x0,callback = lambda x:x,verbose=False,maxiter=200,early_termina
       X_final[:] = x
       values[:] = value_norm
       if (np.all(error < tol) or call_count[0] > maxiter) and early_termination:
-         #print('EXIT',error,tol) 
          raise Exception
       #------------
 
@@ -55,15 +62,48 @@ def solver(LL,P,x0,callback = lambda x:x,verbose=False,maxiter=200,early_termina
       out = scipy.sparse.linalg.lgmres(L,P,x0=x0,tol=tol_gmres,callback=callback_wrapper,maxiter=maxiter)
 
   except Exception as err:
+      print(err)
       pass
 
   return callback(X_final),(X_final,call_count[0])
 
 def load_rta(material,source='database'):
 
-   from openbte.objects import RTA
+   from openbte.objects import MaterialRTA
    
-   return RTA(*load(material,source=source).values())
+   return MaterialRTA(*load(material,source=source).values())
+
+def load_full(material,source='database'):
+
+   from openbte.objects import MaterialFull
+  
+
+   return MaterialFull(*load(material,source=source).values())
+
+def compute_kappa(W,factor,sigma,suppression = []):
+ """ Compute effective thermal conductivity tensor given the scattering operator"""
+
+ M = spla.LinearOperator(W.shape,lambda x: x/np.sqrt(np.diag(W)))
+
+ def get_kappa_scipy(i):
+
+    b  = sigma[:,i]
+    x0 = b/np.diag(W)
+
+    x  = spla.cg(W,b,M=M,x0=x0,atol=1e-19)[0]
+
+    if not len(suppression) == 0:
+       b = np.einsum('u,uv->v',b,suppression) 
+
+    return np.dot(x,b),x
+
+ k_xx,Sx  = get_kappa_scipy(0)
+ k_yy,Sy  = get_kappa_scipy(1)
+ kappa = np.array([[k_xx,0],[0,k_yy]])
+
+ G = np.vstack((Sx,Sy)).T
+
+ return kappa/factor,G
 
 
 def run(target          : Callable, \

@@ -5,7 +5,6 @@ from typing import List,NamedTuple,Tuple
 from multiprocessing import Lock,Barrier,current_process
 import numpy as np
 import time
-import json
 from sqlitedict import SqliteDict
 from openbte import utils
 from scipy.interpolate import LinearNDInterpolator
@@ -90,8 +89,15 @@ class SharedMemory:
          if current_process().name == 'process_0':
           print(strc)
 
+    @classmethod
+    def append(cls,filename,value):
+         if current_process().name == 'process_0':
+             with  open(filename, "a")  as f:
+                f.write(str(value) + "\n")
 
-class RTA(NamedTuple):
+
+
+class MaterialRTA(NamedTuple):
 
     heat_capacity         : np.array
     scattering_time       : np.array
@@ -396,25 +402,24 @@ class SolverResults(NamedTuple):
 
 class Material(NamedTuple):
 
-    kappa            :np.ndarray
-    sigma            :np.ndarray
-    vmfp             :np.ndarray
-    t_coeff          :np.ndarray
-    mfps             :np.ndarray
-    n_angles         :int
-    n_mfp            :int
-    h                :float
-    heat_source_coeff:float
+    thermal_conductivity :np.ndarray
+    sigma                :np.ndarray
+    vmfp                 :np.ndarray
+    t_coeff              :np.ndarray
+    mfps                 :np.ndarray
+    n_angles             :int
+    n_mfp                :int
+    h                    :float
+    heat_source_coeff    :float
 
 class MaterialFull(NamedTuple):
 
     W            :np.ndarray
-    kappa        :np.ndarray
     C            :np.ndarray
     v            :np.ndarray
+    kappa        :np.ndarray
     alpha        :np.ndarray
     h            :f64 = 1e20
-
 
 
 

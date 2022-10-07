@@ -60,7 +60,8 @@ def Fourier(geometry                       : Mesh,\
             global_temperature             : NDArray[Shape["[n_volumes]"], Float] = 0,\
             modified_fourier               : bool  = False,\
             fourier_max_iter               : Int   = 40,\
-            fourier_rtol                   : Float = 1e-8)->SolverResults:
+            fourier_rtol                   : Float = 1e-8,\
+            verbose                        : bool  = True)->SolverResults:
     r"""Solve the steady-state heat conduction equation:
 
   .. math::
@@ -75,10 +76,11 @@ def Fourier(geometry                       : Mesh,\
   :param modified_fourier: Modified Fourier solver (experimental)
   :param fourier_max_iter: max number of iterations for loop termination
   :param fourier_rtol: relative error condition for loop termination
+  :param verbose: whether to write output on screen
     """
 
-
-    v_orth_v,v_nonorth_v =  geometry.get_decomposed_directions(thermal_conductivity[:geometry.dim,:geometry.dim])
+    thermal_conductivity = thermal_conductivity[:geometry.dim,:geometry.dim]
+    v_orth_v,v_nonorth_v =  geometry.get_decomposed_directions(thermal_conductivity)
 
     
     d_vec = [];i_vec = [];j_vec = []
@@ -136,10 +138,18 @@ def Fourier(geometry                       : Mesh,\
 
     F   = sp.csc_matrix((d_vec,(i_vec,j_vec)),shape = (geometry.n_elems,geometry.n_elems))
 
+
     #modified Fourier
     if modified_fourier:
        F += sp.eye(geometry.n_elems,format='csc')
        B += global_temperature
+
+    #Fix a point for stability
+    N = 10
+    F[:,N] = 0
+    F[N,N] = 1
+    B[N] = 0
+    #-----
 
     #Create super lu -------
     lu  = linalg.splu(F)
@@ -184,15 +194,16 @@ def Fourier(geometry                       : Mesh,\
                                               boundary_conditions,\
                                               effective_thermal_conductivity)
 
-        strc = "Kappa (Fourier): {:E}, Iterations {:n}, Error {:E}".format(kappa_eff,n_iter,error) 
-        print(strc)
+        if verbose:
+         strc = "Kappa (Fourier): {:E}, Iterations {:n}, Error {:E}".format(kappa_eff,n_iter,error) 
+         print(strc)
     else:   
        kappa_eff = 0
 
     J = -np.einsum('ij,cj->ci',thermal_conductivity,gradient)
 
     #Normalized T 
-    if effective_thermal_conductivity.contact == None:
+    if not effective_thermal_conductivity.contact == None:
       T -= (max(T) + min(T))*0.5
 
     variables = {'Temperature_Fourier':{'data':T,'units':'K'},'Flux_Fourier':{'data':J,'units':'W/m/m'}}
