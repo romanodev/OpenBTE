@@ -397,6 +397,7 @@ class Mesh(NamedTuple):
 class SolverResults(NamedTuple):
 
     kappa_eff    :float = 0
+    aux          :dict = {}
     variables    :dict = {}
 
 
@@ -430,7 +431,7 @@ class OpenBTEResults(NamedTuple):
     solvers       :dict = []
 
     @classmethod
-    def load(cls,filename):
+    def load(cls,filename = 'state'):
         """Load Results"""
 
         results =  utils.load_readonly(filename)
@@ -448,8 +449,8 @@ class OpenBTEResults(NamedTuple):
         """Get all the variables"""   
 
         variables = {}
-        for key,value in self.solvers:
-          variables.update(value)
+        for key,value in self.solvers.items():
+          variables.update(value.variables)
 
         return variables
 

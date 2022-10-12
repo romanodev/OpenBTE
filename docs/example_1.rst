@@ -117,7 +117,7 @@ Before plotting the results, we group together Fourier and BTE results
 
    from openbte.objects import OpenBTEResults
 
-   results =  OpenBTEResults(mesh=mesh,material = mat,solvers=[fourier,bte])
+   results =  OpenBTEResults(mesh=mesh,material = mat,solvers={'bte':bte,'fourier':fourier})
 
 Lastly, the temperature and heat flux maps can be obtained with
 

@@ -145,9 +145,11 @@ def BTE_RTA(geo                               : Mesh,\
        e2 = geo.side_elem_map[sides][:,1]
        alpha = bcs.periodic[contact]
      sigma_normal = np.einsum('mli,ci->mlc',mat.sigma,geo.normal_areas[sides])
+     side_areas = np.linalg.norm(geo.normal_areas[sides],axis=1)
      #--------------------------------
     K = np.zeros((mat.n_mfp,mat.n_angles))
- 
+    S = np.zeros_like(K)
+
     if len(i_diffuse) > 0:
      TB     = DeltaT[i_diffuse]
     else: 
@@ -190,6 +192,7 @@ def BTE_RTA(geo                               : Mesh,\
          partial_T  = np.zeros_like(DeltaT)
          partial_J  = np.zeros_like(J)
          partial_K  = np.zeros_like(K)
+         partial_S  = np.zeros_like(S)
          
          T = np.zeros(n_elems)
          for n in inds:  
@@ -223,16 +226,17 @@ def BTE_RTA(geo                               : Mesh,\
                    partial_K[m,n]  =  np.dot(T[e1],sigma_normal[m,n])*normalization
                   else:
                    partial_K[m,n]  =  np.dot(T[e1],sigma_normal[m,n].clip(min=0))*normalization
+                   partial_S[m,n]  =  np.dot(T[e1],side_areas)*normalization
 
                   if len(e2) > 0:
                       partial_K[m,n] += np.dot(T[e2],sigma_normal[m,n].clip(max=0))*normalization
 
                   partial_K[m,n] += alpha*np.sum(sigma_normal[m,n].clip(max=0))*normalization
 
-                
          d.reduce(    [['DeltaT',partial_T],\
                        ['TB',    partial_TB],\
                        ['J',     partial_J],\
+                       ['S',     partial_S],\
                        ['K',     partial_K]])
 
          #Compute error--
@@ -246,6 +250,7 @@ def BTE_RTA(geo                               : Mesh,\
     sh = utils.run(target=core,n_tasks = (mat.n_angles,),shared_variables = {'TB':TB,\
                                                                              'J':J,\
                                                                              'DeltaT':DeltaT,\
+                                                                             'S':S,\
                                                                              'K':K})
 
 
@@ -255,7 +260,7 @@ def BTE_RTA(geo                               : Mesh,\
 
     #variables.update({'Vorticity_BTE':{'data':geo.vorticity(bcs,sh['J']),'units':'W/m/m/m'}})
 
-    return SolverResults(kappa_eff = kappa_eff,variables=variables)
+    return SolverResults(kappa_eff = kappa_eff,variables=variables,aux = {'suppression':sh['S']})
                    
 
 
