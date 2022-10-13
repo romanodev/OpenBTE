@@ -34,18 +34,16 @@ As you can see there gradient is managed automatically. Finally, the optimizatio
 
 .. code-block:: python
 
-   from openbte.inverse import optimize
+   from openbte.inverse import matinverse as mi
 
    L = 100 #nm
    R = 30  #nm
 
-   x = optimize(objective,grid = grid,L = L,R = R,min_porosity=0.05)
+   x = mi.optimize(objective,grid = grid,L = L,R = R,min_porosity=0.05)
 
 where ``R`` is the radius of the conic filter. Lastly, you can visualize the structure with
 
 .. code-block:: python
-
-   from openbte.inverse import matinverse as mi
 
    mi.plot_2D(x)
 

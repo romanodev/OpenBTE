@@ -209,7 +209,8 @@ def RTA2DSym(data : MaterialRTA,**kwargs)->Material:
 
     #Compute kappa sample
     Wdiag_inv = np.divide(1, Wdiag_sampled, out=np.zeros_like(Wdiag_sampled), where=Wdiag_sampled!=0)
-    kappa_sampled = np.einsum('mqi,mq,mqj->ij',sigma_sampled,Wdiag_inv,sigma_sampled)
+    kappa_sampled     = np.einsum('mqi,mq,mqj->ij',sigma_sampled,Wdiag_inv,sigma_sampled)
+    kappa_sampled_tot = np.einsum('mqi,mq,mqj->mqij',sigma_sampled,Wdiag_inv,sigma_sampled)
     t_coeff = Wdiag_sampled/np.sum(Wdiag_sampled)
 
 
@@ -224,7 +225,7 @@ def RTA2DSym(data : MaterialRTA,**kwargs)->Material:
     #Heat source ratio
     coeff = 1/np.sum(Wdiag)
 
-    return Material(kappa_sampled,sigma_sampled*1e-9,polar_ave,t_coeff,mfp_sampled*1e9,n_phi,n_mfp,h,coeff*1e18)
+    return Material(kappa_sampled,sigma_sampled*1e-9,polar_ave,t_coeff,mfp_sampled*1e9,n_phi,n_mfp,h,coeff*1e18,kappa_sampled_tot)
 
 
 

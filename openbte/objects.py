@@ -412,6 +412,7 @@ class Material(NamedTuple):
     n_mfp                :int
     h                    :float
     heat_source_coeff    :float
+    kappa_sampled        :np.ndarray
 
 class MaterialFull(NamedTuple):
 
