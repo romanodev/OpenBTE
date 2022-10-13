@@ -29,8 +29,7 @@ The function ``f`` takes the material density and gives the effective thermal co
         return g,(k,aux)
 
 
-As you can see there gradient is managed automatically. Finally, the optimization is done with
-
+The gradient is managed automatically. Finally, the optimization is done with
 
 .. code-block:: python
 
@@ -45,7 +44,7 @@ where ``R`` is the radius of the conic filter. Lastly, you can visualize the str
 
 .. code-block:: python
 
-   mi.plot_2D(x)
+   mi.plot(x)
 
 .. image:: _static/inverse.png
   :width: 400

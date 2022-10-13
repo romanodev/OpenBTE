@@ -1,9 +1,7 @@
 from jax import custom_vjp
-from jax.tree_util import tree_structure
 from sqlitedict import SqliteDict
 import nlopt
 import numpy as np
-#import shelve
 import os
 import time
 import nlopt
@@ -21,18 +19,12 @@ import scipy.sparse as sp
 import warnings
 import matplotlib.pylab as plt
 from pathlib import Path
-import shutil
-#from quart import websocket, json
 import json
-from jax import custom_vjp
 import os.path
-import asyncio
 import matplotlib
-#from utils import * 
 import warnings
 from functools import lru_cache
 import matplotlib as mpl
-#from .visualization import *
 
 from scipy.sparse import (spdiags, SparseEfficiencyWarning, csc_matrix,
     csr_matrix, isspmatrix, dok_matrix, lil_matrix, bsr_matrix)
@@ -42,29 +34,26 @@ mpl.interactive(True)
 
 mpl.rcParams['toolbar'] = 'None'
 
-#jax.config.update('jax_platform_name', 'gpu')
 jax.config.update("jax_log_compiles",0)
 jax.config.update("jax_enable_x64",1)
 
-#@jax.jit
 def reflect_2D(a):
+
  N  = jnp.sqrt(a.shape[0]).astype(int)
- a = a.reshape((N,N))
- c = jnp.concatenate((a,jnp.fliplr(a)),axis=1)
+ a  = a.reshape((N,N))
+ c  = jnp.concatenate((a,jnp.fliplr(a)),axis=1)
+
  return jnp.concatenate((c,jnp.flipud(c)),axis=0).flatten()
 
 def reflect_3D(x):
 
  N  = round(np.power(x.shape[0],1/3))
  x = x.reshape((N,N,N))
-
  x = jnp.concatenate((x,jnp.fliplr(x)),axis=1)
  x = jnp.concatenate((x,jnp.flipud(x)),axis=0)
  x = jnp.concatenate((x,jnp.flip(x,axis=2)),axis=2)
 
  return x.flatten()
-
-
 
 
 @jax.jit
@@ -91,9 +80,6 @@ def convolve_3D(x,y):
 
    return jax.scipy.signal.convolve(a1,y,mode='same')[N:2*N,N:2*N,N:2*N].flatten()
 
-   #quit()
-
-   #return convolve2d(a1,y,mode='same')[N:2*N,N:2*N].flatten()
 
 @jax.jit
 def convolve_2D(x,y):
@@ -121,7 +107,6 @@ def filtering_3D(design_field,conic_kernel):
 @jax.jit
 def projecting(filtered_field,beta):
 
-   #Projection options---
    eta = 0.5
 
    return (jnp.tanh(beta*eta) + jnp.tanh(beta*(filtered_field-eta)))/(jnp.tanh(beta*eta) + jnp.tanh(beta*(1-eta)))
@@ -174,14 +159,9 @@ def generate_correlated_pores(**argv):
 
  #---------------READ Parameters-------
  N = argv['N']
- #L = argv['l']
- #d = L/N
- #p = L
  le  = argv['length']
  phi = argv['porosity']
  #------------------------------------
- #NOTE: Variance is 1 because we only take the smallest number up to a certain point
- #gen = [np.exp(-2/le/le * np.sin(d*np.pi*i/p) ** 2) for i in range(N)]
  gen    = [np.exp(-2/le/le * np.sin(np.pi*i/N) ** 2) for i in range(N)]
  kernel = np.array([[  gen[abs(int(s/N) - int(t/N))]*gen[abs(s%N-t%N)]  for s in range(N*N)] for t in range(N*N)])
  y = np.random.multivariate_normal(np.zeros(N*N), kernel)
@@ -194,17 +174,6 @@ def generate_correlated_pores(**argv):
 
  return x
 
-
-
-def import_evolution(name):
-
-   name = os.getcwd() + '/' + name 
-   data = []
-   with shelve.open(name, 'r') as shelf:
-     for key,value in shelf.items(): 
-       data.append(value)  
-
-   return data
 
 
 def get_guess(**options):
@@ -231,9 +200,6 @@ def get_guess(**options):
 
  elif model =='gaussian':
 
-  #options = {'porosity':0.2,'N':N,'length':2}
-  
-
   options['N'] = grid
   
   final = 1-generate_correlated_pores(**options)
@@ -246,18 +212,7 @@ def get_guess(**options):
     if dim == 2: 
      final = np.random.rand(int(N/4))
      final = reflect_2D(final)
-    #np.array(final).dump('x')
-    #quit()
-    #final = np.random.rand(N)
 
-
-
-
- #elif model =='random_smoothed':
-
- #   x = np.random.rand(int(M/4))
- #   x = reflect(x)
- #   final =  transform(x,1e8)
 
  elif model in ['staggered','aligned']:
 
@@ -306,15 +261,12 @@ def get_guess(**options):
       return final
 
  if options.setdefault('show',False):
-     plot_structure(final,**{'replicate':True,'invert':True,'unitcell':True,'color_unitcell':'r','write':True})
-
- #if options.setdefault('save',False):
- #    final.dump('x')
+     plot(final,**{'replicate':True,'invert':True,'unitcell':True,'color_unitcell':'r','write':True})
 
  return final
 
 
-def plot_2D(x,**options_plot_structure):
+def plot(x,**options_plot_structure):
  
  N  = len(x)   
  Ns = int(jnp.sqrt(len(x)))
@@ -325,8 +277,6 @@ def plot_2D(x,**options_plot_structure):
  if not options_plot_structure.setdefault('headless',False):
     fig  = plt.figure(figsize=(6,6),num='Evolution',frameon=False)
     ax = plt.Axes(fig, [0., 0., 1., 1.])
-    #ax   = fig.add_subplot(111)
-
 
  if options_plot_structure.setdefault('transpose',False):
      x = x.T
@@ -397,8 +347,7 @@ def init_state(name,N,monitor,dim):
     fig  = plt.figure(figsize=(6,6),num='Evolution')
     if dim == 2:
      ax   = fig.add_subplot(111)
-     #im = plot_structure(np.ones(N*N),**{'blocking':False,'invert':True,'replicate':True,'unitcell':True,'color_unitcell':'c'})  
-     im = plot_structure_2D(np.ones(N*N),blocking=False,invert=True,replicate=True,unitcel=True,color_unitcell='c',headless=True)  
+     im = plot(np.ones(N*N),blocking=False,invert=True,replicate=True,unitcel=True,color_unitcell='c',headless=True)  
 
     if dim == 3:
       plt.ion()
@@ -418,14 +367,6 @@ def init_state(name,N,monitor,dim):
         plt.show()
         plt.pause(0.2)
 
-       #async def send_message():
-       #  await asyncio.sleep(0.1)
-       #  await websocket.send(json.dumps(x.tolist()))
-       #asyncio.run(send_message())  
-       #print(data)
-
-       #with SqliteDict(name,autocommit=True) as db:
-       # db[str(len(db))] = data
 
    return update
 
@@ -438,8 +379,6 @@ def init_optimizer(x,objective,N,n_betas,tol,max_iter,maps_regular,update,name,f
     betas = [2**(n+min_beta) for n in range(n_betas)]
     betas.append(1e24)
     
-    #betas = [2]
-    #TESTING
     #Prepare functions----
     maps = maps_regular
 
@@ -450,10 +389,6 @@ def init_optimizer(x,objective,N,n_betas,tol,max_iter,maps_regular,update,name,f
       if k == len(betas) -1 and len(betas) > 1:
            max_iter = 1
       print('beta: ',beta)   
-      #if beta == -1:#last step  
-      #   maps = maps_binary
-      #else:   
-      #   maps = maps_regular
 
       opt = nlopt.opt(nlopt.LD_CCSAQ,N)
       opt.set_lower_bounds(np.zeros(N))
@@ -495,9 +430,6 @@ def init_optimizer(x,objective,N,n_betas,tol,max_iter,maps_regular,update,name,f
 
       print(max_iter,beta)
       opt.set_maxeval(max_iter)
-      #opt.set_stopval(1e-3) #Objective function
-      #opt.set_ftol_abs(1e-4) #Relative on the objective function
-      #opt.set_xtol_rel(1e-5) #Relative tol on x
       x = opt.optimize(x)
 
     print(' ')
@@ -508,7 +440,7 @@ def init_optimizer(x,objective,N,n_betas,tol,max_iter,maps_regular,update,name,f
     return maps(x,beta)  
 
 
-#@jax.jit
+@jax.jit
 def minimum_linewidth(x,c,eta_e,beta,resolution):
 
  #x is filtered field  
@@ -562,7 +494,6 @@ def enhance_function(func,transform,update,beta,name):
                   tmp.append(aux)
                   db[func.__name__] = tmp
           update(mapped_x)        
-                    
 
           print(func.__name__,'  ',aux[0])
 
@@ -631,14 +562,6 @@ def get_3D(N):
     x = np.linspace(-1/2+1/(2*N),1/2-1/(2*N),N)
     centroids = np.array([ [i,j,k] for k in x for i in x for j in x[::-1]])
 
-    #plot centroids to double check
-    #fig = plt.figure()
-    #ax = fig.add_subplot(projection='3d')
-    #for c in centroids:
-    #    ax.scatter(c[0],c[1],c[2],marker='o')
-    #ax.axis('off')
-    #plt.show()    
-
     def maps(i,j,k):
 
         return  (k%N)*N*N  +  (i%N)*N + j%N 
@@ -698,7 +621,6 @@ def get_3D(N):
 
     ind_extremes = [[kl,kr],[ku,kd],[ka,kb]]
 
-    #return {'i':np.array(i_mat),'j':np.array(j_mat),'kr':kr,'ku':ku,'kd':kd,'kl':kl,'ka':ka,'kb':kb,'normals':np.array(normals),'centroids':centroids}
     return {'i':np.array(i_mat),'j':np.array(j_mat),'ind_extremes':np.array(ind_extremes,dtype=int),'normals':np.array(normals),'centroids':centroids}
 
 def get_grid(N,dimension):
@@ -734,7 +656,7 @@ def cachable(func):
 
 
 def compose(func):
-    #A function that adds a vustom vjp to a solver
+    """It adds a custom vjp to func"""
 
     fdiff = custom_vjp(cachable(func))
 
@@ -744,7 +666,7 @@ def compose(func):
 
     def f_bwd(jac, v):
 
-     return (jnp.dot(v[0],jac),) #vJp
+     return (jnp.dot(v[0],jac),) 
 
     fdiff.defvjp(f_fwd, f_bwd)
 
@@ -800,35 +722,9 @@ def optimize(objective,**kwargs):
 
     x = guess(**kwargs)
     
-    #x = guess(model='staggered',save=False,phi=0.2,show=False,dim=dim)
-    #x = guess(model='random',save=False,show=False)
-    #np.array(x).dump('x')
-    #x = np.load('x',allow_pickle=True)
-    #x = guess(model='solid',save=False,show=False)
-
     #Launch simulations---
     return optimizer(x,objective,**kwargs)
 
-
-def load_projected_evolution(name):
-
-   name = os.getcwd() + '/' + name +'/bte'
-   output = []
-   with shelve.open(name, 'r') as shelf:
-     for key,value in shelf.items(): 
-        output.append(np.where(np.asarray(value[0])>0.5,1,0))
-
-   return output
-
-def load_evolution(name):
-
-   name = os.getcwd() + '/' + name +'/bte'
-   output = []
-   with shelve.open(name, 'r') as shelf:
-     for key,value in shelf.items(): 
-        output.append(value[0])
-
-   return output
 
 
 

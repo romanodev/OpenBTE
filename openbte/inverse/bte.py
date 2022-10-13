@@ -241,14 +241,15 @@ def bte(**options)->Callable:
      x0[n,:] = T_mat
      #flux = jnp.einsum('uc,ui->ci',T_mat.reshape(D.shape),sigma)
 
-    #return (kappa/f,T_mat.reshape((nq,n_elems))),jacobian/f
     return (kappa,1),jacobian
 
   func.total_call = 0
   return func
 
 def get_solver(**kwargs):
+    """Returns an AD BTE solver"""
 
     return mi.compose(bte(**kwargs))
+
 
 
