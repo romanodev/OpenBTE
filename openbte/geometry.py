@@ -1,6 +1,6 @@
 import numpy as np
 from shapely.geometry import Polygon,MultiPolygon 
-from openbte.objects import f64,Array,List,NamedTuple
+from openbte.objects import f64,Array,List,NamedTuple,i64
 from shapely.affinity import translate
 from shapely.ops import unary_union
 import os,subprocess
@@ -8,9 +8,9 @@ import os,subprocess
 
 def circle(area :f64 = 1.0 ,\
            x    :f64 = 0.0 ,
-           y    :f64 = 0.0)->Polygon:
+           y    :f64 = 0.0,\
+           Na   :i64 = 24)->Polygon:
 
-    Na   = 24
     dphi = 2.0*np.pi/Na
     r = np.sqrt(2.0*area/Na/np.sin(dphi))
     phase =  dphi/2 + (np.arange(Na)-1) * dphi
@@ -265,10 +265,92 @@ class Geometry(object):
 
      def write_geo(self,**kwargs):
  
-         if kwargs.setdefault('lz',0) == 0:
+         lz = kwargs.setdefault('lz',0) 
+         if lz == 0:
            strc = self.write_2D()
          else:  
-          strc = self.write_3D(**kwargs)
+           strc = self.write_3D(**kwargs)
+
+          #bottom,info = self.write_2D(-lz/2,write_overhead=False)
+
+          #top,info   = self.write_2D(lz/2,info=info)
+
+          #overhead = self.write_3D_overhead(info)
+
+          #strc = bottom + top + overhead
+
+         #Create mesh
+         #with open("mesh.geo", 'w+') as f:
+         #  f.write(strc)
+    
+         #with open(os.devnull, 'w') as devnull:
+         #  output = subprocess.check_output("gmsh -format msh2 -2 mesh.geo -o mesh.msh".split(), stderr=devnull)
+
+     def write_3D_overhead(self,info):
+
+         [n_points,n_lines,n_loops,n_surfaces] = info
+
+         half_line   = int(n_lines/2)
+         half_points = int(n_points/2)
+
+         strc = ''
+         #Build volume
+         for p1 in range(half_points):
+           p2 = p1 + half_points
+           strc += 'Line('+str(n_lines+1) +') = {' + str(p1+1) +','+ str(p2+1)+'};\n'
+           n_lines +=1
+
+         index = 0
+         #Build External Surface
+         for p,_ in enumerate(self.geometry.exterior.coords[:-1]) : 
+            line = p+1  
+
+            loop = [line,2*half_line+(line)%len(self.geometry.exterior.coords[:-1])+1,-(half_line+line),-(2*half_line+line)]
+            
+            strc += 'Line Loop(' + str(n_loops+1) + ') = {'
+            for n,l in enumerate(loop): 
+                strc += str(l)
+                strc += '};\n' if n == len(loop) -1 else  ','
+
+            strc += 'Plane Surface(' + str(n_surfaces+1) + ') = {'  + str(n_loops+1) + '};\n'   
+            n_surfaces +=1
+            n_loops +=1
+            
+         strc += 'Surface Loop (1) = {' + ','.join([str(i+1) for i in np.range(n_surfaces)]) +  '}\n;'
+
+         index = len(self.geometry.exterior.coords[:-1])
+         #Build Internal Surfaces
+         for h,hole in enumerate(self.geometry.interiors):
+
+           checkpoint = index   
+           for k,p in enumerate(hole.coords[:-1]):
+
+            index +=1
+            line = index
+            loop = [line,2*half_line+checkpoint + 1+  (k+1)%(len(hole.coords[:-1])),-(half_line+line),-(2*half_line+line)]
+            
+            strc += 'Line Loop(' + str(n_loops+1) + ') = {'
+            for n,l in enumerate(loop): 
+                strc += str(l)
+                strc += '};\n' if n == len(loop) -1 else  ','
+
+            strc += 'Plane Surface(' + str(n_surfaces+1) + ') = {'  + str(n_loops+1) + '};\n'   
+            n_surfaces +=1
+            n_loops +=1
+
+         #Build Volume
+         strc += 'Volume(' + str(1) + ') = {'  + ','.join([str(i+1) for i in range(n_surfaces)]) + '};\n'   
+
+
+         return strc  
+
+
+
+ 
+
+
+         #print(self.boundaries)       
+ 
 
 
      def write_3D(self,**kwargs):
@@ -325,6 +407,14 @@ class Geometry(object):
                 strc += '};\n' if n == len(hole.coords) - 2 else  ','
              n_loops +=1
 
+             #Inner Surfaces
+             if not self.regions[h] == 'dummy':
+                #Elementary entity 
+                strc += 'Plane Surface(' + str(n_surfaces+1) + ') = {'  + str(n_loops) + '};\n'   #this is the external one
+                n_surfaces +=1
+
+
+
          #Global surface
          strc += 'Plane Surface(' + str(n_surfaces+1) + ') = {' + str(checkpoint_loops + 1)
          for l in range(len(self.geometry.interiors)):
@@ -333,33 +423,50 @@ class Geometry(object):
          n_surfaces +=1
 
          #Perform extrusion--
-         strc += 'Extrude {0,0,' + str(lz)  + '} { Surface{1};}\n'
+         strc += 'Extrude {0,0,' + str(lz)  + '} { Surface{'
+         for s in range(n_surfaces):
+           strc += str(s+1)
+           if s <= n_surfaces-2:
+             strc += ','
+           else :  
+             strc +='};}\n'
 
          #Add physical volume
-         strc += 'Physical Volume("Bulk") = {1};\n'
+         #Perform extrusion--
+         strc += 'Physical Volume("Bulk") = {'
+         for s in range(n_surfaces):
+           strc += str(s+1)
+           if s <= n_surfaces-2:
+             strc += ','
+           else :  
+             strc +='};\n'
 
-         #Mapping to 3D
+         for h,hole in enumerate(self.geometry.interiors):
+             if not self.regions[h] == 'dummy':
+              strc += 'Physical Volume("' + self.regions[h] +   '") = {' + str(h+1) + "};\n"
+         #----------------------------
+
+         #Mapping to 3D-------
          n_interior =0
          for i in self.geometry.interiors:
              n_interior += len(i.coords)-1
          n_exterior = len(self.geometry.exterior.coords) - 1      
          #------------------------------
-         
-         def maps(i):
-             return 1 + 2*(n_exterior + n_interior ) +  abs(i)*4
 
+         def maps(i):
+             return 1 + 2*(n_exterior + n_interior) +  abs(i)*4
+
+         #---------------------
          #Maps boundaries from 2D to 3D
          for key,value in self.boundaries.items():
              self.boundaries[key] =  [maps(i) for i in value]
 
-
          #-----------
          if not kwargs.setdefault('is_periodic_along_z',False):
              #If not periodic the name of top and bottom boundaries must be supplied
-             self.boundaries.setdefault(kwargs['top_surface'],[]).append(maps(n_exterior+n_interior)+1)
-             self.boundaries.setdefault(kwargs['bottom_surface'],[]).append(1)
+             self.boundaries.setdefault(kwargs.setdefault('top_surface','Boundary'),[]).append(maps(n_exterior+n_interior)+1)
+             self.boundaries.setdefault(kwargs.setdefault('bottom_surface','Boundary'),[]).append(1)
          #-------------------
-
 
          #37-49 @1
          #45-73 @2
@@ -399,22 +506,22 @@ class Geometry(object):
              strc += r'''Physical Surface("''' + kwargs['name'] + r'''_b") = {''' + str(maps(n_exterior+n_interior)+1) + '};\n'
              strc += r'''Periodic Surface {''' + str(maps(n_exterior+n_interior)+1) + '} = {' + str(1) + '} Translate {0,0,' + str(lz) +  '};\n'
 
+
          #Create mesh
          with open("mesh.geo", 'w+') as f:
            f.write(strc)
     
          with open(os.devnull, 'w') as devnull:
-           output = subprocess.check_output("gmsh -format msh2 -3 mesh.geo -o mesh.msh".split(), stderr=devnull)
+          output = subprocess.check_output("gmsh -format msh2 -3 mesh.geo -o mesh.msh".split(), stderr=devnull)
+
+         return strc
 
 
+     def write_2D(self,z = 0,write_overhead=True,info=[0,0,0,0]):
 
-     def write_2D(self):
-
-         n_points = 0
-         n_lines  = 0
-         n_loops  = 0
-         n_surfaces  = 0
-         z = 0
+         #Main info---- 
+         [n_points,n_lines,n_loops,n_surfaces] = info
+         #--------------
 
          strc = ''
          strc +='h='+str(self.step) + ';\n'
@@ -462,12 +569,10 @@ class Geometry(object):
      
              #Inner Surfaces
              if not self.regions[h] == 'dummy':
-                #Elementary entity 
                 strc += 'Plane Surface(' + str(n_surfaces+1) + ') = {'  + str(n_loops) + '};\n'   #this is the external one
                 n_surfaces +=1
-
-                #Physical entity 
                 strc += r'''Physical Surface("''' + self.regions[h] + r'''") = {''' + str(n_surfaces) + '};\n'
+
                 
 
          #Global surface
@@ -477,15 +582,21 @@ class Geometry(object):
          strc += '};\n'  
          n_surfaces +=1
 
+
          strc += r'''Physical Surface("Bulk") = {''' + str(n_surfaces) + '};\n'
      
+         #for h,hole in enumerate(self.geometry.interiors):
+         #    if not self.regions[h] == 'dummy':
+                #Physical entity 
+
+
          #Boundary regions
          for name,sides in self.boundaries.items():
-           if len(sides) > 0:
-             strc += r'''Physical Line("''' + name + r'''") = {'''
-             for s,side in enumerate(sides):
-                 strc += str(side)
-                 strc += '};\n' if s == len(sides) -1 else  ','
+            if len(sides) > 0:
+              strc += r'''Physical Line("''' + name + r'''") = {'''
+              for s,side in enumerate(sides):
+                  strc += str(side)
+                  strc += '};\n' if s == len(sides) -1 else  ','
 
          #Periodic boundary
          for name,sides in self.periodic_sides.items():
@@ -512,13 +623,14 @@ class Geometry(object):
               strc += str(abs(side))
               strc += '};\n' if l == len(sides[1]) -1 else  ','
          
-
          #Create mesh
          with open("mesh.geo", 'w+') as f:
            f.write(strc)
     
          with open(os.devnull, 'w') as devnull:
            output = subprocess.check_output("gmsh -format msh2 -2 mesh.geo -o mesh.msh".split(), stderr=devnull)
+  
+         return strc
 
 
 

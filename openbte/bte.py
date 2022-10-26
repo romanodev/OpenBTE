@@ -29,6 +29,14 @@ def BTE_RTA(geo                               : Mesh,\
     #parse material data
     mfps = mat.mfps
     t_coeff = mat.t_coeff
+    n_mfp = mat.grid[0]
+    if len(mat.grid) == 3:
+        n_angles = mat.grid[1] * mat.grid[2]
+    else:    
+        n_angles = mat.grid[1] 
+
+
+    #----------
 
     if fourier == None:
         DeltaT = np.zeros(geo.n_elems)
@@ -51,7 +59,7 @@ def BTE_RTA(geo                               : Mesh,\
     G        = np.einsum('qj,nj->qn',mat.vmfp[:,:geo.dim],k_mat,optimize=True)
     Gp       = G.clip(min=0)
     Gm = G.clip(max=0)
-    D        = np.zeros((mat.n_angles,geo.n_elems))
+    D        = np.zeros((n_angles,geo.n_elems))
     np.add.at(D.T,i_mat,Gp.T)
  
     #Boundary--------------------------------------------
@@ -77,7 +85,7 @@ def BTE_RTA(geo                               : Mesh,\
     n_diffuse = len(i_diffuse)
 
     #---Thermalizing boundary----------------------
-    RHS_ISO  = np.zeros((mat.n_angles,geo.n_elems))
+    RHS_ISO  = np.zeros((n_angles,geo.n_elems))
     for key,contact in bcs.mixed.items():
         sides = geo.side_physical_regions[key]
         tmp   = geo.normal_areas[sides]/geo.elem_volumes[i[sides]][:,np.newaxis]
@@ -86,7 +94,7 @@ def BTE_RTA(geo                               : Mesh,\
         np.add.at(D.T,i[sides],tmp.clip(min=0).T)
 
     #---Periodic boundary----------------------
-    P  = np.zeros((mat.n_angles,geo.n_elems))
+    P  = np.zeros((n_angles,geo.n_elems))
     for region,jump in bcs.periodic.items():
 
         sides =  geo.periodic_sides[region]
@@ -102,7 +110,7 @@ def BTE_RTA(geo                               : Mesh,\
     if bcs.is_nanowire:
      P_nano = -mat.vmfp[:,2]
     else: 
-     P_nano = np.zeros(mat.n_angles)   
+     P_nano = np.zeros(n_angles)   
  
 
     #Total Perturbation--
@@ -147,7 +155,7 @@ def BTE_RTA(geo                               : Mesh,\
      sigma_normal = np.einsum('mli,ci->mlc',mat.sigma,geo.normal_areas[sides])
      side_areas = np.linalg.norm(geo.normal_areas[sides],axis=1)
      #--------------------------------
-    K = np.zeros((mat.n_mfp,mat.n_angles))
+    K = np.zeros((n_mfp,n_angles))
     S = np.zeros_like(K)
 
     if len(i_diffuse) > 0:
@@ -165,7 +173,7 @@ def BTE_RTA(geo                               : Mesh,\
         #Init cache
         cache_compute_lu = LRUCache(maxsize=1e3)
  
-        _,n_angles = mat.t_coeff.shape
+        #_,n_angles = mat.t_coeff.shape
 
         @cached(cache=cache_compute_lu)
         def compute_lu(n,m):
@@ -193,7 +201,7 @@ def BTE_RTA(geo                               : Mesh,\
          partial_J  = np.zeros_like(J)
          partial_K  = np.zeros_like(K)
          partial_S  = np.zeros_like(S)
-         
+        
          T = np.zeros(n_elems)
          for n in inds:  
            for m,mfp in enumerate(mfps):
@@ -247,7 +255,7 @@ def BTE_RTA(geo                               : Mesh,\
          d.print("Kappa (BTE): {:E}, Iterations {:n}, Error {:E}".format(np.sum(d['K']),n_iter,error))
          
 
-    sh = utils.run(target=core,n_tasks = (mat.n_angles,),shared_variables = {'TB':TB,\
+    sh = utils.run(target=core,n_tasks = (n_angles,),shared_variables = {    'TB':TB,\
                                                                              'J':J,\
                                                                              'DeltaT':DeltaT,\
                                                                              'S':S,\

@@ -1,13 +1,11 @@
 from jax import custom_vjp
 from sqlitedict import SqliteDict
-import nlopt
 import numpy as np
 import os
 import time
 import nlopt
 from functools import partial,update_wrapper
 import jax
-from jax import custom_jvp
 from jax import value_and_grad as value_and_grad
 from jax import  jit
 import scipy
@@ -18,9 +16,6 @@ import scipy.sparse.linalg as spla
 import scipy.sparse as sp
 import warnings
 import matplotlib.pylab as plt
-from pathlib import Path
-import json
-import os.path
 import matplotlib
 import warnings
 from functools import lru_cache
@@ -332,13 +327,13 @@ def plot(x,**options_plot_structure):
 
 def init_state(name,N,monitor,dim):
 
-   def remove_file(filename):
-       filepath = filename
-       if os.path.exists(filepath):
-         os.remove(filepath)
+   #def remove_file(filename):
+   #    filepath = filename
+   #    if os.path.exists(filepath):
+   #      os.remove(filepath)
 
    #init database---------
-   remove_file(name)
+   #remove_file(name)
    with SqliteDict(name,autocommit=True) as db:
         db['dim'] = dim
         db['x']   = []
@@ -349,15 +344,15 @@ def init_state(name,N,monitor,dim):
      ax   = fig.add_subplot(111)
      im = plot(np.ones(N*N),blocking=False,invert=True,replicate=True,unitcel=True,color_unitcell='c',headless=True)  
 
-    if dim == 3:
-      plt.ion()
-      ax   = fig.add_subplot(111, projection='3d')
-      init_plot_3D(ax,N)
+    #if dim == 3: #NOT YET IMPLEMENTED
+    #  plt.ion()
+    #  ax   = fig.add_subplot(111, projection='3d')
+    #  init_plot_3D(ax,N)
 
    def update(data):
        if monitor:
-        if dim == 3:
-         plot3D(data,ax,draw_cube=True)
+       # if dim == 3: #NOT YET IMPLEMENTED
+       #  plot3D(data,ax,draw_cube=True)
 
         if dim == 2:
          x = data.reshape((N,N)).T
@@ -366,7 +361,6 @@ def init_state(name,N,monitor,dim):
 
         plt.show()
         plt.pause(0.2)
-
 
    return update
 
@@ -394,10 +388,6 @@ def init_optimizer(x,objective,N,n_betas,tol,max_iter,maps_regular,update,name,f
       opt.set_lower_bounds(np.zeros(N))
       opt.set_upper_bounds(np.ones(N))
 
-
-      #Make this special for dumping
-      objective.objective=True
-      #----
       #Set up the mapping
       opt.set_min_objective(enhance_function(objective,maps,update,beta,name))
 
@@ -406,14 +396,12 @@ def init_optimizer(x,objective,N,n_betas,tol,max_iter,maps_regular,update,name,f
         inequality.objective=False
         opt.add_inequality_constraint(enhance_function(inequality,maps,update,beta,name),tol)
 
-      #Add commonly-used inequalities
       if 'min_porosity' in kwargs.keys():
           func = partial(min_porosity,phi=kwargs['min_porosity'],N=N)
           func.objective=False
           update_wrapper(func,min_porosity)
           opt.add_inequality_constraint(enhance_function(func,maps,update,beta,name),tol)
         
-      #Add commonly-used inequalities
       if 'max_porosity' in kwargs.keys():
           func = partial(max_porosity,phi=kwargs['max_porosity'],N=N)
           func.objective=False
@@ -701,11 +689,12 @@ def optimize(objective,**kwargs):
      transform            = jax.jit(partial(mapping_3D,conic_kernel=conic_kernel))
 
 
-    #-------------------------
-
-    #Get the updater
+    #Init state------
     update = init_state(name,grid,monitor,dim)
     #----------------
+
+
+
 
     #Init optimizer---------------------------------
     optimizer = partial(init_optimizer,N=N,n_betas=n_betas,tol=tol,max_iter=max_iter,\

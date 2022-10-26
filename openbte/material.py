@@ -1,73 +1,14 @@
 import numpy as np
 from openbte.objects import Material,MaterialRTA
 from icosphere import icosphere
+import openbte.utils as utils
 
-
-def compute_polar(mfp_bulk):
-     """Covert from real to angular space"""
-     phi_bulk = np.array([np.arctan2(m[0],m[1]) for m in mfp_bulk])
-     phi_bulk[np.where(phi_bulk < 0) ] = 2*np.pi + phi_bulk[np.where(phi_bulk <0)]
-     r = np.linalg.norm(mfp_bulk[:,:2],axis=1) #absolute values of the projection
-     return r,phi_bulk 
-
-def compute_spherical(mfp_bulk):
- """Covert from real to spherical space"""
- r = np.linalg.norm(mfp_bulk,axis=1) #absolute values of the projection
- phi_bulk = np.array([np.arctan2(m[0],m[1]) for m in mfp_bulk])
- phi_bulk[np.where(phi_bulk < 0) ] = 2*np.pi + phi_bulk[np.where(phi_bulk <0)]
- theta_bulk = np.array([np.arccos((m/r[k])[2]) for k,m in enumerate(mfp_bulk)])
-
- return r,phi_bulk,theta_bulk
-
-
-
-
-def fast_interpolation(fine,coarse,bound=False,scale='linear') :
-
- if scale == 'log':
-   fine    = np.log10(fine)
-   coarse  = np.log10(coarse)
- #--------------
-
- m2 = np.argmax(coarse >= fine[:,np.newaxis],axis=1)
- m1 = m2-1
- a2 = (fine-coarse[m1])/(coarse[m2]-coarse[m1])
- a1 = 1-a2
-
- if bound == 'periodic':
-  Delta = coarse[-1]-coarse[-2]  
-  a = np.where(m2==0)[0] #this can be either regions
-  m1[a] = len(coarse) -1
-  m2[a] = 0
-  fine[fine < Delta/2] += 2*np.pi 
-  a2[a] = (fine[a] - coarse[-1])/ Delta
-  a1 = 1-a2
-
-
- if bound == 'extent':
-
-   #Small values
-   al = np.where(fine<coarse[0])[0] 
-   m2[al] = 1; 
-   m1[al] = 0;
-   a2[al] = (fine[al]-coarse[0])/ (coarse[1]-coarse[0])
-   a1[al] = 1-a2[al]
-
-
-   #Large values
-   ar = np.where(fine>coarse[-1])[0]
-   m2[ar] = len(coarse)-1; 
-   m1[ar] = len(coarse)-2;
-   a2[ar] = (fine[ar]-coarse[-2])/ (coarse[-1]-coarse[-2])
-   a1[ar] = 1-a2[ar]
-
- return a1,a2,m1,m2
 
 def RTA3D(data : MaterialRTA,**kwargs)->Material:
 
     #Parse options
     n_phi   = kwargs.setdefault('n_phi',24)
-    n_mfp   = kwargs.setdefault('n_mfp',30)
+    n_mfp   = kwargs.setdefault('n_mfp',50)
     n_theta = kwargs.setdefault('n_theta',24)
     #----------------
 
@@ -103,7 +44,7 @@ def RTA3D(data : MaterialRTA,**kwargs)->Material:
     sigma = sigma[I]
     #------------------------
 
-    r_bulk,phi_bulk,theta_bulk = compute_spherical(mfp_bulk)
+    r_bulk,phi_bulk,theta_bulk = utils.compute_spherical(mfp_bulk)
 
     #Sampling
     mfp_max = np.max(r_bulk)*1.1
@@ -113,9 +54,9 @@ def RTA3D(data : MaterialRTA,**kwargs)->Material:
     Wdiag_sampled = np.zeros((n_mfp,n_angles))
     sigma_sampled = np.zeros((n_mfp,n_angles,3)) 
 
-    a1,a2,m1,m2 = fast_interpolation(r_bulk,mfp_sampled,bound='extent')
-    b1,b2,p1,p2 = fast_interpolation(phi_bulk,phi,bound='periodic')
-    c1,c2,t1,t2 = fast_interpolation(theta_bulk,theta,bound='extent')
+    a1,a2,m1,m2 = utils.fast_interpolation(r_bulk,mfp_sampled,bound='extent')
+    b1,b2,p1,p2 = utils.fast_interpolation(phi_bulk,phi,bound='periodic')
+    c1,c2,t1,t2 = utils.fast_interpolation(theta_bulk,theta,bound='extent')
 
     index_1 =  t1 * n_phi + p1; u1 = b1*c1
     index_2 =  t1 * n_phi + p2; u2 = b2*c1
@@ -148,7 +89,12 @@ def RTA3D(data : MaterialRTA,**kwargs)->Material:
     kappa_sampled = np.einsum('mqi,mq,mqj->ij',sigma_sampled,Wdiag_inv,sigma_sampled)
     t_coeff = Wdiag_sampled/np.sum(Wdiag_sampled)
 
-    return Material(kappa_sampled,sigma_sampled*1e-9,direction,t_coeff,mfp_sampled*1e9,n_angles,n_mfp,1e20)
+    #boundaru conductance
+    h = 2/3*np.sum(Wdiag*mfp_bulk[:,0].clip(min=0))*1e-18 #from W/m^2/K to W/m/m/K
+    #Heat source ratio
+    coeff = 1/np.sum(Wdiag)
+
+    return Material(kappa_sampled,sigma_sampled*1e-9,direction,t_coeff,mfp_sampled*1e9,(n_mfp,n_theta,n_phi),h,coeff)
 
 
 
@@ -174,7 +120,7 @@ def RTA2DSym(data : MaterialRTA,**kwargs)->Material:
     Wdiag    = data.heat_capacity*f
 
     #Convert into polar space
-    r_bulk,phi_bulk = compute_polar(mfp_bulk)
+    r_bulk,phi_bulk = utils.compute_polar(mfp_bulk)
 
     #Filtering small MFPs out (1e-10m)
     I = np.where(r_bulk>1e-9)
@@ -193,9 +139,9 @@ def RTA2DSym(data : MaterialRTA,**kwargs)->Material:
     Wdiag_sampled = np.zeros((n_mfp,n_phi))
     sigma_sampled = np.zeros((n_mfp,n_phi,2)) 
     #Interpolation in the MFPs
-    a1,a2,m1,m2 = fast_interpolation(r_bulk,mfp_sampled,bound='extent')
+    a1,a2,m1,m2 = utils.fast_interpolation(r_bulk,mfp_sampled,bound='extent')
     #Interpolation in phi---
-    b1,b2,p1,p2 = fast_interpolation(phi_bulk,phi,bound='periodic')
+    b1,b2,p1,p2 = utils.fast_interpolation(phi_bulk,phi,bound='periodic')
     
     np.add.at(Wdiag_sampled,(m1, p1),a1*b1*Wdiag)
     np.add.at(Wdiag_sampled,(m1, p2),a1*b2*Wdiag)
@@ -210,14 +156,12 @@ def RTA2DSym(data : MaterialRTA,**kwargs)->Material:
     #Compute kappa sample
     Wdiag_inv = np.divide(1, Wdiag_sampled, out=np.zeros_like(Wdiag_sampled), where=Wdiag_sampled!=0)
     kappa_sampled     = np.einsum('mqi,mq,mqj->ij',sigma_sampled,Wdiag_inv,sigma_sampled)
-    kappa_sampled_tot = np.einsum('mqi,mq,mqj->mqij',sigma_sampled,Wdiag_inv,sigma_sampled)
+    #kappa_sampled_tot = np.einsum('mqi,mq,mqj->mqij',sigma_sampled,Wdiag_inv,sigma_sampled)
     t_coeff = Wdiag_sampled/np.sum(Wdiag_sampled)
-
 
     #test--
     #kappa = np.einsum('u,u,u->',Wdiag,mfp_bulk[:,0].clip(min=0),mfp_bulk[:,0].clip(min=0))
     #kappa = np.einsum('u,u,u->',Wdiag,np.absolute(mfp_bulk[:,0]),np.absolute(mfp_bulk[:,0]))
-
 
     #Boundary resistance--
     h = 2/3*np.sum(Wdiag*mfp_bulk[:,0].clip(min=0))*1e-9 #from W/m^2/K to W/m/nm/K
@@ -225,7 +169,13 @@ def RTA2DSym(data : MaterialRTA,**kwargs)->Material:
     #Heat source ratio
     coeff = 1/np.sum(Wdiag)
 
-    return Material(kappa_sampled,sigma_sampled*1e-9,polar_ave,t_coeff,mfp_sampled*1e9,n_phi,n_mfp,h,coeff*1e18,kappa_sampled_tot)
+    return Material(kappa_sampled,\
+                    sigma_sampled*1e-9,\
+                    polar_ave,t_coeff,\
+                    mfp_sampled*1e9,\
+                    (n_mfp,n_phi),\
+                    h,\
+                    coeff)
 
 
 

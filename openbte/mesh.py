@@ -123,10 +123,10 @@ def get_mesh()->Mesh:
       for v in value:
           tmp[v].append(key)
     side_elem_map = np.ones((n_sides,2),dtype=int) 
+
     for key,values in tmp.items():
         side_elem_map[key] = np.array(values) #it broadcasts in case of boundary sides
-
-
+    
     #Bulk Physical regions
     elem_physical_regions = {}
     for n in bulk_tags:
@@ -190,7 +190,6 @@ def get_mesh()->Mesh:
     index = np.where(np.einsum('iu,ui->u',normal,c) < 0)[0]
     normal[:,index] = -normal[:,index]
     normal= normal.T
-
 
     normal_areas = np.einsum('si,s->si',normal,side_areas)
 

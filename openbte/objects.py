@@ -25,6 +25,7 @@ class SharedMemory:
     def keys(self):
 
         return self.sv.keys()
+
     def __setitem__(self,name,value):
 
         self.lock.acquire()
@@ -66,6 +67,15 @@ class SharedMemory:
          """Barrier"""
 
          self.barrier.wait()
+
+
+    def set(self,name,value):
+
+        self.sync()        
+        if current_process().name == 'process_0':
+                self[name][:] = value
+        self.sync()        
+
 
     def reduce(self,variables):
 
@@ -115,12 +125,87 @@ class EffectiveThermalConductivity(NamedTuple):
 
     normalization      : f64 = 0
 
-class BoundaryConditions(NamedTuple):
-    """
-    Represents an employee.
 
-    :param diffuse: The employee's ID number
-    """
+
+    def get_diffusive(self,T,geometry,boundary_conditions,thermal_conductivity):
+
+
+     bc   = boundary_conditions.get_bc_by_name(self.contact)
+     if bc == 'Mixed': 
+       sides =   geometry.side_physical_regions[self.contact]
+     else:  
+       sides =   geometry.periodic_sides[self.contact]
+
+
+     v_orth,_ =  geometry.get_decomposed_directions(thermal_conductivity[:geometry.dim,:geometry.dim])
+
+     #Calculate integarted flux
+     P = 0
+     for n,s in enumerate(sides):
+
+        T1 = T[geometry.side_elem_map[s][0]]
+
+        if bc == 'Mixed': 
+            T2   = boundary_conditions.mixed[self.contact]['value']
+            h    = boundary_conditions.mixed[self.contact]['boundary_conductance']
+            
+            tmp = v_orth[s] * h/(h + v_orth[s]/geometry.side_areas[s]) 
+
+        if bc == 'Periodic': 
+            T2   = T[geometry.side_elem_map[s][1]] + boundary_conditions.periodic[self.contact]
+
+            tmp = v_orth[s]
+
+        deltaT = T1 - T2
+
+        P += deltaT*tmp*self.normalization
+
+     return P
+
+    def get(self,T,geo,bcs,sigma,DeltaT):
+           """Compute the effective thermal conductivity at the diffusive level"""
+
+           #Nanowire 
+           if bcs.is_nanowire:
+
+              e1 = np.arange(geo.n_elems)
+              sigma_normal = sigma[2]*geo.elem_volumes
+           
+              partial_K = np.dot(T,sigma_normal)
+              partial_S = np.dot(T-d['DeltaT'],geo.elem_volumes)
+
+              return  partial_K,partial_S
+      
+           else:
+              bc   = bcs.get_bc_by_name(self.contact)
+
+              if bc == 'Dirichlet': 
+                 sides = geo.side_physical_regions[contact]
+                 side_areas = np.linalg.norm(geo.normal_areas[sides],axis=1)
+                 sigma_normal = np.einsum('i,ci->c',sigma,geo.normal_areas[sides])
+                 e1 = geo.side_elem_map[sides][:,0]
+                 partial_K  =  np.dot(T[e1],sigma_normal[m,n].clip(min=0))
+                 partial_K += bcs.dirichlet[contact]*np.sum(sigma_normal.clip(max=0))
+
+              else:   
+                 sides = geo.periodic_sides[self.contact]
+                 side_areas = np.linalg.norm(geo.normal_areas[sides],axis=1)
+                 sigma_normal = np.einsum('i,ci->c',sigma,geo.normal_areas[sides])
+                 e1 = geo.side_elem_map[sides][:,0]
+                 e2 = geo.side_elem_map[sides][:,1]
+                 partial_K   =  np.dot(T[e1]-DeltaT[e1],sigma_normal.clip(min=0))
+                 partial_K  +=  np.dot(T[e2]-DeltaT[e2],sigma_normal.clip(max=0))
+                 #partial_K  +=  bcs.periodic[self.contact]*np.sum(sigma_normal.clip(max=0))
+
+              partial_S   =  np.dot(T[e1]-DeltaT[e1],side_areas)*0.5
+              partial_S  +=  np.dot(T[e2]-DeltaT[e2],side_areas)*0.5
+
+              return partial_K*self.normalization,partial_S*self.normalization   
+
+    
+
+class BoundaryConditions(NamedTuple):
+    """Boundary Conditions"""
 
     diffuse      : str = ''
 
@@ -131,11 +216,6 @@ class BoundaryConditions(NamedTuple):
     is_nanowire  : bool = False
 
     def get_bc_by_name(self,name : str):
-      """
-        Returns whether the employee is an executive.
-
-        :param name: The employee's ID number
-      """
 
       if name in self.mixed.keys():
           return 'Mixed'
@@ -173,10 +253,19 @@ class Mesh(NamedTuple):
     elem_physical_regions: dict = {}
     side_physical_regions: dict = {}
 
-    def save(self,filename : str = 'state'):
+    def save(self,filename : str = 'mesh'):
       """Save data"""
 
       utils.save(filename,self._asdict())  
+
+    @classmethod
+    def load(cls,filename = 'mesh'):
+        """Load Mesh"""
+
+        results =  utils.load_readonly(filename)
+
+        return cls(**results)
+
 
     def find_elem(self,p,guess):
      """Find the element that belongs to a point"""
@@ -408,11 +497,9 @@ class Material(NamedTuple):
     vmfp                 :np.ndarray
     t_coeff              :np.ndarray
     mfps                 :np.ndarray
-    n_angles             :int
-    n_mfp                :int
+    grid                 :List
     h                    :float
     heat_source_coeff    :float
-    kappa_sampled        :np.ndarray
 
 class MaterialFull(NamedTuple):
 
@@ -430,6 +517,7 @@ class OpenBTEResults(NamedTuple):
     material      :Material
     mesh          :Mesh
     solvers       :dict = []
+    mat_mode      :MaterialRTA = None
 
     @classmethod
     def load(cls,filename = 'state'):
@@ -461,14 +549,16 @@ class OpenBTEResults(NamedTuple):
         """Plot over line"""
 
         #Get options--
-        N           = kwargs.setdefault('N',100)
+        #N           = kwargs.setdefault('N',100)
         direction   = kwargs.setdefault('direction','x')
         cut         = kwargs.setdefault('cut',0)
         repeat      = kwargs.setdefault('repeat',[1,1,1])
 
         variables   = kwargs['variables']
-        p1          = kwargs['p1']
-        p2          = kwargs['p2']
+        #p1          = kwargs['p1']
+        #p2          = kwargs['p2']
+        x          = kwargs['x']
+        N          = len(x)
 
         #Collect results variables--
         cell_variables = self.get_variables()
@@ -478,17 +568,15 @@ class OpenBTEResults(NamedTuple):
         node_variables = self.mesh.cell_to_node(cell_variables,nodes,elems)
 
         #adjust points 
-        delta = 1e-4
-        p1 = np.array(p1)
-        p2 = np.array(p2)
-        p1 = p1 + delta*(p2-p1)
-        p2 = p2 - delta*(p2-p1)
+        #delta = 1e-4
+        #p1 = np.array(p1)
+        #p2 = np.array(p2)
+        #p1 = p1 + delta*(p2-p1)
+        #p2 = p2 - delta*(p2-p1)
+        #x = p1[np.newaxis,:] + np.einsum('i,k->ki',(p2-p1),np.arange(N))/(N-1)
 
-        #Init output
-        x = p1[np.newaxis,:] + np.einsum('i,k->ki',(p2-p1),np.arange(N))/(N-1)
-
+        x = np.array(x) 
         output = {variable:[] for variable in variables}
-
         for v,variable in enumerate(variables):
             output[variable] = LinearNDInterpolator(nodes,node_variables[variable]['data'])(x[:,0],x[:,1])
 

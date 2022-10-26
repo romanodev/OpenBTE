@@ -8,16 +8,24 @@ from typing import Callable,Tuple
 import os
 from os.path import exists
 from jax import numpy as jnp
+import functools
 import scipy
 from scipy.ndimage import rotate
+import joblib
 
 
-def solver(LL,P,x0,callback = lambda x:x,verbose=False,maxiter=200,early_termination=False,tol=1e-4,inplace=True,filename = None):
+def solver(LL,P,x0,callback = lambda x:x,verbose=False,maxiter=200,early_termination=False,tol=1e-4,inplace=True,filename = None,MM=None):
   """A wrapper to GMRES solver. It allows to set an early termination criteria based on user-provided functions"""
 
   size = len(P)
   
   L   = spla.LinearOperator((size,size),lambda x:LL(x))
+
+  if not MM == None:
+   M   = spla.LinearOperator((size,size),lambda x:MM(x))
+  else:
+   M = None   
+
 
   values = callback(x0)
 
@@ -59,7 +67,7 @@ def solver(LL,P,x0,callback = lambda x:x,verbose=False,maxiter=200,early_termina
           tol_gmres = 1e-24 #so that it does not interface
       else:    
           tol_gmres = tol
-      out = scipy.sparse.linalg.lgmres(L,P,x0=x0,tol=tol_gmres,callback=callback_wrapper,maxiter=maxiter)
+      out = scipy.sparse.linalg.lgmres(L,P,x0=x0,tol=tol_gmres,callback=callback_wrapper,maxiter=maxiter,M=M)
 
   except Exception as err:
       print(err)
@@ -113,10 +121,12 @@ def run(target          : Callable, \
 
     from openbte.objects import SharedMemory
     import argparse
-
+    import sys
     parser = argparse.ArgumentParser()
     parser.add_argument('-np', help='Number of processors',default=multiprocessing.cpu_count())
-    n_process = int(parser.parse_args(args=[]).np)
+    n_process = int(parser.parse_args().np)
+    
+    print('n_process: ',n_process)
 
     #Init shared variables
     sh = SharedMemory(n_process)
@@ -194,4 +204,85 @@ def load(filename,source='database'):
     quit()
 
 
- return data       
+ return data      
+
+def fast_interpolation(fine,coarse,bound=False,scale='linear') :
+
+ if scale == 'log':
+   fine    = np.log10(fine)
+   coarse  = np.log10(coarse)
+ #--------------
+
+ m2 = np.argmax(coarse >= fine[:,np.newaxis],axis=1)
+ m1 = m2-1
+ a2 = (fine-coarse[m1])/(coarse[m2]-coarse[m1])
+ a1 = 1-a2
+
+ if bound == 'periodic':
+  Delta = coarse[-1]-coarse[-2]  
+  a = np.where(m2==0)[0] #this can be either regions
+  m1[a] = len(coarse) -1
+  m2[a] = 0
+  fine[fine < Delta/2] += 2*np.pi 
+  a2[a] = (fine[a] - coarse[-1])/ Delta
+  a1 = 1-a2
+
+ if bound == 'extent':
+
+   #Small values
+   al = np.where(fine<coarse[0])[0] 
+   m2[al] = 1; 
+   m1[al] = 0;
+   a2[al] = (fine[al]-coarse[0])/ (coarse[1]-coarse[0])
+   a1[al] = 1-a2[al]
+
+
+   #Large values
+   ar = np.where(fine>coarse[-1])[0]
+   m2[ar] = len(coarse)-1; 
+   m1[ar] = len(coarse)-2;
+   a2[ar] = (fine[ar]-coarse[-2])/ (coarse[-1]-coarse[-2])
+   a1[ar] = 1-a2[ar]
+
+ return a1,a2,m1,m2
+
+
+def compute_polar(mfp_bulk):
+     """Covert from real to angular space"""
+     phi_bulk = np.array([np.arctan2(m[0],m[1]) for m in mfp_bulk])
+     phi_bulk[np.where(phi_bulk < 0) ] = 2*np.pi + phi_bulk[np.where(phi_bulk <0)]
+     r = np.linalg.norm(mfp_bulk[:,:2],axis=1) #absolute values of the projection
+     return r,phi_bulk 
+
+def compute_spherical(mfp_bulk):
+ """Covert from real to spherical space"""
+ r = np.linalg.norm(mfp_bulk,axis=1) #absolute values of the projection
+ phi_bulk = np.array([np.arctan2(m[0],m[1]) for m in mfp_bulk])
+ phi_bulk[np.where(phi_bulk < 0) ] = 2*np.pi + phi_bulk[np.where(phi_bulk <0)]
+ theta_bulk = np.array([np.arccos((m/r[k])[2]) for k,m in enumerate(mfp_bulk)])
+
+ return r,phi_bulk,theta_bulk
+
+
+'''
+def cache(func):
+    """Simple cache"""
+    #from openbte import registry
+
+    @functools.wraps(func)
+    def wrapper_decorator(*args):
+        #---------
+        hash_obj = joblib.hash(args)
+
+        if not hasattr(func,'hashes'):
+           func.hashes  = {} 
+
+        if not hash_obj in func.hashes.keys():
+           value = func(*args)
+           func.hashes[hash_obj] = value
+        else:   
+           value = func.hashes[hash_obj] 
+        return value
+
+    return wrapper_decorator
+'''
