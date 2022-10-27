@@ -11,6 +11,12 @@ copyright = '2022, Giuseppe Romano'
 author = 'Giuseppe Romano'
 release = '0.1'
 
+
+import os
+import sys
+sys.path.insert(0, os.path.abspath('../openbte'))
+
+
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
