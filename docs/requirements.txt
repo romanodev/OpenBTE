@@ -9,4 +9,3 @@ nbsphinx
 sphinx-autorun
 sphinx-autodoc-typehints
 sphinxcontrib.bibtex
-openbte

@@ -16,14 +16,32 @@ OpenBTE reference documentation!
    example_2
    references
 
+.. toctree::
+   :maxdepth: 1
+   :caption: Material
+
+   moderesolved
+   almabte
+   mfp
+   
+.. toctree::
+   :maxdepth: 1
+   :caption: Geometry
+
+   gmsh
+   geometry
 
 .. toctree::
-   :maxdepth: 3
-   :caption: API documentation
-   
-   solvers
+   :maxdepth: 1
+   :caption: Boundary Conditions
 
+   boundary_conditions
 
+.. toctree::
+   :maxdepth: 1
+   :caption: Effective Thermal Conductivity
+
+   effective_kappa
 
 
 

@@ -263,7 +263,7 @@ class Geometry(object):
 
          return indices
 
-     def write_geo(self,**kwargs):
+     def save(self,**kwargs):
  
          lz = kwargs.setdefault('lz',0) 
          if lz == 0:
@@ -271,85 +271,6 @@ class Geometry(object):
          else:  
            strc = self.write_3D(**kwargs)
 
-          #bottom,info = self.write_2D(-lz/2,write_overhead=False)
-
-          #top,info   = self.write_2D(lz/2,info=info)
-
-          #overhead = self.write_3D_overhead(info)
-
-          #strc = bottom + top + overhead
-
-         #Create mesh
-         #with open("mesh.geo", 'w+') as f:
-         #  f.write(strc)
-    
-         #with open(os.devnull, 'w') as devnull:
-         #  output = subprocess.check_output("gmsh -format msh2 -2 mesh.geo -o mesh.msh".split(), stderr=devnull)
-
-     def write_3D_overhead(self,info):
-
-         [n_points,n_lines,n_loops,n_surfaces] = info
-
-         half_line   = int(n_lines/2)
-         half_points = int(n_points/2)
-
-         strc = ''
-         #Build volume
-         for p1 in range(half_points):
-           p2 = p1 + half_points
-           strc += 'Line('+str(n_lines+1) +') = {' + str(p1+1) +','+ str(p2+1)+'};\n'
-           n_lines +=1
-
-         index = 0
-         #Build External Surface
-         for p,_ in enumerate(self.geometry.exterior.coords[:-1]) : 
-            line = p+1  
-
-            loop = [line,2*half_line+(line)%len(self.geometry.exterior.coords[:-1])+1,-(half_line+line),-(2*half_line+line)]
-            
-            strc += 'Line Loop(' + str(n_loops+1) + ') = {'
-            for n,l in enumerate(loop): 
-                strc += str(l)
-                strc += '};\n' if n == len(loop) -1 else  ','
-
-            strc += 'Plane Surface(' + str(n_surfaces+1) + ') = {'  + str(n_loops+1) + '};\n'   
-            n_surfaces +=1
-            n_loops +=1
-            
-         strc += 'Surface Loop (1) = {' + ','.join([str(i+1) for i in np.range(n_surfaces)]) +  '}\n;'
-
-         index = len(self.geometry.exterior.coords[:-1])
-         #Build Internal Surfaces
-         for h,hole in enumerate(self.geometry.interiors):
-
-           checkpoint = index   
-           for k,p in enumerate(hole.coords[:-1]):
-
-            index +=1
-            line = index
-            loop = [line,2*half_line+checkpoint + 1+  (k+1)%(len(hole.coords[:-1])),-(half_line+line),-(2*half_line+line)]
-            
-            strc += 'Line Loop(' + str(n_loops+1) + ') = {'
-            for n,l in enumerate(loop): 
-                strc += str(l)
-                strc += '};\n' if n == len(loop) -1 else  ','
-
-            strc += 'Plane Surface(' + str(n_surfaces+1) + ') = {'  + str(n_loops+1) + '};\n'   
-            n_surfaces +=1
-            n_loops +=1
-
-         #Build Volume
-         strc += 'Volume(' + str(1) + ') = {'  + ','.join([str(i+1) for i in range(n_surfaces)]) + '};\n'   
-
-
-         return strc  
-
-
-
- 
-
-
-         #print(self.boundaries)       
  
 
 
