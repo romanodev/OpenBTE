@@ -64,7 +64,7 @@ At this point, we are ready to save the mesh on disk
 
 .. code-block:: python
 
-   G.write_geo()
+   G.save()
 
 If everything went smoothly, you should see ``mesh.geo`` in your current directory. You can open them with GMSH_ to check that the geometry has been created correctly. To create a meshed geometrym we use the function ``get_mesh()``
 

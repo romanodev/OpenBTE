@@ -418,6 +418,7 @@ def init_optimizer(x,objective,N,n_betas,tol,max_iter,maps_regular,update,name,f
 
       print(max_iter,beta)
       opt.set_maxeval(max_iter)
+      opt.set_ftol_rel(tol)
       x = opt.optimize(x)
 
     print(' ')

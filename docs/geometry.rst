@@ -32,7 +32,7 @@ which in this case creates a square frame with side of 10 nm, whis is the unit-c
 
   G.add_hole(rectangle(area = area,x=0,y=0))
 
-If no name of the hole is given, then it will be considered a void region and not included in the meshing. If a name if given, then it is included in the simulation domain and referred to it during the BTE solution, e.g. for heat sources. Finally, we have to define the boundary regions. This task entails selecting the boundary, through ``selector`` and associate a name to it. The following selelectors are available: ``outer``, ``inner``, ``all``, ``top``, ``bottom``, ``left`` and ``right``. In this case, we assign the name ``Boundary`` to all internal region, i.e. the wall of the pore.
+If no name of the hole is given, then it will be considered as a void region and not included in the meshing. If a name if given, then it is included in the simulation domain and referred to it during the BTE solution, e.g. for heat sources. Finally, we have to define the boundary regions. This task entails selecting the boundary, through ``selector`` and associate a name to it. The following selelectors are available: ``outer``, ``inner``, ``all``, ``top``, ``bottom``, ``left`` and ``right``. In this case, we assign the name ``Boundary`` to all internal region, i.e. the wall of the pore.
 
 .. code-block:: python
 
@@ -51,9 +51,9 @@ The region names ``Boundary``, ``Periodic_x`` and ``Periodic_y`` will be referre
 
 .. code-block:: python
 
-   G.write_geo()
+   G.save()
 
-To inspect your geometry, you can call gmsh from your command line
+To inspect your geometry, you can call ``gmsh`` from your command line
 
 .. code-block:: bash
 

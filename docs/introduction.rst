@@ -1,7 +1,7 @@
 Introduction
 ============
 
-OpenBTE is a Python-based tool for modeling particles flux at the nondiffusive level and in arbitrary geometries. Current focus is on thermal transport. The code implements the phonon Boltzmann transport equation, informed by first-principles calculations. A typical OpenBTE simulation is given by the combination of three main blocks: Mesh, Material and Solver. 
+OpenBTE is a Python-based tool for modeling particles flux at the nondiffusive level and in arbitrary geometries. Current focus is on thermal transport. The code implements the phonon Boltzmann transport equation, informed by first-principles calculations. Both forward and backward modes are supported, enabling inverse design using direct parameter optimization. A typical OpenBTE simulation is given by the combination of three main blocks: Mesh, Material and Solver. Both forward and backward modes are supported, enabling inverse design using direct parameter optimization.
 
 .. image:: _static/OpenBTEScheme.png
   :width: 600
@@ -13,9 +13,15 @@ When possible, OpenBTE automatically exploits parallelism using Python's `Multip
 
    python run.py -np 4
 
-Documentation is still WIP.
+Main features include:
 
-
+- Vectorial mean-free-path interpolation
+- Interface with first-principles solvers
+- Arbitrary geometries
+- Inverse design
+- Interactive temperature and flux maps visualization
+- Effective thermal conductivity
+- Outputting data in ``.vtu`` format for advanced visualization
 
 
 

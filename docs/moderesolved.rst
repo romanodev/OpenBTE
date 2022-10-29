@@ -8,13 +8,13 @@ The material underlying the structure is described by the following mode-resolve
 +===============================================+=================================+==================================+
 | ``scattering_time`` [:math:`\tau]`            |             :math:`N`           |        s                         |
 +-----------------------------------------------+---------------------------------+----------------------------------+
-| ``heat_capacity`` [:math:`C]`                 |             :math:`N`           |   Jm :math:`^{-3}`K :math:`^{-1}`|
+| ``heat_capacity`` [:math:`C]`                 |             :math:`N`           |  Jm :math:`^{-3}` K :math:`^{-1}`|
 +-----------------------------------------------+---------------------------------+----------------------------------+
 | ``group_velocity`` [:math:`\mathbf{v}`]       |             :math:`N\times 3`   |   ms :math:`^{-1}`               |
 +-----------------------------------------------+---------------------------------+----------------------------------+
 
-where :math:`N=N_q\times N_b`, with :math:`N_q` and :math:`N_b` being the number of wave-vectors and polarization, respectively. The bulk thermal conductivity tensor is given by 
 
+where :math:`N=N_q\times N_b`, with :math:`N_q` and :math:`N_b` being the number of wave-vectors and polarization, respectively. The bulk thermal conductivity tensor is given by 
 
 .. math::
 
@@ -36,11 +36,39 @@ The material data is stored as a ``sqlite3`` database (with `.db` extension), wh
 
   rta_data = load_rta('foo',source='local')
 
-The above code is nothing than a wrapper to the ``sqlite3``'s loader. Note that there is also a minimal database of precomputed materials. Currently, it includes silicon at room temperature computed by `AlmaBTE <https://almabte.bitbucket.io/>`_.
+The above code is nothing than a wrapper to the ``sqlite3``'s loader. Note that there is also a minimal database of precomputed materials. Currently, it includes silicon at room temperature, computed with `AlmaBTE <https://almabte.bitbucket.io/>`_.
 
 .. code-block:: python
 
   from openbte import load_rta
 
   rta_data = load_rta('Si_rta',source='database')
+
+To save your own material data, you can also use a wrapper
+
+.. code-block:: python
+
+  import openbte.utils
+
+  #C = ...
+  #v   = ...
+  #tau = ...
+
+  utils.save('rta',{'scattering_time':tau,'heat_capacity':C,'group_velocity':v}
+
+You can double-check the consistency of your data by comparing the resulting thermal conductivity with the expected one
+
+.. code-block:: python
+
+  import numpy as np
+  #C = ...
+  #v   = ...
+  #tau = ...
+  #kappa = ... #Expected thermal conductivity tensor
+
+  print(np.allclose(np.einsum('u,ui,uj,u->ij',C,v,v,tau)-kappa))
+
+  
+
+
 

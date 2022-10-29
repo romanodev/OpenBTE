@@ -9,7 +9,7 @@ The object ``BoundaryConditions`` connects the physical boundaries defined in ``
 
    boundary_conditions = BoundaryConditions(periodic={'Periodic_x': 1,'Periodic_y':0},diffuse='Boundary')
 
-The mixed boundary conditions include a thermostatting boundaries and a boundary conductance [in Wm :math:`^-{2}` K :math:`^{-1}`]
+The mixed boundary conditions include a thermostatting boundaries and a boundary conductance [in Wm :math:`^{-2}` K :math:`^{-1}`]
 
 
 .. code-block:: Python

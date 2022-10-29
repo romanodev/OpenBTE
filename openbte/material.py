@@ -35,6 +35,10 @@ def RTA3D(data : MaterialRTA,**kwargs)->Material:
     f        = np.divide(np.ones_like(tau),tau, out=np.zeros_like(tau), where=tau!=0)
     Wdiag    = data.heat_capacity*f
 
+    #Wdiag    = data.gamma
+    #mfp_bulk = data.vMFP
+    #sigma    = np.einsum('u,ui->ui',Wdiag,mfp_bulk)
+
 
     #Filtering--
     r_bulk = np.linalg.norm(mfp_bulk,axis=1)
@@ -119,6 +123,11 @@ def RTA2DSym(data : MaterialRTA,**kwargs)->Material:
     f        = np.divide(np.ones_like(tau),tau, out=np.zeros_like(tau), where=tau!=0)
     Wdiag    = data.heat_capacity*f
 
+    #Wdiag    = data.gamma
+    #mfp_bulk = data.vMFP
+    #sigma    = np.einsum('u,ui->ui',Wdiag,mfp_bulk[:,:2])
+    #quit()
+
     #Convert into polar space
     r_bulk,phi_bulk = utils.compute_polar(mfp_bulk)
 
@@ -176,7 +185,6 @@ def RTA2DSym(data : MaterialRTA,**kwargs)->Material:
                     (n_mfp,n_phi),\
                     h,\
                     coeff)
-
 
 
 def Gray3DEqui(**kwargs):

@@ -1,7 +1,7 @@
 Gmsh
 ==========
 
-OpenBTE uses Gmsh `Gmsh <https://gmsh.info/>`_  as a backend for geometry building. Once the file ``mesh.msh`` is created, it can be imported with
+OpenBTE uses `Gmsh <https://gmsh.info/>`_  as a backend for geometry building. Once the file ``mesh.msh`` is created, it can be imported with
 
 .. code-block:: python
 

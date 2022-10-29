@@ -43,6 +43,30 @@ OpenBTE reference documentation!
 
    effective_kappa
 
+.. toctree::
+   :maxdepth: 1
+   :caption: the BTE Solver
+
+   solver
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Plotting and Postprocessing
+
+   plotting
+   line
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Inverse Design
+
+   inverse
+
+      
+
+
+
+
 
 
 

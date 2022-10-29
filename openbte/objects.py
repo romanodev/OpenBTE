@@ -105,16 +105,19 @@ class SharedMemory:
              with  open(filename, "a")  as f:
                 f.write(str(value) + "\n")
 
-
-
 class MaterialRTA(NamedTuple):
 
-    heat_capacity         : np.array
-    scattering_time       : np.array
-    group_velocity        : np.array
-    frequency             : np.array
-    thermal_conductivity  : np.array
+    #heat_capacity         : np.array
+    #scattering_time       : np.array
+    #group_velocity        : np.array
+    #frequency             : np.array = []
+    #thermal_conductivity  : np.array = []
 
+    gamma                 : np.array
+    vMFP                  : np.array
+    #group_velocity        : np.array
+    #frequency             : np.array = []
+    #thermal_conductivity  : np.array = []
 
 class EffectiveThermalConductivity(NamedTuple):
     """
