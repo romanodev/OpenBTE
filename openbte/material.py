@@ -15,8 +15,8 @@ def RTA3D(data : MaterialRTA,**kwargs)->Material:
     n_angles = n_phi * n_theta
     #Angular discretization
     Dphi = 2.0*np.pi/n_phi
-    #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
-    phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
+    phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+    #phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
     Dtheta = np.pi/n_theta
     theta = np.linspace(Dtheta/2,np.pi-Dtheta/2,n_theta,endpoint=True)
     #theta = np.linspace(0,np.pi,n_theta,endpoint=True)
@@ -111,9 +111,12 @@ def RTA2DSym(data : MaterialRTA,**kwargs)->Material:
 
     #Polar angle---
     Dphi = 2*np.pi/n_phi
+    factor = np.sinc(Dphi/2/np.pi)
+    
     #phi = np.linspace(Dphi/2,2.0*np.pi-Dphi/2,n_phi,endpoint=True)
     phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
-    polar_ave = np.array([np.sin(phi),np.cos(phi)]).T
+
+    polar_ave = np.array([np.sin(phi),np.cos(phi)]).T#*factor
     #----------------
 
     #Build mode-resolved quantities
@@ -123,21 +126,18 @@ def RTA2DSym(data : MaterialRTA,**kwargs)->Material:
     f        = np.divide(np.ones_like(tau),tau, out=np.zeros_like(tau), where=tau!=0)
     Wdiag    = data.heat_capacity*f
 
-    #Wdiag    = data.gamma
-    #mfp_bulk = data.vMFP
-    #sigma    = np.einsum('u,ui->ui',Wdiag,mfp_bulk[:,:2])
-    #quit()
-
     #Convert into polar space
     r_bulk,phi_bulk = utils.compute_polar(mfp_bulk)
 
     #Filtering small MFPs out (1e-10m)
-    I = np.where(r_bulk>1e-9)
+    I = np.where(r_bulk>1e-10)
     r_bulk = r_bulk[I]
     mfp_bulk = mfp_bulk[I]
     phi_bulk = phi_bulk[I]
     Wdiag = Wdiag[I]
     sigma = sigma[I]
+
+    #utils.save('aux',{'gamma':Wdiag,'vMPF':mfp_bulk})
 
     #Sampling
     mfp_max     = kwargs.setdefault('mfp_max',np.max(r_bulk)*1.1)
@@ -148,10 +148,10 @@ def RTA2DSym(data : MaterialRTA,**kwargs)->Material:
     Wdiag_sampled = np.zeros((n_mfp,n_phi))
     sigma_sampled = np.zeros((n_mfp,n_phi,2)) 
     #Interpolation in the MFPs
-    a1,a2,m1,m2 = utils.fast_interpolation(r_bulk,mfp_sampled,bound='extent')
+    a1,a2,m1,m2 = utils.fast_interpolation(r_bulk,mfp_sampled,bound='extent',scale='log')
     #Interpolation in phi---
     b1,b2,p1,p2 = utils.fast_interpolation(phi_bulk,phi,bound='periodic')
-    
+   
     np.add.at(Wdiag_sampled,(m1, p1),a1*b1*Wdiag)
     np.add.at(Wdiag_sampled,(m1, p2),a1*b2*Wdiag)
     np.add.at(Wdiag_sampled,(m2, p1),a2*b1*Wdiag)
@@ -177,6 +177,7 @@ def RTA2DSym(data : MaterialRTA,**kwargs)->Material:
 
     #Heat source ratio
     coeff = 1/np.sum(Wdiag)
+
 
     return Material(kappa_sampled,\
                     sigma_sampled*1e-9,\
@@ -214,20 +215,22 @@ def Gray3DEqui(**kwargs):
 
 def Gray2D(**kwargs):
 
-    n_phi = kwargs.setdefault('n_phi',48)
+    n_phi = kwargs.setdefault('n_phi',96)
     MFP   = kwargs['MFP'] #in nm
     Dphi = 2*np.pi/n_phi
-    phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
-    #phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
-
+    #phi = np.linspace(Dphi/2.0,2.0*np.pi-Dphi/2.0,n_phi,endpoint=True)
+    phi = np.linspace(0,2.0*np.pi,n_phi,endpoint=False)
 
     polar = np.array([np.sin(phi),np.cos(phi)]).T
+
     fphi= np.sinc(Dphi/2.0/np.pi)
     polar_ave = polar#*fphi
+    polar_ave = np.round(polar_ave,4)
     kappa = kwargs.setdefault('kappa',1)*np.eye(2)
 
     sigma = np.zeros((1,n_phi,2))
     sigma[0] =2*kappa[0,0]/MFP * polar_ave/n_phi
+
 
     n_angles = n_phi
     mfps = np.array([MFP])
@@ -240,7 +243,8 @@ def Gray2D(**kwargs):
     #Heat source coeff
     heat_source_coeff = MFP*MFP*0.5/kappa[0,0] 
 
-    return Material(kappa,sigma,polar_ave,t_coeff,mfps,n_angles,1,h,heat_source_coeff)
+    return Material(kappa,sigma,polar_ave,t_coeff,mfps,(1,n_angles),h,heat_source_coeff)
+
 
 def Gray3D(**kwargs):
 

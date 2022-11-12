@@ -51,12 +51,12 @@ def get_periodicity(nodes,lines,dim) :
                    return np.absolute(v)
 
 
-def get_mesh()->Mesh:
+def get_mesh(filename='mesh')->Mesh:
     """Build mesh with gmsh"""
 
     #Dimension
     #Import mesh
-    with open('mesh.msh', 'r') as f: lines = f.readlines()
+    with open(filename + '.msh', 'r') as f: lines = f.readlines()
     #Physical surfaces--
     lines = [l.split()  for l in lines]
     nb = int(lines[4][0])
@@ -313,7 +313,9 @@ def get_mesh()->Mesh:
              ind2 = list(elem_side_map[e2]).index(s)
              diff_dist[e2,ind2] =  -dists[s]
             else:
-             diff_dist[e1,ind1] = dists[s]
+                
+             #diff_dist[e1,ind1] = dists[s]
+             diff_dist[e1,ind1] = side_centroids[s] - elem_centroids[e1] 
 
     gradient_weights = np.linalg.pinv(diff_dist)
 

@@ -112,11 +112,10 @@ def Fourier(geometry                       : Mesh,\
      if modified_fourier:
       F += sp.eye(geometry.n_elems,format='csc')
      else:   
-      if not effective_thermal_conductivity == None:
-       #Fix a point for stability
-       scale = np.ones(geometry.n_elems); scale[N] = 0
-       F.data = F.data * scale[F.indices]
-       F[N,N] = 1
+         if len(boundary_conditions.mixed) == 0:
+           scale = np.ones(geometry.n_elems); scale[N] = 0
+           F.data = F.data * scale[F.indices]
+           F[N,N] = 1
        #-----------------------------
 
      lu = linalg.splu(F)
@@ -139,6 +138,7 @@ def Fourier(geometry                       : Mesh,\
     if modified_fourier:
        B += global_temperature
     else:   
+      if len(boundary_conditions.mixed) == 0:
        B[N] = 0
     #-----------------------
 
@@ -150,10 +150,11 @@ def Fourier(geometry                       : Mesh,\
 
         n_iter +=1
         T        = lu.solve(B+C)
+
         #Normalized T 
-        if (not effective_thermal_conductivity == None) and (not modified_fourier == True):
-         T -= (max(T) + min(T))*0.5
-        
+        if len(boundary_conditions.mixed) == 0 and not modified_fourier:
+           T -= (max(T) + min(T))*0.5
+
         gradient = geometry.gradient(boundary_conditions,T)
        
         #Nonorthogonal contribution (only on internal sides)
@@ -180,7 +181,7 @@ def Fourier(geometry                       : Mesh,\
 
     J = -np.einsum('ij,cj->ci',thermal_conductivity,gradient)
 
-    variables = {'Temperature_Fourier':{'data':T,'units':'K'},'Flux_Fourier':{'data':J,'units':'W/m/m'}}
+    variables = {'Temperature_Fourier':{'data':T,'units':'K'},'Flux_Fourier':{'data':J*1e8,'units':'W/m/m'}}
     return SolverResults(kappa_eff = kappa_eff,variables=variables)
 
 

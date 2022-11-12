@@ -5,7 +5,9 @@ Line data can be plotted with
 
 .. code-block:: python
 
-   path = np.linaspace(-0.5,0.5,100)
+   N = 100
+
+   path = np.stack((np.zeros(N),np.linspace(-0.5,0.5,N))).T
 
    x,data = results.plot_over_line(variables=['Temperature_Fourier','Temperature_BTE','Flux_fourier','Flux_BTE'],x=path)
 

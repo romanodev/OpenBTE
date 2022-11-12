@@ -12,6 +12,74 @@ import functools
 import scipy
 from scipy.ndimage import rotate
 import joblib
+import subprocess,os
+
+def _regularize(phi):
+
+    phi[phi<0]       += 2*np.pi
+    phi[phi>2*np.pi] -= 2*np.pi
+
+    return phi
+
+def _n(phi):
+
+   a = np.sin(phi)
+   b = np.sin(phi)
+   if phi.ndim == 1:
+    return np.stack((np.sin(phi),np.cos(phi))).T
+   else:
+    return np.swapaxes(np.stack((np.sin(phi),np.cos(phi))).T,0,1)
+
+
+def generate_mesh_2D(filename='mesh'):
+    """Generate 2D mesh"""
+
+    with open(os.devnull, 'w') as devnull:
+          output = subprocess.check_output(("gmsh -format msh2 -2 " + filename + ".geo -o " + filename + ".msh").split(), stderr=devnull)
+
+
+def split(S,B,normalize=True):
+
+    phi_B   = _regularize(np.arctan2(B[:,0],B[:,1]))
+    phi_S   = _regularize(np.arctan2(S[...,0],S[...,1]))
+    Dphi    = phi_S[...,1]-phi_S[...,0]
+    if Dphi.ndim == 1:
+        Dphi = Dphi[0]
+
+    #Compute magnitude---------------
+    mag_s = np.linalg.norm(S,axis=-1)
+    mag_B = np.linalg.norm(B,axis=-1)
+    mag   = np.einsum('...,k->...k',mag_s,mag_B)
+    #---------------------------------
+
+    delta = 1e-4
+
+    DeltaPhi = _regularize(phi_S[...,np.newaxis] - phi_B[np.newaxis,:])
+
+    #This does a rotation automatically
+    ap = np.einsum('...,...i,ki->...k',mag_s,_n(phi_S + Dphi/2 - np.pi/2),B)
+    am = np.einsum('...,...i,ki->...k',mag_s,_n(phi_S - Dphi/2 - np.pi/2),B)
+    a  = ap-am
+    gp = a.clip(min=0)
+    gm = a.clip(max=0)
+
+    #Correction at n + np.pi/2
+    r  = np.logical_and(DeltaPhi >= np.pi/2-Dphi/2+delta,DeltaPhi <= np.pi/2 + Dphi/2-delta)
+    gp[r.nonzero()] =  (mag  - am)[r.nonzero()]
+    gm[r.nonzero()] =  (ap   - mag)[r.nonzero()]
+
+    #Correction at n - np.pi/2
+    r  = np.logical_and(DeltaPhi >= 3*np.pi/2-Dphi/2+delta,DeltaPhi <= 3*np.pi/2 + Dphi/2-delta)
+    gp[r.nonzero()] =   (ap  + mag)[r.nonzero()]
+    gm[r.nonzero()] =  -(mag + am)[r.nonzero()]
+
+    factor = 1/Dphi if normalize else 1
+
+
+    return gm*factor,\
+           gp*factor
+
+    
 
 
 def solver(LL,P,x0,callback = lambda x:x,verbose=False,maxiter=200,early_termination=False,tol=1e-4,inplace=True,filename = None,MM=None):
@@ -124,8 +192,8 @@ def run(target          : Callable, \
     import sys
     parser = argparse.ArgumentParser()
     parser.add_argument('-np', help='Number of processors',default=multiprocessing.cpu_count())
-    n_process = int(parser.parse_args().np)
-    
+    args = parser.parse_args("")
+    n_process = int(args.np)
     print('n_process: ',n_process)
 
     #Init shared variables
@@ -203,10 +271,10 @@ def load(filename,source='database'):
     print('{} does not exist'.format(full_name))
     quit()
 
-
  return data      
 
 def fast_interpolation(fine,coarse,bound=False,scale='linear') :
+ """Vectorized Interpolation"""
 
  if scale == 'log':
    fine    = np.log10(fine)

@@ -3,7 +3,8 @@ from shapely.geometry import Polygon,MultiPolygon
 from openbte.objects import f64,Array,List,NamedTuple,i64
 from shapely.affinity import translate
 from shapely.ops import unary_union
-import os,subprocess
+import openbte.utils as utils
+#import os,subprocess
 
 
 def circle(area :f64 = 1.0 ,\
@@ -431,14 +432,14 @@ class Geometry(object):
          #Create mesh
          with open("mesh.geo", 'w+') as f:
            f.write(strc)
-    
+   
          with open(os.devnull, 'w') as devnull:
           output = subprocess.check_output("gmsh -format msh2 -3 mesh.geo -o mesh.msh".split(), stderr=devnull)
 
          return strc
 
 
-     def write_2D(self,z = 0,write_overhead=True,info=[0,0,0,0]):
+     def write_2D(self,z = 0,write_overhead=True,info=[0,0,0,0],filename='mesh'):
 
          #Main info---- 
          [n_points,n_lines,n_loops,n_surfaces] = info
@@ -545,11 +546,10 @@ class Geometry(object):
               strc += '};\n' if l == len(sides[1]) -1 else  ','
          
          #Create mesh
-         with open("mesh.geo", 'w+') as f:
+         with open(filename + ".geo", 'w+') as f:
            f.write(strc)
-    
-         with open(os.devnull, 'w') as devnull:
-           output = subprocess.check_output("gmsh -format msh2 -2 mesh.geo -o mesh.msh".split(), stderr=devnull)
+   
+         utils.generate_mesh_2D(filename)
   
          return strc
 

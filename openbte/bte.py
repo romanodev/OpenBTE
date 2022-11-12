@@ -14,8 +14,8 @@ import numpy as np
 import time
 from nptyping import NDArray, Shape, Float, Int
 
-set_start_method('fork',force=True)
 
+set_start_method('fork',force=True)
 def BTE_RTA(geo                               : Mesh,\
             mat                               : Material,\
             bcs                               : BoundaryConditions,\
@@ -24,7 +24,7 @@ def BTE_RTA(geo                               : Mesh,\
             heat_source                       : HeatSource = None,\
             direct                            : bool  = True,\
             bte_max_iter                      : Int   = 100,\
-            bte_rtol                          : Float = 1e-5)->SolverResults:
+            bte_rtol                          : Float = 1e-4)->SolverResults:
 
     #parse material data
     mfps = mat.mfps
@@ -34,7 +34,6 @@ def BTE_RTA(geo                               : Mesh,\
         n_angles = mat.grid[1] * mat.grid[2]
     else:    
         n_angles = mat.grid[1] 
-
 
     #----------
 
@@ -70,16 +69,19 @@ def BTE_RTA(geo                               : Mesh,\
      s_diffuse = geo.side_physical_regions[bcs.diffuse] #Side of the diffuse boundary
      i_diffuse  = i[s_diffuse] 
      db      = geo.normal_areas[s_diffuse]/geo.elem_volumes[i_diffuse][:,np.newaxis]
+
      Gb      = np.einsum('mqj,sj->mqs',mat.sigma[:,:,:geo.dim],db,optimize=True)
-     Gbp2    = Gb.clip(min=0)
-     tmp     = Gb.clip(max=0).sum(axis=0).sum(axis=0) #Diffuse scattering
+     Gbp     = Gb.clip(min=0)
+     Gbm     = Gb.clip(max=0)
+     tmp     = Gbm.sum(axis=0).sum(axis=0) #Diffuse scattering
      R       = np.divide(1, tmp, out=np.zeros_like(tmp), where=tmp!=0)
+     GG      = np.einsum('mqs,s->mqs',Gbp,R)
+
+     #Tranpsport--
      tmp     = np.einsum('rj,nj->rn',mat.vmfp[:,:geo.dim],db,optimize=True)  
      Gbp2    = tmp.clip(min=0); 
-     Gbm2 = tmp.clip(max=0)
+     Gbm2    = tmp.clip(max=0)
      np.add.at(D.T,i_diffuse,Gbp2.T)
-     Gbp = np.einsum('mqj,sj->mqs',mat.sigma[:,:,:geo.dim],db,optimize=True).clip(min=0)
-     GG = np.einsum('mqs,s->mqs',Gbp,R)
     else: 
      i_diffuse = np.empty(0)
     n_diffuse = len(i_diffuse)
@@ -98,11 +100,12 @@ def BTE_RTA(geo                               : Mesh,\
     for region,jump in bcs.periodic.items():
 
         sides =  geo.periodic_sides[region]
+
         tmp   =  geo.normal_areas[sides]/geo.elem_volumes[i[sides]][:,np.newaxis]
         tmp   =  np.einsum('rj,nj->rn',mat.vmfp,tmp,optimize=True)  
         np.add.at(P.T,i[sides],-(tmp.clip(max=0)*jump).T)
 
-        tmp   =  -geo.normal_areas[sides]/geo.elem_volumes[j[sides]][:,np.newaxis]
+        tmp   = -geo.normal_areas[sides]/geo.elem_volumes[j[sides]][:,np.newaxis]
         tmp   =  np.einsum('rj,nj->rn',mat.vmfp,tmp,optimize=True)  
         np.add.at(P.T,j[sides],(tmp.clip(max=0)*jump).T)
 
@@ -112,7 +115,6 @@ def BTE_RTA(geo                               : Mesh,\
     else: 
      P_nano = np.zeros(n_angles)   
  
-
     #Total Perturbation--
     perturbation = P + RHS_ISO + P_nano[:,np.newaxis]
     #--------------------
@@ -162,6 +164,7 @@ def BTE_RTA(geo                               : Mesh,\
      TB     = DeltaT[i_diffuse]
     else: 
      TB =   np.empty(0)   
+
     J = np.zeros((geo.n_elems,mat.vmfp.shape[1]))
 
     #Options
@@ -201,7 +204,6 @@ def BTE_RTA(geo                               : Mesh,\
          partial_J  = np.zeros_like(J)
          partial_K  = np.zeros_like(K)
          partial_S  = np.zeros_like(S)
-        
          T = np.zeros(n_elems)
          for n in inds:  
            for m,mfp in enumerate(mfps):
@@ -226,7 +228,7 @@ def BTE_RTA(geo                               : Mesh,\
                   np.add.at(partial_TB,np.arange(n_diffuse),-T[i_diffuse]*GG[m,n])
 
                  #Contribute to Flux
-                 partial_J += np.einsum('c,j->cj',T,mat.sigma[m,n])
+                 partial_J += np.einsum('c,j->cj',T-d['DeltaT'],mat.sigma[m,n])
 
                  if not effective_thermal_conductivity == None:
                   #Compute kappa_mode
@@ -264,9 +266,8 @@ def BTE_RTA(geo                               : Mesh,\
 
     kappa_eff = np.sum(sh['K'])
 
-    variables = {'Temperature_BTE':{'data':sh['DeltaT'],'units':'K'},'Flux_BTE':{'data':sh['J'],'units':'W/m/m'}}
-
-    #variables.update({'Vorticity_BTE':{'data':geo.vorticity(bcs,sh['J']),'units':'W/m/m/m'}})
+    variables = {'Temperature_BTE':{'data':sh['DeltaT'],'units':'K'},'Flux_BTE':{'data':sh['J']*1e9,'units':'W/m/m'}}
+        
 
     return SolverResults(kappa_eff = kappa_eff,variables=variables,aux = {'suppression':sh['S']})
                    

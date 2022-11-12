@@ -7,7 +7,7 @@ import numpy as np
 import time
 from sqlitedict import SqliteDict
 from openbte import utils
-from scipy.interpolate import LinearNDInterpolator
+from scipy.interpolate import LinearNDInterpolator,griddata,interp2d
 import plotly.graph_objs as go
 
 f64   = np.float64
@@ -62,6 +62,12 @@ class SharedMemory:
           return variable['data'].value
        else:
           return np.frombuffer(variable['data'].get_obj(),dtype=variable['dtype']).reshape(variable['shape'])
+
+
+    def get_waits(self):
+
+         self.print(self.barrier.wait())
+
 
     def sync(self):
          """Barrier"""
@@ -165,10 +171,10 @@ class EffectiveThermalConductivity(NamedTuple):
 
      return P
 
+
     def get(self,T,geo,bcs,sigma,DeltaT):
            """Compute the effective thermal conductivity at the diffusive level"""
-
-           #Nanowire 
+           #Nanowire
            if bcs.is_nanowire:
 
               e1 = np.arange(geo.n_elems)
@@ -182,26 +188,30 @@ class EffectiveThermalConductivity(NamedTuple):
            else:
               bc   = bcs.get_bc_by_name(self.contact)
 
-              if bc == 'Dirichlet': 
-                 sides = geo.side_physical_regions[contact]
+              if bc == 'Mixed': 
+                 sides = geo.side_physical_regions[self.contact]
                  side_areas = np.linalg.norm(geo.normal_areas[sides],axis=1)
                  sigma_normal = np.einsum('i,ci->c',sigma,geo.normal_areas[sides])
                  e1 = geo.side_elem_map[sides][:,0]
-                 partial_K  =  np.dot(T[e1],sigma_normal[m,n].clip(min=0))
-                 partial_K += bcs.dirichlet[contact]*np.sum(sigma_normal.clip(max=0))
+                 partial_K  =  np.dot(T[e1],sigma_normal.clip(min=0))
+                 partial_K += bcs.mixed[self.contact]['value']*np.sum(sigma_normal.clip(max=0))
 
               else:   
                  sides = geo.periodic_sides[self.contact]
                  side_areas = np.linalg.norm(geo.normal_areas[sides],axis=1)
                  sigma_normal = np.einsum('i,ci->c',sigma,geo.normal_areas[sides])
+                 sm = sigma_normal.clip(max=0)
+                 sp = sigma_normal.clip(min=0)
+
                  e1 = geo.side_elem_map[sides][:,0]
                  e2 = geo.side_elem_map[sides][:,1]
-                 partial_K   =  np.dot(T[e1]-DeltaT[e1],sigma_normal.clip(min=0))
-                 partial_K  +=  np.dot(T[e2]-DeltaT[e2],sigma_normal.clip(max=0))
+                 partial_K   =  np.dot(T[e1]-DeltaT[e1],sp)
+                 partial_K  +=  np.dot(T[e2]-DeltaT[e2],sm)
                  #partial_K  +=  bcs.periodic[self.contact]*np.sum(sigma_normal.clip(max=0))
+                 #partial_K   =  np.dot(T[e1]-DeltaT[e1],sigma_normal)
 
-              partial_S   =  np.dot(T[e1]-DeltaT[e1],side_areas)*0.5
-              partial_S  +=  np.dot(T[e2]-DeltaT[e2],side_areas)*0.5
+
+              partial_S   =  np.dot(T[e1]-DeltaT[e1],side_areas)
 
               return partial_K*self.normalization,partial_S*self.normalization   
 
@@ -218,6 +228,7 @@ class BoundaryConditions(NamedTuple):
 
     is_nanowire  : bool = False
 
+    
     def get_bc_by_name(self,name : str):
 
       if name in self.mixed.keys():
@@ -329,11 +340,6 @@ class Mesh(NamedTuple):
             diff_data[i,ind1] =   delta
             diff_data[j,ind2] =  -delta
 
-            #A[i,i,ind1] =  -1
-            #A[i,j,ind1] =   1
-            #A[j,i,ind2] =   1
-            #A[j,j,ind2] =  -1
-
      #B = np.zeros((self.n_elems,len(self.elems[0])))   
      #Periodic boundaries
      if jump:
@@ -353,7 +359,6 @@ class Mesh(NamedTuple):
 
      #t = np.einsum('kls,l->ks',A,variable)
      #print(np.allclose(t,diff_data))
-     #quit()
 
      #C = np.einsum('kjs,ks->kj',self.gradient_weights,B)
 
@@ -362,11 +367,8 @@ class Mesh(NamedTuple):
      #gradient = np.einsum('kjl,l->kj',T,variable) + C
 
 
-     gradient =  np.array([np.einsum('js,s->j',self.gradient_weights[k],dt) for k,dt in enumerate(diff_data)])
 
      #print(np.allclose(gradient,gradient2))
-
-
 
      #Let's attempt to build a matrix--
 
@@ -390,12 +392,15 @@ class Mesh(NamedTuple):
      #print(np.max(diff_data))
      #quit()
      #Dirichlet boundaries
-     #for key,value in bcs.dirichlet.items():
-     #   for s in mesh.side_physical_regions[key]: 
-     #     i = mesh.side_elem_map[s][0]  #i is the element
-     #     delta = value - variable[i]
-     #     ind    = list(mesh.elem_side_map[i]).index(s)
-     #     diff_data[i,ind] =  delta
+     for key,value in bcs.mixed.items():
+         for s in self.side_physical_regions[key]: 
+          i = self.side_elem_map[s][0]  #i is the element
+          delta = value['value'] - variable[i]
+          ind    = list(self.elem_side_map[i]).index(s)
+          diff_data[i,ind] =  delta
+
+
+     gradient =  np.array([np.einsum('js,s->j',self.gradient_weights[k],dt) for k,dt in enumerate(diff_data)])
 
      return gradient
 
@@ -471,9 +476,8 @@ class Mesh(NamedTuple):
         for k,elem in enumerate(elems):
          conn[elem] +=1
          for key,value in node_variables.items():
-          value['data'][elem[0]] += cell_variables[key]['data'][k]
-          value['data'][elem[1]] += cell_variables[key]['data'][k]
-          value['data'][elem[2]] += cell_variables[key]['data'][k]
+          for i in elem:
+           value['data'][i] += cell_variables[key]['data'][k]
 
         #Normalization
         for key,value in node_variables.items():
@@ -549,19 +553,15 @@ class OpenBTEResults(NamedTuple):
 
 
     def plot_over_line(self,**kwargs):
-        """Plot over line"""
+        """Plot over a line"""
 
         #Get options--
-        #N           = kwargs.setdefault('N',100)
         direction   = kwargs.setdefault('direction','x')
-        cut         = kwargs.setdefault('cut',0)
         repeat      = kwargs.setdefault('repeat',[1,1,1])
 
         variables   = kwargs['variables']
-        #p1          = kwargs['p1']
-        #p2          = kwargs['p2']
-        x          = kwargs['x']
-        N          = len(x)
+        x           = np.array(kwargs['x'])
+        N           = len(x)
 
         #Collect results variables--
         cell_variables = self.get_variables()
@@ -570,18 +570,9 @@ class OpenBTEResults(NamedTuple):
 
         node_variables = self.mesh.cell_to_node(cell_variables,nodes,elems)
 
-        #adjust points 
-        #delta = 1e-4
-        #p1 = np.array(p1)
-        #p2 = np.array(p2)
-        #p1 = p1 + delta*(p2-p1)
-        #p2 = p2 - delta*(p2-p1)
-        #x = p1[np.newaxis,:] + np.einsum('i,k->ki',(p2-p1),np.arange(N))/(N-1)
-
-        x = np.array(x) 
         output = {variable:[] for variable in variables}
         for v,variable in enumerate(variables):
-            output[variable] = LinearNDInterpolator(nodes,node_variables[variable]['data'])(x[:,0],x[:,1])
+            output[variable] = griddata(nodes,node_variables[variable]['data'],x)
 
         #Compute x    
         linear_x = np.zeros(N)
@@ -656,6 +647,7 @@ class OpenBTEResults(NamedTuple):
        for n,(key, value) in enumerate(variables.items()):
 
         name = key + '[' + value['units'] + ']'
+
         if value['data'].ndim == 1: #scalar
              strc +='SCALARS ' + name + ' double\n'
              strc +='LOOKUP_TABLE default\n'
