@@ -11,7 +11,7 @@ from jax import numpy as jnp
 import functools
 import scipy
 from scipy.ndimage import rotate
-import joblib
+#import joblib
 import subprocess,os
 
 def _regularize(phi):

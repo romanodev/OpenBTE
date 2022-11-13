@@ -269,7 +269,7 @@ def BTE_RTA(geo                               : Mesh,\
     variables = {'Temperature_BTE':{'data':sh['DeltaT'],'units':'K'},'Flux_BTE':{'data':sh['J']*1e9,'units':'W/m/m'}}
         
 
-    return SolverResults(kappa_eff = kappa_eff,variables=variables,aux = {'suppression':sh['S']})
+    return SolverResults(kappa_eff = kappa_eff,variables=variables,aux = {'suppression':sh['S'],'kappa_eff':kappa_eff})
                    
 
 
