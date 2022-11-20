@@ -181,7 +181,7 @@ def Fourier(geometry                       : Mesh,\
 
     J = -np.einsum('ij,cj->ci',thermal_conductivity,gradient)
 
-    variables = {'Temperature_Fourier':{'data':T,'units':'K'},'Flux_Fourier':{'data':J*1e8,'units':'W/m/m'}}
+    variables = {'Temperature_Fourier':{'data':T,'units':'K'},'Flux_Fourier':{'data':J*1e9,'units':'W/m/m'}}
     return SolverResults(kappa_eff = kappa_eff,variables=variables)
 
 

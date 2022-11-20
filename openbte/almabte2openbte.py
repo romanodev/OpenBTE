@@ -28,8 +28,7 @@ def almabte2openbte():
  f     = np.divide(np.ones_like(tau),tau, out=np.zeros_like(tau), where=tau!=0)
  #gamma = C*f
  #vMFP  = np.einsum('ki,k->ki',v,tau)
- 
- data  = {'vMFP':vMFP,'gamma':gamma}
+ #data  = {'vMFP':vMFP,'gamma':gamma}
 
  data = {'heat_capacity':C,\
          'scattering_time':tau,\

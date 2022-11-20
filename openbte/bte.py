@@ -218,8 +218,7 @@ def BTE_RTA(geo                               : Mesh,\
                   T  =  compute_lu(n,m).solve(B)
                  else:
                   T  = solve_iterative(n,m,B,T)
-
-
+                
                  #Contribute to DeltaT
                  partial_T += t_coeff[m,n]*T
 

@@ -22,7 +22,7 @@ Assuming you have ``AlmaBTE`` in your current ``PATH``, this an example for ``Si
    </singlecrystal>" > inputfile.xml
 
    VCAbuilder inputfile.xml
-   phononinfo Si/Si_8_8_8.h5 300.0
+   phononinfo -f Si/Si_8_8_8.h5 300.0
 
 - A file named ``Si_8_8_8_300K.phononinfo`` is in your current directory. Note that you can specify the temperature. Here we choose 300 K. The file ``rta.db`` can then be created with
 

@@ -13,6 +13,7 @@ import scipy
 from scipy.ndimage import rotate
 #import joblib
 import subprocess,os
+import __main__ as main
 
 def _regularize(phi):
 
@@ -192,7 +193,11 @@ def run(target          : Callable, \
     import sys
     parser = argparse.ArgumentParser()
     parser.add_argument('-np', help='Number of processors',default=multiprocessing.cpu_count())
-    args = parser.parse_args("")
+    if not hasattr(main, '__file__'):
+     args = parser.parse_args(args='')
+    else: 
+     args = parser.parse_args()
+
     n_process = int(args.np)
     print('n_process: ',n_process)
 

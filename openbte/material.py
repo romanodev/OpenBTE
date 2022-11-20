@@ -148,7 +148,7 @@ def RTA2DSym(data : MaterialRTA,**kwargs)->Material:
     Wdiag_sampled = np.zeros((n_mfp,n_phi))
     sigma_sampled = np.zeros((n_mfp,n_phi,2)) 
     #Interpolation in the MFPs
-    a1,a2,m1,m2 = utils.fast_interpolation(r_bulk,mfp_sampled,bound='extent',scale='log')
+    a1,a2,m1,m2 = utils.fast_interpolation(r_bulk,mfp_sampled,bound='extent',scale='linear')
     #Interpolation in phi---
     b1,b2,p1,p2 = utils.fast_interpolation(phi_bulk,phi,bound='periodic')
    
@@ -168,9 +168,10 @@ def RTA2DSym(data : MaterialRTA,**kwargs)->Material:
     #kappa_sampled_tot = np.einsum('mqi,mq,mqj->mqij',sigma_sampled,Wdiag_inv,sigma_sampled)
     t_coeff = Wdiag_sampled/np.sum(Wdiag_sampled)
 
+     
     #test--
-    #kappa = np.einsum('u,u,u->',Wdiag,mfp_bulk[:,0].clip(min=0),mfp_bulk[:,0].clip(min=0))
-    #kappa = np.einsum('u,u,u->',Wdiag,np.absolute(mfp_bulk[:,0]),np.absolute(mfp_bulk[:,0]))
+    #kappa = np.einsum('u,u,u->',Wdiag,mfp_bulk[:,0],mfp_bulk[:,0])
+
 
     #Boundary resistance--
     h = 2/3*np.sum(Wdiag*mfp_bulk[:,0].clip(min=0))*1e-9 #from W/m^2/K to W/m/nm/K
