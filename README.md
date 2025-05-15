@@ -13,7 +13,7 @@ OpenBTE computes mode-resolved phonon transport using the Boltzmann transport eq
 - Diffuse, isothermal, and periodic boundary conditions.
 - Efficient discretization based on the vectorial phonon mean-free-paths (MFP)
 - The full anisotropy of the phonon dispersion is retained, as opposed to commonly used isotropization.
-- GPU-Accelerated Differentiable phonon transport simulations based on JAX (added in 2022)
+- GPU-Accelerated differentiable phonon transport simulations based on JAX (added in 2022)
 - Inverse design capabilities
 
 Developed by Giuseppe Romano (romanog@mit.edu).
