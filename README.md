@@ -7,10 +7,16 @@
 [![Open in Colab (Inverse Design)](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1DluLzUBbXKNz6K14R1gErOi17u9W_CLu?usp=sharing)
 [![Python](https://img.shields.io/pypi/pyversions/openbte)](https://www.python.org/)
 
-OpenBTE solves transport at the nondiffusive level. Current focus is phonon transport. 
+OpenBTE computes mode-resolved phonon transport using the Boltzmann transport equations. Main features include:
+
+- Interfaced with first-principles solvers (e.g. AlmaBTE)
+- Diffuse, isothermal, and periodic boundary conditions.
+- Efficient discretization based on the vectorial phonon mean-free-paths (MFP)
+- The full anisotropy of the phonon dispersion is retained, as opposed to commonly used isotropization.
+- GPU-Accelerated Differentiable phonon transport simulations based on JAX (added in 2022)
+- Inverse design capabilities
 
 Developed by Giuseppe Romano (romanog@mit.edu).
-
 
 Coming soon: Steady-state BTE using the full scattering operator [Link](https://arxiv.org/abs/2002.08940). You can provide your own scattering operator (only upper diagonal) and perform space-dependent simulations.
 
